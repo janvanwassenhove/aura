@@ -1,0 +1,190 @@
+version: "3.9"
+
+services:
+  robot-runtime:
+    image: aura/robot-runtime:dev
+    build:
+      context: ../..
+      dockerfile: services/robot-runtime/Dockerfile
+    ports:
+      - "8001:8001"
+    environment:
+      - ROBOT_ADAPTER=${ROBOT_ADAPTER:-fake}
+      - IDLE_INTERVAL_SECONDS=${IDLE_INTERVAL_SECONDS:-4}
+      - EVENT_BUS_HOST=0.0.0.0
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:5173}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+
+  conversation-runtime:
+    image: aura/conversation-runtime:dev
+    build:
+      context: ../..
+      dockerfile: services/conversation-runtime/Dockerfile
+    ports:
+      - "8002:8002"
+    environment:
+      - STT_PROVIDER=${STT_PROVIDER:-local_whisper}
+      - TTS_PROVIDER=${TTS_PROVIDER:-kokoro}
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:5173}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4o}
+      - LOCAL_WHISPER_MODEL=${LOCAL_WHISPER_MODEL:-tiny}
+      - LOCAL_TTS_BACKEND=${LOCAL_TTS_BACKEND:-kokoro}
+      - MAX_CONTEXT_TURNS=${MAX_CONTEXT_TURNS:-10}
+      - MEMORY_SERVICE_URL=http://memory-service:8005
+    depends_on:
+      - memory-service
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8002/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+
+  orchestrator:
+    image: aura/orchestrator:dev
+    build:
+      context: ../..
+      dockerfile: services/orchestrator/Dockerfile
+    ports:
+      - "8003:8003"
+    environment:
+      - LLM_PROVIDER=${LLM_PROVIDER:-openai}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4o}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
+      - OPENROUTER_MODEL=${OPENROUTER_MODEL:-openai/gpt-oss-120b:free}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - GEMINI_MODEL=${GEMINI_MODEL:-gemini-2.5-flash}
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:5173}
+      - MAX_CONTEXT_TURNS=${MAX_CONTEXT_TURNS:-10}
+      - APPROVAL_TIMEOUT_SECONDS=${APPROVAL_TIMEOUT_SECONDS:-30}
+      - ACTIVE_PERSONA=${ACTIVE_PERSONA:-work}
+      - CONVERSATION_RUNTIME_URL=http://conversation-runtime:8002
+      - CONNECTOR_SERVICE_URL=http://connector-service:8004
+      - MEMORY_SERVICE_URL=http://memory-service:8005
+      - ROBOT_RUNTIME_URL=http://robot-runtime:8001
+      - IDENTITY_SERVICE_URL=http://identity-service:8006
+    depends_on:
+      - conversation-runtime
+      - connector-service
+      - memory-service
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8003/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    restart: unless-stopped
+
+  connector-service:
+    image: aura/connector-service:dev
+    build:
+      context: ../..
+      dockerfile: services/connector-service/Dockerfile
+    ports:
+      - "8004:8004"
+    environment:
+      - M365_CONNECTOR=${M365_CONNECTOR:-mock}
+      - ENABLED_CONNECTORS=${ENABLED_CONNECTORS:-m365}
+      # Azure / M365 credentials (required when M365_CONNECTOR=workiq)
+      - AZURE_CLIENT_ID=${AZURE_CLIENT_ID:-}
+      - AZURE_CLIENT_SECRET=${AZURE_CLIENT_SECRET:-}
+      - AZURE_TENANT_ID=${AZURE_TENANT_ID:-}
+      - AZURE_SP_ID=${AZURE_SP_ID:-ea9ffc3e-8a23-4a7d-836d-234d7c7565c1}
+      # Per-user access token supplied by identity-service at runtime
+      - M365_USER_ACCESS_TOKEN=${M365_USER_ACCESS_TOKEN:-}
+      - IDENTITY_SERVICE_URL=http://identity-service:8006
+      # Keyring passphrase for headless/Docker token storage
+      - KEYRING_PASSPHRASE=${KEYRING_PASSPHRASE:-}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8004/connector/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+
+  memory-service:
+    image: aura/memory-service:dev
+    build:
+      context: ../..
+      dockerfile: services/memory-service/Dockerfile
+    ports:
+      - "8005:8005"
+    environment:
+      - MEMORY_STORE=${MEMORY_STORE:-sqlite}
+      - SQLITE_PATH=/data/aura.db
+      - SESSION_RETENTION_DAYS=${SESSION_RETENTION_DAYS:-30}
+      - REMINDER_CHECK_INTERVAL=${REMINDER_CHECK_INTERVAL:-10}
+    volumes:
+      - aura-data:/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8005/memory/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+
+  identity-service:
+    image: aura/identity-service:dev
+    build:
+      context: ../..
+      dockerfile: services/identity-service/Dockerfile
+    ports:
+      - "8006:8006"
+    environment:
+      - ACTIVE_PERSONA=${ACTIVE_PERSONA:-work}
+      - PORT=8006
+      - CORS_ORIGINS=*
+      # Microsoft — required for Device Code + OBO flows
+      - AZURE_CLIENT_ID=${AZURE_CLIENT_ID:-}
+      - AZURE_TENANT_ID=${AZURE_TENANT_ID:-}
+      - AZURE_CLIENT_SECRET=${AZURE_CLIENT_SECRET:-}
+      # Google — path inside the container to the client secrets JSON
+      - GOOGLE_CLIENT_SECRETS_FILE=${GOOGLE_CLIENT_SECRETS_FILE:-}
+      # Keyring backend: "keyring" (OS native) or "cryptfile" (Docker-safe encrypted file)
+      - KEYRING_BACKEND=${KEYRING_BACKEND:-cryptfile}
+      - KEYRING_PASSPHRASE=${KEYRING_PASSPHRASE:-}
+    volumes:
+      # Persist encrypted keyring file across container restarts
+      - identity-keyring:/data/keyring
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8006/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+
+  operator-console:
+    image: aura/operator-console:dev
+    build:
+      context: ../../apps/operator-console
+      dockerfile: Dockerfile
+
+      args:
+        - VITE_ORCHESTRATOR_URL=http://localhost:8003
+        - VITE_ROBOT_RUNTIME_WS=ws://localhost:8001/ws/events
+        - VITE_ORCHESTRATOR_WS=ws://localhost:8003/ws/events
+        - VITE_IDENTITY_URL=http://localhost:8006
+        - VITE_CONNECTOR_URL=http://localhost:8004
+    ports:
+      - "5173:5173"
+    depends_on:
+      - orchestrator
+    restart: unless-stopped
+
+volumes:
+  aura-data:
+    driver: local
+  identity-keyring:
+    driver: local

@@ -1,0 +1,15 @@
+[project]
+name = "voice-latency-spike"
+version = "0.0.0"
+description = "Phase 0 throwaway spike — measure streaming voice round-trip latency"
+requires-python = ">=3.11"
+dependencies = [
+    "openai>=1.40",
+]
+
+# Audio mode (mic + speaker + barge-in) also needs:
+#   uv add sounddevice numpy
+# Text mode needs neither.
+
+[tool.uv]
+package = false

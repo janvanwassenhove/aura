@@ -1,0 +1,4 @@
+source:
+  repo: janvanwassenhove/CognitiveHub
+  version: latest
+provider: github-copilot

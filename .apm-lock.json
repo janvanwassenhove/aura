@@ -1,0 +1,740 @@
+{
+  "version": "3.2.0",
+  "source": "janvanwassenhove/CognitiveHub",
+  "provider": "github-copilot",
+  "installed": "2026-05-09T08:34:24Z",
+  "files": [
+    {
+      "path": ".github/agents/analysis-agent.agent.md",
+      "sha256": "c4c790e97f407c91a4ad52e270d8fadfb47f58b38fece7180de623b7af8f9df2"
+    },
+    {
+      "path": ".github/agents/architecture-governance.agent.md",
+      "sha256": "a9d43dc3788b87f87a7d25a5f9bb3545e8d3bf91f4475f6231b6cb4cd96b8e0e"
+    },
+    {
+      "path": ".github/agents/bmad-orchestrator.agent.md",
+      "sha256": "dcf4b5744ad3c20b2f6522c281c3f6abb31d21940a0abf7cf7403634290e234e"
+    },
+    {
+      "path": ".github/agents/bug-fixer.agent.md",
+      "sha256": "a6351985b69e58a813aa28f555712773a43b617f8d25960841bc05bd4db8f6d9"
+    },
+    {
+      "path": ".github/agents/implementer.agent.md",
+      "sha256": "08f58b6e42cd6c6fd07e3e8e20d5afc22aa120c29c08354c0e586c2e0b16b40f"
+    },
+    {
+      "path": ".github/agents/mity-blog-writer.agent.md",
+      "sha256": "7cca78ea073f03761d5fdb8bd322737e75944a95723cb0f1d1aac4c627a7eecc"
+    },
+    {
+      "path": ".github/agents/modernization-agent.agent.md",
+      "sha256": "d3923e6b6293a6fe29b162748f7e267500206459453bde1dc0bf675c0486ca6a"
+    },
+    {
+      "path": ".github/agents/modernization-orchestrator.agent.md",
+      "sha256": "60e8dc632f5595588027618b78e2bcebea7e15d92066b725f51dde296abfb503"
+    },
+    {
+      "path": ".github/agents/quality-validator.agent.md",
+      "sha256": "9bfabc588b58d056f0c6ae41866282a5bbdd488e26e2299f6d3fc3e1d3d45561"
+    },
+    {
+      "path": ".github/agents/security-quality-assessor.agent.md",
+      "sha256": "ad2342efe25b2cf91f4d05e704ca781a26be946253339b217142644df19e6e78"
+    },
+    {
+      "path": ".github/agents/spec-orchestrator.agent.md",
+      "sha256": "a8092bdae85a7c68adb372ff0efd34d90ba914044aad0a19968e07a784913817"
+    },
+    {
+      "path": ".github/agents/workflow-orchestrator.agent.md",
+      "sha256": "68d98306ae8841682c10a0f76fe7d6aab6a26b3a2dd8ccbd32f2fedc038bfef4"
+    },
+    {
+      "path": ".github/prompts/api-extension.prompt.md",
+      "sha256": "8fefd4ea90597c3e2573d7fb1398ea54377ef1b1a88644f656d8420353438803"
+    },
+    {
+      "path": ".github/prompts/architecture-review.prompt.md",
+      "sha256": "9b0a3c798733debc5f2185940b473b329cf01419868de72d12a75da40cb0907a"
+    },
+    {
+      "path": ".github/prompts/brownfield-kickoff.prompt.md",
+      "sha256": "87915a055f20e7738d66c19172c70bbf6088d24a4b62d9fe39b267738fcbdf32"
+    },
+    {
+      "path": ".github/prompts/greenfield-kickoff.prompt.md",
+      "sha256": "80722f67dbac5fcb743bb965bbd9d780dd3ef1b2d460f051a34c96c4d1829ac5"
+    },
+    {
+      "path": ".github/prompts/modernization.prompt.md",
+      "sha256": "2c467679da9810f8a8c319dff9c3d2d7aa40786fc6b91107ea2598173162c3de"
+    },
+    {
+      "path": ".github/prompts/release-readiness.prompt.md",
+      "sha256": "852f988cc1ddd70ab71eda0e65d73be696f7511dddebcdff75a160a4948df9b8"
+    },
+    {
+      "path": ".github/prompts/workflow-bmad.prompt.md",
+      "sha256": "08b7883d04240d8789788b87b4717db7119f6dcca6a606e246bd0f9a360692f3"
+    },
+    {
+      "path": ".github/prompts/workflow-bug-fixing.prompt.md",
+      "sha256": "10481449ff000f6a6c147bfc18efcbef5a186f6cf7a62017f79d1f7e9e934750"
+    },
+    {
+      "path": ".github/prompts/workflow-compliance-check.prompt.md",
+      "sha256": "49cc75f4b90bed27c6e3921d8988a549ec83a53e09ab79674c731e4eda3bf3c0"
+    },
+    {
+      "path": ".github/prompts/workflow-delivery-retrospective.prompt.md",
+      "sha256": "3e41c76d2e89f008313019e5610c795598993a51ed48256ab1119751aabca0fc"
+    },
+    {
+      "path": ".github/prompts/workflow-feature.prompt.md",
+      "sha256": "fc49bcdccd49b726691fd576f4b2bce19cd957dc0a3966d12ea276d2ee89746c"
+    },
+    {
+      "path": ".github/prompts/workflow-idea-to-spec.prompt.md",
+      "sha256": "fb616629f559c74c310e48920341caeebeafc99b1b25ef34da3b7252684d78a1"
+    },
+    {
+      "path": ".github/prompts/workflow-implementation-loop.prompt.md",
+      "sha256": "0bf993276824e5a4218288fa6b182a75c89cbc89a5779103b14f90190f88efe8"
+    },
+    {
+      "path": ".github/prompts/workflow-incident-resolution.prompt.md",
+      "sha256": "d27e00973e74af2e9b08487d44e44f2f5d27e8221d603212af905aae2d1d97cd"
+    },
+    {
+      "path": ".github/prompts/workflow-modernization.prompt.md",
+      "sha256": "b6377342240e748288e420a84b6575f86aaef44afa5c6828ed1489c575af48d3"
+    },
+    {
+      "path": ".github/prompts/workflow-quality.prompt.md",
+      "sha256": "8735b31c3e9048e05383f8d7be2e4b9b4e3bef7642550ad865718cde4e2e9070"
+    },
+    {
+      "path": ".github/prompts/workflow-release-readiness.prompt.md",
+      "sha256": "4a96ac9146e84c8113a47950fa08842e66f449ba17e315e9bbaf360084856b01"
+    },
+    {
+      "path": ".github/prompts/workflow-security-quality.prompt.md",
+      "sha256": "8148be5b0328f4a195623a7134979c0f4ced17fd4697dbb43adf55120457abab"
+    },
+    {
+      "path": ".github/prompts/workflow-spec-kit.prompt.md",
+      "sha256": "8be58adb8bbec71ef7f0f914022a02fdbc415770bac1ec0b0763518cd2169d12"
+    },
+    {
+      "path": ".github/prompts/workflow-spec-to-execution.prompt.md",
+      "sha256": "199815377223d557f7805c9eebdd6fd33f661dd970af950cf6822e5e4d2794d8"
+    },
+    {
+      "path": ".github/instructions/apm-layer.instructions.md",
+      "sha256": "3e01a70895302131275d90c48ce9dc36fcaf8694ddb4af3bc9916494368f6e8c"
+    },
+    {
+      "path": ".github/instructions/knowledge-base.instructions.md",
+      "sha256": "64ff402b3ba1bc41e9e8342a7ee9d20fc713676b95c368c560099f0026b5cfae"
+    },
+    {
+      "path": ".github/instructions/readme.instructions.md",
+      "sha256": "41295882ecb51d83aef99468896f1d4d0ffec2a312c6e894a77d2e1820781e3e"
+    },
+    {
+      "path": ".github/instructions/spec-kit.instructions.md",
+      "sha256": "49cb40aa13c2a726856066feaef3440f06b8f939867473b5148555754a9652ec"
+    },
+    {
+      "path": ".github/instructions/workflow.instructions.md",
+      "sha256": "f425f839955bb40c1f2efd7e64d8e5d742b862d764c6013371a772652350bd84"
+    },
+    {
+      "path": ".github/apm/skills/accessibility-audit/SKILL.md",
+      "sha256": "12964aa45fc18e93f0e0a178c6ce252fed8032340f4efe4285f45c4cd426d1ee"
+    },
+    {
+      "path": ".github/apm/skills/adaptive-decision/SKILL.md",
+      "sha256": "4b5c466d7aa5a538fa2b5ce424c462f8a8331c2ecc7a392a5e3309f272f48c93"
+    },
+    {
+      "path": ".github/apm/skills/adr-generation/SKILL.md",
+      "sha256": "68b048e7765b2adef36ff79c889c2aef8ae5688fe42925699c1aba3dc184b589"
+    },
+    {
+      "path": ".github/apm/skills/adr-generation/resources/adr-template.md",
+      "sha256": "85e923313e4830faa3096628a4de1b2138a9b8a6026b7fd3a2e5fdcb4492630a"
+    },
+    {
+      "path": ".github/apm/skills/architecture-guardrails/SKILL.md",
+      "sha256": "becb1683fe350d8433fd327385892c3308c5a6832da7d7f3045045952ff2a743"
+    },
+    {
+      "path": ".github/apm/skills/architecture-guardrails/resources/dotnet-guardrails.md",
+      "sha256": "f144d9f51f5187cd0ded5f5e09b56eb62d76cf0d8a4ae87d035c59fda493c401"
+    },
+    {
+      "path": ".github/apm/skills/architecture-guardrails/resources/java-guardrails.md",
+      "sha256": "fc7304c53fab818404735b087165c46a2dbdf5fa40df7bc4ec3a2d3a19c8f235"
+    },
+    {
+      "path": ".github/apm/skills/architecture-guardrails/resources/microservice-guardrails.md",
+      "sha256": "69d08c3e5c05ad04a059e88f40f3583539323f08c1fbef5841fd6d04c05f1153"
+    },
+    {
+      "path": ".github/apm/skills/architecture-guardrails/resources/monolith-guardrails.md",
+      "sha256": "51521ea7d99a399d558766a4753575ed77f9970e9debca921628dda0d7969dbd"
+    },
+    {
+      "path": ".github/apm/skills/audience-calibration/SKILL.md",
+      "sha256": "f09411821eaff17d90f5a83e3923a13a57de73b7786040d69c3db12135be7136"
+    },
+    {
+      "path": ".github/apm/skills/brownfield-context/SKILL.md",
+      "sha256": "1f99ecdfd9c46b4ef2ab0c93ea7b1a15b9a4ca5c22112ad68aa74422af09b66e"
+    },
+    {
+      "path": ".github/apm/skills/brownfield-context/resources/reverse-brief-template.md",
+      "sha256": "417748fd8af1dfcaf6f54c6aca1aa24c1c6de6369b578950e417e25e5c802647"
+    },
+    {
+      "path": ".github/apm/skills/brownfield-context/resources/system-context-checklist.md",
+      "sha256": "2b8f3b047f8958755acb6b41c386854f866a3be42a6dbdf06f0929cb0792a0bb"
+    },
+    {
+      "path": ".github/apm/skills/bug-reproduction/SKILL.md",
+      "sha256": "4bab5ce34eb4e80c79faec6bf0b8627622bbdec1e37885b192d1850dfd84657f"
+    },
+    {
+      "path": ".github/apm/skills/bug-triage/SKILL.md",
+      "sha256": "f6a3b29528cec43e7c163ee4ad0b01fd669fe0976ee75009787161ac02cb469f"
+    },
+    {
+      "path": ".github/apm/skills/code-implementation/SKILL.md",
+      "sha256": "4334c4c10499708dc1da29b0186eab6ac92fa2b7cb158289c4845894362b409e"
+    },
+    {
+      "path": ".github/apm/skills/code-implementation/resources/implementation-checklist.md",
+      "sha256": "50f01105403d52301df2e661b562c282987a022984731ef36cfcfc64b2b0cc6b"
+    },
+    {
+      "path": ".github/apm/skills/code-refactoring/SKILL.md",
+      "sha256": "cab0777f0bcb773d66af21e32d60e4bbb80c4116a1dc9f4ae28ab457658391cf"
+    },
+    {
+      "path": ".github/apm/skills/codebase-assessment/SKILL.md",
+      "sha256": "68ac3a37f83cda1f382311f764f939138da67b8a23f03b7c31117cd675d1e86c"
+    },
+    {
+      "path": ".github/apm/skills/coverage-assessment/SKILL.md",
+      "sha256": "d6c91aff9e091deb519a42e3c3ddbc408e2eb1b2a1ea27ab16e2072207a7cc54"
+    },
+    {
+      "path": ".github/apm/skills/coverage-assessment/resources/coveragepy-adapter.md",
+      "sha256": "97ddbf9b52d20c50c04991cfbf97eabe9924e2daab0efafc83f7faae4bdc5f3b"
+    },
+    {
+      "path": ".github/apm/skills/coverage-assessment/resources/istanbul-adapter.md",
+      "sha256": "4e18a01a81fc02d6aeaa9b0e68133f0500004fa1691969cd83e27ece546bedeb"
+    },
+    {
+      "path": ".github/apm/skills/coverage-assessment/resources/jacoco-adapter.md",
+      "sha256": "0f33f42f1861decb8a59c8ebb2e48756450f7a738d9bee5e09c4efe38a5c0895"
+    },
+    {
+      "path": ".github/apm/skills/delivery-metrics/SKILL.md",
+      "sha256": "95785d1020a37a6b42db97930f7639f2c67e2f39177e26f696e3b86134da8fa5"
+    },
+    {
+      "path": ".github/apm/skills/dependency-audit/SKILL.md",
+      "sha256": "71eb64ea32069a79117a28f065da43f0452cc191f2894510504e650b3e19b730"
+    },
+    {
+      "path": ".github/apm/skills/dependency-audit/resources/owasp-depcheck-adapter.md",
+      "sha256": "5cad8853dc2de3891c654eb73d91f3e9d497267b408b51aedbd6bc0d805a3243"
+    },
+    {
+      "path": ".github/apm/skills/dependency-audit/resources/snyk-adapter.md",
+      "sha256": "ab4472dae876814735272e72f9004acc1225e3d36106317f3cb37d0983241a8d"
+    },
+    {
+      "path": ".github/apm/skills/dependency-audit/resources/trivy-adapter.md",
+      "sha256": "8079db7fc8cad707b5448d14b6f78fa4450909cce665d3936f39d5d4d15e52fd"
+    },
+    {
+      "path": ".github/apm/skills/docs-architect/SKILL.md",
+      "sha256": "e0aad1ff1ccd76dfe5b9d1ab6a0f8d8b2c882c767da1301b1c29356791e958ba"
+    },
+    {
+      "path": ".github/apm/skills/domain-driven-design/SKILL.md",
+      "sha256": "507faf9762244c8547fc6e4cc2c16da994a6fd1db7fff9d29bcd06403137a60c"
+    },
+    {
+      "path": ".github/apm/skills/drift-detection/SKILL.md",
+      "sha256": "fbc489399856a9bb41fc8dde8ee04caf9c45b09c5a118a0cd0465ac9af5c18d5"
+    },
+    {
+      "path": ".github/apm/skills/fix-planning/SKILL.md",
+      "sha256": "cf8717e5abaff664cd02d565c69fb75b1be89ee510e05d3a4a675693eec76564"
+    },
+    {
+      "path": ".github/apm/skills/governance-rules/SKILL.md",
+      "sha256": "ef4bc33e81c281cd7ee99754fb88992a75b98a45bf3092fe8d1ca510b5b75e23"
+    },
+    {
+      "path": ".github/apm/skills/hardening-review/SKILL.md",
+      "sha256": "47f0da75b6a3b960d0c0f2278fde012fd76e0b5dea103caf0431ee31cd09224c"
+    },
+    {
+      "path": ".github/apm/skills/humor-guardrails/SKILL.md",
+      "sha256": "7a012f6aeee89067fce8493a507d9ff1e36906bec36d2965e2c3f70d4c0c6a81"
+    },
+    {
+      "path": ".github/apm/skills/incident-analysis/SKILL.md",
+      "sha256": "37cd1e75f689be7e316fd9555f3ab652c7d335610a6e699e9b313c7b30faa985"
+    },
+    {
+      "path": ".github/apm/skills/intent-capture/SKILL.md",
+      "sha256": "01ff34709168d386af1f11ca3e2e751cc28ffdc220dd860875c3d4d9da6d8504"
+    },
+    {
+      "path": ".github/apm/skills/iteration-scoring/SKILL.md",
+      "sha256": "55e2ea9728fa74888aefb54a9ad8243b07cd64a24961aff7cc63de507a513e2b"
+    },
+    {
+      "path": ".github/apm/skills/knowledge-update/SKILL.md",
+      "sha256": "ed7b229459a13e60bc94ef7b93de969d1e27812c7e61422f8169fec70e89814c"
+    },
+    {
+      "path": ".github/apm/skills/linkedin-writing/SKILL.md",
+      "sha256": "c77d4ab2a7f3f1920f68e1ffe781073fd116a6aec5b6d210078115ae6ddcb758"
+    },
+    {
+      "path": ".github/apm/skills/lint-analysis/SKILL.md",
+      "sha256": "a56e48883255c4c043cd6ae92cadcb2e65d252120eda62c89264b7f37b9afbc2"
+    },
+    {
+      "path": ".github/apm/skills/lint-analysis/resources/clippy-adapter.md",
+      "sha256": "3bd103324612a60182ad9302352cb023364716cf7e5d64273f3b76387cefc68b"
+    },
+    {
+      "path": ".github/apm/skills/lint-analysis/resources/eslint-adapter.md",
+      "sha256": "ee61133c173b003659e71f3ce19fdfcf4ef927a2d31cfa6b18cba54e69d8bb46"
+    },
+    {
+      "path": ".github/apm/skills/lint-analysis/resources/pylint-adapter.md",
+      "sha256": "369d17353a26eac2f988d1055b282232e0bc74d159c8f461e2bef297bb8c0e57"
+    },
+    {
+      "path": ".github/apm/skills/migration-planning/SKILL.md",
+      "sha256": "4db6e24ba8283a8880f8d78461405a0db1506015468299622923703a0212043d"
+    },
+    {
+      "path": ".github/apm/skills/mity-blog-style/SKILL.md",
+      "sha256": "b51121b83ed312ed845fd877d65952e3e08c69bef15384d64c0aa74b65db5624"
+    },
+    {
+      "path": ".github/apm/skills/nfr-review/SKILL.md",
+      "sha256": "c7f19f623f7289d9699fd2ca688d685d3e0a74f9c9ebcf61ff7c120b0597076d"
+    },
+    {
+      "path": ".github/apm/skills/nfr-review/resources/nfr-template.md",
+      "sha256": "e0b3667b93a7d71409bb3ce118cadda9f25041b36cac452c63cbe495f56626b0"
+    },
+    {
+      "path": ".github/apm/skills/nfr-review/resources/observability-checklist.md",
+      "sha256": "7f290d97c5fd4c45a6fc2c765b31b1120fc53583b0be222806affbb064f310d6"
+    },
+    {
+      "path": ".github/apm/skills/observability-readiness/SKILL.md",
+      "sha256": "9a922c6bdbfbdd9bf1b56d86270650b060270a1d5d2fafed7cc3dc4ff54c2b59"
+    },
+    {
+      "path": ".github/apm/skills/parity-validation/SKILL.md",
+      "sha256": "87be9ad07a079d0f2393feab7e6e686db5e98becf1a22a11347e0031179f3c57"
+    },
+    {
+      "path": ".github/apm/skills/post-formats/SKILL.md",
+      "sha256": "4c10628ac4d59a2da0de02f853dcb4aa37e43931aa179bd6f310f6494b986262"
+    },
+    {
+      "path": ".github/apm/skills/quality-report/SKILL.md",
+      "sha256": "d27cc0a1ce666ef06037cf7139257ba43f478193f66860ac4495d86a163ef6ec"
+    },
+    {
+      "path": ".github/apm/skills/quality-report/resources/quality-report-template.md",
+      "sha256": "6dca3cb799a424d38543a2847d635dd44aa121c8439d8ac13df7a22c7a475966"
+    },
+    {
+      "path": ".github/apm/skills/repo-analysis/SKILL.md",
+      "sha256": "93ab09a10ca497a4b65d60cf2e51159de59702acffa1b657f0956730c093770f"
+    },
+    {
+      "path": ".github/apm/skills/repo-analysis/resources/repo-analysis-template.md",
+      "sha256": "c2565c9e1139660e9be8007096a08a8936968dfa18140099d379dda7affc0fcc"
+    },
+    {
+      "path": ".github/apm/skills/risk-scoring/SKILL.md",
+      "sha256": "f8f35567718ce9f59110f5130f94c1e111c9176359ae22b3b2a3e609741b979a"
+    },
+    {
+      "path": ".github/apm/skills/root-cause-analysis/SKILL.md",
+      "sha256": "4f4cfc4838d20fd6fb825d44a82c3b2da8b87a9ecdffe8f991d9427e946d58d2"
+    },
+    {
+      "path": ".github/apm/skills/security-scan/SKILL.md",
+      "sha256": "bcb626db5a5ec8da0294048d7a0f67e98c8b15ae7edfb014cee5492c849d24fd"
+    },
+    {
+      "path": ".github/apm/skills/security-scan/resources/checkmarx-sast-adapter.md",
+      "sha256": "70dd0de5599019a69b3365d9015006b6b6a05354e069357549c94c5f2ab55923"
+    },
+    {
+      "path": ".github/apm/skills/security-scan/resources/owasp-zap-dast-adapter.md",
+      "sha256": "763274e14bfe7a3874536950da6333050d7e9bcef0fdc62ea1d9a96437abd80e"
+    },
+    {
+      "path": ".github/apm/skills/social-media-adaptation/SKILL.md",
+      "sha256": "a336e88281131d9b8cd7a0840abf2619bda942f6ee233ba361ba3fe8eb72c915"
+    },
+    {
+      "path": ".github/apm/skills/sonic-pi-rust-expert/SKILL.md",
+      "sha256": "77ffafac9c6b41b35b895777d597abda442e015db6f487000d2d6d5d2e4996e6"
+    },
+    {
+      "path": ".github/apm/skills/spec-analyze/SKILL.md",
+      "sha256": "97d6ed8c2045e05d238cdae8b5d15cc16bc4a3ac707698a226131e12b1c90edd"
+    },
+    {
+      "path": ".github/apm/skills/spec-checklist/SKILL.md",
+      "sha256": "12be8d6477c45282d08ac8e72331b5445be55f14dbe74346e845bbcb3a727d0b"
+    },
+    {
+      "path": ".github/apm/skills/spec-clarify/SKILL.md",
+      "sha256": "97ee55b19f903d9945ca2b2fa5f904fc700f68cc40a7bcd4ec4cb60de515ac77"
+    },
+    {
+      "path": ".github/apm/skills/spec-clarify/resources/clarify-checklist.md",
+      "sha256": "5dcd7abcfe365a6bd93da050c402770df940fb0f055a827a76aa766ae168aad5"
+    },
+    {
+      "path": ".github/apm/skills/spec-clarify/resources/nfr-clarify-checklist.md",
+      "sha256": "f1a449a5493c0b0a8b0607382ad5b45e0bebb7360e0f503c9cf51fcb8e446a45"
+    },
+    {
+      "path": ".github/apm/skills/spec-constitution/SKILL.md",
+      "sha256": "4f6819d45a34860cceec5b08b43efeeffb2d3fcb6fb001a4554a56ce25b8effa"
+    },
+    {
+      "path": ".github/apm/skills/spec-constitution/resources/brownfield-constitution-example.md",
+      "sha256": "389e9c2eae6a9b2ba01ee7478c347317e7d7e1ebe624fc67708cd96b232a5a09"
+    },
+    {
+      "path": ".github/apm/skills/spec-constitution/resources/constitution-template.md",
+      "sha256": "2c31cac21e48c96378888e5ae29421c2c4f6fbd998993eadbc34d6115dc102f1"
+    },
+    {
+      "path": ".github/apm/skills/spec-constitution/resources/greenfield-constitution-example.md",
+      "sha256": "f97429bd91a7179142efcb17354b3c628fc97dcbd85a569f5b79fc545efff85b"
+    },
+    {
+      "path": ".github/apm/skills/spec-feature/SKILL.md",
+      "sha256": "cd4b56a4f2682de9f71249961b50632ccd262c61a4ac4ad10d5fff5f65886cea"
+    },
+    {
+      "path": ".github/apm/skills/spec-feature/resources/api-extension-template.md",
+      "sha256": "1b5ab4bb75bc623d9e046eb2423abb7e05fbacffa7ea098b5d7725494086192d"
+    },
+    {
+      "path": ".github/apm/skills/spec-feature/resources/feature-spec-template.md",
+      "sha256": "d785ca83df48dc58a358f659d41d126ae459081b5caf68fff3577bf758c8940d"
+    },
+    {
+      "path": ".github/apm/skills/spec-feature/resources/modernization-template.md",
+      "sha256": "5b9aa2840a7054ef403e141907696f53ac96e8b4154a9731dc775797c2357e88"
+    },
+    {
+      "path": ".github/apm/skills/spec-plan/SKILL.md",
+      "sha256": "af85ce442b143d8e4eab269645887da664373d6d908abd86a5556b838ad54c89"
+    },
+    {
+      "path": ".github/apm/skills/spec-plan/resources/implementation-plan-template.md",
+      "sha256": "430cf156cd9aee597ff83b4fc55b5c9a76c1b3ac05250fdce7fedf8350beea07"
+    },
+    {
+      "path": ".github/apm/skills/spec-plan/resources/risk-template.md",
+      "sha256": "8cf9404998b0e51ccc16e84739fda0ff8322bd49ee4a738faedcb03f444e1785"
+    },
+    {
+      "path": ".github/apm/skills/spec-plan/resources/rollout-template.md",
+      "sha256": "bb1271d7abe2fb3476a8e65fc3f84cc633906ccd4530384d9a2e40140b354940"
+    },
+    {
+      "path": ".github/apm/skills/spec-quality-gate/SKILL.md",
+      "sha256": "8eae1734e5a7bcf83a222434ef22ee339e27bd407f42ac54aa4f72f1003b3857"
+    },
+    {
+      "path": ".github/apm/skills/spec-quality-gate/resources/pr-review-template.md",
+      "sha256": "7b1c5b4ef8f2381812b6b541ece1e65464937a3ba35a196f3f72794ee6b991ce"
+    },
+    {
+      "path": ".github/apm/skills/spec-quality-gate/resources/quality-gate-checklist.md",
+      "sha256": "bb52a8db973a309d799d2998bf2626e583f37d304d06a2f01d24ec50d5f48414"
+    },
+    {
+      "path": ".github/apm/skills/spec-red-team/SKILL.md",
+      "sha256": "8da7fa606658138d623c8f37879f06a30e692f451f5e52481ba2793cf4895a40"
+    },
+    {
+      "path": ".github/apm/skills/spec-tasks/SKILL.md",
+      "sha256": "bb5099d375cbd7f1d267932833ac5f4072ac7ff60aec2e198672bccabbad738a"
+    },
+    {
+      "path": ".github/apm/skills/spec-tasks/resources/task-breakdown-template.md",
+      "sha256": "c60079af5cbd0aa5bf86f2ff9d64fdd61a8d8c377a3acf490879e943ca7f93e2"
+    },
+    {
+      "path": ".github/apm/skills/spec-tasks/resources/test-strategy-template.md",
+      "sha256": "2d0350fa8eeaabf4ac85f5b56f575e65400041a5eae20a9e8181f37e6856bdf7"
+    },
+    {
+      "path": ".github/apm/skills/static-analysis/SKILL.md",
+      "sha256": "bb1c8aabe0fbb94d7e668893e02f9fb4dbd3411845479732fc4fb106fb0d6ed1"
+    },
+    {
+      "path": ".github/apm/skills/static-analysis/resources/sonarcloud-adapter.md",
+      "sha256": "4ef54a12c30dc59816e3c8e41010a3c38e9e5c76d59e209f7a9cb0502d36b562"
+    },
+    {
+      "path": ".github/apm/skills/static-analysis/resources/sonarqube-adapter.md",
+      "sha256": "1c178799611b24cb957a6e51e6bcf54797d40f75793a0f5050f8c686b3735378"
+    },
+    {
+      "path": ".github/apm/skills/tech-debt-analysis/SKILL.md",
+      "sha256": "fe47f525e2ec6b28fbe0b1690250bafb88fd959d2e326107449755deb71db4ec"
+    },
+    {
+      "path": ".github/apm/skills/test-strategy/SKILL.md",
+      "sha256": "0a837c09cd66e03601ef6ff71ebfa1ec1e85137fde73af618fed0ee8d7cb6849"
+    },
+    {
+      "path": ".github/apm/skills/test-strategy/resources/test-pyramid-template.md",
+      "sha256": "f232f78c52888029260ea707ccfc88dac349939247959f14c6a5702c274730ad"
+    },
+    {
+      "path": ".github/apm/skills/threat-modelling/SKILL.md",
+      "sha256": "f1136edfbe337a490aa9d5a699ccfa51ec7e1fef04addc5e6da81dd3d05ab9cc"
+    },
+    {
+      "path": ".github/apm/skills/workflow-engine/SKILL.md",
+      "sha256": "b9903714e4e595f247fb10d99e72d7e5a3d03946df3025a46edb91d34b1b7ccb"
+    },
+    {
+      "path": ".github/apm/skills/workflow-engine/resources/gate-report-template.md",
+      "sha256": "ea15a3078f53e276fe917762589da126203c6b11b2ed948716c78ca7988eb84d"
+    },
+    {
+      "path": ".github/apm/skills/workflow-engine/resources/station-state-template.md",
+      "sha256": "726d4ed0e2c47cb7aecd9e60389e17237c6771c571c554a7a4b9e3e9f59c68a5"
+    },
+    {
+      "path": ".github/apm/workflows/_schema.md",
+      "sha256": "8d32a5080063199b475c0880183ce18915370288efad0f13f6a252418043de71"
+    },
+    {
+      "path": ".github/apm/workflows/bmad.md",
+      "sha256": "64e750c7751b796af8a2326244aab2efd958c99b771995f53bfc48295d021eb1"
+    },
+    {
+      "path": ".github/apm/workflows/bmad.yml",
+      "sha256": "7f977dccbc682c4ce56cc612c5667f342d4c5851b5ab34a667fe4b988acda483"
+    },
+    {
+      "path": ".github/apm/workflows/bug-fixing.md",
+      "sha256": "1791ce01ac2b76ac1bb337b4da70c17653446c146cafff120d855374345356d1"
+    },
+    {
+      "path": ".github/apm/workflows/bug-fixing.yml",
+      "sha256": "74bf4f1b37f11eae92ccce2bd93a35489454215c6f5e1032d2eb3d745e914e23"
+    },
+    {
+      "path": ".github/apm/workflows/compliance-check.md",
+      "sha256": "e4263af8acb2ff3cd13edf11b6954064ebd810ffcfaefbb92a6a3524adac222b"
+    },
+    {
+      "path": ".github/apm/workflows/compliance-check.yml",
+      "sha256": "b91fdad0fc8c4093f1ba4c7811aaf890898002115bf9174b7dda7c1fadf5f6ad"
+    },
+    {
+      "path": ".github/apm/workflows/delivery-retrospective.md",
+      "sha256": "c131675b4cf8733b0936796302b75c4bd8f56fe14f26913d9535abd5e921da53"
+    },
+    {
+      "path": ".github/apm/workflows/delivery-retrospective.yml",
+      "sha256": "f12abf8e258b1136ebfc5517f2b30e843ecdeb13fff3bf6bbe43ca38d1d1bbc3"
+    },
+    {
+      "path": ".github/apm/workflows/feature-implementation.md",
+      "sha256": "6eea2de92f260341e8e544c63ed9d2906ce494acae046d3a5ca3bfd7d79a03af"
+    },
+    {
+      "path": ".github/apm/workflows/feature-implementation.yml",
+      "sha256": "db58e01179b44194b7b1ab47823cf4a074cc4d558763e4cb70666a1ea04f6e8c"
+    },
+    {
+      "path": ".github/apm/workflows/idea-to-spec.md",
+      "sha256": "e2e65a39949aee771e60a6f37c75898c3d58e4cf57bfb0763dab2442c74566b2"
+    },
+    {
+      "path": ".github/apm/workflows/idea-to-spec.yml",
+      "sha256": "1b6efcb3b9023e23d616bfd3911fbc6d95de50ed5035d9c31e734c1d34652956"
+    },
+    {
+      "path": ".github/apm/workflows/implementation-loop.md",
+      "sha256": "6ef2e2f486eb24697e347042ace36ba2e378e1683bbf45a77d46989e5dcd88e6"
+    },
+    {
+      "path": ".github/apm/workflows/implementation-loop.yml",
+      "sha256": "34899b561e49249b18eb06e959b502256e706593c4c3fcebe6020b95dc7f0fca"
+    },
+    {
+      "path": ".github/apm/workflows/incident-resolution.md",
+      "sha256": "220bf6ef85e3def424699041e0e53ac2452ef07d9f3fb2744dfbb46b836dc1df"
+    },
+    {
+      "path": ".github/apm/workflows/incident-resolution.yml",
+      "sha256": "10cb2a6d51cd8a2d4e1efaf6ea25b78b145cba1ea083475b26fd2a5f98ca5bab"
+    },
+    {
+      "path": ".github/apm/workflows/modernization.md",
+      "sha256": "a3b9a08f3cf2accb10a76f03386750883c0e1361625b80a03dd71cbf24f4c2b2"
+    },
+    {
+      "path": ".github/apm/workflows/modernization.yml",
+      "sha256": "f7a2437c4f63b42385f432248f934e83e97b6325b6d57d3b66e15216c460a6e5"
+    },
+    {
+      "path": ".github/apm/workflows/quality-validation.md",
+      "sha256": "bb7e470e24b2a5cf5852d3181ced29820bd011a1ca1556de83034c0fc93a6cb0"
+    },
+    {
+      "path": ".github/apm/workflows/quality-validation.yml",
+      "sha256": "9d00790eaa2f39a82ba03752bf473cc6bc6367cc1a2548b88a092ea4f89e9875"
+    },
+    {
+      "path": ".github/apm/workflows/release-readiness.md",
+      "sha256": "9f3b26925263d5ccad41de703425b1524ca6a6523857b4255248db8c6a363a5f"
+    },
+    {
+      "path": ".github/apm/workflows/release-readiness.yml",
+      "sha256": "ecca29de355def2de58711f239b63748860ac0c8caef536c147f02658888c563"
+    },
+    {
+      "path": ".github/apm/workflows/security-quality-assessment.yml",
+      "sha256": "7e32d50da400ea07875acc48000a16597bb7800b3ddfdf064c357bd91c26f9ae"
+    },
+    {
+      "path": ".github/apm/workflows/spec-kit.md",
+      "sha256": "21dad4c1c5717a3e2bea0f500d99215e7b6eb7a525300a8af90c8148097335ca"
+    },
+    {
+      "path": ".github/apm/workflows/spec-kit.yml",
+      "sha256": "94e27fd3c8ecfc0784d39283c5c492fa724d79bb12549e8cac31b6ce21a0d869"
+    },
+    {
+      "path": ".github/apm/workflows/spec-to-execution.md",
+      "sha256": "6499c5cb0bb1f8485ebedb21a3c4ba2a5c14cdd107ea3cd40e4aea9030d5a238"
+    },
+    {
+      "path": ".github/apm/workflows/spec-to-execution.yml",
+      "sha256": "ce10a7b56bb1c6c2b471d1e31c13577ddc519c9d98eeeb0977d23fd6a0721c86"
+    },
+    {
+      "path": ".github/apm/contexts/delivery-operating-model.md",
+      "sha256": "55f0d0978cd2f17e98ed4c33523f82f43c570f46acfd67d976e92d176c25d1eb"
+    },
+    {
+      "path": ".github/apm/contexts/quality-standards.md",
+      "sha256": "e84e64c2168f00a79a9cfad9b8214a9c3e47fcacfe17b23208d4632eda3470cb"
+    },
+    {
+      "path": ".github/apm/contexts/spec-kit-context.md",
+      "sha256": "b610e468eaf2d1423ad23051ddeb9e48dc2eaa253d3015c1ba30a48e2e8610fd"
+    },
+    {
+      "path": ".github/copilot-instructions.md",
+      "sha256": "892095ba72a840ddb77353591486d624baa54236503f08946d049f19f17c0b90"
+    },
+    {
+      "path": ".github/apm/knowledge/constitution/brownfield.md",
+      "sha256": "d9386ebd5e89a9e35b39b2eb43d9197cd181d145ac2b2a396b9bfa9f3947a36f"
+    },
+    {
+      "path": ".github/apm/knowledge/constitution/enterprise-defaults.md",
+      "sha256": "5c1170bf09ad257626dc7ca64256eac4b25e52e8c7a920832abfefe5fb97a59a"
+    },
+    {
+      "path": ".github/apm/knowledge/constitution/greenfield.md",
+      "sha256": "dfc1784240b1c07901a9d191cadf730495efb32d5ffd0f14c6f3f9d8aa94d052"
+    },
+    {
+      "path": ".github/apm/knowledge/constitution/principles.md",
+      "sha256": "b8eb0282cb05f7d10a0b8ff458d8542c1e9452c1155e7bcb925b1b709848dcbb"
+    },
+    {
+      "path": ".github/apm/knowledge/examples/sample-brownfield-spec/reverse-brief.md",
+      "sha256": "1693cf97e83495883e5fde349b35e6401739fa52753cfd1059f926937592f20e"
+    },
+    {
+      "path": ".github/apm/knowledge/examples/sample-greenfield-spec/spec.md",
+      "sha256": "821a8897942b8843ac9900b5de3cfcf7e5e77b997e7a8bb25379a2ba5c2c1517"
+    },
+    {
+      "path": ".github/apm/knowledge/governance/architecture-principles.md",
+      "sha256": "716c8b7b9c38098edbc26fdd253688b984b4560ef36d25f7d53efb9b5ee0ec48"
+    },
+    {
+      "path": ".github/apm/knowledge/governance/observability-by-default.md",
+      "sha256": "66fa4f95c61eafa7a4aa7b72bfca303f990f8621b51090a0296d85682c6b57ad"
+    },
+    {
+      "path": ".github/apm/knowledge/governance/secure-by-default.md",
+      "sha256": "4fa06ea2be47aadf16ca20a33a77d5b46079a657619741a43937ebba8446789f"
+    },
+    {
+      "path": ".github/apm/knowledge/governance/testing-policy.md",
+      "sha256": "f19293e38d513f38d432b074cdcdd8ada89471c2f4240838deea218ee1a44f81"
+    },
+    {
+      "path": ".github/apm/knowledge/playbooks/api-extension-playbook.md",
+      "sha256": "0adccc4982e26095145b03666b255b1e3de5fc4ddf3a5f68aab09098ac2b08fd"
+    },
+    {
+      "path": ".github/apm/knowledge/playbooks/brownfield-playbook.md",
+      "sha256": "9e5edce36197a02a04b62f1c793b195435bbaa377b6d3ad8ad0635028b825eac"
+    },
+    {
+      "path": ".github/apm/knowledge/playbooks/greenfield-playbook.md",
+      "sha256": "a76727cda15ce6f72159150756df7abc7996603fcad10caf7abaef0a263e3cf6"
+    },
+    {
+      "path": ".github/apm/knowledge/playbooks/modernization-playbook.md",
+      "sha256": "64737c40a4e6898007c67e9a287fdb2a7cec34d7ae184ea00a333af13d801b9f"
+    },
+    {
+      "path": ".github/apm/knowledge/playbooks/workflow-playbook.md",
+      "sha256": "0dcd9077a454cd5d2e1457cafe09006835ff4b26bff4c18a1156a7fd84dd0aac"
+    },
+    {
+      "path": ".github/apm/knowledge/templates/index.md",
+      "sha256": "6ca80f78d7e025df980711acc200b3913c99ec17d1a760889a96ae28bb5e0456"
+    },
+    {
+      "path": ".github/apm/knowledge/templates/README.md",
+      "sha256": "d104833b2d193ba03084cd1e5fedc65f0e439310256806133db9d6f5502e2566"
+    }
+  ]
+}

@@ -1,0 +1,67 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install uv
+        run: pip install uv
+
+      - name: Install workspace dependencies
+        run: uv sync --all-packages
+
+      - name: Run shared-schemas tests
+        run: uv run --package shared-schemas pytest packages/shared-schemas/tests -v
+
+      - name: Run shared-events tests
+        run: uv run --package shared-events pytest packages/shared-events/tests -v
+
+      - name: Run shared-policies tests
+        run: uv run --package shared-policies pytest packages/shared-policies/tests -v
+
+      - name: Run shared-personas tests
+        run: uv run --package shared-personas pytest packages/shared-personas/tests -v
+
+      - name: Run robot-runtime tests
+        run: uv run --package robot-runtime pytest services/robot-runtime/tests -v
+
+      - name: Run memory-service tests
+        run: uv run --package memory-service pytest services/memory-service/tests -v
+
+      - name: Run orchestrator tests
+        run: uv run --package orchestrator pytest services/orchestrator/tests -v
+
+      - name: Run conversation-runtime tests
+        run: uv run --package conversation-runtime pytest services/conversation-runtime/tests -v
+
+      - name: Run connector-service tests
+        run: uv run --package connector-service pytest services/connector-service/tests -v
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install ruff
+        run: pip install ruff
+
+      - name: Lint
+        run: ruff check packages/ services/

@@ -1,0 +1,117 @@
+"""FastAPI routes for connector-service."""
+
+from __future__ import annotations
+
+import logging
+from typing import TYPE_CHECKING
+
+from fastapi import APIRouter, HTTPException
+from fastapi.responses import JSONResponse
+
+from shared_schemas.m365.connector import M365Connector
+
+if TYPE_CHECKING:
+    from connector_service.registry import ConnectorRegistry
+
+router = APIRouter(prefix="/connector")
+logger = logging.getLogger(__name__)
+
+_connector: M365Connector | None = None
+_registry: "ConnectorRegistry | None" = None
+
+
+def set_connector(connector: M365Connector) -> None:
+    global _connector
+    _connector = connector
+
+
+def set_registry(registry: "ConnectorRegistry") -> None:
+    global _registry
+    _registry = registry
+
+
+def _require_connector() -> M365Connector:
+    if _connector is None:
+        raise HTTPException(
+            status_code=503,
+            detail="No connector available. Complete authentication at POST /identity/auth/microsoft/start.",
+        )
+    return _connector
+
+
+# ------------------------------------------------------------------
+# Health — now includes per-connector status from registry
+# ------------------------------------------------------------------
+
+
+@router.get("/health")
+async def health() -> JSONResponse:
+    if _registry is None:
+        return JSONResponse({"status": "ok", "connectors": {}})
+    return JSONResponse({
+        "status": _registry.overall_status(),
+        "connectors": _registry.health(),
+    })
+
+
+# ------------------------------------------------------------------
+# Calendar
+# ------------------------------------------------------------------
+
+
+@router.get("/calendar/today")
+async def calendar_today() -> JSONResponse:
+    events = await _require_connector().list_calendar_events_today()
+    return JSONResponse([e.model_dump(mode="json") for e in events])
+
+
+# ------------------------------------------------------------------
+# Mail
+# ------------------------------------------------------------------
+
+
+@router.get("/mail/unread")
+async def unread_mail(limit: int = 10) -> JSONResponse:
+    items = await _require_connector().get_unread_mail(limit=limit)
+    return JSONResponse([m.model_dump(mode="json") for m in items])
+
+
+@router.post("/mail/send")
+async def send_mail(body: dict) -> JSONResponse:
+    await _require_connector().send_mail(
+        to=body["to"],
+        subject=body["subject"],
+        body=body["body"],
+    )
+    return JSONResponse({"ok": True})
+
+
+@router.post("/teams/message")
+async def post_teams_message(body: dict) -> JSONResponse:
+    msg = await _require_connector().post_teams_message(
+        channel=body["channel"],
+        content=body["content"],
+    )
+    return JSONResponse(msg.model_dump(mode="json"))
+
+
+# ------------------------------------------------------------------
+# Tasks
+# ------------------------------------------------------------------
+
+
+@router.get("/tasks")
+async def list_tasks(plan_id: str = "") -> JSONResponse:
+    tasks = await _require_connector().list_tasks(plan_id=plan_id)
+    return JSONResponse([t.model_dump(mode="json") for t in tasks])
+
+
+@router.post("/tasks")
+async def create_task(body: dict) -> JSONResponse:
+    task = await _require_connector().create_task(
+        title=body["title"],
+        plan_id=body.get("plan_id", ""),
+        due_date=body.get("due_date", ""),
+    )
+    return JSONResponse(task.model_dump(mode="json"))
+

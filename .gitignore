@@ -1,0 +1,60 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+.env
+.env.local
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+coverage.xml
+
+# Node / Vue
+node_modules/
+dist/
+.nuxt/
+.output/
+*.local
+
+# Docker
+.docker/
+
+# Editors
+.vscode/settings.json
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Secrets
+*.pem
+*.key
+secrets/
+
+# SQLite
+*.db
+*.sqlite3
+
+# Logs
+*.log
+logs/
+
+# uv
+.uv/
+
+
+.github/apm
+# Windows crash dumps
+*.stackdump

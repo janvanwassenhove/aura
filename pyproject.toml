@@ -1,0 +1,50 @@
+[project]
+name = "reachy-chief-of-staff"
+version = "0.1.0"
+description = "AURA — Adaptive Unified Robotic Assistant"
+requires-python = ">=3.11"
+
+[tool.uv.workspace]
+members = [
+    "packages/shared-schemas",
+    "packages/shared-events",
+    "packages/shared-config",
+    "packages/shared-policies",
+    "packages/shared-personas",
+    "packages/shared-prompts",
+    "services/robot-runtime",
+    "services/conversation-runtime",
+    "services/orchestrator",
+    "services/connector-service",
+    "services/memory-service",
+    "services/identity-service",
+]
+
+[tool.uv.sources]
+shared-schemas  = { workspace = true }
+shared-events   = { workspace = true }
+shared-config   = { workspace = true }
+shared-policies = { workspace = true }
+shared-personas = { workspace = true }
+shared-prompts  = { workspace = true }
+
+[tool.uv]
+package = false
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = []
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]
