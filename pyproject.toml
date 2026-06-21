@@ -18,6 +18,7 @@ members = [
     "services/connector-service",
     "services/memory-service",
     "services/identity-service",
+    "apps/aura-brain",
 ]
 
 [tool.uv.sources]
@@ -27,6 +28,11 @@ shared-config   = { workspace = true }
 shared-policies = { workspace = true }
 shared-personas = { workspace = true }
 shared-prompts  = { workspace = true }
+orchestrator         = { workspace = true }
+conversation-runtime = { workspace = true }
+connector-service    = { workspace = true }
+memory-service       = { workspace = true }
+identity-service     = { workspace = true }
 
 [tool.uv]
 package = false

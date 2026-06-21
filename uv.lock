@@ -9,6 +9,7 @@ resolution-markers = [
 
 [manifest]
 members = [
+    "aura-brain",
     "connector-service",
     "conversation-runtime",
     "identity-service",
@@ -125,6 +126,54 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/e2/c6/a759ece8f1829d1f162261226fbfd2c6832b3ff7657384045286d2afa384/argon2_cffi_bindings-25.1.0-cp39-abi3-win_amd64.whl", hash = "sha256:a98cd7d17e9f7ce244c0803cad3c23a7d379c301ba618a5fa76a67d116618b98", size = 31715, upload-time = "2025-07-30T10:01:58.56Z" },
     { url = "https://files.pythonhosted.org/packages/42/b9/f8d6fa329ab25128b7e98fd83a3cb34d9db5b059a9847eddb840a0af45dd/argon2_cffi_bindings-25.1.0-cp39-abi3-win_arm64.whl", hash = "sha256:b0fdbcf513833809c882823f98dc2f931cf659d9a1429616ac3adebb49f5db94", size = 27149, upload-time = "2025-07-30T10:01:59.329Z" },
 ]
+
+[[package]]
+name = "aura-brain"
+version = "0.1.0"
+source = { editable = "apps/aura-brain" }
+dependencies = [
+    { name = "connector-service" },
+    { name = "conversation-runtime" },
+    { name = "fastapi" },
+    { name = "identity-service" },
+    { name = "memory-service" },
+    { name = "orchestrator" },
+    { name = "shared-config" },
+    { name = "shared-events" },
+    { name = "shared-personas" },
+    { name = "shared-policies" },
+    { name = "shared-prompts" },
+    { name = "shared-schemas" },
+    { name = "uvicorn", extra = ["standard"] },
+]
+
+[package.optional-dependencies]
+dev = [
+    { name = "httpx" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "connector-service", editable = "services/connector-service" },
+    { name = "conversation-runtime", editable = "services/conversation-runtime" },
+    { name = "fastapi", specifier = ">=0.111" },
+    { name = "httpx", marker = "extra == 'dev'", specifier = ">=0.27" },
+    { name = "identity-service", editable = "services/identity-service" },
+    { name = "memory-service", editable = "services/memory-service" },
+    { name = "orchestrator", editable = "services/orchestrator" },
+    { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.2" },
+    { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.23" },
+    { name = "shared-config", editable = "packages/shared-config" },
+    { name = "shared-events", editable = "packages/shared-events" },
+    { name = "shared-personas", editable = "packages/shared-personas" },
+    { name = "shared-policies", editable = "packages/shared-policies" },
+    { name = "shared-prompts", editable = "packages/shared-prompts" },
+    { name = "shared-schemas", editable = "packages/shared-schemas" },
+    { name = "uvicorn", extras = ["standard"], specifier = ">=0.29" },
+]
+provides-extras = ["dev"]
 
 [[package]]
 name = "backports-tarfile"
