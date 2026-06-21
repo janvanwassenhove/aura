@@ -52,10 +52,15 @@ Prove the current online path actually works before restructuring around it.
       as proper OpenAI-shaped `assistant.tool_calls` + one `tool` message per call
       (with matching `tool_call_id`, including blocked/denied calls). Also fixed a
       latent bug: `_call_connector` never substituted `{id}` path params. Covered
-      by `tests/test_tool_calling.py`; full suite 106 passed. *Remaining:* exercise
-      against a live LLM + the mock connector for a true end-to-end round-trip.
-- [ ] **End-to-end smoke test** (FakeRobot + mock M365 + echo→real LLM) covering
-      one read tool and one write tool (to exercise the approval gate).
+      by `tests/test_tool_calling.py`; full suite 106 passed.
+- [x] **Live end-to-end confirmed (done).** With the real OpenAI provider (only
+      `_call_connector` stubbed with mock data): the model emits the correct
+      tool_calls and the real API accepts the reconstructed assistant.tool_calls +
+      tool messages — "what meetings do I have today?" → `list_calendar_events_today`
+      → correct spoken answer; same for tasks.
+- [ ] **Full-stack smoke test** (FakeRobot + mock M365 connector-service + real
+      LLM) covering one read tool and one **write** tool (to exercise the approval
+      gate end-to-end over HTTP) — needs the services running; do during Phase 1.
 - [ ] **Delete dead ceremony from the working tree.** Move `.github/apm/` and
       `knowledge/` to `docs/method/` (or a separate archive repo). Add a
       `.gitignore` entry for the stray `node_modules/`, `dist/`, `.pytest_cache/`
