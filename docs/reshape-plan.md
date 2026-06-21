@@ -21,20 +21,24 @@ most likely to invalidate the whole approach. Prove it on the real hardware +
 real provider **before** investing in the restructure. This is a throwaway
 vertical spike — correctness/cleanliness not required, *measured latency* is.
 
-- [ ] Minimal path: Pi mic → laptop → **streaming STT** (OpenAI Realtime API, or
-      streaming local Whisper) → LLM with **token streaming** → **streaming TTS**
-      → Pi speaker. Skip orchestration, tools, approval, memory entirely.
-- [ ] Instrument and record **first-word-out** and **full-turn** latency over the
-      real LAN link, on the actual Pi 5, with your actual provider/subscription.
-- [ ] Prove **barge-in**: speaking over AURA cancels in-flight TTS within ~200ms.
-- [ ] Compare cloud Realtime vs streaming-local on the Pi-class path; decide the
-      default and the offline fallback tier from measured numbers, not the ADR.
-- [ ] **Go/no-go:** if streaming hits a usable target (e.g. < ~700ms first word),
-      proceed with confidence. If not, the voice transport — not the architecture
-      — is the thing to solve first, and we know it now instead of after Phase 3.
+Harness: `spikes/voice-latency/` (built + run). Status of the items:
 
-**Exit:** a real, measured, interruptible spoken round-trip on the Wireless, with
-numbers that justify (or redirect) the rest of the plan. Findings feed Phase 3.5.
+- [x] Instrumented streaming harness measuring first-audio-out and full-turn,
+      with a chained-vs-realtime head-to-head (`--engine both`).
+- [x] **Decision made (2026-06-21, laptop, text-in):** chained LLM→TTS first-audio
+      ~1065 ms (⚠️ marginal, bottleneck = ~800 ms TTS first-byte); **OpenAI Realtime
+      API (speech-to-speech) first-audio 556 ms p95 598 ms → GO ✅**, full turn
+      ~1.7 s vs ~3.1 s. **Verdict: GO on the Realtime transport.**
+- [ ] Re-confirm on the **Reachy Wireless** over the LAN: add mic→Pi→laptop legs
+      (`--mode audio`) and re-measure on-device — network adds to every number.
+- [ ] Prove **barge-in** end-to-end on-device (Realtime supports it natively;
+      harness audio-mode has the hook).
+- [ ] Measure **streaming-local** (Whisper + Piper/Kokoro) on the Pi for the
+      **offline** tier's known numbers.
+
+**Outcome:** the architecture is not the risk — the voice *transport* was, and the
+Realtime API clears the bar. Decision feeds Phase 1 (adopt Realtime as the default
+voice transport) and Phase 3.5 (perf gate). See `spikes/voice-latency/README.md`.
 
 ---
 
@@ -42,11 +46,14 @@ numbers that justify (or redirect) the rest of the plan. Findings feed Phase 3.5
 
 Prove the current online path actually works before restructuring around it.
 
-- [ ] **Fix tool-calling.** In `services/orchestrator/src/orchestrator/pipeline.py`,
-      pass real function schemas to the LLM (`openai_chat(messages, tools=...)`)
-      and build those schemas from `MODE_TOOL_MAP` / the `_TOOL_ROUTES` table.
-      Confirm a real `tool_calls` round-trips: "what meetings do I have today?"
-      → `list_calendar_events_today` → mock connector → spoken answer.
+- [x] **Fix tool-calling (done).** Added `orchestrator/tool_schemas.py` (OpenAI
+      function schemas, filtered to `MODE_TOOL_MAP` via `build_tool_specs`);
+      `pipeline.py` now passes `tools=` to the LLM and reconstructs the follow-up
+      as proper OpenAI-shaped `assistant.tool_calls` + one `tool` message per call
+      (with matching `tool_call_id`, including blocked/denied calls). Also fixed a
+      latent bug: `_call_connector` never substituted `{id}` path params. Covered
+      by `tests/test_tool_calling.py`; full suite 106 passed. *Remaining:* exercise
+      against a live LLM + the mock connector for a true end-to-end round-trip.
 - [ ] **End-to-end smoke test** (FakeRobot + mock M365 + echo→real LLM) covering
       one read tool and one write tool (to exercise the approval gate).
 - [ ] **Delete dead ceremony from the working tree.** Move `.github/apm/` and

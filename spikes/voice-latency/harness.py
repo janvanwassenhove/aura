@@ -50,6 +50,7 @@ DEFAULT_LLM_MODEL = "gpt-4o-mini"   # the responsive choice; override with --mod
 DEFAULT_TTS_MODEL = "gpt-4o-mini-tts"
 DEFAULT_TTS_VOICE = "alloy"
 DEFAULT_STT_MODEL = "gpt-4o-mini-transcribe"
+DEFAULT_REALTIME_MODEL = "gpt-realtime"   # GA model; beta preview shape is disabled
 
 SYSTEM_PROMPT = (
     "You are AURA, a concise desk-robot assistant. Answer in 1-2 short spoken "
@@ -215,35 +216,166 @@ class VoiceTurn:
 
 
 # --------------------------------------------------------------------------- #
+# Realtime engine — speech-to-speech, single hop (the candidate fix)
+# --------------------------------------------------------------------------- #
+
+
+class RealtimeTurn:
+    """OpenAI Realtime API. One persistent WebSocket; audio is emitted directly
+    by the model (no separate text-LLM→TTS hop), which is the thing we're testing.
+
+    Connection setup (handshake + session.update) is done ONCE in setup() and
+    excluded from per-turn timing — a shipped robot keeps the socket open.
+    """
+
+    def __init__(self, client: AsyncOpenAI, model: str, voice: str, sink=None) -> None:
+        self._client = client
+        self._model = model
+        self._voice = voice
+        self._sink = sink
+        self._cm = None
+        self._conn = None
+
+    async def setup(self) -> None:
+        # GA Realtime API (client.realtime); fall back to the old beta namespace
+        # only if this SDK predates GA.
+        ns = getattr(self._client, "realtime", None) or self._client.beta.realtime
+        self._cm = ns.connect(model=self._model)
+        self._conn = await self._cm.__aenter__()
+        await self._conn.session.update(session={
+            "type": "realtime",
+            "instructions": SYSTEM_PROMPT,
+            "output_modalities": ["audio"],
+            "audio": {
+                "output": {
+                    "voice": self._voice,
+                    "format": {"type": "audio/pcm", "rate": 24_000},
+                }
+            },
+        })
+
+    async def close(self) -> None:
+        if self._cm is not None:
+            await self._cm.__aexit__(None, None, None)
+
+    async def run(self, prompt: str, t0: float | None = None) -> TurnTiming:
+        conn = self._conn
+        timing = TurnTiming(prompt=prompt)
+
+        await conn.conversation.item.create(item={
+            "type": "message", "role": "user",
+            "content": [{"type": "input_text", "text": prompt}],
+        })
+        t0 = t0 if t0 is not None else time.perf_counter()
+        await conn.response.create()
+
+        got_text = False
+        first_audio = False
+        total = 0
+        transcript = ""
+
+        async for e in conn:
+            etype = getattr(e, "type", "")
+            if etype.endswith("transcript.delta") or etype.endswith("text.delta"):
+                if not got_text:
+                    timing.llm_first_token_ms = (time.perf_counter() - t0) * 1000
+                    got_text = True
+                transcript += getattr(e, "delta", "") or ""
+            elif "audio.delta" in etype:
+                if not first_audio:
+                    timing.first_audio_ms = (time.perf_counter() - t0) * 1000
+                    timing.first_clause_ms = timing.first_audio_ms  # no separate clause stage
+                    first_audio = True
+                import base64
+                b = base64.b64decode(getattr(e, "delta", "") or "")
+                total += len(b)
+                if self._sink is not None:
+                    await self._sink(b)
+            elif etype == "error":
+                raise RuntimeError(f"Realtime error: {getattr(e, 'error', e)}")
+            elif etype == "response.done":
+                break
+
+        timing.full_turn_ms = (time.perf_counter() - t0) * 1000
+        timing.llm_done_ms = timing.full_turn_ms
+        timing.reply = transcript.strip()
+        timing.audio_bytes = total
+        return timing
+
+
+# --------------------------------------------------------------------------- #
 # Text mode (no hardware) — runnable now
 # --------------------------------------------------------------------------- #
 
 
-async def run_text_mode(args) -> None:
-    client = AsyncOpenAI()
+_PROMPTS = [
+    "What meetings do I have today?",
+    "Remind me to call the plumber at four.",
+    "What's the weather looking like this afternoon?",
+    "Tell me a fun fact about octopuses.",
+    "Summarize my unread email in one line.",
+]
+
+
+async def _measure_chained(args, client, prompts) -> Report:
     turn = VoiceTurn(client, args.model, args.tts_model, args.voice, sink=None)
     report = Report()
-
-    prompts = [args.prompt] if args.prompt else [
-        "What meetings do I have today?",
-        "Remind me to call the plumber at four.",
-        "What's the weather looking like this afternoon?",
-        "Tell me a fun fact about octopuses.",
-        "Summarize my unread email in one line.",
-    ]
-
-    print(f"\nLLM={args.model}  TTS={args.tts_model}  voice={args.voice}")
-    print("Warming up (1 untimed turn)…")
+    print(f"\n[chained]  LLM={args.model}  TTS={args.tts_model}  voice={args.voice}")
+    print("  warming up…")
     await turn.run("Say ready.")
-
     for i in range(args.turns):
-        p = prompts[i % len(prompts)]
-        t = await turn.run(p)
+        t = await turn.run(prompts[i % len(prompts)])
         report.add(t)
         print(f"  turn {i+1}: first-audio {t.first_audio_ms:5.0f}ms | "
-              f"full {t.full_turn_ms:5.0f}ms | \"{t.reply[:50]}\"")
+              f"full {t.full_turn_ms:5.0f}ms | \"{t.reply[:46]}\"")
+    return report
 
-    print(report.summary())
+
+async def _measure_realtime(args, client, prompts) -> Report:
+    turn = RealtimeTurn(client, args.realtime_model, args.voice, sink=None)
+    report = Report()
+    print(f"\n[realtime]  model={args.realtime_model}  voice={args.voice}")
+    await turn.setup()
+    try:
+        print("  warming up…")
+        await turn.run("Say ready.")
+        for i in range(args.turns):
+            t = await turn.run(prompts[i % len(prompts)])
+            report.add(t)
+            print(f"  turn {i+1}: first-audio {t.first_audio_ms:5.0f}ms | "
+                  f"full {t.full_turn_ms:5.0f}ms | \"{t.reply[:46]}\"")
+    finally:
+        await turn.close()
+    return report
+
+
+async def run_text_mode(args) -> None:
+    client = AsyncOpenAI()
+    prompts = [args.prompt] if args.prompt else _PROMPTS
+
+    engines = ["chained", "realtime"] if args.engine == "both" else [args.engine]
+    results: dict[str, Report] = {}
+    for eng in engines:
+        try:
+            if eng == "chained":
+                results[eng] = await _measure_chained(args, client, prompts)
+            else:
+                results[eng] = await _measure_realtime(args, client, prompts)
+        except Exception as exc:  # noqa: BLE001 — spike: report and continue
+            print(f"\n[{eng}] FAILED: {type(exc).__name__}: {exc}")
+            if eng == "realtime":
+                print("  (check your key has Realtime access and --realtime-model is valid, "
+                      "e.g. gpt-4o-realtime-preview or gpt-realtime)")
+
+    for eng, rep in results.items():
+        print(f"\n### engine: {eng}")
+        print(rep.summary())
+
+    if len(results) == 2:
+        c = statistics.median(results["chained"]._col("first_audio_ms"))
+        r = statistics.median(results["realtime"]._col("first_audio_ms"))
+        print(f"\n>>> first-audio median:  chained {c:.0f}ms   vs   realtime {r:.0f}ms"
+              f"   →  realtime is {c - r:+.0f}ms ({'faster' if r < c else 'slower'})\n")
 
 
 # --------------------------------------------------------------------------- #
@@ -314,9 +446,12 @@ async def run_audio_mode(args) -> None:
 def main() -> None:
     ap = argparse.ArgumentParser(description="Phase 0 voice-latency spike")
     ap.add_argument("--mode", choices=["text", "audio"], default="text")
+    ap.add_argument("--engine", choices=["chained", "realtime", "both"], default="chained",
+                    help="text mode: chained (LLM→TTS), realtime (speech-to-speech), or both")
     ap.add_argument("--turns", type=int, default=5)
     ap.add_argument("--prompt", default="")
     ap.add_argument("--model", default=DEFAULT_LLM_MODEL)
+    ap.add_argument("--realtime-model", default=DEFAULT_REALTIME_MODEL)
     ap.add_argument("--tts-model", default=DEFAULT_TTS_MODEL)
     ap.add_argument("--stt-model", default=DEFAULT_STT_MODEL)
     ap.add_argument("--voice", default=DEFAULT_TTS_VOICE)

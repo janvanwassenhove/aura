@@ -63,16 +63,43 @@ internet link:
   Chaining a text LLM to a separate TTS service structurally pays the TTS
   first-byte penalty on every turn.
 
-### What this tells us to do next (feeds Phase 3.5)
+## Realtime API results (2026-06-21, dev laptop, speech-to-speech) — GO ✅
 
-1. **Measure the OpenAI Realtime API (speech-to-speech).** It is designed to
-   eliminate exactly this text-LLM→TTS hop by emitting audio directly — the most
-   likely way to get first-audio under target. This is the next experiment.
-2. **Compare a lower-first-byte TTS** (local Piper/Kokoro on the laptop, or a
-   streaming TTS with faster TTFB) behind the same harness.
-3. Then add the **mic→Pi→laptop** legs (`--mode audio`) and re-measure on the
-   real **Reachy Mini Wireless** over the LAN — network adds to every number
-   above, so the cloud-vs-local decision must be made on *on-device* numbers.
+`--mode text --engine realtime`, `gpt-realtime` GA model, n=5, same network:
+
+| Stage | median | p95 |
+|---|---|---|
+| First token (transcript) | 423 ms | 472 ms |
+| **► First audio out** | **556 ms** | **598 ms** |
+| Full turn (last audio) | 1689 ms | 1793 ms |
+
+### Head-to-head
+
+| Path | First audio (median) | Full turn | Verdict |
+|---|---|---|---|
+| Chained (LLM → separate TTS) | ~1065 ms | ~3.1 s | ⚠️ marginal |
+| **Realtime (speech-to-speech)** | **556 ms** | **~1.7 s** | **✅ GO (< 700 ms)** |
+
+The Realtime API nearly **halves** first-audio and full-turn latency by emitting
+audio directly — it removes the ~800 ms TTS-first-byte hop the chained breakdown
+exposed. **This is the Phase 0 go/no-go answer: GO, on the speech-to-speech
+transport.**
+
+### What this means for the build (feeds Phase 1 + 3.5)
+
+1. **Adopt the OpenAI Realtime API as the default voice transport** in
+   `conversation-runtime` (the constitution already names it; the *current code*
+   doesn't implement it — it uses batch `whisper-1`/`tts-1`). Realtime does
+   STT + reasoning + TTS in one hop and supports **barge-in** and **function
+   calling** natively, which also collapses the "two sequential LLM calls"
+   problem in the orchestrator.
+2. Keep **streaming-local** (Whisper + Piper/Kokoro) behind the same provider ABC
+   as the **offline** tier — measure it on the Pi with `--engine chained` +
+   local models so the offline fallback has known numbers.
+3. Add the **mic→Pi→laptop** legs (`--mode audio`) and re-measure on the real
+   **Reachy Mini Wireless** over the LAN before locking the budget — network adds
+   to every number above. The cloud Realtime number must be re-confirmed
+   on-device.
 
 ## Caveats
 

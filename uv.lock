@@ -724,8 +724,7 @@ version = "0.1.0"
 source = { editable = "services/identity-service" }
 dependencies = [
     { name = "fastapi" },
-    { name = "google-api-python-client" },
-    { name = "google-auth-oauthlib" },
+    { name = "httpx" },
     { name = "keyring" },
     { name = "keyrings-cryptfile" },
     { name = "msal" },
@@ -745,8 +744,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "fastapi", specifier = ">=0.111" },
-    { name = "google-api-python-client", specifier = ">=2.0" },
-    { name = "google-auth-oauthlib", specifier = ">=1.2" },
+    { name = "httpx", specifier = ">=0.27" },
     { name = "httpx", marker = "extra == 'dev'", specifier = ">=0.27" },
     { name = "keyring", specifier = ">=25.0" },
     { name = "keyrings-cryptfile", specifier = ">=1.3" },

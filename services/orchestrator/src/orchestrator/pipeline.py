@@ -14,6 +14,7 @@ from orchestrator.fallback_agent import FallbackAgent
 from orchestrator.intent_router import IntentRouter
 from orchestrator.llm import openai_chat
 from orchestrator.persona_manager import PersonaManager
+from orchestrator.tool_schemas import build_tool_specs
 from shared_events.bus import AsyncEventBus
 from shared_policies import APPROVAL_REQUIRED
 from shared_schemas.events.conversation import IntentRecognized, ResponseDrafted
@@ -90,8 +91,9 @@ class OrchestratorPipeline:
             {"role": "user", "content": text},
         ]
 
-        # Call LLM
-        llm_response = await openai_chat(messages)
+        # Call LLM — advertise the allowed tools so it can emit real tool_calls.
+        tool_specs = build_tool_specs(allowed)
+        llm_response = await openai_chat(messages, tools=tool_specs or None)
         content: str | None = llm_response["content"]
         tool_calls: list | None = llm_response["tool_calls"]
 
@@ -110,15 +112,29 @@ class OrchestratorPipeline:
             )
             return reply
 
-        # Handle tool calls sequentially
-        tool_results: list[str] = []
+        # Handle tool calls sequentially. The OpenAI API requires that EVERY
+        # advertised tool_call gets a matching `tool` message on the follow-up
+        # turn — including blocked/denied ones — keyed by tool_call_id.
+        assistant_tool_calls: list[dict] = []  # OpenAI-shaped, for the follow-up message
+        tool_messages: list[dict] = []         # one per tool_call, with tool_call_id
         for tc in tool_calls:
             tool_name: str = tc["name"]
+            tc_id: str = tc.get("id") or f"call_{tool_name}"
+            raw_args = tc.get("arguments", "{}")
+            args_str = raw_args if isinstance(raw_args, str) else json.dumps(raw_args)
             try:
-                raw_args = tc.get("arguments", "{}")
-                arguments: dict = json.loads(raw_args) if isinstance(raw_args, str) else raw_args
+                arguments: dict = json.loads(args_str) if args_str else {}
             except json.JSONDecodeError:
                 arguments = {}
+
+            assistant_tool_calls.append({
+                "id": tc_id,
+                "type": "function",
+                "function": {"name": tool_name, "arguments": args_str},
+            })
+
+            def _record(result: str) -> None:
+                tool_messages.append({"role": "tool", "tool_call_id": tc_id, "content": result})
 
             # Mode check
             if not self._router.is_allowed(tool_name):
@@ -126,7 +142,7 @@ class OrchestratorPipeline:
                 await self._bus.publish(
                     ToolCallFailed(session_id=session_id, tool_name=tool_name, error_code="mode_mismatch")
                 )
-                tool_results.append(f"[{tool_name}: not available in current mode]")
+                _record(f"[{tool_name}: not available in current mode]")
                 continue
 
             await self._bus.publish(
@@ -142,13 +158,13 @@ class OrchestratorPipeline:
                     await self._bus.publish(
                         ToolCallFailed(session_id=session_id, tool_name=tool_name, error_code="approval_timeout")
                     )
-                    tool_results.append(f"[{tool_name}: approval timed out]")
+                    _record(f"[{tool_name}: approval timed out]")
                     continue
                 except ApprovalDeniedError:
                     await self._bus.publish(
                         ToolCallFailed(session_id=session_id, tool_name=tool_name, error_code="approval_denied")
                     )
-                    tool_results.append(f"[{tool_name}: denied by user]")
+                    _record(f"[{tool_name}: denied by user]")
                     continue
 
             # Execute via connector-service
@@ -160,15 +176,18 @@ class OrchestratorPipeline:
                     result_summary=result_text[:500],
                 )
             )
-            tool_results.append(f"[{tool_name}]: {result_text}")
+            _record(result_text)
 
         # Synthesize final response from tool results
-        if tool_results:
-            tool_summary = "\n".join(tool_results)
-            messages.append({"role": "assistant", "content": content or "", "tool_calls": tool_calls})
-            messages.append({"role": "tool", "content": tool_summary})
+        if tool_messages:
+            messages.append({
+                "role": "assistant",
+                "content": content or None,
+                "tool_calls": assistant_tool_calls,
+            })
+            messages.extend(tool_messages)
             final = await openai_chat(messages)
-            reply = final["content"] or tool_summary
+            reply = final["content"] or "\n".join(m["content"] for m in tool_messages)
         else:
             reply = content or "(no response)"
 
@@ -180,6 +199,12 @@ class OrchestratorPipeline:
         if route is None:
             return f"(no connector route for {tool_name!r})"
         method, path = route
+        # Substitute path params (e.g. /calendar/events/{id}) from arguments.
+        if "{" in path:
+            try:
+                path = path.format(**arguments)
+            except KeyError as exc:
+                return f"(missing path argument {exc} for {tool_name!r})"
         url = f"{self._connector_url}{path}"
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
