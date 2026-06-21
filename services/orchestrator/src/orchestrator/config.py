@@ -10,9 +10,11 @@ import os
 from dataclasses import dataclass, field
 from typing import Literal
 
-LLMProvider = Literal["openai", "openrouter", "gemini", "echo"]
+LLMProvider = Literal["openai", "openrouter", "gemini", "anthropic", "ollama", "echo"]
 
-_VALID_PROVIDERS: frozenset[str] = frozenset({"openai", "openrouter", "gemini", "echo"})
+_VALID_PROVIDERS: frozenset[str] = frozenset(
+    {"openai", "openrouter", "gemini", "anthropic", "ollama", "echo"}
+)
 
 
 def _default_model(provider: str) -> str:
@@ -20,6 +22,10 @@ def _default_model(provider: str) -> str:
         return os.environ.get("OPENROUTER_MODEL", "openai/gpt-oss-120b:free")
     if provider == "gemini":
         return os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
+    if provider == "anthropic":
+        return os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-4-6")
+    if provider == "ollama":
+        return os.environ.get("OLLAMA_MODEL", "llama3.1")
     return os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
 
 

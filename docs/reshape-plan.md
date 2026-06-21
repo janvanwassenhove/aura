@@ -65,9 +65,13 @@ Prove the current online path actually works before restructuring around it.
       `knowledge/` to `docs/method/` (or a separate archive repo). Add a
       `.gitignore` entry for the stray `node_modules/`, `dist/`, `.pytest_cache/`
       currently untracked.
-- [ ] Decide LLM-provider story for "brain": confirm provider switch covers your
-      ChatGPT/Claude/Copilot subscriptions via API keys, and note which need a
-      local proxy.
+- [x] **LLM-provider story (done).** Multi-provider behind the runtime switch:
+      `openai`, `anthropic` (Claude), `ollama` (local), plus existing `openrouter`/
+      `gemini`/`echo` — all tool-calling-capable (Anthropic via OpenAI↔Anthropic
+      message conversion in `llm.py`). `OPENAI_BASE_URL` fronts an OpenAI-compatible
+      proxy, which is the route for a ChatGPT/Copilot subscription (no direct API).
+      Documented in `.env.example`; wired through docker-compose. Tests 110 passed.
+      *Note:* Ollama runs on the laptop brain, never the Pi.
 
 **Exit:** a real conversation triggers a real (mock) tool call and an approval.
 

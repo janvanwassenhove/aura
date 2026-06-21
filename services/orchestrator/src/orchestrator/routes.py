@@ -45,10 +45,11 @@ class LLMConfigResponse(BaseModel):
     openai_key_set: bool
     openrouter_key_set: bool
     gemini_key_set: bool
+    anthropic_key_set: bool = False
 
 
 class LLMConfigUpdate(BaseModel):
-    provider: Literal["openai", "openrouter", "gemini", "echo"]
+    provider: Literal["openai", "openrouter", "gemini", "anthropic", "ollama", "echo"]
     model: str = ""
 
 
@@ -124,6 +125,7 @@ def _llm_config_response(cfg) -> LLMConfigResponse:
         openai_key_set=bool(os.environ.get("OPENAI_API_KEY")),
         openrouter_key_set=bool(os.environ.get("OPENROUTER_API_KEY")),
         gemini_key_set=bool(os.environ.get("GEMINI_API_KEY")),
+        anthropic_key_set=bool(os.environ.get("ANTHROPIC_API_KEY")),
     )
 
 
@@ -136,16 +138,8 @@ async def get_llm_config() -> LLMConfigResponse:
 @router.patch("/orchestrator/config/llm", response_model=LLMConfigResponse)
 async def patch_llm_config(body: LLMConfigUpdate) -> LLMConfigResponse:
     """Update the runtime LLM provider and model without restarting."""
-    model = body.model
-    if not model:
-        if body.provider == "openrouter":
-            model = os.environ.get("OPENROUTER_MODEL", "openai/gpt-oss-120b:free")
-        elif body.provider == "gemini":
-            model = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
-        elif body.provider == "echo":
-            model = ""
-        else:
-            model = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
+    from orchestrator.config import _default_model
+    model = body.model or ("" if body.provider == "echo" else _default_model(body.provider))
     cfg = update_config(body.provider, model)
     return _llm_config_response(cfg)
 
