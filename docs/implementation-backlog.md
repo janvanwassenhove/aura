@@ -44,11 +44,10 @@ the human can unblock it.
 - [x] **U1 — mount memory router** · deps: none · `e428c28`
   `set_store(store)` + `ReminderScheduler(ctx.bus)` + `include_router` in `aura_brain.main`.
   Done: `/memory/health` + todo create/list round-trip through the brain; brain suite 3 green.
-- [ ] **U2 — identity → APIRouter + mount** · deps: none
-  Refactor `identity-service` app-level routes into an `APIRouter`; keep its app working; mount in brain.
-  Done: `/identity/persona` reachable via brain; identity + brain tests green.
-- [ ] **U3 — mount connector router** · deps: U1
-  `routes.init(registry, bus=ctx.bus)`; mount. Done: `/connector/health` via brain; tests green.
+- [x] **U2 — identity → APIRouter + mount** · deps: none · `98ba088`
+  identity routes moved onto an `APIRouter`; `create_app()`/`app` kept for standalone. Brain mounts it; `/identity/persona` reachable; brain suite 4 green.
+- [x] **U3 — mount connector router** · deps: U1 · `99252b6`
+  Brain lifespan builds `ConnectorRegistry` (mock M365), sets primary+registry, mounts router. `/connector/health` via brain; brain suite 5 green.
 - [ ] **U4 — mount conversation router** · deps: U1
   `routes.init(stt, tts, bus=ctx.bus, …)` with mock/echo providers; mount. Done: text-turn route via brain; tests green.
 - [ ] **U5 — mount orchestrator router** · deps: U2,U3,U4
@@ -115,3 +114,4 @@ the human can unblock it.
 
 - 2026-06-21 — ledger created on `aura-autobuild`; Phase 0/0b complete, Phase 1 scaffold (U-pre) done before this loop started.
 - 2026-06-21 — U1 done (`e428c28`): memory router mounted into aura-brain, shared bus. Next: U2 (identity → APIRouter).
+- 2026-06-21 — U2 (`98ba088`) + U3 (`99252b6`): identity refactored to APIRouter + mounted; connector registry built + mounted. Brain suite 5 green. Next: U4 (conversation router), then U5 (orchestrator — deps U2,U3,U4 now needs only U4).
