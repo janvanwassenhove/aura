@@ -57,3 +57,12 @@ def test_identity_module_mounted() -> None:
         body = resp.json()
         assert "persona" in body
         assert "authenticated_providers" in body
+
+
+def test_connector_module_mounted() -> None:
+    """U3: connector routes are reachable via brain and the registry is wired."""
+    app = create_app()
+    with TestClient(app) as client:
+        resp = client.get("/connector/health")
+        assert resp.status_code == 200
+        assert ctx.connector_registry is not None

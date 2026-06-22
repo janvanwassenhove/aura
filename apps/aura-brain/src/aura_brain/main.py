@@ -50,6 +50,7 @@ class BrainContext:
         # Module singletons (populated in lifespan as modules are mounted).
         self.memory_store = None
         self._reminder_scheduler = None
+        self.connector_registry = None
 
 
 ctx = BrainContext()
@@ -77,7 +78,20 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     ctx._reminder_scheduler = ReminderScheduler(ctx.memory_store, ctx.bus, session_id=session_id)
     await ctx._reminder_scheduler.start()
 
-    # step 2 (next units): identity, connector, conversation, orchestrator
+    # --- U3: connector module ---
+    from connector_service import routes as connector_routes
+    from connector_service.registry import ConnectorRegistry
+    from shared_config import ConnectorServiceSettings
+
+    connector_registry = ConnectorRegistry(settings=ConnectorServiceSettings())
+    connector_registry.build()
+    primary = connector_registry.get_primary_m365()
+    if primary is not None:
+        connector_routes.set_connector(primary)
+    connector_routes.set_registry(connector_registry)
+    ctx.connector_registry = connector_registry
+
+    # step 2 (next units): conversation, orchestrator
     # step 2: start heartbeat (brain↔robot link), offline queue
 
     yield
@@ -117,6 +131,9 @@ def create_app() -> FastAPI:
 
     from identity_service.main import router as identity_router
     app.include_router(identity_router)  # U2
+
+    from connector_service import routes as connector_routes
+    app.include_router(connector_routes.router)  # U3
 
     return app
 
