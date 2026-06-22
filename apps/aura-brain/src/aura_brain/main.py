@@ -115,6 +115,9 @@ def create_app() -> FastAPI:
     from memory_service import routes as memory_routes
     app.include_router(memory_routes.router)  # U1
 
+    from identity_service.main import router as identity_router
+    app.include_router(identity_router)  # U2
+
     return app
 
 

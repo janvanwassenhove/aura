@@ -46,3 +46,14 @@ def test_memory_module_mounted() -> None:
         assert listed.status_code == 200
         assert any(t["text"] == "buy milk" for t in listed.json())
         assert ctx.memory_store is not None  # singleton wired in lifespan
+
+
+def test_identity_module_mounted() -> None:
+    """U2: identity routes (refactored to an APIRouter) are reachable via brain."""
+    app = create_app()
+    with TestClient(app) as client:
+        resp = client.get("/identity/persona")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert "persona" in body
+        assert "authenticated_providers" in body

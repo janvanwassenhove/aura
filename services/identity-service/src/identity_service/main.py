@@ -19,7 +19,7 @@ import asyncio
 import logging
 from datetime import UTC, datetime, timedelta
 
-from fastapi import FastAPI, HTTPException
+from fastapi import APIRouter, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
@@ -41,15 +41,9 @@ _token_store: TokenStore = build_token_store(
     cryptfile_path=_settings.keyring_cryptfile_path,
 )
 
-app = FastAPI(title="AURA Identity Service", version="0.3.0")
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# Routes live on an APIRouter so the identity module can be mounted into the
+# unified aura-brain process (Phase 1) as well as run standalone (create_app).
+router = APIRouter()
 
 _active_persona = Persona(_settings.active_persona)
 
@@ -137,7 +131,7 @@ def _github_flow() -> object:
 # Health
 # ---------------------------------------------------------------------------
 
-@app.get("/health")
+@router.get("/health")
 async def health() -> JSONResponse:
     return JSONResponse({"status": "ok"})
 
@@ -146,7 +140,7 @@ async def health() -> JSONResponse:
 # Persona
 # ---------------------------------------------------------------------------
 
-@app.get("/identity/persona")
+@router.get("/identity/persona")
 async def get_persona() -> JSONResponse:
     cfg = get_persona_config(_active_persona)
     # Report which providers have stored (possibly expired) tokens for the active user.
@@ -162,7 +156,7 @@ async def get_persona() -> JSONResponse:
     })
 
 
-@app.post("/identity/persona")
+@router.post("/identity/persona")
 async def set_persona(body: dict) -> JSONResponse:
     global _active_persona
     try:
@@ -177,7 +171,7 @@ async def set_persona(body: dict) -> JSONResponse:
 # Token endpoint (for connector-service)
 # ---------------------------------------------------------------------------
 
-@app.get("/identity/token/{user_id}/{provider}")
+@router.get("/identity/token/{user_id}/{provider}")
 async def get_token(user_id: str, provider: str) -> JSONResponse:
     """Return a valid access token for (user_id, provider).
 
@@ -227,7 +221,7 @@ async def get_token(user_id: str, provider: str) -> JSONResponse:
 # Microsoft Device Code flow
 # ---------------------------------------------------------------------------
 
-@app.post("/identity/auth/microsoft/start")
+@router.post("/identity/auth/microsoft/start")
 async def microsoft_auth_start(body: dict) -> JSONResponse:
     """Start Microsoft Device Code flow.
 
@@ -258,7 +252,7 @@ async def microsoft_auth_start(body: dict) -> JSONResponse:
     })
 
 
-@app.post("/identity/auth/microsoft/poll")
+@router.post("/identity/auth/microsoft/poll")
 async def microsoft_auth_poll(body: dict) -> JSONResponse:
     """Complete a Device Code flow previously started via /start.
 
@@ -294,7 +288,7 @@ async def microsoft_auth_poll(body: dict) -> JSONResponse:
 # Google Device Code flow
 # ---------------------------------------------------------------------------
 
-@app.post("/identity/auth/google/start")
+@router.post("/identity/auth/google/start")
 async def google_auth_start(body: dict) -> JSONResponse:
     """Start Google Device Code flow.
 
@@ -325,7 +319,7 @@ async def google_auth_start(body: dict) -> JSONResponse:
     })
 
 
-@app.post("/identity/auth/google/poll")
+@router.post("/identity/auth/google/poll")
 async def google_auth_poll(body: dict) -> JSONResponse:
     """Complete a Google Device Code flow previously started via /start.
 
@@ -363,7 +357,7 @@ async def google_auth_poll(body: dict) -> JSONResponse:
 # GitHub Device Code flow
 # ---------------------------------------------------------------------------
 
-@app.post("/identity/auth/github/start")
+@router.post("/identity/auth/github/start")
 async def github_auth_start(body: dict) -> JSONResponse:
     """Start GitHub Device Code flow.
 
@@ -394,7 +388,7 @@ async def github_auth_start(body: dict) -> JSONResponse:
     })
 
 
-@app.post("/identity/auth/github/poll")
+@router.post("/identity/auth/github/poll")
 async def github_auth_poll(body: dict) -> JSONResponse:
     """Complete a GitHub Device Code flow previously started via /start.
 
@@ -432,7 +426,7 @@ async def github_auth_poll(body: dict) -> JSONResponse:
 # Generic token management (GitHub, Slack — simple API-key storage)
 # ---------------------------------------------------------------------------
 
-@app.put("/identity/token/{user_id}/{provider}")
+@router.put("/identity/token/{user_id}/{provider}")
 async def store_token(user_id: str, provider: str, body: dict) -> JSONResponse:
     """Store an API key / token for a simple provider (e.g. github, slack).
 
@@ -454,7 +448,7 @@ async def store_token(user_id: str, provider: str, body: dict) -> JSONResponse:
     return JSONResponse({"status": "stored", "provider": provider, "user_id": user_id})
 
 
-@app.delete("/identity/token/{user_id}/{provider}")
+@router.delete("/identity/token/{user_id}/{provider}")
 async def revoke_token(user_id: str, provider: str) -> JSONResponse:
     """Remove stored token for (user_id, provider)."""
     _token_store.delete(user_id, provider)
@@ -465,7 +459,7 @@ async def revoke_token(user_id: str, provider: str) -> JSONResponse:
 # Provider configuration status
 # ---------------------------------------------------------------------------
 
-@app.get("/identity/config")
+@router.get("/identity/config")
 async def get_config() -> JSONResponse:
     """Report which OAuth providers are ready (have client_ids configured).
 
@@ -488,6 +482,26 @@ async def get_config() -> JSONResponse:
             "ready": True,  # Slack always accepts token paste — no OAuth app needed
         },
     })
+
+
+# ---------------------------------------------------------------------------
+# Application factory (standalone) — the brain mounts `router` directly instead
+# ---------------------------------------------------------------------------
+
+def create_app() -> FastAPI:
+    app = FastAPI(title="AURA Identity Service", version="0.3.0")
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["http://localhost:5173"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+    app.include_router(router)
+    return app
+
+
+app = create_app()
 
 
 # ---------------------------------------------------------------------------
