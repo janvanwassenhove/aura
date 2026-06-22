@@ -41,9 +41,9 @@ the human can unblock it.
 
 ## Phase 1 — collapse to aura-brain  (scaffold done: 3263ffc)
 
-- [ ] **U1 — mount memory router** · deps: none
-  `routes.init(store, bus=ctx.bus)` + `include_router` in `aura_brain.main`.
-  Done: `GET /memory/health` and a todo create/list work through the brain app; brain tests green.
+- [x] **U1 — mount memory router** · deps: none · `e428c28`
+  `set_store(store)` + `ReminderScheduler(ctx.bus)` + `include_router` in `aura_brain.main`.
+  Done: `/memory/health` + todo create/list round-trip through the brain; brain suite 3 green.
 - [ ] **U2 — identity → APIRouter + mount** · deps: none
   Refactor `identity-service` app-level routes into an `APIRouter`; keep its app working; mount in brain.
   Done: `/identity/persona` reachable via brain; identity + brain tests green.
@@ -114,3 +114,4 @@ the human can unblock it.
 ## Progress log (append-only; newest last)
 
 - 2026-06-21 — ledger created on `aura-autobuild`; Phase 0/0b complete, Phase 1 scaffold (U-pre) done before this loop started.
+- 2026-06-21 — U1 done (`e428c28`): memory router mounted into aura-brain, shared bus. Next: U2 (identity → APIRouter).
