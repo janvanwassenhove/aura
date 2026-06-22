@@ -3,6 +3,12 @@ single shared bus starts/stops cleanly via the app lifespan."""
 
 from __future__ import annotations
 
+import os
+
+# In-memory DB before any import pulls in memory_service.db.session (which reads
+# DATABASE_URL at import time). Mirrors the memory-service unit tests.
+os.environ.setdefault("DATABASE_URL", "sqlite+aiosqlite:///:memory:")
+
 from fastapi.testclient import TestClient
 
 from aura_brain.main import create_app, ctx
@@ -26,3 +32,17 @@ def test_single_shared_bus_instance() -> None:
 
     c = BrainContext()
     assert c.broadcaster._bus is c.bus
+
+
+def test_memory_module_mounted() -> None:
+    """U1: the memory router is reachable through the unified brain app and a
+    todo round-trips against the in-process store."""
+    app = create_app()
+    with TestClient(app) as client:
+        assert client.get("/memory/health").status_code == 200
+        created = client.post("/memory/todos", json={"text": "buy milk"})
+        assert created.status_code in (200, 201)
+        listed = client.get("/memory/todos")
+        assert listed.status_code == 200
+        assert any(t["text"] == "buy milk" for t in listed.json())
+        assert ctx.memory_store is not None  # singleton wired in lifespan

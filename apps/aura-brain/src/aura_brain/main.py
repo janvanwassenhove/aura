@@ -47,6 +47,9 @@ class BrainContext:
     def __init__(self) -> None:
         self.bus = AsyncEventBus()
         self.broadcaster = WebSocketBroadcaster(self.bus)
+        # Module singletons (populated in lifespan as modules are mounted).
+        self.memory_store = None
+        self._reminder_scheduler = None
 
 
 ctx = BrainContext()
@@ -55,9 +58,32 @@ ctx = BrainContext()
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     await ctx.bus.start()
-    # step 2: build module singletons + call each routes.init(..., bus=ctx.bus)
-    # step 2: start heartbeat (brain↔robot link), offline queue, reminder scheduler
+
+    # --- U1: memory module (shares ctx.bus) ---
+    # Ensure the default file-backed SQLite dir exists for real runs (tests
+    # override DATABASE_URL with :memory:).
+    if "/:memory:" not in os.environ.get("DATABASE_URL", ""):
+        os.makedirs("./data", exist_ok=True)
+
+    from memory_service import routes as memory_routes
+    from memory_service.db.session import init_db
+    from memory_service.scheduler import ReminderScheduler
+    from memory_service.store import SQLiteMemoryStore
+
+    await init_db()
+    ctx.memory_store = SQLiteMemoryStore()
+    memory_routes.set_store(ctx.memory_store)
+    session_id = os.environ.get("DEFAULT_SESSION_ID", "default")
+    ctx._reminder_scheduler = ReminderScheduler(ctx.memory_store, ctx.bus, session_id=session_id)
+    await ctx._reminder_scheduler.start()
+
+    # step 2 (next units): identity, connector, conversation, orchestrator
+    # step 2: start heartbeat (brain↔robot link), offline queue
+
     yield
+
+    if ctx._reminder_scheduler is not None:
+        await ctx._reminder_scheduler.stop()
     await ctx.bus.stop()
 
 
@@ -85,7 +111,9 @@ def create_app() -> FastAPI:
         finally:
             ctx.broadcaster.disconnect(websocket)
 
-    # --- step 2 mounts go here (see module docstring for order) ---
+    # --- step 2 mounts (see module docstring for order) ---
+    from memory_service import routes as memory_routes
+    app.include_router(memory_routes.router)  # U1
 
     return app
 
