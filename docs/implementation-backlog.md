@@ -54,8 +54,8 @@ the human can unblock it.
   Full orchestrator wiring (pipeline, persona, approval, gateway, presentation, offline queue, webhook dispatcher) on `ctx.bus`; mounted. `/orchestrator/turn` (echo) + `/orchestrator/config/llm` via brain. All 5 modules now one process. Brain suite 7 green.
 - [x] **U6 — one shared bus, verified** · deps: U5 · `e2383fd`
   Integration test: an orchestrator echo turn delivers `ResponseDrafted` on `ctx.bus`; broadcaster + pipeline are wired to that same bus instance. Brain suite 8 green.
-- [ ] **U7 — seam: connector→identity in-process** · deps: U5
-  Replace the HTTP token fetch in `connectors/{github,google,slack,workiq}` with an injected in-process TokenStore handle. Convert its tests.
+- [x] **U7 — seam: connector→identity in-process** · deps: U5 · `7389618`
+  Connectors gain an optional async `token_fetcher`; when set they skip the HTTP token fetch (HTTP kept as fallback). Registry threads it; identity exposes in-process `get_valid_token`; brain injects it. Connector suite 26 green (+3 seam tests); brain 8 green.
 - [ ] **U8 — seam: orchestrator→connector in-process** · deps: U5
   `pipeline._call_connector` calls the connector module directly (keep an HTTP fallback flag). Convert tests.
 - [ ] **U9 — seam: →memory in-process** · deps: U5
@@ -116,3 +116,4 @@ the human can unblock it.
 - 2026-06-21 — U2 (`98ba088`) + U3 (`99252b6`): identity refactored to APIRouter + mounted; connector registry built + mounted. Brain suite 5 green. Next: U4 (conversation router), then U5 (orchestrator — deps U2,U3,U4 now needs only U4).
 - 2026-06-21 — U4 (`dedea85`) + U5 (`960c73a`): conversation (null providers) + orchestrator mounted. **Phase 1 step 2 (mounting) COMPLETE — all 5 modules serve from one aura-brain process, one shared bus.** Brain suite 7 green. Next: U6 (verify single bus end-to-end), then seams U7–U10.
 - 2026-06-21 — U6 (`e2383fd`): shared-bus invariant verified (brain suite 8). Stopped at 1 unit — next is U7, a 4-connector seam (github/google/slack/workiq → identity in-process) better suited to a fresh budget. Approach: add an injectable async `token_fetcher(user_id, provider)` to those connectors + registry; identity exposes an in-process token helper; brain injects it.
+- 2026-06-21 — U7 (`7389618`): connector→identity seam flipped in-process across all 4 connectors + registry + identity helper + brain wiring (large multi-file unit; stopped at 1). Next: U8 (orchestrator→connector in-process — `pipeline._call_connector` calls the connector module directly, keep HTTP fallback flag).
