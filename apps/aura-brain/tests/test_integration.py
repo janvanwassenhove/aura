@@ -47,3 +47,19 @@ async def test_pipeline_calls_connector_in_process() -> None:
         assert ctx.pipeline._connector_client is not None  # in-process client wired
         result = await ctx.pipeline._call_connector("list_calendar_events_today", {})
         assert "Standup" in result  # mock connector calendar data, end-to-end
+
+
+def test_conversation_persists_to_memory_in_process() -> None:
+    """U9: a conversation turn persists to memory in-process (conversation→memory
+    seam), reachable via /memory/turns on the same app — no network hop."""
+    from fastapi.testclient import TestClient
+
+    app = create_app()
+    with TestClient(app) as client:
+        sid = "u9-session"
+        turn = client.post("/conversation/turn", json={"text": "remember this", "session_id": sid})
+        assert turn.status_code == 200
+        stored = client.get(f"/memory/turns/{sid}")
+        assert stored.status_code == 200
+        contents = [t["content"] for t in stored.json()]
+        assert any("remember this" in c for c in contents)  # user turn persisted in-process

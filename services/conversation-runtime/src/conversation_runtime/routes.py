@@ -23,6 +23,9 @@ _bus: AsyncEventBus | None = None
 _sessions: SessionManager | None = None
 _orchestrator_url: str = "http://orchestrator:8003"
 _memory_url: str = "http://memory-service:8005"
+# When set (aura-brain), orchestrator + memory calls go in-process via this
+# client's ASGI transport instead of over HTTP (Phase 1 seam, U9).
+_inproc_client: httpx.AsyncClient | None = None
 
 
 def init(
@@ -33,24 +36,28 @@ def init(
     *,
     orchestrator_url: str = "http://orchestrator:8003",
     memory_url: str = "http://memory-service:8005",
+    inproc_client: httpx.AsyncClient | None = None,
 ) -> None:
-    global _stt, _tts, _bus, _sessions, _orchestrator_url, _memory_url
+    global _stt, _tts, _bus, _sessions, _orchestrator_url, _memory_url, _inproc_client
     _stt = stt
     _tts = tts
     _bus = bus
     _sessions = sessions
     _orchestrator_url = orchestrator_url
     _memory_url = memory_url
+    _inproc_client = inproc_client
 
 
 async def _call_orchestrator(text: str, session_id: str) -> str:
     """Forward turn to orchestrator; fall back to echo on connection error."""
+    payload = {"text": text, "session_id": session_id}
     try:
+        if _inproc_client is not None:
+            resp = await _inproc_client.post("/orchestrator/turn", json=payload)
+            resp.raise_for_status()
+            return resp.json().get("reply", text)
         async with httpx.AsyncClient(timeout=30.0) as client:
-            resp = await client.post(
-                f"{_orchestrator_url}/orchestrator/turn",
-                json={"text": text, "session_id": session_id},
-            )
+            resp = await client.post(f"{_orchestrator_url}/orchestrator/turn", json=payload)
             resp.raise_for_status()
             return resp.json().get("reply", text)
     except Exception as exc:
@@ -60,12 +67,13 @@ async def _call_orchestrator(text: str, session_id: str) -> str:
 
 async def _persist_turn(session_id: str, role: str, content: str) -> None:
     """Best-effort persist turn to memory-service."""
+    payload = {"session_id": session_id, "role": role, "content": content}
     try:
+        if _inproc_client is not None:
+            await _inproc_client.post("/memory/turns", json=payload)
+            return
         async with httpx.AsyncClient(timeout=5.0) as client:
-            await client.post(
-                f"{_memory_url}/memory/turns",
-                json={"session_id": session_id, "role": role, "content": content},
-            )
+            await client.post(f"{_memory_url}/memory/turns", json=payload)
     except Exception as exc:
         logger.debug("Turn persistence skipped: %s", exc)
 

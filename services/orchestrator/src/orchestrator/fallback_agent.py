@@ -51,10 +51,13 @@ _REMINDER_BODY_RE = re.compile(
 class FallbackAgent:
     """Offline pattern-matching agent."""
 
-    def __init__(self) -> None:
+    def __init__(self, memory_client: httpx.AsyncClient | None = None) -> None:
         self._memory_url = os.environ.get(
             "MEMORY_SERVICE_URL", "http://memory-service:8005"
         )
+        # When set (aura-brain), reminders are created in-process via this client's
+        # ASGI transport instead of over HTTP (Phase 1 seam, U9).
+        self._memory_client = memory_client
 
     # ------------------------------------------------------------------ #
     # Public API
@@ -158,11 +161,14 @@ class FallbackAgent:
 
     async def _create_reminder(self, message: str, session_id: str) -> bool:
         """Attempt to create a reminder in the memory service.  Returns True on success."""
+        payload = {"session_id": session_id, "message": message}
         try:
+            if self._memory_client is not None:
+                resp = await self._memory_client.post("/memory/reminders", json=payload)
+                return resp.is_success
             async with httpx.AsyncClient(timeout=3.0) as client:
                 resp = await client.post(
-                    f"{self._memory_url}/memory/reminders",
-                    json={"session_id": session_id, "message": message},
+                    f"{self._memory_url}/memory/reminders", json=payload
                 )
                 return resp.is_success
         except Exception as exc:
