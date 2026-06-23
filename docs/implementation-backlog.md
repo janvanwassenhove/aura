@@ -48,11 +48,10 @@ the human can unblock it.
   identity routes moved onto an `APIRouter`; `create_app()`/`app` kept for standalone. Brain mounts it; `/identity/persona` reachable; brain suite 4 green.
 - [x] **U3 — mount connector router** · deps: U1 · `99252b6`
   Brain lifespan builds `ConnectorRegistry` (mock M365), sets primary+registry, mounts router. `/connector/health` via brain; brain suite 5 green.
-- [ ] **U4 — mount conversation router** · deps: U1
-  `routes.init(stt, tts, bus=ctx.bus, …)` with mock/echo providers; mount. Done: text-turn route via brain; tests green.
-- [ ] **U5 — mount orchestrator router** · deps: U2,U3,U4
-  Wire pipeline, persona, approval, gateway, presentation, offline queue against `ctx.bus`; mount.
-  Done: `/orchestrate` + `/orchestrator/config/llm` via brain; orchestrator tests green.
+- [x] **U4 — mount conversation router** · deps: U1 · `dedea85`
+  Added Null STT/TTS providers (`STT_PROVIDER/TTS_PROVIDER=null`) so it mounts text-first without Whisper/Kokoro; `routes.init(... ctx.bus ...)` + mount. Text turn round-trips (echo fallback). Brain suite 6 green.
+- [x] **U5 — mount orchestrator router** · deps: U2,U3,U4 · `960c73a`
+  Full orchestrator wiring (pipeline, persona, approval, gateway, presentation, offline queue, webhook dispatcher) on `ctx.bus`; mounted. `/orchestrator/turn` (echo) + `/orchestrator/config/llm` via brain. All 5 modules now one process. Brain suite 7 green.
 - [ ] **U6 — one shared bus, verified** · deps: U5
   Assert every module published onto `ctx.bus`; a single `/ws/events` carries the whole stream. Add a brain integration test.
 - [ ] **U7 — seam: connector→identity in-process** · deps: U5
@@ -115,3 +114,4 @@ the human can unblock it.
 - 2026-06-21 — ledger created on `aura-autobuild`; Phase 0/0b complete, Phase 1 scaffold (U-pre) done before this loop started.
 - 2026-06-21 — U1 done (`e428c28`): memory router mounted into aura-brain, shared bus. Next: U2 (identity → APIRouter).
 - 2026-06-21 — U2 (`98ba088`) + U3 (`99252b6`): identity refactored to APIRouter + mounted; connector registry built + mounted. Brain suite 5 green. Next: U4 (conversation router), then U5 (orchestrator — deps U2,U3,U4 now needs only U4).
+- 2026-06-21 — U4 (`dedea85`) + U5 (`960c73a`): conversation (null providers) + orchestrator mounted. **Phase 1 step 2 (mounting) COMPLETE — all 5 modules serve from one aura-brain process, one shared bus.** Brain suite 7 green. Next: U6 (verify single bus end-to-end), then seams U7–U10.
