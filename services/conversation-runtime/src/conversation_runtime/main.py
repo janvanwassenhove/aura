@@ -17,6 +17,9 @@ from shared_schemas.voice.providers import STTProvider, TTSProvider
 
 def _build_stt() -> STTProvider:
     provider = os.environ.get("STT_PROVIDER", "local_whisper")
+    if provider in ("null", "none"):
+        from conversation_runtime.providers.null_provider import NullSTTProvider
+        return NullSTTProvider()
     if provider == "openai_realtime":
         from conversation_runtime.providers.openai_provider import OpenAISTTProvider
         return OpenAISTTProvider()
@@ -26,6 +29,9 @@ def _build_stt() -> STTProvider:
 
 def _build_tts() -> TTSProvider:
     provider = os.environ.get("TTS_PROVIDER", "kokoro")
+    if provider in ("null", "none"):
+        from conversation_runtime.providers.null_provider import NullTTSProvider
+        return NullTTSProvider()
     if provider == "openai":
         from conversation_runtime.providers.openai_provider import OpenAITTSProvider
         return OpenAITTSProvider()

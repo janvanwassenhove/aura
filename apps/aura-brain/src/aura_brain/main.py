@@ -91,7 +91,23 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     connector_routes.set_registry(connector_registry)
     ctx.connector_registry = connector_registry
 
-    # step 2 (next units): conversation, orchestrator
+    # --- U4: conversation module (shares ctx.bus) ---
+    # Default to the lightweight null STT/TTS in-process; real transport (Realtime)
+    # is selected via STT_PROVIDER/TTS_PROVIDER. orchestrator/memory stay URL-based
+    # here; in-process seams are flipped in later units.
+    os.environ.setdefault("STT_PROVIDER", "null")
+    os.environ.setdefault("TTS_PROVIDER", "null")
+    from conversation_runtime import routes as conversation_routes
+    from conversation_runtime.main import _build_stt, _build_tts
+    from conversation_runtime.session_manager import SessionManager
+
+    conversation_routes.init(
+        _build_stt(), _build_tts(), ctx.bus, SessionManager(),
+        orchestrator_url=os.environ.get("ORCHESTRATOR_URL", "http://orchestrator:8003"),
+        memory_url=os.environ.get("MEMORY_SERVICE_URL", "http://memory-service:8005"),
+    )
+
+    # step 2 (next unit): orchestrator
     # step 2: start heartbeat (brain↔robot link), offline queue
 
     yield
@@ -134,6 +150,9 @@ def create_app() -> FastAPI:
 
     from connector_service import routes as connector_routes
     app.include_router(connector_routes.router)  # U3
+
+    from conversation_runtime import routes as conversation_routes
+    app.include_router(conversation_routes.router)  # U4
 
     return app
 

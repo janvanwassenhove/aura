@@ -66,3 +66,15 @@ def test_connector_module_mounted() -> None:
         resp = client.get("/connector/health")
         assert resp.status_code == 200
         assert ctx.connector_registry is not None
+
+
+def test_conversation_module_mounted() -> None:
+    """U4: conversation routes mount with the null providers; a text turn
+    round-trips (echo fallback, orchestrator unreachable)."""
+    app = create_app()
+    with TestClient(app) as client:
+        created = client.post("/conversation/sessions")
+        assert created.status_code == 200
+        turn = client.post("/conversation/turn", json={"text": "Hello AURA", "session_id": "s1"})
+        assert turn.status_code == 200
+        assert "Hello AURA" in turn.json()["reply"]
