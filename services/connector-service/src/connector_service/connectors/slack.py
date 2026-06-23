@@ -13,6 +13,7 @@ M365Connector ABC methods that don't map to Slack raise ConnectorUnavailableErro
 from __future__ import annotations
 
 import logging
+from collections.abc import Awaitable, Callable
 
 import httpx
 
@@ -34,11 +35,20 @@ class SlackConnector(M365Connector):
         settings: ConnectorServiceSettings,
         identity_url: str = "http://identity-service:8006",
         user_id: str = "default",
+        token_fetcher: Callable[[str, str], Awaitable[str | None]] | None = None,
     ) -> None:
         self._identity_url = identity_url.rstrip("/")
         self._user_id = user_id
+        self._token_fetcher = token_fetcher
 
     async def _get_token(self) -> str:
+        if self._token_fetcher is not None:  # Phase 1 in-process seam
+            token = await self._token_fetcher(self._user_id, "slack")
+            if not token:
+                raise ConnectorAuthError(
+                    f"Slack token not found for user={self._user_id!r}."
+                )
+            return token
         async with httpx.AsyncClient(timeout=5.0) as client:
             resp = await client.get(
                 f"{self._identity_url}/identity/token/{self._user_id}/slack"

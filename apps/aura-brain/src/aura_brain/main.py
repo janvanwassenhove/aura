@@ -86,7 +86,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     from connector_service.registry import ConnectorRegistry
     from shared_config import ConnectorServiceSettings
 
-    connector_registry = ConnectorRegistry(settings=ConnectorServiceSettings())
+    # U7 seam: connectors fetch tokens from identity in-process (no HTTP hop).
+    from identity_service.main import get_valid_token as _identity_token
+
+    connector_registry = ConnectorRegistry(
+        settings=ConnectorServiceSettings(), token_fetcher=_identity_token,
+    )
     connector_registry.build()
     primary = connector_registry.get_primary_m365()
     if primary is not None:

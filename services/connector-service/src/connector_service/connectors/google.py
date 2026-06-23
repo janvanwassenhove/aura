@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import logging
 import uuid
+from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
 
 import httpx
@@ -39,11 +40,20 @@ class GoogleConnector(M365Connector):
         settings: ConnectorServiceSettings,
         identity_url: str = "http://identity-service:8006",
         user_id: str = "default",
+        token_fetcher: Callable[[str, str], Awaitable[str | None]] | None = None,
     ) -> None:
         self._identity_url = identity_url.rstrip("/")
         self._user_id = user_id
+        self._token_fetcher = token_fetcher
 
     async def _get_access_token(self) -> str:
+        if self._token_fetcher is not None:  # Phase 1 in-process seam
+            token = await self._token_fetcher(self._user_id, "google")
+            if not token:
+                raise ConnectorAuthError(
+                    f"Google token unavailable for user={self._user_id!r}."
+                )
+            return token
         async with httpx.AsyncClient(timeout=5.0) as client:
             resp = await client.get(
                 f"{self._identity_url}/identity/token/{self._user_id}/google"

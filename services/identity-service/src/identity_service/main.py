@@ -128,6 +128,31 @@ def _github_flow() -> object:
 
 
 # ---------------------------------------------------------------------------
+# In-process token access (Phase 1 seam — used by aura-brain instead of HTTP)
+# ---------------------------------------------------------------------------
+
+async def get_valid_token(user_id: str, provider: str) -> str | None:
+    """Return a valid access token for (user_id, provider), or None.
+
+    The in-process equivalent of GET /identity/token/{user_id}/{provider}: used by
+    the connector module when both run inside aura-brain, avoiding an HTTP hop.
+    Returns None (instead of raising) when unconfigured or no token — the caller
+    decides how to surface that.
+    """
+    try:
+        if provider == "m365":
+            return _ms_flow().get_valid_token(user_id)  # type: ignore[union-attr]
+        if provider == "google":
+            return _google_flow().get_valid_token(user_id)  # type: ignore[union-attr]
+        if provider == "github":
+            return _github_flow().get_valid_token(user_id)  # type: ignore[union-attr]
+        token_data = _token_store.get(user_id, provider)
+        return token_data.access_token if token_data is not None else None
+    except (HTTPException, RuntimeError):
+        return None
+
+
+# ---------------------------------------------------------------------------
 # Health
 # ---------------------------------------------------------------------------
 

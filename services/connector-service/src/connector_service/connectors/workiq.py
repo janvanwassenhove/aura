@@ -17,6 +17,7 @@ Token lifecycle:
 from __future__ import annotations
 
 import logging
+from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
 
 import httpx
@@ -58,9 +59,11 @@ class WorkIQConnector(M365Connector):
         settings: ConnectorServiceSettings,
         identity_url: str = "http://identity-service:8006",
         user_id: str = "default",
+        token_fetcher: Callable[[str, str], Awaitable[str | None]] | None = None,
     ) -> None:
         self._identity_url = identity_url.rstrip("/")
         self._user_id = user_id
+        self._token_fetcher = token_fetcher
         self._client_id = settings.azure_client_id
         self._client_secret = settings.azure_client_secret.get_secret_value()
         self._tenant_id = settings.azure_tenant_id
@@ -74,6 +77,13 @@ class WorkIQConnector(M365Connector):
 
     async def _get_user_token(self) -> str:
         """Fetch a valid user access token from identity-service."""
+        if self._token_fetcher is not None:  # Phase 1 in-process seam
+            token = await self._token_fetcher(self._user_id, "m365")
+            if not token:
+                raise ConnectorAuthError(
+                    f"identity returned no token for user={self._user_id!r}."
+                )
+            return token
         async with httpx.AsyncClient(timeout=5.0) as client:
             resp = await client.get(
                 f"{self._identity_url}/identity/token/{self._user_id}/m365"

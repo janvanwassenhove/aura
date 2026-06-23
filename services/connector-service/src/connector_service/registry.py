@@ -16,6 +16,7 @@ Usage:
 from __future__ import annotations
 
 import logging
+from collections.abc import Awaitable, Callable
 from enum import Enum
 
 import httpx
@@ -48,9 +49,13 @@ class ConnectorRegistry:
         self,
         settings: ConnectorServiceSettings,
         http_client: httpx.AsyncClient | None = None,
+        token_fetcher: Callable[[str, str], Awaitable[str | None]] | None = None,
     ) -> None:
         self._settings = settings
         self._http_client = http_client
+        # When set (aura-brain), connectors fetch tokens from identity in-process
+        # instead of over HTTP (Phase 1 seam).
+        self._token_fetcher = token_fetcher
         self._entries: dict[str, ConnectorEntry] = {}
 
     def build(self) -> None:
@@ -87,7 +92,8 @@ class ConnectorRegistry:
                     "AZURE_CLIENT_ID and AZURE_TENANT_ID are required for M365_CONNECTOR=workiq"
                 )
             from connector_service.connectors.workiq import WorkIQConnector
-            return WorkIQConnector(settings=s, identity_url=s.identity_service_url)
+            return WorkIQConnector(settings=s, identity_url=s.identity_service_url,
+                                   token_fetcher=self._token_fetcher)
 
         if key == "google":
             if not s.google_client_secrets_file:
@@ -95,16 +101,19 @@ class ConnectorRegistry:
                     "GOOGLE_CLIENT_SECRETS_FILE is required for the google connector"
                 )
             from connector_service.connectors.google import GoogleConnector
-            return GoogleConnector(settings=s, identity_url=s.identity_service_url)
+            return GoogleConnector(settings=s, identity_url=s.identity_service_url,
+                                   token_fetcher=self._token_fetcher)
 
         if key == "github":
             # GitHub token may be stored in keyring — absence is not fatal at startup
             from connector_service.connectors.github import GitHubConnector
-            return GitHubConnector(settings=s, identity_url=s.identity_service_url)
+            return GitHubConnector(settings=s, identity_url=s.identity_service_url,
+                                   token_fetcher=self._token_fetcher)
 
         if key == "slack":
             from connector_service.connectors.slack import SlackConnector
-            return SlackConnector(settings=s, identity_url=s.identity_service_url)
+            return SlackConnector(settings=s, identity_url=s.identity_service_url,
+                                  token_fetcher=self._token_fetcher)
 
         if key.startswith("mcp:"):
             # Generic MCP connector: key format "mcp:<name>"
