@@ -51,6 +51,9 @@ class BrainContext:
         self.memory_store = None
         self._reminder_scheduler = None
         self.connector_registry = None
+        self.pipeline = None
+        self._offline_queue = None
+        self._webhook_dispatcher = None
 
 
 ctx = BrainContext()
@@ -107,11 +110,68 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         memory_url=os.environ.get("MEMORY_SERVICE_URL", "http://memory-service:8005"),
     )
 
-    # step 2 (next unit): orchestrator
-    # step 2: start heartbeat (brain↔robot link), offline queue
+    # --- U5: orchestrator module (shares ctx.bus) ---
+    from orchestrator import routes as orchestrator_routes
+    from orchestrator.approval_manager import ApprovalManager
+    from orchestrator.context_builder import ContextBuilder
+    from orchestrator.fallback_agent import FallbackAgent
+    from orchestrator.gateway import GatewayManager
+    from orchestrator.intent_router import IntentRouter
+    from orchestrator.offline_queue import OfflineQueue
+    from orchestrator.persona_manager import PersonaManager
+    from orchestrator.pipeline import OrchestratorPipeline
+    from orchestrator.presentation import PresentationManager
+    from orchestrator.webhook_dispatcher import WebhookDispatcher
+    from shared_personas import Persona
+
+    mode = os.environ.get("ACTIVE_PERSONA", "work")
+    try:
+        persona = Persona(mode)
+    except ValueError:
+        persona = Persona.WORK
+
+    intent_router = IntentRouter(mode=mode)
+    approval_mgr = ApprovalManager(ctx.bus, session_id=session_id)
+    context_builder = ContextBuilder()
+    persona_mgr = PersonaManager(initial_persona=persona)
+    fallback_agent = FallbackAgent()
+
+    ctx._offline_queue = OfflineQueue(ctx.bus)
+    await ctx._offline_queue.open()
+
+    ctx.pipeline = OrchestratorPipeline(
+        ctx.bus, intent_router, approval_mgr, context_builder, persona_mgr,
+        fallback_agent=fallback_agent, offline_queue=ctx._offline_queue,
+    )
+
+    presentation_mgr = PresentationManager(ctx.bus, session_id=session_id)
+
+    api_keys: dict[str, str] = {}
+    for pair in os.environ.get("GATEWAY_KEYS", "").split(","):
+        pair = pair.strip()
+        if ":" in pair:
+            kid, raw = pair.split(":", 1)
+            api_keys[kid.strip()] = raw.strip()
+    gateway_mgr = GatewayManager(
+        api_keys=api_keys,
+        rate_limit=int(os.environ.get("GATEWAY_RATE_LIMIT", "10")),
+    )
+    ctx._webhook_dispatcher = WebhookDispatcher(ctx.bus)
+
+    orchestrator_routes.init(
+        intent_router, approval_mgr, context_builder, persona_mgr, ctx.pipeline,
+        presentation_mgr,
+        gateway_mgr=gateway_mgr, webhook_dispatcher=ctx._webhook_dispatcher,
+    )
+
+    # step 2: start heartbeat (brain↔robot link) — Phase 2 (U14)
 
     yield
 
+    if ctx._webhook_dispatcher is not None:
+        await ctx._webhook_dispatcher.close()
+    if ctx._offline_queue is not None:
+        await ctx._offline_queue.close()
     if ctx._reminder_scheduler is not None:
         await ctx._reminder_scheduler.stop()
     await ctx.bus.stop()
@@ -153,6 +213,9 @@ def create_app() -> FastAPI:
 
     from conversation_runtime import routes as conversation_routes
     app.include_router(conversation_routes.router)  # U4
+
+    from orchestrator import routes as orchestrator_routes
+    app.include_router(orchestrator_routes.router)  # U5
 
     return app
 

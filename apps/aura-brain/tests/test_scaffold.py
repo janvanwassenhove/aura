@@ -78,3 +78,17 @@ def test_conversation_module_mounted() -> None:
         turn = client.post("/conversation/turn", json={"text": "Hello AURA", "session_id": "s1"})
         assert turn.status_code == 200
         assert "Hello AURA" in turn.json()["reply"]
+
+
+def test_orchestrator_module_mounted() -> None:
+    """U5: orchestrator routes mount; config endpoint + an echo /orchestrate work
+    through the unified app, and the pipeline singleton is wired."""
+    app = create_app()
+    with TestClient(app) as client:
+        cfg = client.get("/orchestrator/config/llm")
+        assert cfg.status_code == 200
+        assert "provider" in cfg.json()
+        out = client.post("/orchestrator/turn", json={"text": "hi there", "session_id": "s1"})
+        assert out.status_code == 200
+        assert "reply" in out.json()
+        assert ctx.pipeline is not None
