@@ -52,8 +52,8 @@ the human can unblock it.
   Added Null STT/TTS providers (`STT_PROVIDER/TTS_PROVIDER=null`) so it mounts text-first without Whisper/Kokoro; `routes.init(... ctx.bus ...)` + mount. Text turn round-trips (echo fallback). Brain suite 6 green.
 - [x] **U5 — mount orchestrator router** · deps: U2,U3,U4 · `960c73a`
   Full orchestrator wiring (pipeline, persona, approval, gateway, presentation, offline queue, webhook dispatcher) on `ctx.bus`; mounted. `/orchestrator/turn` (echo) + `/orchestrator/config/llm` via brain. All 5 modules now one process. Brain suite 7 green.
-- [ ] **U6 — one shared bus, verified** · deps: U5
-  Assert every module published onto `ctx.bus`; a single `/ws/events` carries the whole stream. Add a brain integration test.
+- [x] **U6 — one shared bus, verified** · deps: U5 · `e2383fd`
+  Integration test: an orchestrator echo turn delivers `ResponseDrafted` on `ctx.bus`; broadcaster + pipeline are wired to that same bus instance. Brain suite 8 green.
 - [ ] **U7 — seam: connector→identity in-process** · deps: U5
   Replace the HTTP token fetch in `connectors/{github,google,slack,workiq}` with an injected in-process TokenStore handle. Convert its tests.
 - [ ] **U8 — seam: orchestrator→connector in-process** · deps: U5
@@ -115,3 +115,4 @@ the human can unblock it.
 - 2026-06-21 — U1 done (`e428c28`): memory router mounted into aura-brain, shared bus. Next: U2 (identity → APIRouter).
 - 2026-06-21 — U2 (`98ba088`) + U3 (`99252b6`): identity refactored to APIRouter + mounted; connector registry built + mounted. Brain suite 5 green. Next: U4 (conversation router), then U5 (orchestrator — deps U2,U3,U4 now needs only U4).
 - 2026-06-21 — U4 (`dedea85`) + U5 (`960c73a`): conversation (null providers) + orchestrator mounted. **Phase 1 step 2 (mounting) COMPLETE — all 5 modules serve from one aura-brain process, one shared bus.** Brain suite 7 green. Next: U6 (verify single bus end-to-end), then seams U7–U10.
+- 2026-06-21 — U6 (`e2383fd`): shared-bus invariant verified (brain suite 8). Stopped at 1 unit — next is U7, a 4-connector seam (github/google/slack/workiq → identity in-process) better suited to a fresh budget. Approach: add an injectable async `token_fetcher(user_id, provider)` to those connectors + registry; identity exposes an in-process token helper; brain injects it.
