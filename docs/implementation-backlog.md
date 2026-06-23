@@ -56,10 +56,10 @@ the human can unblock it.
   Integration test: an orchestrator echo turn delivers `ResponseDrafted` on `ctx.bus`; broadcaster + pipeline are wired to that same bus instance. Brain suite 8 green.
 - [x] **U7 — seam: connector→identity in-process** · deps: U5 · `7389618`
   Connectors gain an optional async `token_fetcher`; when set they skip the HTTP token fetch (HTTP kept as fallback). Registry threads it; identity exposes in-process `get_valid_token`; brain injects it. Connector suite 26 green (+3 seam tests); brain 8 green.
-- [ ] **U8 — seam: orchestrator→connector in-process** · deps: U5
-  `pipeline._call_connector` calls the connector module directly (keep an HTTP fallback flag). Convert tests.
-- [ ] **U9 — seam: →memory in-process** · deps: U5
-  `fallback_agent` + conversation persistence use the in-process MemoryStore. Convert tests.
+- [x] **U8 — seam: orchestrator→connector in-process** · deps: U5 · `c66e8ca`
+  Pipeline gains a `connector_client`; when set it calls the connector module via ASGI in-process (HTTP fallback kept). Also fixed latent bug: `_call_connector` omitted the `/connector` prefix. Brain suite 9 green; orchestrator 110 green.
+- [x] **U9 — seam: →memory (+ conversation→orchestrator) in-process** · deps: U5 · `960474d`
+  One ASGI `ctx._inproc_client` routes fallback_agent reminders, conversation turn-persistence, and conversation→orchestrator back into the brain app. Brain suite 10 green.
 - [ ] **U10 — seam: orchestrator→identity in-process** · deps: U5
 - [ ] **U11 — compose down to 3 services** · deps: U6–U10
   `aura-brain` + `robot-runtime` + `operator-console`. Delete the 4 retired Dockerfiles/health-checks; update operator-console origins to one brain URL.
@@ -117,3 +117,4 @@ the human can unblock it.
 - 2026-06-21 — U4 (`dedea85`) + U5 (`960c73a`): conversation (null providers) + orchestrator mounted. **Phase 1 step 2 (mounting) COMPLETE — all 5 modules serve from one aura-brain process, one shared bus.** Brain suite 7 green. Next: U6 (verify single bus end-to-end), then seams U7–U10.
 - 2026-06-21 — U6 (`e2383fd`): shared-bus invariant verified (brain suite 8). Stopped at 1 unit — next is U7, a 4-connector seam (github/google/slack/workiq → identity in-process) better suited to a fresh budget. Approach: add an injectable async `token_fetcher(user_id, provider)` to those connectors + registry; identity exposes an in-process token helper; brain injects it.
 - 2026-06-21 — U7 (`7389618`): connector→identity seam flipped in-process across all 4 connectors + registry + identity helper + brain wiring (large multi-file unit; stopped at 1). Next: U8 (orchestrator→connector in-process — `pipeline._call_connector` calls the connector module directly, keep HTTP fallback flag).
+- 2026-06-21 — U8 (`c66e8ca`) + U9 (`960474d`): orchestrator→connector and →memory seams flipped in-process via one ASGI client; also fixed a latent `/connector` prefix bug. Only U10 (orchestrator→identity) seam remains — note orchestrator doesn't yet call identity directly (no current HTTP seam in pipeline); U10 is mostly verifying/wiring identity access. Then U11 (compose→3) + U12 (smoke, 🔒 SECRET part).
