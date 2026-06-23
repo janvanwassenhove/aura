@@ -52,6 +52,7 @@ class OrchestratorPipeline:
         persona_mgr: PersonaManager,
         fallback_agent: FallbackAgent | None = None,
         offline_queue=None,  # OfflineQueue | None — avoid circular import
+        connector_client: httpx.AsyncClient | None = None,
     ) -> None:
         self._bus = bus
         self._router = intent_router
@@ -61,6 +62,9 @@ class OrchestratorPipeline:
         self._fallback = fallback_agent or FallbackAgent()
         self._offline_queue = offline_queue
         self._heartbeat = None  # set later via set_heartbeat_monitor()
+        # When set (aura-brain), connector calls go in-process via this client's
+        # ASGI transport instead of over the network (Phase 1 seam, U8).
+        self._connector_client = connector_client
         self._connector_url = os.environ.get(
             "CONNECTOR_SERVICE_URL", "http://connector-service:8004"
         )
@@ -205,15 +209,20 @@ class OrchestratorPipeline:
                 path = path.format(**arguments)
             except KeyError as exc:
                 return f"(missing path argument {exc} for {tool_name!r})"
-        url = f"{self._connector_url}{path}"
+        # Connector routes are served under the /connector prefix.
+        endpoint = f"/connector{path}"
+        json_body = None if method == "GET" else arguments
         try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
-                if method == "GET":
-                    resp = await client.get(url)
-                else:
-                    resp = await client.request(method, url, json=arguments)
+            if self._connector_client is not None:
+                # In-process (aura-brain): ASGI transport, no network hop.
+                resp = await self._connector_client.request(method, endpoint, json=json_body)
+            else:
+                async with httpx.AsyncClient(timeout=10.0) as client:
+                    resp = await client.request(
+                        method, f"{self._connector_url}{endpoint}", json=json_body
+                    )
             resp.raise_for_status()
             return resp.text[:500]
         except Exception as exc:
-            logger.warning("Connector call failed: %s %s — %s", method, url, exc)
+            logger.warning("Connector call failed: %s %s — %s", method, endpoint, exc)
             return f"(connector error: {exc})"

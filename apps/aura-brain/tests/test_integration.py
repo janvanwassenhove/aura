@@ -37,3 +37,13 @@ async def test_orchestrator_event_lands_on_shared_bus() -> None:
         # The broadcaster fans out THAT bus → one /ws/events carries everything.
         assert ctx.broadcaster._bus is ctx.bus
         assert ctx.pipeline._bus is ctx.bus
+
+
+async def test_pipeline_calls_connector_in_process() -> None:
+    """U8: the pipeline reaches the mounted (mock) connector in-process via ASGI
+    — a real tool call returns mock data, no network, correct /connector prefix."""
+    app = create_app()
+    async with app.router.lifespan_context(app):
+        assert ctx.pipeline._connector_client is not None  # in-process client wired
+        result = await ctx.pipeline._call_connector("list_calendar_events_today", {})
+        assert "Standup" in result  # mock connector calendar data, end-to-end

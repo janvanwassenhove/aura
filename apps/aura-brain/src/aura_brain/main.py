@@ -54,6 +54,7 @@ class BrainContext:
         self.pipeline = None
         self._offline_queue = None
         self._webhook_dispatcher = None
+        self._connector_client = None
 
 
 ctx = BrainContext()
@@ -144,9 +145,16 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     ctx._offline_queue = OfflineQueue(ctx.bus)
     await ctx._offline_queue.open()
 
+    # U8 seam: the pipeline calls the connector module in-process via ASGI
+    # against THIS app, instead of over HTTP to connector-service.
+    import httpx
+    ctx._connector_client = httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app), base_url="http://aura-brain",
+    )
     ctx.pipeline = OrchestratorPipeline(
         ctx.bus, intent_router, approval_mgr, context_builder, persona_mgr,
         fallback_agent=fallback_agent, offline_queue=ctx._offline_queue,
+        connector_client=ctx._connector_client,
     )
 
     presentation_mgr = PresentationManager(ctx.bus, session_id=session_id)
@@ -173,6 +181,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     yield
 
+    if ctx._connector_client is not None:
+        await ctx._connector_client.aclose()
     if ctx._webhook_dispatcher is not None:
         await ctx._webhook_dispatcher.close()
     if ctx._offline_queue is not None:
