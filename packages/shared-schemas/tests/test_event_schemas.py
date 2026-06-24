@@ -70,8 +70,8 @@ def _instances() -> list[BaseEvent]:
         MotionStarted(session_id=_SESSION, motion_id="nod"),
         MotionCompleted(session_id=_SESSION, motion_id="nod"),
         MotionFailed(session_id=_SESSION, motion_id="nod", reason="hardware error"),
-        BackendHeartbeatOk(session_id=_SESSION, latency_ms=12.5),
-        BackendHeartbeatFailed(session_id=_SESSION, consecutive_failures=3),
+        BackendHeartbeatOk(session_id=_SESSION, service="llm", latency_ms=12.5),
+        BackendHeartbeatFailed(session_id=_SESSION, service="llm", consecutive_failures=3),
         OfflineRequestQueued(session_id=_SESSION, queue_depth=1),
         OfflineQueueSyncStarted(session_id=_SESSION),
         OfflineQueueSyncCompleted(session_id=_SESSION, synced_count=5),
@@ -92,7 +92,7 @@ def test_all_events_have_valid_event_id(event: BaseEvent) -> None:
 def test_events_are_frozen(event: BaseEvent) -> None:
     """Frozen models reject mutation."""
     with pytest.raises((ValidationError, TypeError)):
-        object.__setattr__(event, "session_id", "mutated")
+        event.session_id = "mutated"  # pydantic intercepts; object.__setattr__ would bypass frozen
 
 
 @pytest.mark.parametrize("event", _instances())
