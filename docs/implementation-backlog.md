@@ -77,13 +77,15 @@ the human can unblock it.
   `OfflineBehaviorLoop` in robot-runtime: brain commands `_touch()` liveness; on timeout the robot speaks a one-time "lost my brain" notice + idles + emits RobotModeChanged(→OFFLINE), recovering on next command. Verified vs FakeRobot. Robot suite 28 green.
 - [ ] **U16 — ReachyRobotAdapter + Pi packaging** · 🔒 HW · deps: U13
   Implement `adapters/reachy.py` against the SDK (same contract tests as Fake); package robot-runtime as a Reachy Mini app. Needs the Pi.
-- [ ] **U17 — two-host bring-up docs** · deps: U13 (doc can precede HW)
+- [x] **U17 — two-host bring-up docs** · deps: U13 · `fe11c72`
+  `infra/two-host-bringup.md`: run robot-runtime on the Pi + aura-brain on the laptop across the one network hop; env for both sides, console URLs, and a U14+U15 resilience check.
 
 ## Phase 3 — capability spine
 
 - [ ] **U18 — recognition (perception)** · 🔒 HW for camera; schema/store doable now · deps: U11
   Schema (`PersonRecognized`) + encrypted embedding store + enrollment API can be built and unit-tested with fixture images; live camera is 🔒 HW.
-- [ ] **U19a — knowledge layer: schemas + person-scoped store** · deps: U11 · ADR-008
+- [x] **U19a — knowledge layer: schemas + person-scoped store** · deps: U11 · ADR-008 · `27cabbb`
+  `shared_schemas/knowledge`: models (Person/ProfileFact/ObservedSignal/Relationship/ConsentRecord/RecognitionLink) + KnowledgeStore ABC + InMemory impl. Per-person scoping, erasure, signal reinforcement, minors-explicit-only guard. Suite 88 green (also fixed 2 pre-existing shared-schemas test bugs).
 - [ ] **U19b — envelope crypto (OMK/DEK, AES-GCM, keyring)** · deps: U19a · ADR-008
 - [ ] **U19c — owner-unlock tiers (OS-session + step-up)** · 🔒 DECIDE (unlock UX confirmed in ADR-008 §9 — implement that) · deps: U19b
 - [ ] **U19d — transparency/console: inspect-edit-delete a profile** · deps: U19a
@@ -122,3 +124,4 @@ the human can unblock it.
 - 2026-06-21 — U10 (no-op, verified) + U11 (`8990dc1`): **Phase 1 COMPLETE — compose collapsed to 3 services (robot-runtime + aura-brain + console).** Next: U12 full-stack smoke (echo-mode portion doable; real-LLM/write-tool part is 🔒 SECRET). After that, Phase 2 starts: U13 (brain↔robot boundary contract).
 - 2026-06-21 — U12 (`e5b58d1`, echo/mock part) + U13 (`b0d9410`): write-tool/approval-gate smoke through the brain; brain↔robot RobotClient contract (tested vs FakeRobot). **Phase 2 underway.** Next: U14 (heartbeat watches brain↔robot link + upstream net) and U15 (on-device offline loop) — both buildable vs FakeRobot. 🔒 HW units (U16 Reachy adapter/Pi pkg, U26) and 🔒 DECIDE (U19c, U20) still pending.
 - 2026-06-21 — U14 (`2c75031`) + U15 (`7f2f569`): heartbeat now watches the real failure surface (robot link + upstream) with an OFFLINE state; robot has an on-device offline behavior loop. **Phase 2 resilience done.** Next: U17 (two-host bring-up docs, no HW) then Phase 3 non-HW units: U19a (knowledge schemas+store), U18 schema/store part. 🔒 U16 (Reachy adapter — HW), 🔒 U19c/U20 (DECIDE) remain blocked.
+- 2026-06-21 — U17 (`fe11c72`) + U19a (`27cabbb`): two-host bring-up doc; knowledge-layer foundation (models + person-scoped store, ADR-008). Knowledge layer started. Next unblocked: U19b (envelope crypto for the store), U21 (local-LLM offline tier), U23 (latency instrumentation), U18 schema/store part. 🔒 U16/U26 (HW), U19c/U20 (DECIDE) still blocked.
