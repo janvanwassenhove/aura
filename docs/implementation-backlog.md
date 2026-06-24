@@ -71,10 +71,10 @@ the human can unblock it.
 
 - [x] **U13 — brain↔robot boundary contract** · deps: U11 · `b0d9410`
   `aura_brain.robot_client.RobotClient` — connect/status/speak/motion/mode over REST, matching robot-runtime's endpoints. Contract test drives the real robot-runtime (FakeRobot) in-process via ASGI; no hardware. robot-runtime is a test-only dep of the brain (runtime decoupled). Brain suite 13 green.
-- [ ] **U14 — heartbeat watches the real link** · deps: U13
-  Rework `HeartbeatMonitor` to watch (a) brain↔robot link and (b) upstream internet; drive ONLINE/DEGRADED/OFFLINE. Tests with a fake link.
-- [ ] **U15 — on-device offline loop** · deps: U13
-  `robot-runtime` minimal local behavior (idle motion, "lost my brain" speech, wake-word ack) when brain unreachable. Testable against FakeRobot.
+- [x] **U14 — heartbeat watches the real link** · deps: U13 · `2c75031`
+  HeartbeatMonitor gains OFFLINE (DEGRADED→OFFLINE when ALL signals down; backward-compatible). Brain wires it to watch ROBOT_RUNTIME_URL/health + UPSTREAM_HEALTH_URL and sets it on the pipeline (degradation→FallbackAgent); gated by HEARTBEAT_ENABLED. Heartbeat 7, orchestrator 111, brain 13 green.
+- [x] **U15 — on-device offline loop** · deps: U13 · `7f2f569`
+  `OfflineBehaviorLoop` in robot-runtime: brain commands `_touch()` liveness; on timeout the robot speaks a one-time "lost my brain" notice + idles + emits RobotModeChanged(→OFFLINE), recovering on next command. Verified vs FakeRobot. Robot suite 28 green.
 - [ ] **U16 — ReachyRobotAdapter + Pi packaging** · 🔒 HW · deps: U13
   Implement `adapters/reachy.py` against the SDK (same contract tests as Fake); package robot-runtime as a Reachy Mini app. Needs the Pi.
 - [ ] **U17 — two-host bring-up docs** · deps: U13 (doc can precede HW)
@@ -121,3 +121,4 @@ the human can unblock it.
 - 2026-06-21 — U8 (`c66e8ca`) + U9 (`960474d`): orchestrator→connector and →memory seams flipped in-process via one ASGI client; also fixed a latent `/connector` prefix bug. Only U10 (orchestrator→identity) seam remains — note orchestrator doesn't yet call identity directly (no current HTTP seam in pipeline); U10 is mostly verifying/wiring identity access. Then U11 (compose→3) + U12 (smoke, 🔒 SECRET part).
 - 2026-06-21 — U10 (no-op, verified) + U11 (`8990dc1`): **Phase 1 COMPLETE — compose collapsed to 3 services (robot-runtime + aura-brain + console).** Next: U12 full-stack smoke (echo-mode portion doable; real-LLM/write-tool part is 🔒 SECRET). After that, Phase 2 starts: U13 (brain↔robot boundary contract).
 - 2026-06-21 — U12 (`e5b58d1`, echo/mock part) + U13 (`b0d9410`): write-tool/approval-gate smoke through the brain; brain↔robot RobotClient contract (tested vs FakeRobot). **Phase 2 underway.** Next: U14 (heartbeat watches brain↔robot link + upstream net) and U15 (on-device offline loop) — both buildable vs FakeRobot. 🔒 HW units (U16 Reachy adapter/Pi pkg, U26) and 🔒 DECIDE (U19c, U20) still pending.
+- 2026-06-21 — U14 (`2c75031`) + U15 (`7f2f569`): heartbeat now watches the real failure surface (robot link + upstream) with an OFFLINE state; robot has an on-device offline behavior loop. **Phase 2 resilience done.** Next: U17 (two-host bring-up docs, no HW) then Phase 3 non-HW units: U19a (knowledge schemas+store), U18 schema/store part. 🔒 U16 (Reachy adapter — HW), 🔒 U19c/U20 (DECIDE) remain blocked.
