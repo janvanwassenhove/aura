@@ -64,13 +64,13 @@ the human can unblock it.
   No-op by design: orchestrator never calls identity over HTTP; identity is mounted in-brain (U2) + `get_valid_token` in-process (U7). Verified, nothing to flip.
 - [x] **U11 — compose down to 3 services** · deps: U6–U10 · `8990dc1`
   Compose now: `robot-runtime` + `aura-brain` (5 merged) + `operator-console`. Added apps/aura-brain/Dockerfile + root .dockerignore; console points all APIs at the brain origin (:8000); deleted 5 retired service Dockerfiles. Compose validates. (Not docker-built here — no docker in this env.)
-- [ ] **U12 — full-stack smoke** · deps: U11 · partly 🔒 SECRET (real LLM key)
-  FakeRobot + mock connector + real (or echo) LLM: one read tool + one **write** tool through the approval gate, end-to-end. Echo-mode portion is doable now; real-LLM portion uses `OPENAI_API_KEY` if present.
+- [x] **U12 — full-stack smoke (echo/mock part)** · deps: U11 · `e5b58d1`
+  `test_smoke.py`: a **write** tool (send_mail) through the collapsed brain — stubbed LLM → approval gate fires → auto-granted in-process → mock connector executes → synthesis reply. Approval gate proven in-path, no key. 🔒 SECRET remainder: live-LLM + Realtime voice run (manual, needs `OPENAI_API_KEY`).
 
 ## Phase 2 — laptop↔Reachy split & resilience
 
-- [ ] **U13 — brain↔robot boundary contract** · deps: U11
-  Define the WS(events)+REST(commands) contract the brain uses to drive `robot-runtime`. Code + schema; no hardware needed (FakeRobot).
+- [x] **U13 — brain↔robot boundary contract** · deps: U11 · `b0d9410`
+  `aura_brain.robot_client.RobotClient` — connect/status/speak/motion/mode over REST, matching robot-runtime's endpoints. Contract test drives the real robot-runtime (FakeRobot) in-process via ASGI; no hardware. robot-runtime is a test-only dep of the brain (runtime decoupled). Brain suite 13 green.
 - [ ] **U14 — heartbeat watches the real link** · deps: U13
   Rework `HeartbeatMonitor` to watch (a) brain↔robot link and (b) upstream internet; drive ONLINE/DEGRADED/OFFLINE. Tests with a fake link.
 - [ ] **U15 — on-device offline loop** · deps: U13
@@ -120,3 +120,4 @@ the human can unblock it.
 - 2026-06-21 — U7 (`7389618`): connector→identity seam flipped in-process across all 4 connectors + registry + identity helper + brain wiring (large multi-file unit; stopped at 1). Next: U8 (orchestrator→connector in-process — `pipeline._call_connector` calls the connector module directly, keep HTTP fallback flag).
 - 2026-06-21 — U8 (`c66e8ca`) + U9 (`960474d`): orchestrator→connector and →memory seams flipped in-process via one ASGI client; also fixed a latent `/connector` prefix bug. Only U10 (orchestrator→identity) seam remains — note orchestrator doesn't yet call identity directly (no current HTTP seam in pipeline); U10 is mostly verifying/wiring identity access. Then U11 (compose→3) + U12 (smoke, 🔒 SECRET part).
 - 2026-06-21 — U10 (no-op, verified) + U11 (`8990dc1`): **Phase 1 COMPLETE — compose collapsed to 3 services (robot-runtime + aura-brain + console).** Next: U12 full-stack smoke (echo-mode portion doable; real-LLM/write-tool part is 🔒 SECRET). After that, Phase 2 starts: U13 (brain↔robot boundary contract).
+- 2026-06-21 — U12 (`e5b58d1`, echo/mock part) + U13 (`b0d9410`): write-tool/approval-gate smoke through the brain; brain↔robot RobotClient contract (tested vs FakeRobot). **Phase 2 underway.** Next: U14 (heartbeat watches brain↔robot link + upstream net) and U15 (on-device offline loop) — both buildable vs FakeRobot. 🔒 HW units (U16 Reachy adapter/Pi pkg, U26) and 🔒 DECIDE (U19c, U20) still pending.
