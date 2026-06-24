@@ -43,13 +43,24 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     broadcaster = WebSocketBroadcaster(bus)
 
+    # On-device offline behavior when the brain link drops (U15).
+    from robot_runtime.offline_loop import OfflineBehaviorLoop
+
+    offline_loop = OfflineBehaviorLoop(
+        engine, bus, session_id=session_id,
+        timeout_s=float(os.environ.get("BRAIN_LINK_TIMEOUT_S", "15")),
+    )
+    offline_loop.start()
+
     # Inject into routes module
     routes.adapter = adapter
     routes.engine = engine
     routes.broadcaster = broadcaster
+    routes.offline_loop = offline_loop
 
     yield
 
+    await offline_loop.stop()
     await engine.stop()
     await adapter.disconnect()
     await bus.stop()

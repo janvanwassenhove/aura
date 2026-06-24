@@ -16,6 +16,13 @@ router = APIRouter()
 adapter: FakeRobotAdapter | None = None
 engine: BehaviorEngine | None = None
 broadcaster: WebSocketBroadcaster | None = None
+offline_loop = None  # OfflineBehaviorLoop | None — set by main.py (U15)
+
+
+def _touch() -> None:
+    """Record brain liveness — any brain command means the link is up."""
+    if offline_loop is not None:
+        offline_loop.touch()
 
 
 # ------------------------------------------------------------------
@@ -65,6 +72,7 @@ async def disconnect() -> JSONResponse:
 @router.post("/robot/speak")
 async def speak(body: dict) -> JSONResponse:
     assert engine is not None
+    _touch()
     text: str = body.get("text", "")
     if not text:
         return JSONResponse({"error": "text is required"}, status_code=422)
@@ -80,6 +88,7 @@ async def speak(body: dict) -> JSONResponse:
 @router.post("/robot/motion")
 async def execute_motion(command: MotionCommand) -> JSONResponse:
     assert adapter is not None
+    _touch()
     await adapter.execute_motion(command)
     return JSONResponse({"ok": True})
 
@@ -92,6 +101,7 @@ async def execute_motion(command: MotionCommand) -> JSONResponse:
 @router.post("/robot/mode")
 async def set_mode(body: dict) -> JSONResponse:
     assert engine is not None
+    _touch()
     mode_str: str = body.get("mode", "")
     try:
         mode = RobotMode(mode_str)
