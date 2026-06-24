@@ -152,6 +152,7 @@ dev = [
     { name = "httpx" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
+    { name = "robot-runtime" },
 ]
 
 [package.metadata]
@@ -165,6 +166,7 @@ requires-dist = [
     { name = "orchestrator", editable = "services/orchestrator" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.2" },
     { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.23" },
+    { name = "robot-runtime", marker = "extra == 'dev'", editable = "services/robot-runtime" },
     { name = "shared-config", editable = "packages/shared-config" },
     { name = "shared-events", editable = "packages/shared-events" },
     { name = "shared-personas", editable = "packages/shared-personas" },

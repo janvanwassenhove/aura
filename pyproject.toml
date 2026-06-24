@@ -28,6 +28,7 @@ shared-config   = { workspace = true }
 shared-policies = { workspace = true }
 shared-personas = { workspace = true }
 shared-prompts  = { workspace = true }
+robot-runtime        = { workspace = true }
 orchestrator         = { workspace = true }
 conversation-runtime = { workspace = true }
 connector-service    = { workspace = true }
