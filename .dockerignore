@@ -1,0 +1,14 @@
+# Build-context excludes for root-context image builds (aura-brain, robot-runtime)
+**/__pycache__/
+**/*.pyc
+**/.pytest_cache/
+**/.mypy_cache/
+**/.ruff_cache/
+.venv/
+**/node_modules/
+**/dist/
+.git/
+**/*.db
+**/*.sqlite3
+infra/dev/.env
+.github/apm/
