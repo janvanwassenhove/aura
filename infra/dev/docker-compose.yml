@@ -67,6 +67,9 @@ services:
       - KEYRING_PASSPHRASE=${KEYRING_PASSPHRASE:-}
       # Robot boundary (the one remaining network hop)
       - ROBOT_RUNTIME_URL=http://robot-runtime:8001
+      # Heartbeat watches the real failure surface: brain↔robot link + upstream
+      - HEARTBEAT_ENABLED=${HEARTBEAT_ENABLED:-true}
+      - UPSTREAM_HEALTH_URL=${UPSTREAM_HEALTH_URL:-}
       # Approval / gateway
       - APPROVAL_TIMEOUT_SECONDS=${APPROVAL_TIMEOUT_SECONDS:-30}
       - GATEWAY_KEYS=${GATEWAY_KEYS:-}

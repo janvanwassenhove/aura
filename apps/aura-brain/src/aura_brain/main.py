@@ -54,6 +54,7 @@ class BrainContext:
         self.pipeline = None
         self._offline_queue = None
         self._webhook_dispatcher = None
+        self._heartbeat = None
         # One ASGI client routes all intra-brain HTTP-shaped calls in-process
         # (connector, memory, orchestrator) — the Phase 1 seams.
         self._inproc_client = None
@@ -182,10 +183,25 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         gateway_mgr=gateway_mgr, webhook_dispatcher=ctx._webhook_dispatcher,
     )
 
-    # step 2: start heartbeat (brain↔robot link) — Phase 2 (U14)
+    # --- U14: heartbeat watches the REAL failure surface — the brain↔robot link
+    # and upstream internet — not sibling containers (which no longer exist after
+    # the collapse). Gated by env so it doesn't flap during tests.
+    if os.environ.get("HEARTBEAT_ENABLED", "false").lower() == "true":
+        from orchestrator.heartbeat import HeartbeatMonitor
+
+        robot_url = os.environ.get("ROBOT_RUNTIME_URL", "http://robot-runtime:8001")
+        hb_services = {"robot": f"{robot_url.rstrip('/')}/health"}
+        upstream = os.environ.get("UPSTREAM_HEALTH_URL")  # e.g. the LLM/API endpoint
+        if upstream:
+            hb_services["upstream"] = upstream
+        ctx._heartbeat = HeartbeatMonitor(ctx.bus, hb_services)
+        ctx._heartbeat.start()
+        ctx.pipeline.set_heartbeat_monitor(ctx._heartbeat)
 
     yield
 
+    if ctx._heartbeat is not None:
+        await ctx._heartbeat.stop()
     if ctx._inproc_client is not None:
         await ctx._inproc_client.aclose()
     if ctx._webhook_dispatcher is not None:

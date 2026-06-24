@@ -222,3 +222,40 @@ async def test_recovering_drops_back_to_degraded_on_failure(bus):
         await asyncio.sleep(0)
 
     assert monitor.mode == RobotMode.DEGRADED
+
+
+# --------------------------------------------------------------------------- #
+# DEGRADED → OFFLINE when ALL monitored signals are down; OFFLINE → RECOVERING
+# --------------------------------------------------------------------------- #
+
+def _mk_client(get_fn):
+    m = AsyncMock()
+    m.get = get_fn
+    m.__aenter__ = AsyncMock(return_value=m)
+    m.__aexit__ = AsyncMock(return_value=False)
+    return m
+
+
+async def test_all_signals_down_goes_offline_then_recovers(bus):
+    # Two signals (robot + upstream) — the brain↔robot link and internet.
+    monitor = make_monitor(
+        bus, services={"robot": "http://robot/health", "upstream": "http://net/health"},
+        failure_threshold=1,
+    )
+    fail = AsyncMock(side_effect=Exception("down"))
+    ok_resp = AsyncMock(); ok_resp.is_success = True
+    ok = AsyncMock(return_value=ok_resp)
+
+    # Both down: ONLINE → DEGRADED (run 1) → OFFLINE (run 2, all_failing)
+    with patch("httpx.AsyncClient") as mc:
+        mc.return_value = _mk_client(fail)
+        await monitor._run_once(); await asyncio.sleep(0)
+        assert monitor.mode == RobotMode.DEGRADED
+        await monitor._run_once(); await asyncio.sleep(0)
+        assert monitor.mode == RobotMode.OFFLINE
+
+    # Both recover: OFFLINE → RECOVERING
+    with patch("httpx.AsyncClient") as mc:
+        mc.return_value = _mk_client(ok)
+        await monitor._run_once(); await asyncio.sleep(0)
+        assert monitor.mode == RobotMode.RECOVERING

@@ -107,8 +107,12 @@ class HeartbeatMonitor:
         any_degraded = any(
             self._failures[n] >= self._threshold for n in self._services
         )
+        # All monitored signals (e.g. brain↔robot link AND upstream internet) down.
+        all_failing = bool(self._services) and all(
+            self._failures[n] >= self._threshold for n in self._services
+        )
 
-        await self._transition(all_healthy, any_degraded)
+        await self._transition(all_healthy, any_degraded, all_failing)
 
     async def _check(self, client: httpx.AsyncClient, name: str, url: str) -> bool:
         """Ping one service; emit heartbeat event; return True if healthy."""
@@ -137,8 +141,17 @@ class HeartbeatMonitor:
             )
             return False
 
-    async def _transition(self, all_healthy: bool, any_degraded: bool) -> None:
-        """Apply mode state machine transitions."""
+    async def _transition(
+        self, all_healthy: bool, any_degraded: bool, all_failing: bool = False
+    ) -> None:
+        """Apply mode state machine transitions.
+
+        ONLINE → DEGRADED   (any monitored signal fails)
+        DEGRADED → OFFLINE  (ALL signals down — fully cut off; e.g. robot link AND
+                             internet both gone)
+        DEGRADED/OFFLINE → RECOVERING → ONLINE  (recovery)
+        DEGRADED → MAINTENANCE (>= 24h degraded)
+        """
         now = time.monotonic()
 
         if self._mode == RobotMode.ONLINE:
@@ -151,6 +164,14 @@ class HeartbeatMonitor:
             if self._degraded_since and (now - self._degraded_since) >= _MAINTENANCE_THRESHOLD_S:
                 await self._set_mode(RobotMode.MAINTENANCE)
                 return
+            if all_failing:
+                await self._set_mode(RobotMode.OFFLINE)
+                return
+            if all_healthy:
+                self._recovering_since = now
+                await self._set_mode(RobotMode.RECOVERING)
+
+        elif self._mode == RobotMode.OFFLINE:
             if all_healthy:
                 self._recovering_since = now
                 await self._set_mode(RobotMode.RECOVERING)
