@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import os
@@ -142,39 +143,35 @@ class OrchestratorPipeline:
         # turn — including blocked/denied ones — keyed by tool_call_id.
         assistant_tool_calls: list[dict] = []  # OpenAI-shaped, for the follow-up message
         tool_messages: list[dict] = []         # one per tool_call, with tool_call_id
+        # Pass 1 (sequential): build the assistant message, enforce mode + the
+        # interactive approval gate, and collect the tools cleared to execute.
+        to_execute: list[tuple[str, str, dict]] = []  # (tc_id, tool_name, arguments)
         for tc in tool_calls:
-            tool_name: str = tc["name"]
-            tc_id: str = tc.get("id") or f"call_{tool_name}"
+            tool_name = tc["name"]
+            tc_id = tc.get("id") or f"call_{tool_name}"
             raw_args = tc.get("arguments", "{}")
             args_str = raw_args if isinstance(raw_args, str) else json.dumps(raw_args)
             try:
-                arguments: dict = json.loads(args_str) if args_str else {}
+                arguments = json.loads(args_str) if args_str else {}
             except json.JSONDecodeError:
                 arguments = {}
 
             assistant_tool_calls.append({
-                "id": tc_id,
-                "type": "function",
+                "id": tc_id, "type": "function",
                 "function": {"name": tool_name, "arguments": args_str},
             })
 
-            def _record(result: str) -> None:
-                tool_messages.append({"role": "tool", "tool_call_id": tc_id, "content": result})
-
-            # Mode check
             if not self._router.is_allowed(tool_name):
                 logger.warning("Tool %r blocked by mode %r", tool_name, self._router.mode)
                 await self._bus.publish(
                     ToolCallFailed(session_id=session_id, tool_name=tool_name, error_code="mode_mismatch")
                 )
-                _record(f"[{tool_name}: not available in current mode]")
+                tool_messages.append({"role": "tool", "tool_call_id": tc_id,
+                                      "content": f"[{tool_name}: not available in current mode]"})
                 continue
 
-            await self._bus.publish(
-                ToolCallRequested(session_id=session_id, tool_name=tool_name)
-            )
+            await self._bus.publish(ToolCallRequested(session_id=session_id, tool_name=tool_name))
 
-            # Approval check
             if tool_name in APPROVAL_REQUIRED:
                 try:
                     await self._approval.request_approval(tool_name, arguments)
@@ -183,27 +180,33 @@ class OrchestratorPipeline:
                     await self._bus.publish(
                         ToolCallFailed(session_id=session_id, tool_name=tool_name, error_code="approval_timeout")
                     )
-                    _record(f"[{tool_name}: approval timed out]")
+                    tool_messages.append({"role": "tool", "tool_call_id": tc_id,
+                                          "content": f"[{tool_name}: approval timed out]"})
                     continue
                 except ApprovalDeniedError:
                     await self._bus.publish(
                         ToolCallFailed(session_id=session_id, tool_name=tool_name, error_code="approval_denied")
                     )
-                    _record(f"[{tool_name}: denied by user]")
+                    tool_messages.append({"role": "tool", "tool_call_id": tc_id,
+                                          "content": f"[{tool_name}: denied by user]"})
                     continue
 
-            # Execute via connector-service
-            _t = time.perf_counter()
+            to_execute.append((tc_id, tool_name, arguments))
+
+        # Pass 2 (concurrent): independent tool executions run in parallel — a
+        # turn that touches calendar + mail + tasks no longer pays their sum.
+        async def _run(tc_id: str, tool_name: str, arguments: dict) -> dict:
             result_text = await self._call_connector(tool_name, arguments)
-            timing["tool_ms"] += (time.perf_counter() - _t) * 1000
-            await self._bus.publish(
-                ToolCallSucceeded(
-                    session_id=session_id,
-                    tool_name=tool_name,
-                    result_summary=result_text[:500],
-                )
-            )
-            _record(result_text)
+            await self._bus.publish(ToolCallSucceeded(
+                session_id=session_id, tool_name=tool_name, result_summary=result_text[:500],
+            ))
+            return {"role": "tool", "tool_call_id": tc_id, "content": result_text}
+
+        if to_execute:
+            _t = time.perf_counter()
+            results = await asyncio.gather(*(_run(*x) for x in to_execute))
+            timing["tool_ms"] += (time.perf_counter() - _t) * 1000  # wall-clock (parallel)
+            tool_messages.extend(results)
 
         # Synthesize final response from tool results
         if tool_messages:
