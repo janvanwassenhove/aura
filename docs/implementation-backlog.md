@@ -86,14 +86,15 @@ the human can unblock it.
   Schema (`PersonRecognized`) + encrypted embedding store + enrollment API can be built and unit-tested with fixture images; live camera is 🔒 HW.
 - [x] **U19a — knowledge layer: schemas + person-scoped store** · deps: U11 · ADR-008 · `27cabbb`
   `shared_schemas/knowledge`: models (Person/ProfileFact/ObservedSignal/Relationship/ConsentRecord/RecognitionLink) + KnowledgeStore ABC + InMemory impl. Per-person scoping, erasure, signal reinforcement, minors-explicit-only guard. Suite 88 green (also fixed 2 pre-existing shared-schemas test bugs).
-- [ ] **U19b — envelope crypto (OMK/DEK, AES-GCM, keyring)** · deps: U19a · ADR-008
+- [x] **U19b — envelope crypto (OMK/DEK, AES-GCM)** · deps: U19a · ADR-008 · `dce86a6`
+  `crypto.py` (AES-256-GCM + scrypt, vetted lib) + `EncryptedKnowledgeStore`: per-person DEK wrapped by OMK, at-rest bytes always ciphertext, delete=cryptographic erasure. Contract parametrized across memory+encrypted stores. Shared-schemas 100 green.
 - [ ] **U19c — owner-unlock tiers (OS-session + step-up)** · 🔒 DECIDE (unlock UX confirmed in ADR-008 §9 — implement that) · deps: U19b
 - [ ] **U19d — transparency/console: inspect-edit-delete a profile** · deps: U19a
 - [ ] **U19e — judgment/anticipation layer (stateless over the store)** · deps: U19a,U19c
 - [ ] **U20 — outbound dev-agent tool** · deps: U5 · 🔒 DECIDE sandbox scope
   `run_dev_task` gated by `ApprovalManager`, repo allow-list, full audit. Build behind a flag; the allow-list/scope needs human sign-off before enabling.
-- [ ] **U21 — local-LLM offline tier wiring** · deps: U5 (Ollama provider already added)
-  Make `ollama` the automatic DEGRADED/OFFLINE brain instead of the regex FallbackAgent.
+- [x] **U21 — local-LLM offline tier wiring** · deps: U5 · `f2a4864`
+  Pipeline offline path tries a local model (OFFLINE_LLM_PROVIDER, e.g. ollama) before the regex FallbackAgent; `openai_chat` gained per-call provider/model overrides. Orchestrator 113 green.
 - [ ] **U22 — Realtime API voice transport** · deps: U4 · 🔒 SECRET (key) for live
   Replace batch whisper-1/tts-1 in `conversation-runtime` with the GA Realtime path proven in the spike; barge-in; token-stream. Logic buildable; live run needs the key + audio (🔒 HW).
 
@@ -125,3 +126,4 @@ the human can unblock it.
 - 2026-06-21 — U12 (`e5b58d1`, echo/mock part) + U13 (`b0d9410`): write-tool/approval-gate smoke through the brain; brain↔robot RobotClient contract (tested vs FakeRobot). **Phase 2 underway.** Next: U14 (heartbeat watches brain↔robot link + upstream net) and U15 (on-device offline loop) — both buildable vs FakeRobot. 🔒 HW units (U16 Reachy adapter/Pi pkg, U26) and 🔒 DECIDE (U19c, U20) still pending.
 - 2026-06-21 — U14 (`2c75031`) + U15 (`7f2f569`): heartbeat now watches the real failure surface (robot link + upstream) with an OFFLINE state; robot has an on-device offline behavior loop. **Phase 2 resilience done.** Next: U17 (two-host bring-up docs, no HW) then Phase 3 non-HW units: U19a (knowledge schemas+store), U18 schema/store part. 🔒 U16 (Reachy adapter — HW), 🔒 U19c/U20 (DECIDE) remain blocked.
 - 2026-06-21 — U17 (`fe11c72`) + U19a (`27cabbb`): two-host bring-up doc; knowledge-layer foundation (models + person-scoped store, ADR-008). Knowledge layer started. Next unblocked: U19b (envelope crypto for the store), U21 (local-LLM offline tier), U23 (latency instrumentation), U18 schema/store part. 🔒 U16/U26 (HW), U19c/U20 (DECIDE) still blocked.
+- 2026-06-21 — U19b (`dce86a6`) + U21 (`f2a4864`): knowledge store now has real envelope encryption (AES-GCM, per-person DEK/OMK, cryptographic erasure); offline tier prefers a local model over regex. **Remaining unblocked: U23 (latency instrumentation), U25 (single-pass tool calling), U18 schema/store part, U19d (console — Vue/TS), U27/U28 (presentation/console).** 🔒 BLOCKED: U16/U26 (HW), U19c/U20 (DECIDE), U22/U24 live voice (SECRET/HW), U19e (deps U19c).
