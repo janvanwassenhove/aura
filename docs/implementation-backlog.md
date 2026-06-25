@@ -100,10 +100,12 @@ the human can unblock it.
 
 ## Phase 3.5 — performance gate
 
-- [ ] **U23 — per-turn latency instrumentation** · deps: U5
+- [x] **U23 — per-turn latency instrumentation** · deps: U5 · `aec8518`
+  `TurnLatencyMeasured` event (total/llm/tool ms, first_audio_ms=None until voice) emitted every turn, wired through broadcaster → console. Orchestrator 114 green.
   Emit first-audio + full-turn timings into the event stream; show in console.
 - [ ] **U24 — streaming STT + token-streamed TTS + barge-in** · deps: U22
-- [ ] **U25 — single-pass / parallel tool calling** · deps: U5
+- [x] **U25 — parallel tool calling** · deps: U5 · `afdb299`
+  Tool loop split into a sequential gate pass + a concurrent (asyncio.gather) execution pass for independent tools; approval-gated tools still serialize. A multi-tool turn pays the slowest tool, not the sum. Orchestrator 115, brain 13 green.
 - [ ] **U26 — on-Pi budget guard** · 🔒 HW · deps: U16
 
 ## Phase 4 — presentations & polish
@@ -127,3 +129,4 @@ the human can unblock it.
 - 2026-06-21 — U14 (`2c75031`) + U15 (`7f2f569`): heartbeat now watches the real failure surface (robot link + upstream) with an OFFLINE state; robot has an on-device offline behavior loop. **Phase 2 resilience done.** Next: U17 (two-host bring-up docs, no HW) then Phase 3 non-HW units: U19a (knowledge schemas+store), U18 schema/store part. 🔒 U16 (Reachy adapter — HW), 🔒 U19c/U20 (DECIDE) remain blocked.
 - 2026-06-21 — U17 (`fe11c72`) + U19a (`27cabbb`): two-host bring-up doc; knowledge-layer foundation (models + person-scoped store, ADR-008). Knowledge layer started. Next unblocked: U19b (envelope crypto for the store), U21 (local-LLM offline tier), U23 (latency instrumentation), U18 schema/store part. 🔒 U16/U26 (HW), U19c/U20 (DECIDE) still blocked.
 - 2026-06-21 — U19b (`dce86a6`) + U21 (`f2a4864`): knowledge store now has real envelope encryption (AES-GCM, per-person DEK/OMK, cryptographic erasure); offline tier prefers a local model over regex. **Remaining unblocked: U23 (latency instrumentation), U25 (single-pass tool calling), U18 schema/store part, U19d (console — Vue/TS), U27/U28 (presentation/console).** 🔒 BLOCKED: U16/U26 (HW), U19c/U20 (DECIDE), U22/U24 live voice (SECRET/HW), U19e (deps U19c).
+- 2026-06-21 — U23 (`aec8518`) + U25 (`afdb299`): per-turn latency event + parallel tool execution. **Remaining buildable (Python): U18 schema/store part (recognition — camera is HW). Remaining is mostly console (U19d/U28 — Vue/TS, need brain knowledge endpoints) + presentations (U27).** 🔒 BLOCKED: U16/U26 (HW), U19c/U20 (DECIDE), U22/U24 (voice HW/SECRET), U19e (deps U19c). Runway nearly exhausted — after U18-store + maybe U27, the rest needs hardware or the DECIDE calls.
