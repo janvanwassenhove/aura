@@ -82,7 +82,8 @@ the human can unblock it.
 
 ## Phase 3 — capability spine
 
-- [ ] **U18 — recognition (perception)** · 🔒 HW for camera; schema/store doable now · deps: U11
+- [~] **U18 — recognition (perception): non-HW slice done** · deps: U11 · `5bf88cd`
+  `EmbeddingMatcher` (enroll/identify via cosine + threshold, embeddings AES-GCM encrypted at rest) + `PersonRecognized` event (broadcast). 🔒 HW remainder: camera capture + frame→embedding model (on the Pi) and the brain greet/mode wiring on a live feed.
   Schema (`PersonRecognized`) + encrypted embedding store + enrollment API can be built and unit-tested with fixture images; live camera is 🔒 HW.
 - [x] **U19a — knowledge layer: schemas + person-scoped store** · deps: U11 · ADR-008 · `27cabbb`
   `shared_schemas/knowledge`: models (Person/ProfileFact/ObservedSignal/Relationship/ConsentRecord/RecognitionLink) + KnowledgeStore ABC + InMemory impl. Per-person scoping, erasure, signal reinforcement, minors-explicit-only guard. Suite 88 green (also fixed 2 pre-existing shared-schemas test bugs).
@@ -110,7 +111,8 @@ the human can unblock it.
 
 ## Phase 4 — presentations & polish
 
-- [ ] **U27 — presentations to real slides + synced gestures** · deps: U5
+- [x] **U27 — presentations: synced speech+gesture + co-pilot** · deps: U5 · `f1127d9`
+  PresentationManager drives speech + slide motion_cue concurrently (RobotDriver Protocol; brain injects RobotClient) with advance()/previous() navigation. Orchestrator 118, brain 13 green.
 - [ ] **U28 — operator-console pass for new events** · deps: U6,U18,U20
 
 ---
@@ -130,3 +132,4 @@ the human can unblock it.
 - 2026-06-21 — U17 (`fe11c72`) + U19a (`27cabbb`): two-host bring-up doc; knowledge-layer foundation (models + person-scoped store, ADR-008). Knowledge layer started. Next unblocked: U19b (envelope crypto for the store), U21 (local-LLM offline tier), U23 (latency instrumentation), U18 schema/store part. 🔒 U16/U26 (HW), U19c/U20 (DECIDE) still blocked.
 - 2026-06-21 — U19b (`dce86a6`) + U21 (`f2a4864`): knowledge store now has real envelope encryption (AES-GCM, per-person DEK/OMK, cryptographic erasure); offline tier prefers a local model over regex. **Remaining unblocked: U23 (latency instrumentation), U25 (single-pass tool calling), U18 schema/store part, U19d (console — Vue/TS), U27/U28 (presentation/console).** 🔒 BLOCKED: U16/U26 (HW), U19c/U20 (DECIDE), U22/U24 live voice (SECRET/HW), U19e (deps U19c).
 - 2026-06-21 — U23 (`aec8518`) + U25 (`afdb299`): per-turn latency event + parallel tool execution. **Remaining buildable (Python): U18 schema/store part (recognition — camera is HW). Remaining is mostly console (U19d/U28 — Vue/TS, need brain knowledge endpoints) + presentations (U27).** 🔒 BLOCKED: U16/U26 (HW), U19c/U20 (DECIDE), U22/U24 (voice HW/SECRET), U19e (deps U19c). Runway nearly exhausted — after U18-store + maybe U27, the rest needs hardware or the DECIDE calls.
+- 2026-06-21 — U18 non-HW slice (`5bf88cd`) + U27 (`f1127d9`): recognition matcher + PersonRecognized event; presentation co-pilot (synced speech+gesture). **RUNWAY EXHAUSTED for the autonomous loop.** Every remaining unit is blocked: U16/U26 🔒HW, U19c/U20 🔒DECIDE (your sign-off), U22/U24 🔒voice(HW/SECRET), U19e deps U19c, U18-remainder 🔒HW(camera). U19d/U28 are Vue/TS console work needing brain knowledge endpoints + UI review (deferred — front-end, lower autonomous confidence). Next loop fire should report all-blocked and END.
