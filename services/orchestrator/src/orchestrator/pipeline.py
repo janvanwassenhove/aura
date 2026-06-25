@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import time
 
 import httpx
 
@@ -19,6 +20,7 @@ from shared_events.bus import AsyncEventBus
 from shared_policies import APPROVAL_REQUIRED
 from shared_schemas.events.conversation import IntentRecognized, ResponseDrafted
 from shared_schemas.events.orchestrator import ToolCallFailed, ToolCallRequested, ToolCallSucceeded
+from shared_schemas.events.system import TurnLatencyMeasured
 from shared_schemas.robot.models import RobotMode
 
 logger = logging.getLogger(__name__)
@@ -77,7 +79,20 @@ class OrchestratorPipeline:
         self._heartbeat = monitor
 
     async def orchestrate(self, text: str, session_id: str) -> str:
-        """Process one user turn; returns the assistant reply text."""
+        """Process one user turn; times it and emits TurnLatencyMeasured (U23)."""
+        timing = {"llm_ms": 0.0, "tool_ms": 0.0}
+        t0 = time.perf_counter()
+        reply = await self._orchestrate_impl(text, session_id, timing)
+        total_ms = (time.perf_counter() - t0) * 1000
+        await self._bus.publish(TurnLatencyMeasured(
+            session_id=session_id,
+            total_ms=round(total_ms, 1),
+            llm_ms=round(timing["llm_ms"], 1),
+            tool_ms=round(timing["tool_ms"], 1),
+        ))
+        return reply
+
+    async def _orchestrate_impl(self, text: str, session_id: str, timing: dict) -> str:
         # Offline / DEGRADED mode: try a local model, then the regex FallbackAgent.
         if self._heartbeat and self._heartbeat.mode in (
             RobotMode.DEGRADED, RobotMode.OFFLINE, RobotMode.MAINTENANCE
@@ -101,7 +116,9 @@ class OrchestratorPipeline:
 
         # Call LLM — advertise the allowed tools so it can emit real tool_calls.
         tool_specs = build_tool_specs(allowed)
+        _t = time.perf_counter()
         llm_response = await openai_chat(messages, tools=tool_specs or None)
+        timing["llm_ms"] += (time.perf_counter() - _t) * 1000
         content: str | None = llm_response["content"]
         tool_calls: list | None = llm_response["tool_calls"]
 
@@ -176,7 +193,9 @@ class OrchestratorPipeline:
                     continue
 
             # Execute via connector-service
+            _t = time.perf_counter()
             result_text = await self._call_connector(tool_name, arguments)
+            timing["tool_ms"] += (time.perf_counter() - _t) * 1000
             await self._bus.publish(
                 ToolCallSucceeded(
                     session_id=session_id,
@@ -194,7 +213,9 @@ class OrchestratorPipeline:
                 "tool_calls": assistant_tool_calls,
             })
             messages.extend(tool_messages)
+            _t = time.perf_counter()
             final = await openai_chat(messages)
+            timing["llm_ms"] += (time.perf_counter() - _t) * 1000
             reply = final["content"] or "\n".join(m["content"] for m in tool_messages)
         else:
             reply = content or "(no response)"

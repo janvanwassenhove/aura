@@ -29,6 +29,7 @@ from shared_schemas.events import (
     ReminderTriggered,
     ResponseDrafted,
     RobotConnected,
+    TurnLatencyMeasured,
     RobotDisconnected,
     RobotModeChanged,
     SpeechPlaybackCompleted,
@@ -72,6 +73,7 @@ _ALL_EVENT_TYPES: tuple[type[BaseEvent], ...] = (
     OfflineQueueSyncCompleted,
     ReminderTriggered,
     PresentationCueReceived,
+    TurnLatencyMeasured,
 )
 
 

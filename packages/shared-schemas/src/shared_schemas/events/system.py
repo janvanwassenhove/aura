@@ -39,6 +39,20 @@ class OfflineQueueSyncCompleted(BaseEvent):
     synced_count: int
 
 
+class TurnLatencyMeasured(BaseEvent):
+    """Per-turn latency, emitted for the operator console (Phase 3.5, U23).
+
+    first_audio_ms is the voice headline (time-to-first-spoken-word); it stays
+    None for text turns until the streaming voice path (U24) lands.
+    """
+
+    event_type: Literal["TurnLatencyMeasured"] = "TurnLatencyMeasured"
+    total_ms: float
+    llm_ms: float = 0.0
+    tool_ms: float = 0.0
+    first_audio_ms: float | None = None
+
+
 class ReminderTriggered(BaseEvent):
     event_type: Literal["ReminderTriggered"] = "ReminderTriggered"
     reminder_id: UUID

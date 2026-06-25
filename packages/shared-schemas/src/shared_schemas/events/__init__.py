@@ -34,6 +34,7 @@ from shared_schemas.events.system import (
     OfflineRequestQueued,
     PresentationCueReceived,
     ReminderTriggered,
+    TurnLatencyMeasured,
 )
 
 __all__ = [
@@ -67,6 +68,7 @@ __all__ = [
     "MotionFailed",
     # system
     "BackendHeartbeatOk",
+    "TurnLatencyMeasured",
     "BackendHeartbeatFailed",
     "OfflineRequestQueued",
     "OfflineQueueSyncStarted",
