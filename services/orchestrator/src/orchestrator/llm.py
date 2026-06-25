@@ -26,6 +26,9 @@ _OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 async def openai_chat(
     messages: list[dict[str, Any]],
     tools: list[dict[str, Any]] | None = None,
+    *,
+    provider: str | None = None,
+    model: str | None = None,
 ) -> dict[str, Any]:
     """Call the LLM and return the raw choice dict.
 
@@ -33,11 +36,13 @@ async def openai_chat(
       - ``content``: str | None — the assistant text reply
       - ``tool_calls``: list | None — OpenAI tool call objects
 
-    When provider is ``echo`` the last user message is echoed back — no
-    API key required.
+    ``provider``/``model`` override the runtime config for this call only — used by
+    the offline tier to force a local model (ollama) while DEGRADED/OFFLINE.
+    When provider is ``echo`` the last user message is echoed back — no key required.
     """
     cfg = get_config()
-    provider = cfg.provider
+    provider = provider or cfg.provider
+    model_override = model
 
     if provider == "echo":
         last_user = next(
@@ -53,7 +58,7 @@ async def openai_chat(
         from google.genai import types as genai_types
 
         gclient = google_genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
-        model = cfg.model
+        model = model_override or cfg.model
 
         # Convert OpenAI messages format → Gemini contents format
         contents = []
@@ -114,7 +119,7 @@ async def openai_chat(
 
     # --- Anthropic (Claude) ---
     if provider == "anthropic":
-        return await _anthropic_chat(messages, tools, cfg.model)
+        return await _anthropic_chat(messages, tools, model_override or cfg.model)
 
     # --- OpenRouter ---
     if provider == "openrouter":
@@ -124,7 +129,7 @@ async def openai_chat(
             api_key=os.environ.get("OPENROUTER_API_KEY"),
             base_url=_OPENROUTER_BASE_URL,
         )
-        model = cfg.model
+        model = model_override or cfg.model
 
     # --- Ollama (local, OpenAI-compatible endpoint) ---
     elif provider == "ollama":
@@ -134,7 +139,7 @@ async def openai_chat(
             api_key="ollama",  # Ollama ignores the key but the SDK requires one
             base_url=os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434/v1"),
         )
-        model = cfg.model
+        model = model_override or cfg.model
 
     # --- OpenAI (or any OpenAI-compatible proxy via OPENAI_BASE_URL) ---
     else:
@@ -146,7 +151,7 @@ async def openai_chat(
             api_key=os.environ.get("OPENAI_API_KEY"),
             base_url=os.environ.get("OPENAI_BASE_URL") or None,
         )
-        model = cfg.model
+        model = model_override or cfg.model
 
     kwargs: dict[str, Any] = {
         "model": model,

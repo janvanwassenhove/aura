@@ -50,6 +50,9 @@ services:
       - ANTHROPIC_MODEL=${ANTHROPIC_MODEL:-claude-sonnet-4-6}
       - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://host.docker.internal:11434/v1}
       - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3.1}
+      # Offline tier: local model used while DEGRADED/OFFLINE (else regex fallback)
+      - OFFLINE_LLM_PROVIDER=${OFFLINE_LLM_PROVIDER:-}
+      - OFFLINE_LLM_MODEL=${OFFLINE_LLM_MODEL:-llama3.1}
       # Voice (null = text-first; openai_realtime for the GA Realtime transport)
       - STT_PROVIDER=${STT_PROVIDER:-null}
       - TTS_PROVIDER=${TTS_PROVIDER:-null}

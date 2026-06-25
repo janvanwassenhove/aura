@@ -65,6 +65,10 @@ class OrchestratorPipeline:
         # When set (aura-brain), connector calls go in-process via this client's
         # ASGI transport instead of over the network (Phase 1 seam, U8).
         self._connector_client = connector_client
+        # Offline tier (U21): while DEGRADED/OFFLINE, prefer a LOCAL model
+        # (ollama) over the regex FallbackAgent. Unset → regex only.
+        self._offline_llm = os.environ.get("OFFLINE_LLM_PROVIDER")  # e.g. "ollama"
+        self._offline_llm_model = os.environ.get("OFFLINE_LLM_MODEL", "llama3.1")
         self._connector_url = os.environ.get(
             "CONNECTOR_SERVICE_URL", "http://connector-service:8004"
         )
@@ -74,11 +78,11 @@ class OrchestratorPipeline:
 
     async def orchestrate(self, text: str, session_id: str) -> str:
         """Process one user turn; returns the assistant reply text."""
-        # Offline / DEGRADED mode: delegate to FallbackAgent
+        # Offline / DEGRADED mode: try a local model, then the regex FallbackAgent.
         if self._heartbeat and self._heartbeat.mode in (
             RobotMode.DEGRADED, RobotMode.OFFLINE, RobotMode.MAINTENANCE
         ):
-            reply = await self._fallback.handle(text, session_id)
+            reply = await self._offline_reply(text, session_id)
             await self._bus.publish(ResponseDrafted(session_id=session_id, response_text=reply))
             return reply
 
@@ -197,6 +201,27 @@ class OrchestratorPipeline:
 
         await self._bus.publish(ResponseDrafted(session_id=session_id, response_text=reply))
         return reply
+
+    async def _offline_reply(self, text: str, session_id: str) -> str:
+        """Degraded/offline turn: a LOCAL model if one is configured and reachable,
+        otherwise the regex FallbackAgent. Tools/connectors are skipped (offline)."""
+        if self._offline_llm:
+            try:
+                system = self._persona.render_system_prompt(
+                    "(operating offline on a local model — no live tools)", ""
+                )
+                messages = [
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": text},
+                ]
+                resp = await openai_chat(
+                    messages, provider=self._offline_llm, model=self._offline_llm_model
+                )
+                if resp.get("content"):
+                    return resp["content"]
+            except Exception as exc:
+                logger.warning("Offline local LLM unavailable (%s); using regex fallback", exc)
+        return await self._fallback.handle(text, session_id)
 
     async def _call_connector(self, tool_name: str, arguments: dict) -> str:
         route = _TOOL_ROUTES.get(tool_name)
