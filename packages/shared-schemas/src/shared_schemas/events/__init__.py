@@ -36,6 +36,7 @@ from shared_schemas.events.system import (
     ReminderTriggered,
     TurnLatencyMeasured,
 )
+from shared_schemas.events.perception import PersonRecognized
 
 __all__ = [
     "BaseEvent",
@@ -69,6 +70,7 @@ __all__ = [
     # system
     "BackendHeartbeatOk",
     "TurnLatencyMeasured",
+    "PersonRecognized",
     "BackendHeartbeatFailed",
     "OfflineRequestQueued",
     "OfflineQueueSyncStarted",

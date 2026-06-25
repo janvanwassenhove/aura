@@ -15,10 +15,12 @@ from shared_schemas.knowledge.store import (
     KnowledgeStore,
 )
 from shared_schemas.knowledge.encrypted_store import EncryptedKnowledgeStore
+from shared_schemas.knowledge.recognition import EmbeddingMatcher
 
 __all__ = [
     "ConsentError",
     "ConsentRecord",
+    "EmbeddingMatcher",
     "EncryptedKnowledgeStore",
     "InMemoryKnowledgeStore",
     "KnowledgeStore",

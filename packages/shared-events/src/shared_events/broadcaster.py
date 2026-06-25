@@ -25,6 +25,7 @@ from shared_schemas.events import (
     OfflineQueueSyncCompleted,
     OfflineQueueSyncStarted,
     OfflineRequestQueued,
+    PersonRecognized,
     PresentationCueReceived,
     ReminderTriggered,
     ResponseDrafted,
@@ -74,6 +75,7 @@ _ALL_EVENT_TYPES: tuple[type[BaseEvent], ...] = (
     ReminderTriggered,
     PresentationCueReceived,
     TurnLatencyMeasured,
+    PersonRecognized,
 )
 
 
