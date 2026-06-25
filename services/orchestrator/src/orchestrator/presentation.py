@@ -2,14 +2,24 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
-from typing import IO
+from typing import IO, Protocol
 
 import yaml
 
 from shared_events.bus import AsyncEventBus
 from shared_schemas.events.system import PresentationCueReceived
 from shared_schemas.presentation.models import PresentationScript, SlideScript
+from shared_schemas.robot.models import MotionCommand
+
+
+class RobotDriver(Protocol):
+    """Minimal robot surface the presenter drives (duck-typed; the brain injects
+    its RobotClient). Kept as a Protocol so orchestrator needn't import aura-brain."""
+
+    async def speak(self, text: str) -> object: ...
+    async def execute_motion(self, command: MotionCommand) -> object: ...
 
 logger = logging.getLogger(__name__)
 
@@ -40,9 +50,15 @@ class PresentationManager:
     tags are never executed (yaml.safe_load is used throughout).
     """
 
-    def __init__(self, bus: AsyncEventBus, session_id: str = "default") -> None:
+    def __init__(
+        self,
+        bus: AsyncEventBus,
+        session_id: str = "default",
+        robot: "RobotDriver | None" = None,
+    ) -> None:
         self._bus = bus
         self._session_id = session_id
+        self._robot = robot  # when set, slides drive synchronized speech + gesture
         self._script: PresentationScript | None = None
         self._current_slide: int | None = None
 
@@ -126,4 +142,31 @@ class PresentationManager:
                 cue_text=slide.speech_cue,
             )
         )
+
+        # "Present with me": drive speech + gesture concurrently so the robot
+        # gestures *while* speaking the cue (synchronized, not sequential).
+        if self._robot is not None:
+            tasks = [self._robot.speak(slide.speech_cue)]
+            if slide.motion_cue:
+                tasks.append(self._robot.execute_motion(MotionCommand(motion_id=slide.motion_cue)))
+            await asyncio.gather(*tasks)
+
         return slide
+
+    async def advance(self) -> SlideScript:
+        """Co-pilot: activate the next slide (or the first if none active)."""
+        if self._script is None:
+            raise PresentationError("No presentation session is active")
+        nxt = 0 if self._current_slide is None else self._current_slide + 1
+        if nxt >= len(self._script.slides):
+            raise SlideOutOfRangeError(nxt)
+        return await self.activate_slide(nxt)
+
+    async def previous(self) -> SlideScript:
+        """Co-pilot: go back one slide."""
+        if self._script is None:
+            raise PresentationError("No presentation session is active")
+        prev = 0 if self._current_slide is None else self._current_slide - 1
+        if prev < 0:
+            raise SlideOutOfRangeError(prev)
+        return await self.activate_slide(prev)

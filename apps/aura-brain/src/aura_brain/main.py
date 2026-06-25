@@ -163,7 +163,13 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         connector_client=ctx._inproc_client,
     )
 
-    presentation_mgr = PresentationManager(ctx.bus, session_id=session_id)
+    # U27: the presenter drives the robot (speech + synced gesture) over the
+    # brain↔robot boundary via RobotClient.
+    from aura_brain.robot_client import RobotClient
+
+    presentation_mgr = PresentationManager(
+        ctx.bus, session_id=session_id, robot=RobotClient(),
+    )
 
     api_keys: dict[str, str] = {}
     for pair in os.environ.get("GATEWAY_KEYS", "").split(","):
