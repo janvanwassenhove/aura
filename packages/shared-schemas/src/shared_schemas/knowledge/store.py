@@ -35,6 +35,18 @@ class ConsentError(PermissionError):
     """Raised when passive learning is attempted without required consent."""
 
 
+async def ensure_minor_learning_consent(store: "KnowledgeStore", person_id: str) -> None:
+    """ADR-008 §10: a minor's profile gets no passive (observed) learning unless
+    the owner granted explicit consent. Shared by every store implementation."""
+    person = await store.get_person(person_id)
+    if person is not None and person.role == PersonRole.MINOR:
+        if not await store.has_consent(person_id, _OBSERVED_LEARNING):
+            raise ConsentError(
+                f"Passive learning disabled for minor {person_id!r} "
+                "(no observed_learning consent)."
+            )
+
+
 class KnowledgeStore(ABC):
     # --- people ---
     @abstractmethod
@@ -122,14 +134,7 @@ class InMemoryKnowledgeStore(KnowledgeStore):
                     facts.remove(f)
 
     async def record_signal(self, signal: ObservedSignal) -> ObservedSignal:
-        # ADR-008 §10: no passive learning for minors without explicit consent.
-        person = self._people.get(signal.person_id)
-        if person is not None and person.role == PersonRole.MINOR:
-            if not await self.has_consent(signal.person_id, _OBSERVED_LEARNING):
-                raise ConsentError(
-                    f"Passive learning disabled for minor {signal.person_id!r} "
-                    "(no observed_learning consent)."
-                )
+        await ensure_minor_learning_consent(self, signal.person_id)
         # Reinforce an existing signal of the same kind instead of duplicating.
         existing = next(
             (s for s in self._signals.get(signal.person_id, []) if s.kind == signal.kind),

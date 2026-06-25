@@ -14,10 +14,12 @@ from shared_schemas.knowledge.store import (
     InMemoryKnowledgeStore,
     KnowledgeStore,
 )
+from shared_schemas.knowledge.encrypted_store import EncryptedKnowledgeStore
 
 __all__ = [
     "ConsentError",
     "ConsentRecord",
+    "EncryptedKnowledgeStore",
     "InMemoryKnowledgeStore",
     "KnowledgeStore",
     "ObservedSignal",

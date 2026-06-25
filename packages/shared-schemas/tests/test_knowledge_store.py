@@ -8,6 +8,7 @@ import pytest
 from shared_schemas.knowledge import (
     ConsentError,
     ConsentRecord,
+    EncryptedKnowledgeStore,
     InMemoryKnowledgeStore,
     ObservedSignal,
     Person,
@@ -17,9 +18,12 @@ from shared_schemas.knowledge import (
 )
 
 
-@pytest.fixture()
-def store() -> InMemoryKnowledgeStore:
-    return InMemoryKnowledgeStore()
+# The same contract must hold for the in-memory and the encrypted-at-rest store.
+@pytest.fixture(params=["memory", "encrypted"])
+def store(request):
+    if request.param == "memory":
+        return InMemoryKnowledgeStore()
+    return EncryptedKnowledgeStore(omk=b"k" * 32)
 
 
 async def test_facts_are_person_scoped(store) -> None:

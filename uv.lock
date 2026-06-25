@@ -1980,6 +1980,7 @@ name = "shared-schemas"
 version = "0.1.0"
 source = { editable = "packages/shared-schemas" }
 dependencies = [
+    { name = "cryptography" },
     { name = "pydantic" },
 ]
 
@@ -1991,6 +1992,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "cryptography", specifier = ">=42" },
     { name = "pydantic", specifier = ">=2.7,<3" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.2" },
     { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.23" },
