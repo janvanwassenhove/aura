@@ -51,6 +51,7 @@ class BrainContext:
         self.memory_store = None
         self._reminder_scheduler = None
         self.connector_registry = None
+        self.knowledge_store = None
         self.pipeline = None
         self._offline_queue = None
         self._webhook_dispatcher = None
@@ -84,6 +85,23 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     from memory_service.db.session import init_db
     from memory_service.scheduler import ReminderScheduler
     from memory_service.store import SQLiteMemoryStore
+
+    # --- U19d: knowledge store (ADR-008). Encrypted at rest if a passphrase is
+    # set (OMK via scrypt), else in-memory for dev. ---
+    from aura_brain import knowledge_api
+    from shared_schemas.knowledge import (
+        EncryptedKnowledgeStore,
+        InMemoryKnowledgeStore,
+        crypto,
+    )
+
+    _kpass = os.environ.get("KNOWLEDGE_PASSPHRASE")
+    if _kpass:
+        _salt = os.environ.get("KNOWLEDGE_SALT", "aura-knowledge").encode().ljust(16, b"0")[:16]
+        ctx.knowledge_store = EncryptedKnowledgeStore(crypto.derive_omk(_kpass, _salt))
+    else:
+        ctx.knowledge_store = InMemoryKnowledgeStore()
+    knowledge_api.set_store(ctx.knowledge_store)
 
     await init_db()
     ctx.memory_store = SQLiteMemoryStore()
@@ -258,6 +276,9 @@ def create_app() -> FastAPI:
 
     from orchestrator import routes as orchestrator_routes
     app.include_router(orchestrator_routes.router)  # U5
+
+    from aura_brain import knowledge_api
+    app.include_router(knowledge_api.router)  # U19d
 
     return app
 
