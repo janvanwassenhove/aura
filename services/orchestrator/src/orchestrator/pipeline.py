@@ -12,6 +12,7 @@ import httpx
 
 from orchestrator.approval_manager import ApprovalDeniedError, ApprovalManager, ApprovalTimeout
 from orchestrator.context_builder import ContextBuilder
+from orchestrator.dev_agent import DevAgentTool
 from orchestrator.fallback_agent import FallbackAgent
 from orchestrator.intent_router import IntentRouter
 from orchestrator.llm import openai_chat
@@ -56,6 +57,7 @@ class OrchestratorPipeline:
         fallback_agent: FallbackAgent | None = None,
         offline_queue=None,  # OfflineQueue | None — avoid circular import
         connector_client: httpx.AsyncClient | None = None,
+        dev_agent: DevAgentTool | None = None,
     ) -> None:
         self._bus = bus
         self._router = intent_router
@@ -68,6 +70,8 @@ class OrchestratorPipeline:
         # When set (aura-brain), connector calls go in-process via this client's
         # ASGI transport instead of over the network (Phase 1 seam, U8).
         self._connector_client = connector_client
+        # U20: outbound dev-agent tool (None if not configured / DEV_AGENT_ENABLED not set).
+        self._dev_agent = dev_agent
         # Offline tier (U21): while DEGRADED/OFFLINE, prefer a LOCAL model
         # (ollama) over the regex FallbackAgent. Unset → regex only.
         self._offline_llm = os.environ.get("OFFLINE_LLM_PROVIDER")  # e.g. "ollama"
@@ -196,7 +200,15 @@ class OrchestratorPipeline:
         # Pass 2 (concurrent): independent tool executions run in parallel — a
         # turn that touches calendar + mail + tasks no longer pays their sum.
         async def _run(tc_id: str, tool_name: str, arguments: dict) -> dict:
-            result_text = await self._call_connector(tool_name, arguments)
+            if tool_name == "run_dev_task" and self._dev_agent is not None:
+                result_text = await self._dev_agent.run(
+                    task=arguments.get("task", ""),
+                    session_id=session_id,
+                    working_dir=arguments.get("working_dir"),
+                    operation_type=arguments.get("operation_type"),
+                )
+            else:
+                result_text = await self._call_connector(tool_name, arguments)
             await self._bus.publish(ToolCallSucceeded(
                 session_id=session_id, tool_name=tool_name, result_summary=result_text[:500],
             ))

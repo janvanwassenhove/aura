@@ -94,6 +94,44 @@ TOOL_SCHEMAS: dict[str, dict] = {
             "due_at": {"type": "string", "description": "ISO-8601 due datetime."},
         }, "required": ["text", "due_at"]},
     ),
+    "run_dev_task": _fn(
+        "run_dev_task",
+        (
+            "Run a development task: execute a shell command (read/grep/test) or "
+            "invoke Claude Code CLI for complex coding work. "
+            "Write/edit/commit/push operations require owner approval. "
+            "Provide 'task' as a concrete shell command (e.g. 'uv run pytest tests/') "
+            "for shell operations, or a natural-language description when using Claude Code."
+        ),
+        {
+            "type": "object",
+            "properties": {
+                "task": {
+                    "type": "string",
+                    "description": (
+                        "Shell command or natural-language task description. "
+                        "For shell backend: must be a valid shell command. "
+                        "For claude backend: natural language is fine."
+                    ),
+                },
+                "working_dir": {
+                    "type": "string",
+                    "description": "Directory to run in. Defaults to the brain's cwd.",
+                },
+                "operation_type": {
+                    "type": "string",
+                    "enum": ["read", "write", "commit", "push", "complex"],
+                    "description": (
+                        "Hint for the approval tier. Auto-classified from 'task' if omitted. "
+                        "Use 'read' for safe reads/tests, 'write' for file edits, "
+                        "'commit'/'push' for git operations, 'complex' for multi-step coding."
+                    ),
+                },
+            },
+            "required": ["task"],
+            "additionalProperties": False,
+        },
+    ),
 }
 
 

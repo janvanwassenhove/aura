@@ -20,6 +20,7 @@ APPROVAL_REQUIRED: frozenset[str] = frozenset(
 MODE_TOOL_MAP: dict[str, frozenset[str]] = {
     "work": frozenset(
         {
+            "run_dev_task",
             "list_calendar_events_today",
             "create_calendar_event",
             "delete_calendar_event",
@@ -62,6 +63,7 @@ MODE_TOOL_MAP: dict[str, frozenset[str]] = {
     ),
     "demo": frozenset(
         {
+            "run_dev_task",
             "list_calendar_events_today",
             "get_unread_mail",
             "send_mail",

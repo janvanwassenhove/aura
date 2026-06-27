@@ -102,6 +102,13 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     else:
         ctx.knowledge_store = InMemoryKnowledgeStore()
     knowledge_api.set_store(ctx.knowledge_store)
+    knowledge_api.set_omk_loaded(bool(_kpass))
+
+    # U19c: step-up gate for destructive knowledge operations (ADR-008 §9).
+    from aura_brain.stepup_gate import StepUpGate
+
+    _stepup_gate = StepUpGate()  # reads STEP_UP_WEBHOOK_URL + BRAIN_BASE_URL from env
+    knowledge_api.set_stepup_gate(_stepup_gate)
 
     await init_db()
     ctx.memory_store = SQLiteMemoryStore()
@@ -180,6 +187,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         fallback_agent=fallback_agent, offline_queue=ctx._offline_queue,
         connector_client=ctx._inproc_client,
     )
+
+    # U20: outbound dev-agent tool (gated by DEV_AGENT_ENABLED env var).
+    if os.environ.get("DEV_AGENT_ENABLED", "false").lower() == "true":
+        from orchestrator.dev_agent import DevAgentTool
+
+        ctx.pipeline._dev_agent = DevAgentTool(approval_mgr, ctx.bus)
 
     # U27: the presenter drives the robot (speech + synced gesture) over the
     # brain↔robot boundary via RobotClient.
