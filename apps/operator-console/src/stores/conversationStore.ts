@@ -14,6 +14,8 @@ export const useConversationStore = defineStore('conversation', () => {
   const pendingText = ref('')
   const isProcessing = ref(false)
   const sessionId = ref<string | null>(null)
+  // U23: last TurnLatencyMeasured event, shown in the conversation panel.
+  const lastLatency = ref<{ total_ms: number; llm_ms: number; tool_ms: number } | null>(null)
 
   const conversationUrl = import.meta.env.VITE_CONVERSATION_URL ?? 'http://localhost:8002'
 
@@ -51,6 +53,13 @@ export const useConversationStore = defineStore('conversation', () => {
     } else if (type === 'ToolCallFailed') {
       const turn = turns.value.findLast(t => t.toolCall?.name === event.tool_name)
       if (turn?.toolCall) turn.toolCall.status = 'failed'
+    } else if (type === 'TurnLatencyMeasured') {
+      // U23: per-turn latency instrumentation.
+      lastLatency.value = {
+        total_ms: (event.total_ms as number) ?? 0,
+        llm_ms: (event.llm_ms as number) ?? 0,
+        tool_ms: (event.tool_ms as number) ?? 0,
+      }
     }
   }
 
@@ -84,7 +93,8 @@ export const useConversationStore = defineStore('conversation', () => {
     pendingText.value = ''
     isProcessing.value = false
     sessionId.value = null
+    lastLatency.value = null
   }
 
-  return { turns, pendingText, isProcessing, sessionId, addTurn, applyEvent, submitTurn, $reset }
+  return { turns, pendingText, isProcessing, sessionId, lastLatency, addTurn, applyEvent, submitTurn, $reset }
 })

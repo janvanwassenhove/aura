@@ -23,6 +23,15 @@
       {{ robotStore.currentTranscript }}
     </div>
 
+    <div v-if="robotStore.lastRecognized" class="status-row">
+      <span class="label">Recognized</span>
+      <span v-if="robotStore.lastRecognized.known" class="value">
+        {{ robotStore.lastRecognized.display_name }}
+        <span class="text-gray-400 text-xs">({{ Math.round(robotStore.lastRecognized.confidence * 100) }}%)</span>
+      </span>
+      <span v-else class="value text-gray-400">Unknown face</span>
+    </div>
+
     <div class="mt-3">
       <h3 class="section-label">Motion Log</h3>
       <ul class="motion-log">

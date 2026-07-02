@@ -25,6 +25,12 @@
       </div>
     </div>
 
+    <div v-if="conversationStore.lastLatency" class="latency-bar text-xs text-gray-400 mb-2">
+      Last turn: {{ conversationStore.lastLatency.total_ms.toFixed(0) }}ms total
+      (LLM {{ conversationStore.lastLatency.llm_ms.toFixed(0) }}ms
+      + tools {{ conversationStore.lastLatency.tool_ms.toFixed(0) }}ms)
+    </div>
+
     <form class="input-row" @submit.prevent="submit">
       <input
         v-model="conversationStore.pendingText"

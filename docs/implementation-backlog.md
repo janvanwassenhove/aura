@@ -93,7 +93,8 @@ the human can unblock it.
   `StepUpGate` (STEP_UP_WEBHOOK_URL, auto-deny if unset); `UnlockTier` (BENIGN/SENSITIVE); knowledge API gated by tier; `/knowledge/lock`, `/knowledge/tier`, `/knowledge/stepup/callback/{token}/grant|deny`; `set_omk_loaded()` wired in main. Brain 23 green.
 - [~] **U19d — transparency API done; Vue view remains** · deps: U19a · `1fe53d0`
   Brain `/knowledge/*` API: list/inspect (facts+signals)/add+delete fact/erase person/consent; encrypted store when KNOWLEDGE_PASSPHRASE set. Brain 15 green. Remainder: the operator-console Vue view (front-end, needs UI review) + owner-gating (U19c, DECIDE).
-- [ ] **U19e — judgment/anticipation layer (stateless over the store)** · deps: U19a,U19c
+- [x] **U19e — judgment/anticipation layer (stateless over the store)** · deps: U19a,U19c · `8783ab5`
+  `JudgmentLayer` (shared-schemas): builds a minimal `PersonContext` per turn — guest→name only, minor→explicit facts only (ADR-008 §10), family/owner→top-N facts + high-confidence signals. `PersonContext.to_system_note()` injected into pipeline system prompt. Brain subscribes to `PersonRecognized` to track active person. Shared-schemas 117 green, orchestrator 137 green, brain 23 green.
 - [ ] **U20 — outbound dev-agent tool** · deps: U5 · ~~🔒 DECIDE~~ · DONE
   `DevAgentTool`: classify read/write/commit/push; auto-approve reads; `ApprovalManager` step-up for writes/commit/push; cross-repo always asks; Claude Code escalation via `DEV_AGENT_BACKEND=claude` with separate approval. Gated by `DEV_AGENT_ENABLED=true`. Orchestrator 139 green.
 - [x] **U21 — local-LLM offline tier wiring** · deps: U5 · `f2a4864`
@@ -115,7 +116,8 @@ the human can unblock it.
 
 - [x] **U27 — presentations: synced speech+gesture + co-pilot** · deps: U5 · `f1127d9`
   PresentationManager drives speech + slide motion_cue concurrently (RobotDriver Protocol; brain injects RobotClient) with advance()/previous() navigation. Orchestrator 118, brain 13 green.
-- [ ] **U28 — operator-console pass for new events** · deps: U6,U18,U20
+- [x] **U28 — operator-console pass for new events** · deps: U6,U18,U20 · `<hash>`
+  `robotStore.ts`: handles `PersonRecognized` (tracks last recognized person + confidence) and `RobotModeChanged` (offline mode from OfflineBehaviorLoop). `conversationStore.ts`: handles `TurnLatencyMeasured` (tracks total/llm/tool ms). `RobotPanel.vue`: shows recognized person name + confidence. `ConversationPanel.vue`: shows per-turn latency bar after each response.
 
 ---
 
@@ -136,3 +138,4 @@ the human can unblock it.
 - 2026-06-21 — U23 (`aec8518`) + U25 (`afdb299`): per-turn latency event + parallel tool execution. **Remaining buildable (Python): U18 schema/store part (recognition — camera is HW). Remaining is mostly console (U19d/U28 — Vue/TS, need brain knowledge endpoints) + presentations (U27).** 🔒 BLOCKED: U16/U26 (HW), U19c/U20 (DECIDE), U22/U24 (voice HW/SECRET), U19e (deps U19c). Runway nearly exhausted — after U18-store + maybe U27, the rest needs hardware or the DECIDE calls.
 - 2026-06-21 — U18 non-HW slice (`5bf88cd`) + U27 (`f1127d9`): recognition matcher + PersonRecognized event; presentation co-pilot (synced speech+gesture). **RUNWAY EXHAUSTED for the autonomous loop.** Every remaining unit is blocked: U16/U26 🔒HW, U19c/U20 🔒DECIDE (your sign-off), U22/U24 🔒voice(HW/SECRET), U19e deps U19c, U18-remainder 🔒HW(camera). U19d/U28 are Vue/TS console work needing brain knowledge endpoints + UI review (deferred — front-end, lower autonomous confidence).
 - 2026-06-27 — U19c + U20: owner-unlock tiers (StepUpGate, BENIGN/SENSITIVE, /knowledge/lock, stepup callbacks) + outbound dev-agent (classify read/write/commit/push, ApprovalManager gating, Claude Code escalation with separate approval, DEV_AGENT_ENABLED flag). Brain 23 green; orchestrator 139 green. **Remaining: U19e (deps U19c ✓ now unblocked), U19d Vue view (UI review), U28 (deps U20 ✓ now unblocked). HW/SECRET: U16/U26/U22/U24/U18-camera.**
+- 2026-07-03 — orchestrator simplification (dropped anthropic + ollama providers); U19e (`8783ab5`): judgment layer (JudgmentLayer + PersonContext, stateless over knowledge store, data-minimisation per ADR-008 §6/§10, wired into pipeline + brain). U28: operator-console handles PersonRecognized (RobotPanel), RobotModeChanged, TurnLatencyMeasured (ConversationPanel latency bar). **ALL remaining buildable units now complete. Still blocked: U16/U26 🔒HW, U22/U24 🔒voice(HW/SECRET), U18-camera 🔒HW, U19d Vue view (UI review).**

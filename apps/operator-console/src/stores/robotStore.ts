@@ -8,6 +8,14 @@ export interface MotionLogEntry {
   status: 'started' | 'completed' | 'failed'
 }
 
+export interface RecognizedPerson {
+  person_id: string | null
+  display_name: string | null
+  confidence: number
+  known: boolean
+  timestamp: string
+}
+
 export const useRobotStore = defineStore('robot', () => {
   const mode = ref<string>('unknown')
   const behaviorState = ref<string>('idle')
@@ -16,6 +24,7 @@ export const useRobotStore = defineStore('robot', () => {
   const uptime = ref(0)
   const connected = ref(false)
   const motionLog = ref<MotionLogEntry[]>([])
+  const lastRecognized = ref<RecognizedPerson | null>(null)
 
   const statusBadgeClass = computed(() => {
     if (!connected.value) return 'badge-gray'
@@ -40,6 +49,18 @@ export const useRobotStore = defineStore('robot', () => {
     } else if (type === 'RobotStateChanged') {
       mode.value = (event.mode as string) ?? mode.value
       behaviorState.value = (event.behavior_state as string) ?? behaviorState.value
+    } else if (type === 'RobotModeChanged') {
+      // U15: OfflineBehaviorLoop emits this when the robot goes offline or recovers.
+      mode.value = (event.to_mode as string) ?? mode.value
+    } else if (type === 'PersonRecognized') {
+      // U18: face-recognition result from the perception layer.
+      lastRecognized.value = {
+        person_id: (event.person_id as string | null) ?? null,
+        display_name: (event.display_name as string | null) ?? null,
+        confidence: (event.confidence as number) ?? 0,
+        known: (event.known as boolean) ?? false,
+        timestamp: (event.timestamp as string) ?? new Date().toISOString(),
+      }
     } else if (type === 'MotionStarted') {
       isSpeaking.value = false
       const entry: MotionLogEntry = {
@@ -71,7 +92,8 @@ export const useRobotStore = defineStore('robot', () => {
     uptime.value = 0
     connected.value = false
     motionLog.value = []
+    lastRecognized.value = null
   }
 
-  return { mode, behaviorState, isSpeaking, currentTranscript, uptime, connected, motionLog, statusBadgeClass, applyEvent, $reset }
+  return { mode, behaviorState, isSpeaking, currentTranscript, uptime, connected, motionLog, lastRecognized, statusBadgeClass, applyEvent, $reset }
 })
