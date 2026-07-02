@@ -143,43 +143,10 @@ async def test_openai_chat_uses_runtime_config_echo() -> None:
 
 
 # ------------------------------------------------------------------
-# Multi-provider support (anthropic, ollama) — config-level only
+# PATCH rejects removed providers (anthropic/ollama stripped in refactor)
 # ------------------------------------------------------------------
 
 @pytest.mark.parametrize("provider", ["anthropic", "ollama"])
-def test_patch_accepts_new_providers(client: TestClient, provider: str) -> None:
+def test_patch_rejects_removed_providers(client: TestClient, provider: str) -> None:
     resp = client.patch("/orchestrator/config/llm", json={"provider": provider, "model": ""})
-    assert resp.status_code == 200
-    assert resp.json()["provider"] == provider
-
-
-def test_default_models_for_new_providers() -> None:
-    from orchestrator.config import _default_model
-
-    assert _default_model("anthropic").startswith("claude-")
-    assert _default_model("ollama")  # non-empty
-
-
-def test_anthropic_message_conversion_round_trips_tools() -> None:
-    """OpenAI-shaped assistant.tool_calls + tool messages → Anthropic blocks."""
-    from orchestrator.llm import _to_anthropic
-
-    system, msgs = _to_anthropic([
-        {"role": "system", "content": "be brief"},
-        {"role": "user", "content": "meetings today?"},
-        {"role": "assistant", "content": None, "tool_calls": [
-            {"id": "c1", "type": "function",
-             "function": {"name": "list_calendar_events_today", "arguments": "{}"}},
-        ]},
-        {"role": "tool", "tool_call_id": "c1", "content": "[2 events]"},
-    ])
-
-    assert system == "be brief"
-    # assistant turn carries a tool_use block with the right id
-    asst = next(m for m in msgs if m["role"] == "assistant")
-    tool_use = next(b for b in asst["content"] if b["type"] == "tool_use")
-    assert tool_use["id"] == "c1" and tool_use["name"] == "list_calendar_events_today"
-    # tool result becomes a user turn with a matching tool_result block
-    tr = [b for m in msgs if m["role"] == "user" and isinstance(m["content"], list)
-          for b in m["content"] if b["type"] == "tool_result"]
-    assert tr and tr[0]["tool_use_id"] == "c1"
+    assert resp.status_code == 422  # not in the allowed Literal

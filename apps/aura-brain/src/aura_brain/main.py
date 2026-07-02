@@ -194,6 +194,18 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
         ctx.pipeline._dev_agent = DevAgentTool(approval_mgr, ctx.bus)
 
+    # U19e: judgment/anticipation layer — injects minimal personal context per turn.
+    from shared_schemas.knowledge import JudgmentLayer
+    from shared_schemas.events.perception import PersonRecognized
+
+    _judgment = JudgmentLayer(ctx.knowledge_store)
+    ctx.pipeline.set_judgment_layer(_judgment)
+
+    async def _on_person_recognized(event: PersonRecognized) -> None:
+        ctx.pipeline.set_active_person(event.person_id if event.known else None)
+
+    ctx.bus.subscribe(PersonRecognized, _on_person_recognized)
+
     # U27: the presenter drives the robot (speech + synced gesture) over the
     # brain↔robot boundary via RobotClient.
     from aura_brain.robot_client import RobotClient

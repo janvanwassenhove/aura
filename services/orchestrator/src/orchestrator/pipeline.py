@@ -72,6 +72,9 @@ class OrchestratorPipeline:
         self._connector_client = connector_client
         # U20: outbound dev-agent tool (None if not configured / DEV_AGENT_ENABLED not set).
         self._dev_agent = dev_agent
+        # U19e: judgment/anticipation layer + active-person tracking.
+        self._judgment = None  # JudgmentLayer | None — set via set_judgment_layer()
+        self._active_person_id: str | None = None
         # Offline tier (U21): while DEGRADED/OFFLINE, prefer a LOCAL model
         # (ollama) over the regex FallbackAgent. Unset → regex only.
         self._offline_llm = os.environ.get("OFFLINE_LLM_PROVIDER")  # e.g. "ollama"
@@ -82,6 +85,14 @@ class OrchestratorPipeline:
 
     def set_heartbeat_monitor(self, monitor) -> None:
         self._heartbeat = monitor
+
+    def set_judgment_layer(self, judgment) -> None:
+        """Inject the U19e JudgmentLayer. Called from aura_brain.main at startup."""
+        self._judgment = judgment
+
+    def set_active_person(self, person_id: str | None) -> None:
+        """Update the currently-recognized person (called on PersonRecognized events)."""
+        self._active_person_id = person_id
 
     async def orchestrate(self, text: str, session_id: str) -> str:
         """Process one user turn; times it and emits TurnLatencyMeasured (U23)."""
@@ -111,6 +122,13 @@ class OrchestratorPipeline:
 
         # Build system prompt + context string
         ctx_str = await self._context.build_context()
+
+        # U19e: prepend a minimal personal-context note when a person is active.
+        if self._judgment is not None and self._active_person_id:
+            person_ctx = await self._judgment.build_context(self._active_person_id)
+            if person_ctx is not None:
+                ctx_str = person_ctx.to_system_note() + "\n\n" + ctx_str
+
         tool_list_str = await self._context.build_tool_list(allowed)
         system_prompt = self._persona.render_system_prompt(ctx_str, tool_list_str)
 

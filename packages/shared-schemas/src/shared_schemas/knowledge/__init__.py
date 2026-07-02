@@ -16,6 +16,7 @@ from shared_schemas.knowledge.store import (
 )
 from shared_schemas.knowledge.encrypted_store import EncryptedKnowledgeStore
 from shared_schemas.knowledge.recognition import EmbeddingMatcher
+from shared_schemas.knowledge.judgment import JudgmentLayer, PersonContext
 
 __all__ = [
     "ConsentError",
@@ -23,9 +24,11 @@ __all__ = [
     "EmbeddingMatcher",
     "EncryptedKnowledgeStore",
     "InMemoryKnowledgeStore",
+    "JudgmentLayer",
     "KnowledgeStore",
     "ObservedSignal",
     "Person",
+    "PersonContext",
     "PersonRole",
     "ProfileFact",
     "RecognitionLink",
