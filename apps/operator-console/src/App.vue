@@ -6,6 +6,7 @@
       <div class="header-status">
         <span :class="['ws-indicator', `ws-${wsStatus}`]" />
         <span class="ws-label">{{ wsStatusLabel }}</span>
+        <button class="btn-gear" title="Knowledge" @click="showKnowledge = true">🧠</button>
         <button class="btn-gear" title="Settings" @click="showSettings = true">⚙</button>
       </div>
     </header>
@@ -15,6 +16,9 @@
 
     <!-- Settings modal (LLM + Connections tabs) -->
     <SettingsPanel v-if="showSettings" @close="showSettings = false" />
+
+    <!-- Knowledge transparency modal (ADR-008 §8: inspect/edit/erase profiles) -->
+    <KnowledgePanel v-if="showKnowledge" @close="showKnowledge = false" />
 
     <!-- Main grid: 3 columns -->
     <main class="app-grid">
@@ -32,10 +36,12 @@ import ConversationPanel from './components/ConversationPanel.vue'
 import EventLogPanel from './components/EventLogPanel.vue'
 import ApprovalPanel from './components/ApprovalPanel.vue'
 import SettingsPanel from './components/SettingsPanel.vue'
+import KnowledgePanel from './components/KnowledgePanel.vue'
 import { useEventBusWs } from './composables/useEventBusWs'
 
 const { wsStatus, connect } = useEventBusWs()
 const showSettings = ref(false)
+const showKnowledge = ref(false)
 
 const wsStatusLabel = computed(() => {
   if (wsStatus.value === 'open') return 'Connected'
