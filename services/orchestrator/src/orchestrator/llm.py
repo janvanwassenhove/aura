@@ -26,9 +26,6 @@ _OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 async def openai_chat(
     messages: list[dict[str, Any]],
     tools: list[dict[str, Any]] | None = None,
-    *,
-    provider: str | None = None,
-    model: str | None = None,
 ) -> dict[str, Any]:
     """Call the LLM and return the raw choice dict.
 
@@ -36,13 +33,11 @@ async def openai_chat(
       - ``content``: str | None — the assistant text reply
       - ``tool_calls``: list | None — OpenAI tool call objects
 
-    ``provider``/``model`` override the runtime config for this call only — used by
-    the offline tier to force a local model (ollama) while DEGRADED/OFFLINE.
-    When provider is ``echo`` the last user message is echoed back — no key required.
+    When provider is ``echo`` the last user message is echoed back — no
+    API key required.
     """
     cfg = get_config()
-    provider = provider or cfg.provider
-    model_override = model
+    provider = cfg.provider
 
     if provider == "echo":
         last_user = next(
@@ -58,7 +53,7 @@ async def openai_chat(
         from google.genai import types as genai_types
 
         gclient = google_genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
-        model = model_override or cfg.model
+        model = cfg.model
 
         # Convert OpenAI messages format → Gemini contents format
         contents = []
@@ -117,10 +112,6 @@ async def openai_chat(
         logger.debug("LLM response (gemini): finish=%s", candidate.finish_reason if candidate else "none")
         return {"content": text_content, "tool_calls": tool_calls}
 
-    # --- Anthropic (Claude) ---
-    if provider == "anthropic":
-        return await _anthropic_chat(messages, tools, model_override or cfg.model)
-
     # --- OpenRouter ---
     if provider == "openrouter":
         from openai import AsyncOpenAI
@@ -129,29 +120,14 @@ async def openai_chat(
             api_key=os.environ.get("OPENROUTER_API_KEY"),
             base_url=_OPENROUTER_BASE_URL,
         )
-        model = model_override or cfg.model
+        model = cfg.model
 
-    # --- Ollama (local, OpenAI-compatible endpoint) ---
-    elif provider == "ollama":
-        from openai import AsyncOpenAI
-
-        client = AsyncOpenAI(
-            api_key="ollama",  # Ollama ignores the key but the SDK requires one
-            base_url=os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434/v1"),
-        )
-        model = model_override or cfg.model
-
-    # --- OpenAI (or any OpenAI-compatible proxy via OPENAI_BASE_URL) ---
+    # --- OpenAI ---
     else:
         from openai import AsyncOpenAI
 
-        # OPENAI_BASE_URL lets a local proxy stand in for a ChatGPT/Copilot
-        # subscription (those expose no direct API). Unset → real OpenAI.
-        client = AsyncOpenAI(
-            api_key=os.environ.get("OPENAI_API_KEY"),
-            base_url=os.environ.get("OPENAI_BASE_URL") or None,
-        )
-        model = model_override or cfg.model
+        client = AsyncOpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+        model = cfg.model
 
     kwargs: dict[str, Any] = {
         "model": model,
@@ -178,95 +154,3 @@ async def openai_chat(
         ]
 
     return {"content": choice.content, "tool_calls": tool_calls}
-
-
-# --------------------------------------------------------------------------- #
-# Anthropic (Claude) — converts to/from the OpenAI-shaped messages the
-# orchestrator pipeline builds, so tool-calling round-trips identically.
-# --------------------------------------------------------------------------- #
-
-
-def _to_anthropic(messages: list[dict[str, Any]]) -> tuple[str, list[dict[str, Any]]]:
-    """Convert OpenAI-shaped messages → (system_str, anthropic_messages).
-
-    Handles assistant.tool_calls → tool_use blocks and role=tool (+tool_call_id)
-    → tool_result blocks grouped into the following user message.
-    """
-    system_parts: list[str] = []
-    out: list[dict[str, Any]] = []
-    import json as _json
-
-    for msg in messages:
-        role = msg.get("role")
-        if role == "system":
-            if msg.get("content"):
-                system_parts.append(msg["content"])
-        elif role == "tool":
-            block = {
-                "type": "tool_result",
-                "tool_use_id": msg.get("tool_call_id", ""),
-                "content": msg.get("content") or "",
-            }
-            # Anthropic wants tool_result blocks in a user turn; merge consecutive.
-            if out and out[-1]["role"] == "user" and isinstance(out[-1]["content"], list):
-                out[-1]["content"].append(block)
-            else:
-                out.append({"role": "user", "content": [block]})
-        elif role == "assistant":
-            blocks: list[dict[str, Any]] = []
-            if msg.get("content"):
-                blocks.append({"type": "text", "text": msg["content"]})
-            for tc in msg.get("tool_calls") or []:
-                fn = tc["function"]
-                try:
-                    args = _json.loads(fn["arguments"] or "{}")
-                except _json.JSONDecodeError:
-                    args = {}
-                blocks.append({"type": "tool_use", "id": tc["id"], "name": fn["name"], "input": args})
-            out.append({"role": "assistant", "content": blocks or (msg.get("content") or "")})
-        else:  # user
-            out.append({"role": "user", "content": msg.get("content") or ""})
-
-    return "\n".join(system_parts), out
-
-
-async def _anthropic_chat(
-    messages: list[dict[str, Any]], tools: list[dict[str, Any]] | None, model: str
-) -> dict[str, Any]:
-    from anthropic import AsyncAnthropic
-
-    client = AsyncAnthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
-    system, a_messages = _to_anthropic(messages)
-
-    kwargs: dict[str, Any] = {"model": model, "max_tokens": 1024, "messages": a_messages}
-    if system:
-        kwargs["system"] = system
-    if tools:
-        # OpenAI function schema → Anthropic tool schema
-        kwargs["tools"] = [
-            {
-                "name": t["function"]["name"],
-                "description": t["function"].get("description", ""),
-                "input_schema": t["function"].get("parameters", {"type": "object", "properties": {}}),
-            }
-            for t in tools if t.get("type") == "function"
-        ]
-
-    logger.debug("LLM request (anthropic): model=%s messages=%d", model, len(a_messages))
-    resp = await client.messages.create(**kwargs)
-
-    text: str | None = None
-    tool_calls: list[dict[str, Any]] | None = None
-    import json as _json
-    for block in resp.content:
-        if block.type == "text":
-            text = (text or "") + block.text
-        elif block.type == "tool_use":
-            tool_calls = tool_calls or []
-            tool_calls.append({
-                "id": block.id,
-                "name": block.name,
-                "arguments": _json.dumps(block.input or {}),
-            })
-
-    return {"content": text, "tool_calls": tool_calls}
