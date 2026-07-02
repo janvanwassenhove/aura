@@ -116,7 +116,7 @@ the human can unblock it.
 
 - [x] **U27 — presentations: synced speech+gesture + co-pilot** · deps: U5 · `f1127d9`
   PresentationManager drives speech + slide motion_cue concurrently (RobotDriver Protocol; brain injects RobotClient) with advance()/previous() navigation. Orchestrator 118, brain 13 green.
-- [x] **U28 — operator-console pass for new events** · deps: U6,U18,U20 · `<hash>`
+- [x] **U28 — operator-console pass for new events** · deps: U6,U18,U20 · `df26bbc`
   `robotStore.ts`: handles `PersonRecognized` (tracks last recognized person + confidence) and `RobotModeChanged` (offline mode from OfflineBehaviorLoop). `conversationStore.ts`: handles `TurnLatencyMeasured` (tracks total/llm/tool ms). `RobotPanel.vue`: shows recognized person name + confidence. `ConversationPanel.vue`: shows per-turn latency bar after each response.
 
 ---
