@@ -99,8 +99,8 @@ the human can unblock it.
   `DevAgentTool`: classify read/write/commit/push; auto-approve reads; `ApprovalManager` step-up for writes/commit/push; cross-repo always asks; Claude Code escalation via `DEV_AGENT_BACKEND=claude` with separate approval. Gated by `DEV_AGENT_ENABLED=true`. Orchestrator 139 green.
 - [x] **U21 — local-LLM offline tier wiring** · deps: U5 · `f2a4864`
   Pipeline offline path tries a local model (OFFLINE_LLM_PROVIDER, e.g. ollama) before the regex FallbackAgent; `openai_chat` gained per-call provider/model overrides. Orchestrator 113 green.
-- [ ] **U22 — Realtime API voice transport** · deps: U4 · 🔒 SECRET (key) for live
-  Replace batch whisper-1/tts-1 in `conversation-runtime` with the GA Realtime path proven in the spike; barge-in; token-stream. Logic buildable; live run needs the key + audio (🔒 HW).
+- [~] **U22 — Realtime API voice transport (logic done)** · deps: U4 · `32ad906` · 🔒 SECRET+HW for live
+  `RealtimeVoiceSession` (conversation-runtime): GA-protocol state machine over an injectable wire — server VAD, b64 PCM in/out, text turns, transcript deltas, barge-in (response.cancel + on_interrupt). 10 tests over a fake wire; conversation-runtime 20 green. Remainder: live socket + mic/speaker wiring (🔒 SECRET key + HW).
 
 ## Phase 3.5 — performance gate
 
@@ -118,6 +118,17 @@ the human can unblock it.
   PresentationManager drives speech + slide motion_cue concurrently (RobotDriver Protocol; brain injects RobotClient) with advance()/previous() navigation. Orchestrator 118, brain 13 green.
 - [x] **U28 — operator-console pass for new events** · deps: U6,U18,U20 · `df26bbc`
   `robotStore.ts`: handles `PersonRecognized` (tracks last recognized person + confidence) and `RobotModeChanged` (offline mode from OfflineBehaviorLoop). `conversationStore.ts`: handles `TurnLatencyMeasured` (tracks total/llm/tool ms). `RobotPanel.vue`: shows recognized person name + confidence. `ConversationPanel.vue`: shows per-turn latency bar after each response.
+
+## Phase 5 — final development (device-day readiness)
+
+- [x] **U29 — encrypted knowledge store persists to disk** · deps: U19b · `3965153`
+  `EncryptedKnowledgeStore(path=…)`: ciphertext bundles + wrapped DEKs load at init, atomic flush on every mutation; erasure reaches disk; plaintext never written. Brain wires `KNOWLEDGE_DB_PATH` when `KNOWLEDGE_PASSPHRASE` set. Shared-schemas 123 green.
+- [x] **U30 — interactive setup wizard** · deps: U29 · `1294049`
+  `python -m aura_brain.wizard`: robot link (+health check), LLM provider/key, voice, offline resilience, security (passphrase confirm + opt-in .env storage, random salt, step-up webhook, dev-agent), persona, connectors, and person seeding (owner/family/guest/minor + facts) directly into the encrypted store. Secrets never echoed; refuses plaintext people. Compose /data → bind mount; knowledge env passthrough. Brain 30 green.
+- [x] **U31 — full documentation pass** · deps: U29,U30 · `<hash>`
+  README overhaul (topology, quickstart, security-model table, layout, status); `docs/setup-guide.md` (device day: unboxing → wizard → security §5 → voice → resilience check → day-two ops table); `.env.example` refresh (dropped removed anthropic/ollama providers, added knowledge/security + OFFLINE_LLM_BASE_URL sections).
+- [x] **U21-fix — offline tier repaired after provider simplification** · `6abfa90`
+  `_offline_reply` passed removed provider=/model= kwargs to `openai_chat` (TypeError). Now calls a local OpenAI-compatible server via `local_chat(OFFLINE_LLM_BASE_URL, OFFLINE_LLM_MODEL)`; regex fallback last. Orchestrator 138 green.
 
 ---
 
@@ -140,3 +151,4 @@ the human can unblock it.
 - 2026-06-27 — U19c + U20: owner-unlock tiers (StepUpGate, BENIGN/SENSITIVE, /knowledge/lock, stepup callbacks) + outbound dev-agent (classify read/write/commit/push, ApprovalManager gating, Claude Code escalation with separate approval, DEV_AGENT_ENABLED flag). Brain 23 green; orchestrator 139 green. **Remaining: U19e (deps U19c ✓ now unblocked), U19d Vue view (UI review), U28 (deps U20 ✓ now unblocked). HW/SECRET: U16/U26/U22/U24/U18-camera.**
 - 2026-07-03 — orchestrator simplification (dropped anthropic + ollama providers); U19e (`8783ab5`): judgment layer (JudgmentLayer + PersonContext, stateless over knowledge store, data-minimisation per ADR-008 §6/§10, wired into pipeline + brain). U28: operator-console handles PersonRecognized (RobotPanel), RobotModeChanged, TurnLatencyMeasured (ConversationPanel latency bar). **ALL remaining buildable units now complete. Still blocked: U16/U26 🔒HW, U22/U24 🔒voice(HW/SECRET), U18-camera 🔒HW, U19d Vue view (UI review).**
 - 2026-07-03 — U19d Vue view: knowledgeStore (Pinia over brain `/knowledge/*`, 403-locked handling) + KnowledgePanel modal (people/facts/signals transparency UI, forget-person, tier badge + lock) wired into App header (🧠). Console 45 green, vite build clean. **U19d fully done. Remaining is HW/SECRET-blocked only: U16/U26, U22/U24 live voice, U18-camera. Optional: U22 transport logic buildable without key.**
+- 2026-07-03 — FINAL DEV session (user request): U21-fix (`6abfa90`, offline tier TypeError), U29 (`3965153`, encrypted store persists — profiles survive restarts), U30 (`1294049`, setup wizard: env + encrypted person seeding), U22 logic slice (`32ad906`, Realtime transport state machine w/ barge-in), U31 (docs: README overhaul + docs/setup-guide.md + .env.example refresh). **Software runway fully exhausted — every remaining unit needs the physical device or a live key: U16 (Reachy adapter), U18-camera, U22/U24 live voice, U26. Device-day path: docs/setup-guide.md → `python -m aura_brain.wizard`.**
