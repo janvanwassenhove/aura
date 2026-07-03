@@ -42,6 +42,10 @@ Thumbs.db
 *.pem
 *.key
 secrets/
+*.env.bak
+
+# Runtime data (memory DB, encrypted knowledge store — never commit)
+data/
 
 # SQLite
 *.db

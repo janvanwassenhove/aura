@@ -46,12 +46,9 @@ services:
       - OPENROUTER_MODEL=${OPENROUTER_MODEL:-openai/gpt-oss-120b:free}
       - GEMINI_API_KEY=${GEMINI_API_KEY:-}
       - GEMINI_MODEL=${GEMINI_MODEL:-gemini-2.5-flash}
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
-      - ANTHROPIC_MODEL=${ANTHROPIC_MODEL:-claude-sonnet-4-6}
-      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://host.docker.internal:11434/v1}
-      - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3.1}
-      # Offline tier: local model used while DEGRADED/OFFLINE (else regex fallback)
-      - OFFLINE_LLM_PROVIDER=${OFFLINE_LLM_PROVIDER:-}
+      # Offline tier: local OpenAI-compatible server used while DEGRADED/OFFLINE
+      # (ollama/llama.cpp on the host; else regex fallback)
+      - OFFLINE_LLM_BASE_URL=${OFFLINE_LLM_BASE_URL:-}
       - OFFLINE_LLM_MODEL=${OFFLINE_LLM_MODEL:-llama3.1}
       # Voice (null = text-first; openai_realtime for the GA Realtime transport)
       - STT_PROVIDER=${STT_PROVIDER:-null}
@@ -76,8 +73,17 @@ services:
       # Approval / gateway
       - APPROVAL_TIMEOUT_SECONDS=${APPROVAL_TIMEOUT_SECONDS:-30}
       - GATEWAY_KEYS=${GATEWAY_KEYS:-}
+      # Knowledge layer (ADR-008): encrypted person profiles + owner unlock
+      - KNOWLEDGE_PASSPHRASE=${KNOWLEDGE_PASSPHRASE:-}
+      - KNOWLEDGE_SALT=${KNOWLEDGE_SALT:-}
+      - KNOWLEDGE_DB_PATH=${KNOWLEDGE_DB_PATH:-/data/knowledge.enc.json}
+      - STEP_UP_WEBHOOK_URL=${STEP_UP_WEBHOOK_URL:-}
+      # Outbound dev agent (U20) — off unless explicitly enabled
+      - DEV_AGENT_ENABLED=${DEV_AGENT_ENABLED:-false}
     volumes:
-      - aura-data:/data
+      # Bind-mounted so the setup wizard can seed knowledge.enc.json from the
+      # host and the owner can inspect/back up the (ciphertext-only) data dir.
+      - ../../data:/data
       - identity-keyring:/data/keyring
     depends_on:
       - robot-runtime
@@ -109,7 +115,5 @@ services:
     restart: unless-stopped
 
 volumes:
-  aura-data:
-    driver: local
   identity-keyring:
     driver: local
