@@ -98,7 +98,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     _kpass = os.environ.get("KNOWLEDGE_PASSPHRASE")
     if _kpass:
         _salt = os.environ.get("KNOWLEDGE_SALT", "aura-knowledge").encode().ljust(16, b"0")[:16]
-        ctx.knowledge_store = EncryptedKnowledgeStore(crypto.derive_omk(_kpass, _salt))
+        # U29: ciphertext bundles persist across restarts (ciphertext-only file).
+        _kpath = os.environ.get("KNOWLEDGE_DB_PATH", "./data/knowledge.enc.json")
+        ctx.knowledge_store = EncryptedKnowledgeStore(
+            crypto.derive_omk(_kpass, _salt), path=_kpath,
+        )
     else:
         ctx.knowledge_store = InMemoryKnowledgeStore()
     knowledge_api.set_store(ctx.knowledge_store)

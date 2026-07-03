@@ -6,14 +6,21 @@ are always ciphertext; plaintext exists only transiently in memory during an
 operation. Deleting a person destroys their DEK + blob → cryptographic erasure.
 
 Same `KnowledgeStore` interface as the in-memory store, so the brain can swap it
-in transparently. Persistence of the ciphertext (to disk) is a thin layer over the
-`_blobs`/`_wrapped_deks` maps and is left to the caller / a later unit; the crypto
-boundary is what matters here.
+in transparently.
+
+Persistence (U29): pass ``path=`` to keep the ciphertext bundles on disk. Only
+ciphertext and wrapped DEKs ever touch the file — plaintext exists transiently in
+memory during an operation. Person IDs appear as file keys (they are needed as
+AAD to decrypt anyway); everything else is opaque. Writes are atomic
+(tmp + replace) so a crash mid-write cannot corrupt the store.
 """
 
 from __future__ import annotations
 
+import base64
 import json
+import os
+from pathlib import Path
 
 from shared_schemas.knowledge import crypto
 from shared_schemas.knowledge.models import (
@@ -28,12 +35,43 @@ from shared_schemas.knowledge.store import KnowledgeStore, ensure_minor_learning
 
 
 class EncryptedKnowledgeStore(KnowledgeStore):
-    def __init__(self, omk: bytes) -> None:
+    def __init__(self, omk: bytes, path: str | Path | None = None) -> None:
         if len(omk) != 32:
             raise ValueError("OMK must be 32 bytes (AES-256).")
         self._omk = omk
         self._wrapped_deks: dict[str, bytes] = {}
         self._blobs: dict[str, bytes] = {}  # person_id -> AES-GCM ciphertext bundle
+        self._path = Path(path) if path is not None else None
+        if self._path is not None and self._path.exists():
+            self._load_file()
+
+    # ------------------------------------------------------------------
+    # Disk persistence (U29) — ciphertext only, atomic writes
+    # ------------------------------------------------------------------
+
+    def _load_file(self) -> None:
+        data = json.loads(self._path.read_text(encoding="utf-8"))
+        for pid, entry in data.get("people", {}).items():
+            self._wrapped_deks[pid] = base64.b64decode(entry["wrapped_dek"])
+            self._blobs[pid] = base64.b64decode(entry["blob"])
+
+    def _flush(self) -> None:
+        if self._path is None:
+            return
+        data = {
+            "version": 1,
+            "people": {
+                pid: {
+                    "wrapped_dek": base64.b64encode(self._wrapped_deks[pid]).decode(),
+                    "blob": base64.b64encode(blob).decode(),
+                }
+                for pid, blob in self._blobs.items()
+            },
+        }
+        self._path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = self._path.with_suffix(self._path.suffix + ".tmp")
+        tmp.write_text(json.dumps(data), encoding="utf-8")
+        os.replace(tmp, self._path)
 
     # ------------------------------------------------------------------
     # Bundle load/save (the only place plaintext exists, transiently)
@@ -60,6 +98,7 @@ class EncryptedKnowledgeStore(KnowledgeStore):
         self._blobs[person_id] = crypto.encrypt(
             dek, json.dumps(bundle).encode(), aad=person_id.encode()
         )
+        self._flush()
 
     # ------------------------------------------------------------------
     # People
@@ -87,6 +126,7 @@ class EncryptedKnowledgeStore(KnowledgeStore):
         # Destroy the wrapped DEK and ciphertext → data is unrecoverable.
         self._wrapped_deks.pop(person_id, None)
         self._blobs.pop(person_id, None)
+        self._flush()  # erasure must reach disk too
 
     # ------------------------------------------------------------------
     # Facts
