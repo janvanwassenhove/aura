@@ -125,7 +125,7 @@ the human can unblock it.
   `EncryptedKnowledgeStore(path=…)`: ciphertext bundles + wrapped DEKs load at init, atomic flush on every mutation; erasure reaches disk; plaintext never written. Brain wires `KNOWLEDGE_DB_PATH` when `KNOWLEDGE_PASSPHRASE` set. Shared-schemas 123 green.
 - [x] **U30 — interactive setup wizard** · deps: U29 · `1294049`
   `python -m aura_brain.wizard`: robot link (+health check), LLM provider/key, voice, offline resilience, security (passphrase confirm + opt-in .env storage, random salt, step-up webhook, dev-agent), persona, connectors, and person seeding (owner/family/guest/minor + facts) directly into the encrypted store. Secrets never echoed; refuses plaintext people. Compose /data → bind mount; knowledge env passthrough. Brain 30 green.
-- [x] **U31 — full documentation pass** · deps: U29,U30 · `<hash>`
+- [x] **U31 — full documentation pass** · deps: U29,U30 · `eb5355b`
   README overhaul (topology, quickstart, security-model table, layout, status); `docs/setup-guide.md` (device day: unboxing → wizard → security §5 → voice → resilience check → day-two ops table); `.env.example` refresh (dropped removed anthropic/ollama providers, added knowledge/security + OFFLINE_LLM_BASE_URL sections).
 - [x] **U21-fix — offline tier repaired after provider simplification** · `6abfa90`
   `_offline_reply` passed removed provider=/model= kwargs to `openai_chat` (TypeError). Now calls a local OpenAI-compatible server via `local_chat(OFFLINE_LLM_BASE_URL, OFFLINE_LLM_MODEL)`; regex fallback last. Orchestrator 138 green.
