@@ -15,7 +15,7 @@ from orchestrator.context_builder import ContextBuilder
 from orchestrator.dev_agent import DevAgentTool
 from orchestrator.fallback_agent import FallbackAgent
 from orchestrator.intent_router import IntentRouter
-from orchestrator.llm import openai_chat
+from orchestrator.llm import local_chat, openai_chat
 from orchestrator.persona_manager import PersonaManager
 from orchestrator.tool_schemas import build_tool_specs
 from shared_events.bus import AsyncEventBus
@@ -75,9 +75,10 @@ class OrchestratorPipeline:
         # U19e: judgment/anticipation layer + active-person tracking.
         self._judgment = None  # JudgmentLayer | None — set via set_judgment_layer()
         self._active_person_id: str | None = None
-        # Offline tier (U21): while DEGRADED/OFFLINE, prefer a LOCAL model
-        # (ollama) over the regex FallbackAgent. Unset → regex only.
-        self._offline_llm = os.environ.get("OFFLINE_LLM_PROVIDER")  # e.g. "ollama"
+        # Offline tier (U21): while DEGRADED/OFFLINE, prefer a LOCAL model over
+        # the regex FallbackAgent. Points at any OpenAI-compatible local server
+        # (ollama/llama.cpp `/v1`). Unset → regex only.
+        self._offline_llm_base = os.environ.get("OFFLINE_LLM_BASE_URL")
         self._offline_llm_model = os.environ.get("OFFLINE_LLM_MODEL", "llama3.1")
         self._connector_url = os.environ.get(
             "CONNECTOR_SERVICE_URL", "http://connector-service:8004"
@@ -259,7 +260,7 @@ class OrchestratorPipeline:
     async def _offline_reply(self, text: str, session_id: str) -> str:
         """Degraded/offline turn: a LOCAL model if one is configured and reachable,
         otherwise the regex FallbackAgent. Tools/connectors are skipped (offline)."""
-        if self._offline_llm:
+        if self._offline_llm_base:
             try:
                 system = self._persona.render_system_prompt(
                     "(operating offline on a local model — no live tools)", ""
@@ -268,8 +269,8 @@ class OrchestratorPipeline:
                     {"role": "system", "content": system},
                     {"role": "user", "content": text},
                 ]
-                resp = await openai_chat(
-                    messages, provider=self._offline_llm, model=self._offline_llm_model
+                resp = await local_chat(
+                    messages, base_url=self._offline_llm_base, model=self._offline_llm_model
                 )
                 if resp.get("content"):
                     return resp["content"]

@@ -154,3 +154,21 @@ async def openai_chat(
         ]
 
     return {"content": choice.content, "tool_calls": tool_calls}
+
+
+async def local_chat(
+    messages: list[dict[str, Any]],
+    base_url: str,
+    model: str,
+) -> dict[str, Any]:
+    """Call a LOCAL OpenAI-compatible server (ollama, llama.cpp, vLLM) directly.
+
+    Used by the offline tier: independent of the configured cloud provider, no
+    API key, no tools. Returns the same shape as ``openai_chat``.
+    """
+    from openai import AsyncOpenAI
+
+    client = AsyncOpenAI(api_key="local", base_url=base_url)
+    logger.debug("LLM request (local): base_url=%s model=%s", base_url, model)
+    response = await client.chat.completions.create(model=model, messages=messages)
+    return {"content": response.choices[0].message.content, "tool_calls": None}

@@ -36,28 +36,38 @@ def _pipeline(bus) -> OrchestratorPipeline:
         ContextBuilder(), PersonaManager(),
     )
     p.set_heartbeat_monitor(_FakeHeartbeat())
-    p._offline_llm = "ollama"
+    p._offline_llm_base = "http://localhost:11434/v1"
+    p._offline_llm_model = "llama3.1"
     return p
 
 
 async def test_offline_uses_local_model_when_available(monkeypatch, bus) -> None:
     used: dict = {}
 
-    async def fake_llm(messages, tools=None, *, provider=None, model=None):
-        used["provider"] = provider
+    async def fake_local(messages, *, base_url, model):
+        used["base_url"] = base_url
+        used["model"] = model
         return {"content": "Local model answer.", "tool_calls": None}
 
-    monkeypatch.setattr(pipeline_mod, "openai_chat", fake_llm)
+    monkeypatch.setattr(pipeline_mod, "local_chat", fake_local)
     reply = await _pipeline(bus).orchestrate("what's up?", "s1")
     assert reply == "Local model answer."
-    assert used["provider"] == "ollama"  # forced the local provider
+    assert used["base_url"] == "http://localhost:11434/v1"
+    assert used["model"] == "llama3.1"
 
 
 async def test_offline_falls_back_to_regex_when_local_down(monkeypatch, bus) -> None:
-    async def dead_llm(messages, tools=None, *, provider=None, model=None):
-        raise ConnectionError("ollama not running")
+    async def dead_local(messages, *, base_url, model):
+        raise ConnectionError("local model not running")
 
-    monkeypatch.setattr(pipeline_mod, "openai_chat", dead_llm)
+    monkeypatch.setattr(pipeline_mod, "local_chat", dead_local)
     # The regex FallbackAgent handles "time" locally.
     reply = await _pipeline(bus).orchestrate("what time is it?", "s1")
     assert "current time" in reply.lower()  # regex fallback kicked in
+
+
+async def test_offline_regex_only_when_no_local_base_url(bus) -> None:
+    p = _pipeline(bus)
+    p._offline_llm_base = None  # no local model configured
+    reply = await p.orchestrate("what time is it?", "s1")
+    assert "current time" in reply.lower()
