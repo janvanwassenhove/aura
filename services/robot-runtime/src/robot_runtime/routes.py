@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Response, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse
 
 from robot_runtime.adapters.fake import FakeRobotAdapter
@@ -91,6 +91,22 @@ async def execute_motion(command: MotionCommand) -> JSONResponse:
     _touch()
     await adapter.execute_motion(command)
     return JSONResponse({"ok": True})
+
+
+# ------------------------------------------------------------------
+# Camera (U18: one frame per request; the brain's perception loop polls)
+# ------------------------------------------------------------------
+
+
+@router.get("/robot/camera/frame")
+async def camera_frame() -> Response:
+    assert adapter is not None
+    _touch()
+    try:
+        png = await adapter.get_camera_frame()
+    except RuntimeError as exc:
+        return JSONResponse({"error": str(exc)}, status_code=503)
+    return Response(content=png, media_type="image/png")
 
 
 # ------------------------------------------------------------------
