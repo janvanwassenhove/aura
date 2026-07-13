@@ -1,0 +1,13 @@
+{
+  "name": "aura-desktop",
+  "version": "0.1.0",
+  "description": "AURA desktop app — brain + operator console in one window",
+  "main": "main.cjs",
+  "scripts": {
+    "start": "electron .",
+    "build:console": "cd ../operator-console && npm run build"
+  },
+  "devDependencies": {
+    "electron": "^33.0.0"
+  }
+}
