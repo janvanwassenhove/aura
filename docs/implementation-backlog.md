@@ -75,7 +75,7 @@ the human can unblock it.
   HeartbeatMonitor gains OFFLINE (DEGRADED→OFFLINE when ALL signals down; backward-compatible). Brain wires it to watch ROBOT_RUNTIME_URL/health + UPSTREAM_HEALTH_URL and sets it on the pipeline (degradation→FallbackAgent); gated by HEARTBEAT_ENABLED. Heartbeat 7, orchestrator 111, brain 13 green.
 - [x] **U15 — on-device offline loop** · deps: U13 · `7f2f569`
   `OfflineBehaviorLoop` in robot-runtime: brain commands `_touch()` liveness; on timeout the robot speaks a one-time "lost my brain" notice + idles + emits RobotModeChanged(→OFFLINE), recovering on next command. Verified vs FakeRobot. Robot suite 28 green.
-- [~] **U16 — ReachyRobotAdapter LIVE-VERIFIED; Pi packaging remains** · deps: U13 · `<hash>`
+- [~] **U16 — ReachyRobotAdapter LIVE-VERIFIED; Pi packaging remains** · deps: U13 · `66ecaa0`
   `adapters/reachy.py` over the reachy-mini SDK (optional `[reachy]` extra, lazy import): motion vocabulary (nod/tilt/shake/wave/gesture/point/bow/wake_up/sleep) as head-pose/antenna primitives, media via MediaManager (graceful no_media), sync SDK behind to_thread + motion lock; ROBOT_ADAPTER=reachy wired. 12 stub-SDK contract tests + 3 live tests (REACHY_LIVE=1) **passed against the physical robot over wifi** (192.168.0.178, network mode). Remainder: package robot-runtime to run ON the Pi (needs SSH onto the device) + live media (WebRTC/local ALSA).
 - [x] **U17 — two-host bring-up docs** · deps: U13 · `fe11c72`
   `infra/two-host-bringup.md`: run robot-runtime on the Pi + aura-brain on the laptop across the one network hop; env for both sides, console URLs, and a U14+U15 resilience check.
