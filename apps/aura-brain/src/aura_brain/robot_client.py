@@ -66,3 +66,7 @@ class RobotClient:
 
     async def set_mode(self, mode: str) -> str:
         return (await self._request("POST", "/robot/mode", {"mode": mode})).json().get("mode", "")
+
+    async def camera_frame(self) -> bytes:
+        """One PNG frame from the robot's camera (U18 perception loop)."""
+        return (await self._request("GET", "/robot/camera/frame")).content

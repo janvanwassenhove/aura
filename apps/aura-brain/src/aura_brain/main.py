@@ -53,6 +53,7 @@ class BrainContext:
         self.connector_registry = None
         self.knowledge_store = None
         self.pipeline = None
+        self._perception = None
         self._offline_queue = None
         self._webhook_dispatcher = None
         self._heartbeat = None
@@ -236,6 +237,33 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         gateway_mgr=gateway_mgr, webhook_dispatcher=ctx._webhook_dispatcher,
     )
 
+    # --- U18: live perception loop — camera → face embedding → PersonRecognized.
+    # Needs encryption (embeddings are biometric data) so it requires the
+    # knowledge passphrase; gated by RECOGNITION_ENABLED.
+    from aura_brain import recognition_api
+
+    if os.environ.get("RECOGNITION_ENABLED", "false").lower() == "true" and _kpass:
+        from aura_brain.perception import PerceptionLoop, build_embedder
+        from shared_schemas.knowledge.recognition import EmbeddingMatcher
+
+        _rec_matcher = EmbeddingMatcher(
+            crypto.derive_omk(_kpass, _salt),
+            path=os.environ.get("RECOGNITION_DB_PATH", "./data/recognition.enc.json"),
+        )
+        _rec_embedder = build_embedder(os.environ.get("FACE_EMBEDDER", "null"))
+        _rec_robot = RobotClient()
+        ctx._perception = PerceptionLoop(
+            ctx.bus, _rec_matcher, _rec_robot, _rec_embedder,
+            knowledge_store=ctx.knowledge_store,
+            interval_s=float(os.environ.get("RECOGNITION_INTERVAL_S", "2.0")),
+            session_id=session_id,
+        )
+        ctx._perception.start()
+        recognition_api.init(
+            _rec_matcher, _rec_embedder, _rec_robot, ctx.knowledge_store,
+            loop=ctx._perception,
+        )
+
     # --- U14: heartbeat watches the REAL failure surface — the brain↔robot link
     # and upstream internet — not sibling containers (which no longer exist after
     # the collapse). Gated by env so it doesn't flap during tests.
@@ -253,6 +281,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     yield
 
+    if ctx._perception is not None:
+        await ctx._perception.stop()
     if ctx._heartbeat is not None:
         await ctx._heartbeat.stop()
     if ctx._inproc_client is not None:
@@ -308,6 +338,9 @@ def create_app() -> FastAPI:
 
     from aura_brain import knowledge_api
     app.include_router(knowledge_api.router)  # U19d
+
+    from aura_brain import recognition_api
+    app.include_router(recognition_api.router)  # U18
 
     return app
 

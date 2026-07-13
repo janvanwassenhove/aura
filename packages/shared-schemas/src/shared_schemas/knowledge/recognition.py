@@ -10,8 +10,11 @@ the opaque ref → person; this holds the actual (encrypted) vectors.
 
 from __future__ import annotations
 
+import base64
 import json
 import math
+import os
+from pathlib import Path
 
 from shared_schemas.knowledge import crypto
 
@@ -30,12 +33,38 @@ def _cosine(a: list[float], b: list[float]) -> float:
 
 
 class EmbeddingMatcher:
-    def __init__(self, omk: bytes, threshold: float = _DEFAULT_THRESHOLD) -> None:
+    def __init__(
+        self,
+        omk: bytes,
+        threshold: float = _DEFAULT_THRESHOLD,
+        path: str | Path | None = None,
+    ) -> None:
         if len(omk) != 32:
             raise ValueError("OMK must be 32 bytes (AES-256).")
         self._omk = omk
         self._threshold = threshold
         self._enrolled: dict[str, bytes] = {}  # person_id -> encrypted embedding
+        # Optional disk persistence (ciphertext only — same rules as U29).
+        self._path = Path(path) if path is not None else None
+        if self._path is not None and self._path.exists():
+            data = json.loads(self._path.read_text(encoding="utf-8"))
+            self._enrolled = {
+                pid: base64.b64decode(blob) for pid, blob in data.get("embeddings", {}).items()
+            }
+
+    def _flush(self) -> None:
+        if self._path is None:
+            return
+        data = {
+            "version": 1,
+            "embeddings": {
+                pid: base64.b64encode(blob).decode() for pid, blob in self._enrolled.items()
+            },
+        }
+        self._path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = self._path.with_suffix(self._path.suffix + ".tmp")
+        tmp.write_text(json.dumps(data), encoding="utf-8")
+        os.replace(tmp, self._path)
 
     def enroll(self, person_id: str, embedding: list[float]) -> None:
         """Store (encrypted) a reference embedding for a known person."""
@@ -43,9 +72,11 @@ class EmbeddingMatcher:
             self._omk, json.dumps(embedding).encode(), aad=person_id.encode()
         )
         self._enrolled[person_id] = blob
+        self._flush()
 
     def forget(self, person_id: str) -> None:
         self._enrolled.pop(person_id, None)
+        self._flush()  # erasure must reach disk too
 
     def identify(self, embedding: list[float]) -> tuple[str | None, float]:
         """Return (person_id, confidence) for the best match, or (None, score)

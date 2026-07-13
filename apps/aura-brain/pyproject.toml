@@ -31,6 +31,13 @@ dev = [
     # in-process. NOT a runtime dependency — robot-runtime is a separate deployable.
     "robot-runtime",
 ]
+# Real face recognition (U18): uv sync --package aura-brain --extra recognition
+recognition = [
+    "insightface>=0.7",
+    "onnxruntime>=1.18",
+    "pillow>=10.0",
+    "numpy>=1.26",
+]
 
 [project.scripts]
 aura-brain = "aura_brain.main:run"
