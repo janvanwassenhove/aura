@@ -82,7 +82,7 @@ the human can unblock it.
 
 ## Phase 3 — capability spine
 
-- [x] **U18 — recognition (perception): full loop wired** · deps: U11 · `5bf88cd` + `<hash>`
+- [x] **U18 — recognition (perception): full loop wired** · deps: U11 · `5bf88cd` + `5825b99`
   `EmbeddingMatcher` (enroll/identify via cosine + threshold, embeddings AES-GCM encrypted at rest, now disk-persisted like U29) + `PersonRecognized` event. Live loop: robot-runtime `GET /robot/camera/frame` → `RobotClient.camera_frame()` → brain `PerceptionLoop` (pluggable `FaceEmbedder`: null inert / insightface via `[recognition]` extra) → debounced `PersonRecognized` on the bus (pipeline + console already consume it). `/recognition` API: enroll-from-camera (person must exist in knowledge first), forget, status. Gated: RECOGNITION_ENABLED + requires KNOWLEDGE_PASSPHRASE (biometrics ciphertext-only). Brain 43, robot 42, shared-schemas 123 green. Live camera feed itself still needs the robot's media path up (daemon stability + WebRTC/on-Pi).
 - [x] **U19a — knowledge layer: schemas + person-scoped store** · deps: U11 · ADR-008 · `27cabbb`
   `shared_schemas/knowledge`: models (Person/ProfileFact/ObservedSignal/Relationship/ConsentRecord/RecognitionLink) + KnowledgeStore ABC + InMemory impl. Per-person scoping, erasure, signal reinforcement, minors-explicit-only guard. Suite 88 green (also fixed 2 pre-existing shared-schemas test bugs).
