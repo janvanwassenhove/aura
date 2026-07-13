@@ -26,6 +26,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     adapter_type = os.environ.get("ROBOT_ADAPTER", "fake")
     if adapter_type == "fake":
         adapter = FakeRobotAdapter()
+    elif adapter_type == "reachy":
+        # U16: the real robot. Needs the optional reachy-mini SDK:
+        #   uv sync --package robot-runtime --extra reachy
+        from robot_runtime.adapters.reachy import ReachyRobotAdapter
+
+        adapter = ReachyRobotAdapter()
     else:
         raise ValueError(f"Unknown ROBOT_ADAPTER: {adapter_type!r}")
 

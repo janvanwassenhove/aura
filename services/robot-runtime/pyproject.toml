@@ -19,6 +19,10 @@ dev = [
     "pytest-asyncio>=0.23",
     "httpx>=0.27",
 ]
+# The real robot (U16): uv sync --package robot-runtime --extra reachy
+reachy = [
+    "reachy-mini>=1.9",
+]
 
 [project.scripts]
 robot-runtime = "robot_runtime.main:run"
