@@ -41,8 +41,12 @@ def _identity_prefix() -> str:
     else:
         lang_line = "Always reply in the language the user is using."
     return (
-        f"Your name is {name}. You respond when addressed as {name}. "
-        f"{lang_line}\n\n"
+        f"Your name is {name}, a warm, curious desk-robot companion. You respond "
+        f"when addressed as {name}. Hold a natural, flowing conversation on ANY "
+        f"topic — chat, banter, opinions, and open questions are welcome, not just "
+        f"tasks. Keep replies concise and spoken-friendly (1-3 sentences unless "
+        f"asked for detail); no markdown or lists when simply chatting. Use the "
+        f"conversation so far to stay coherent and personal. {lang_line}\n\n"
     )
 
 
@@ -179,6 +183,22 @@ class OrchestratorPipeline:
         self._connector_url = os.environ.get(
             "CONNECTOR_SERVICE_URL", "http://connector-service:8004"
         )
+        # U42: per-session conversation memory so the robot can hold a real
+        # dialogue (previously each turn was stateless). Rolling window of the
+        # last MAX_CONTEXT_TURNS exchanges; user+assistant text only.
+        self._history: dict[str, list[dict]] = {}
+        self._max_history = int(os.environ.get("MAX_CONTEXT_TURNS", "10")) * 2
+
+    def _recall(self, session_id: str) -> list[dict]:
+        return self._history.get(session_id, [])
+
+    def _remember(self, session_id: str, role: str, content: str) -> None:
+        if not content:
+            return
+        hist = self._history.setdefault(session_id, [])
+        hist.append({"role": role, "content": content})
+        if len(hist) > self._max_history:
+            del hist[: len(hist) - self._max_history]
 
     def set_heartbeat_monitor(self, monitor) -> None:
         self._heartbeat = monitor
@@ -230,10 +250,13 @@ class OrchestratorPipeline:
         system_prompt = self._persona.render_system_prompt(ctx_str, tool_list_str)
         system_prompt = _identity_prefix() + system_prompt
 
+        # U42: include recent turns so the robot holds a coherent dialogue.
         messages: list[dict] = [
             {"role": "system", "content": system_prompt},
+            *self._recall(session_id),
             {"role": "user", "content": text},
         ]
+        self._remember(session_id, "user", text)
 
         # Call LLM — advertise the allowed tools so it can emit real tool_calls.
         tool_specs = build_tool_specs(allowed)
@@ -253,6 +276,7 @@ class OrchestratorPipeline:
 
         if not tool_calls:
             reply = content or "(no response)"
+            self._remember(session_id, "assistant", reply)
             await self._bus.publish(
                 ResponseDrafted(session_id=session_id, response_text=reply)
             )
@@ -357,6 +381,7 @@ class OrchestratorPipeline:
         else:
             reply = content or "(no response)"
 
+        self._remember(session_id, "assistant", reply)
         await self._bus.publish(ResponseDrafted(session_id=session_id, response_text=reply))
         return reply
 

@@ -233,26 +233,49 @@ class DevAgentTool:
             return f"[run_dev_task: error — {exc}]"
 
     async def _execute_claude(self, task: str, cwd: Path) -> str:
-        """Invoke Claude Code CLI: ``claude --task <task> --cwd <cwd>``."""
-        claude_bin = os.environ.get("CLAUDE_CODE_BIN", "claude")
+        """Invoke Claude Code CLI headlessly to do real multi-step coding.
+
+        Uses print mode: ``claude -p "<prompt>" --output-format text`` with the
+        working directory set via the subprocess cwd. The owner already approved
+        the escalation; the permission mode lets it edit files in that repo.
+        Coding tasks can run long, so it gets its own generous timeout.
+        """
+        import shutil
+
+        claude_bin = (
+            os.environ.get("CLAUDE_CODE_BIN")
+            or shutil.which("claude")
+            or shutil.which("claude.cmd")
+        )
+        if claude_bin is None:
+            return (
+                "[run_dev_task: Claude Code CLI not found. Install it "
+                "(npm i -g @anthropic-ai/claude-code) or set CLAUDE_CODE_BIN.]"
+            )
+        perm_mode = os.environ.get("CLAUDE_CODE_PERMISSION_MODE", "acceptEdits")
+        timeout_s = float(os.environ.get("CLAUDE_CODE_TIMEOUT_S", "600"))
+        argv = [
+            claude_bin, "-p", task,
+            "--output-format", "text",
+            "--permission-mode", perm_mode,
+        ]
         try:
             proc = await asyncio.create_subprocess_exec(
-                claude_bin,
-                "--task", task,
-                "--cwd", str(cwd),
+                *argv,
+                cwd=str(cwd),
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.STDOUT,
             )
             try:
-                stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=_EXEC_TIMEOUT_S)
+                stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=timeout_s)
             except TimeoutError:
                 proc.kill()
-                return f"[run_dev_task: Claude Code timed out after {_EXEC_TIMEOUT_S:.0f}s]"
+                return f"[run_dev_task: Claude Code timed out after {timeout_s:.0f}s]"
 
             output = stdout.decode(errors="replace").strip()
             if proc.returncode != 0:
-                return f"[run_dev_task: claude exit {proc.returncode}]\n" + output[:1000]
-            return output[:2000] or "(claude completed with no output)"
+                return f"[run_dev_task: claude exit {proc.returncode}]\n" + output[-1500:]
+            return output[-3000:] or "(Claude Code completed with no output)"
 
         except FileNotFoundError:
             return (
