@@ -21,7 +21,13 @@ from orchestrator.tool_schemas import build_tool_specs
 from shared_events.bus import AsyncEventBus
 from shared_policies import APPROVAL_REQUIRED
 from shared_schemas.events.conversation import IntentRecognized, ResponseDrafted
-from shared_schemas.events.orchestrator import ToolCallFailed, ToolCallRequested, ToolCallSucceeded
+from shared_schemas.events.orchestrator import (
+    AgentRoundCompleted,
+    AgentRoundStarted,
+    ToolCallFailed,
+    ToolCallRequested,
+    ToolCallSucceeded,
+)
 from shared_schemas.events.system import TurnLatencyMeasured
 from shared_schemas.robot.models import RobotMode
 
@@ -241,6 +247,22 @@ class OrchestratorPipeline:
         # last MAX_CONTEXT_TURNS exchanges; user+assistant text only.
         self._history: dict[str, list[dict]] = {}
         self._max_history = int(os.environ.get("MAX_CONTEXT_TURNS", "10")) * 2
+        # U57: agentic loop — owner steering (injected next round) + stop flags.
+        self._steering: dict[str, list[str]] = {}
+        self._stop_flags: set[str] = set()
+
+    # -- U57: owner steering of a running loop --------------------------
+
+    def steer(self, session_id: str, text: str) -> None:
+        """Queue owner guidance; it's injected at the start of the next round."""
+        self._steering.setdefault(session_id, []).append(text)
+
+    def request_stop(self, session_id: str) -> None:
+        """Ask the loop to wrap up after the current round."""
+        self._stop_flags.add(session_id)
+
+    def _drain_steering(self, session_id: str) -> list[str]:
+        return self._steering.pop(session_id, [])
 
     @property
     def persona_config(self):
@@ -316,33 +338,89 @@ class OrchestratorPipeline:
         ]
         self._remember(session_id, "user", text)
 
-        # Call LLM — advertise the allowed tools so it can emit real tool_calls.
+        # U57: AGENTIC LOOP — reason → tools → observe results → next round,
+        # until the model gives a final answer (no more tool calls), the round
+        # budget runs out, or the owner asks to stop. A simple question
+        # converges in round 1, identical to the old single-shot behavior.
+        # The approval gate fires per tool call, every round — never bypassed.
         tool_specs = build_tool_specs(allowed)
+        max_rounds = max(1, int(os.environ.get("AGENT_MAX_ROUNDS", "8")))
+        self._stop_flags.discard(session_id)
+        reply: str | None = None
+
+        for round_no in range(1, max_rounds + 1):
+            # Owner steering: guidance sent while the loop runs lands here.
+            for note in self._drain_steering(session_id):
+                messages.append({"role": "system",
+                                 "content": f"[Owner guidance — follow this now] {note}"})
+
+            await self._bus.publish(AgentRoundStarted(
+                session_id=session_id, round_no=round_no, max_rounds=max_rounds))
+
+            _t = time.perf_counter()
+            llm_response = await openai_chat(messages, tools=tool_specs or None)
+            timing["llm_ms"] += (time.perf_counter() - _t) * 1000
+            content: str | None = llm_response["content"]
+            tool_calls: list | None = llm_response["tool_calls"]
+
+            if round_no == 1:
+                await self._bus.publish(IntentRecognized(
+                    session_id=session_id,
+                    intent="tool_call" if tool_calls else "direct_response",
+                    tool_name=tool_calls[0]["name"] if tool_calls else None,
+                ))
+
+            if not tool_calls:
+                reply = content or "(no response)"
+                await self._bus.publish(AgentRoundCompleted(
+                    session_id=session_id, round_no=round_no, tool_names=[], done=True))
+                break
+
+            assistant_tool_calls, tool_messages, executed = await self._run_tool_round(
+                tool_calls, session_id, timing)
+            messages.append({"role": "assistant", "content": content or None,
+                             "tool_calls": assistant_tool_calls})
+            messages.extend(tool_messages)
+            await self._bus.publish(AgentRoundCompleted(
+                session_id=session_id, round_no=round_no, tool_names=executed, done=False))
+
+            if session_id in self._stop_flags:
+                self._stop_flags.discard(session_id)
+                messages.append({"role": "system", "content":
+                    "The owner asked you to wrap up. Give your final answer now, "
+                    "based on what you have so far."})
+                reply = await self._final_answer(messages, timing, tool_messages)
+                break
+
+        if reply is None:  # round budget exhausted — force a final answer
+            messages.append({"role": "system", "content":
+                "Your round budget is exhausted. Give your final answer now, "
+                "including what remains unfinished."})
+            reply = await self._final_answer(messages, timing, None)
+
+        self._remember(session_id, "assistant", reply)
+        await self._bus.publish(ResponseDrafted(session_id=session_id, response_text=reply))
+        return reply
+
+    async def _final_answer(self, messages: list[dict], timing: dict,
+                            tool_messages: list[dict] | None) -> str:
+        """One tool-less synthesis call (stop / budget-exhausted paths)."""
         _t = time.perf_counter()
-        llm_response = await openai_chat(messages, tools=tool_specs or None)
+        final = await openai_chat(messages)
         timing["llm_ms"] += (time.perf_counter() - _t) * 1000
-        content: str | None = llm_response["content"]
-        tool_calls: list | None = llm_response["tool_calls"]
+        fallback = "\n".join(m["content"] for m in (tool_messages or [])) or "(no response)"
+        return final["content"] or fallback
 
-        await self._bus.publish(
-            IntentRecognized(
-                session_id=session_id,
-                intent="tool_call" if tool_calls else "direct_response",
-                tool_name=tool_calls[0]["name"] if tool_calls else None,
-            )
-        )
+    async def _run_tool_round(
+        self, tool_calls: list, session_id: str, timing: dict,
+    ) -> tuple[list[dict], list[dict], list[str]]:
+        """Gate + execute one round of tool calls; returns (assistant_tool_calls,
+        tool_messages, executed_tool_names).
 
-        if not tool_calls:
-            reply = content or "(no response)"
-            self._remember(session_id, "assistant", reply)
-            await self._bus.publish(
-                ResponseDrafted(session_id=session_id, response_text=reply)
-            )
-            return reply
-
-        # Handle tool calls sequentially. The OpenAI API requires that EVERY
-        # advertised tool_call gets a matching `tool` message on the follow-up
-        # turn — including blocked/denied ones — keyed by tool_call_id.
+        The OpenAI API requires that EVERY advertised tool_call gets a matching
+        `tool` message on the follow-up turn — including blocked/denied ones —
+        keyed by tool_call_id.
+        """
         assistant_tool_calls: list[dict] = []  # OpenAI-shaped, for the follow-up message
         tool_messages: list[dict] = []         # one per tool_call, with tool_call_id
         # Pass 1 (sequential): build the assistant message, enforce mode + the
@@ -435,24 +513,8 @@ class OrchestratorPipeline:
             timing["tool_ms"] += (time.perf_counter() - _t) * 1000  # wall-clock (parallel)
             tool_messages.extend(results)
 
-        # Synthesize final response from tool results
-        if tool_messages:
-            messages.append({
-                "role": "assistant",
-                "content": content or None,
-                "tool_calls": assistant_tool_calls,
-            })
-            messages.extend(tool_messages)
-            _t = time.perf_counter()
-            final = await openai_chat(messages)
-            timing["llm_ms"] += (time.perf_counter() - _t) * 1000
-            reply = final["content"] or "\n".join(m["content"] for m in tool_messages)
-        else:
-            reply = content or "(no response)"
-
-        self._remember(session_id, "assistant", reply)
-        await self._bus.publish(ResponseDrafted(session_id=session_id, response_text=reply))
-        return reply
+        executed = [name for _tc, name, _args in to_execute]
+        return assistant_tool_calls, tool_messages, executed
 
     async def _offline_reply(self, text: str, session_id: str) -> str:
         """Degraded/offline turn: a LOCAL model if one is configured and reachable,
