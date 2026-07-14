@@ -145,6 +145,18 @@ TOOL_SCHEMAS: dict[str, dict] = {
             "line": {"type": "integer", "description": "1-based line number (optional)."},
         }, "required": ["path"], "additionalProperties": False},
     ),
+    "delegate_subtask": _fn(
+        "delegate_subtask",
+        "Delegate a focused, self-contained subtask to a SUBAGENT with a "
+        "restricted read-only toolset and its own small round budget. Use for "
+        "gathering/verifying information (read files, git status, tab lists, "
+        "calendar/mail/task lookups) while you keep the main thread. The "
+        "subagent cannot write, launch apps, or delegate further.",
+        {"type": "object", "properties": {
+            "goal": {"type": "string", "description": "Concrete, self-contained subtask."},
+            "max_rounds": {"type": "integer", "description": "Subagent round budget (default 4, max 6)."},
+        }, "required": ["goal"], "additionalProperties": False},
+    ),
     "save_skill": _fn(
         "save_skill",
         "SELF-TRAINING: save or update a skill — a procedure the owner taught "
