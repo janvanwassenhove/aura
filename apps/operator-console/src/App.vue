@@ -178,6 +178,7 @@ body {
 .field-label { font-size: 0.75rem; color: var(--text-muted); }
 .field-value { font-size: 0.85rem; text-align: right; max-width: 60%; word-break: break-all; }
 .approval-countdown { font-size: 0.75rem; color: var(--warn); margin-top: 0.75rem; }
+.approval-remember { display: flex; align-items: center; gap: 0.4rem; font-size: 0.75rem; color: var(--text-muted); margin-top: 0.6rem; cursor: pointer; }
 .approval-actions { display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 1rem; }
 .btn-deny { padding: 0.4rem 1.25rem; border-radius: var(--radius); background: var(--danger-bg-hover); color: var(--danger-text); border: none; cursor: pointer; font-size: 0.85rem; }
 .btn-deny:hover { background: var(--danger); color: #fff; }

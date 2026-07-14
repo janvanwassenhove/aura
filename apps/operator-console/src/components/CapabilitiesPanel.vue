@@ -31,6 +31,20 @@
           ><span class="toggle-knob" /></button>
         </div>
 
+        <div v-if="store.autoApproved.length > 0" class="cap-apps">
+          <div class="cap-label">Always-allowed actions</div>
+          <div class="cap-desc">
+            Actions you chose to auto-approve — they no longer ask each time.
+            Revoke any to go back to asking.
+          </div>
+          <div class="cap-app-list">
+            <span v-for="a in store.autoApproved" :key="a" class="cap-auto">
+              {{ a }}
+              <button class="cap-auto-x" title="Revoke — ask again next time" @click="store.revokeAuto(a)"><X :size="11" /></button>
+            </span>
+          </div>
+        </div>
+
         <div class="cap-apps">
           <div class="cap-label">Allowed apps</div>
           <div class="cap-desc">
@@ -62,6 +76,7 @@ const prefsStore = usePrefsStore()
 
 onMounted(() => {
   store.fetchCapabilities()
+  store.fetchAutoApprovals()
   prefsStore.fetchPrefs()
 })
 </script>
@@ -99,6 +114,9 @@ onMounted(() => {
 .cap-apps { padding-top: 0.7rem; }
 .cap-app-list { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-top: 0.4rem; }
 .cap-app { font-size: 0.72rem; background: var(--surface-3); border: 1px solid var(--border); border-radius: 999px; padding: 0.15rem 0.6rem; }
+.cap-auto { display: inline-flex; align-items: center; gap: 0.25rem; font-size: 0.72rem; background: var(--ok-bg); color: var(--ok-text); border-radius: 999px; padding: 0.15rem 0.3rem 0.15rem 0.6rem; }
+.cap-auto-x { display: inline-flex; background: none; border: none; color: var(--ok-text); cursor: pointer; opacity: 0.7; }
+.cap-auto-x:hover { opacity: 1; }
 
 .toggle {
   width: 40px; height: 22px; border-radius: 999px; border: 1px solid var(--border);

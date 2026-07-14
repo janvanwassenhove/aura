@@ -32,9 +32,13 @@ export const useApprovalStore = defineStore('approval', () => {
     }
   }
 
-  async function grant(approvalId: string): Promise<void> {
+  async function grant(approvalId: string, remember = false): Promise<void> {
     try {
-      await fetch(`${orchestratorUrl}/orchestrator/approval/${approvalId}/grant`, { method: 'POST' })
+      await fetch(`${orchestratorUrl}/orchestrator/approval/${approvalId}/grant`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ remember }),
+      })
     } finally {
       pending.value = pending.value.filter(p => p.approvalId !== approvalId)
     }
