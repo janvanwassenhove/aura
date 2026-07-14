@@ -37,7 +37,7 @@ async def listen_turn(body: dict | None = None) -> JSONResponse:
 
     duration = float((body or {}).get("duration_s", 5.0))
     try:
-        wav = await _robot.listen(duration_s=duration)
+        wav, _peak = await _robot.listen(duration_s=duration)
     except Exception as exc:  # noqa: BLE001 — robot offline / mic disabled
         return JSONResponse(
             {"error": f"could not record from the robot mic: {type(exc).__name__}"},

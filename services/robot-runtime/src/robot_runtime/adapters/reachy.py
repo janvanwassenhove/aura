@@ -84,6 +84,12 @@ class ReachyRobotAdapter(RobotAdapter):
         # Whether follow-me head tracking is active. Motions pause it so they
         # play at full amplitude, then resume it (U38-fix).
         self._tracking_on = False
+        # Raw (pre-normalization) peak of the last mic capture — lets the voice
+        # loop tell silence from speech cheaply, without transcribing (U47).
+        self._last_raw_peak = 0.0
+
+    def last_capture_peak(self) -> float:
+        return self._last_raw_peak
 
     def set_volume(self, level: float) -> float:
         self._volume = max(0.0, min(1.0, level))
@@ -275,6 +281,7 @@ class ReachyRobotAdapter(RobotAdapter):
             # so peak-normalize each capture toward a usable level (capped, so
             # near-silence isn't blown up into noise). Whisper then hears speech.
             peak = float(np.abs(pcm).max()) if len(pcm) else 0.0
+            self._last_raw_peak = peak  # raw level for the voice loop's VAD
             if peak > 0.0015:
                 target = float(os.environ.get("MIC_TARGET_PEAK", "0.5"))
                 max_gain = float(os.environ.get("MIC_MAX_GAIN", "40"))

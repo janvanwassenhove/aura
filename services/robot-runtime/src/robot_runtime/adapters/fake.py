@@ -49,6 +49,9 @@ class FakeRobotAdapter(RobotAdapter):
     def get_volume(self) -> float:
         return self._volume
 
+    def last_capture_peak(self) -> float:
+        return 0.0
+
     # ------------------------------------------------------------------
     # Lifecycle
     # ------------------------------------------------------------------

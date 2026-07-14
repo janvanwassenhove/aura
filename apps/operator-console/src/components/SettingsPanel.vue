@@ -83,6 +83,18 @@
               <option v-for="l in LANGUAGES" :key="l.id" :value="l.id">{{ l.label }}</option>
             </select>
           </div>
+          <div class="settings-field">
+            <label class="field-label" for="voice-mode">Hands-free listening</label>
+            <select id="voice-mode" v-model="localVoiceMode" class="field-select">
+              <option value="off">Off — use the mic button</option>
+              <option value="wake_word">Wake word — say the name to start</option>
+            </select>
+          </div>
+          <div v-if="localVoiceMode === 'wake_word'" class="settings-field">
+            <label class="field-label" for="wake-word">Wake word</label>
+            <input id="wake-word" v-model="localWake" class="field-input" maxlength="24" :placeholder="localName" />
+            <p class="conn-hint">Say “{{ localWake || localName }}, …” to start. After any reply the robot keeps listening so you can just answer.</p>
+          </div>
           <div>
             <button class="btn-apply" :disabled="prefsStore.saving" @click="savePrefs">
               {{ prefsStore.saving ? 'Saving…' : 'Save' }}
@@ -317,17 +329,26 @@ const activeTab = ref<'llm' | 'connections' | 'appearance'>('llm')
 
 const localName = ref(prefsStore.assistantName)
 const localLang = ref(prefsStore.language)
+const localVoiceMode = ref(prefsStore.voiceMode)
+const localWake = ref(prefsStore.wakeWord)
 const prefsSaved = ref(false)
 
 onMounted(async () => {
   await prefsStore.fetchPrefs()
   localName.value = prefsStore.assistantName
   localLang.value = prefsStore.language
+  localVoiceMode.value = prefsStore.voiceMode
+  localWake.value = prefsStore.wakeWord
 })
 
 async function savePrefs() {
   prefsSaved.value = false
-  const ok = await prefsStore.save(localName.value.trim() || 'AURA', localLang.value)
+  const ok = await prefsStore.save({
+    assistant_name: localName.value.trim() || 'AURA',
+    language: localLang.value,
+    voice_mode: localVoiceMode.value,
+    wake_word: localWake.value.trim() || localName.value.trim() || 'AURA',
+  })
   if (ok) { prefsSaved.value = true; setTimeout(() => { prefsSaved.value = false }, 2000) }
 }
 

@@ -57,6 +57,7 @@ class BrainContext:
         self._perception = None
         self._robot_bridge = None
         self._maintenance = None
+        self._voice_loop = None
         self._offline_queue = None
         self._webhook_dispatcher = None
         self._heartbeat = None
@@ -277,6 +278,23 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     voice_api.init(ctx.pipeline, ctx.bus, session_id, robot=_robot)
 
+    # U47: hands-free wake-word voice loop on the robot mic. Runs always but
+    # only acts when VOICE_MODE=wake_word (read live). Each spoken reply opens
+    # a follow-up window so a greeting/answer becomes a conversation.
+    from aura_brain.voice_loop import VoiceLoop
+
+    ctx._voice_loop = VoiceLoop(
+        _robot, ctx.pipeline, ctx.bus, session_id=session_id,
+        default_wake_word=os.environ.get("ASSISTANT_NAME", "AURA").lower(),
+    )
+    ctx._voice_loop.start()
+
+    async def _voice_note_spoken(event: ResponseDrafted) -> None:
+        if ctx._voice_loop is not None:
+            ctx._voice_loop.note_spoken(event.response_text or "")
+
+    ctx.bus.subscribe(ResponseDrafted, _voice_note_spoken)
+
     async def _on_person_recognized(event: PersonRecognized) -> None:
         ctx.pipeline.set_active_person(event.person_id if event.known else None)
         # Greet a KNOWN person: personalized text (the pipeline injects their
@@ -469,6 +487,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     yield
 
+    if ctx._voice_loop is not None:
+        await ctx._voice_loop.stop()
     if ctx._maintenance is not None:
         await ctx._maintenance.stop()
     if ctx._robot_bridge is not None:
