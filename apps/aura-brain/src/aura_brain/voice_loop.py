@@ -92,7 +92,13 @@ class VoiceLoop:
         # U54: barge-in — while the robot talks, a clearly louder voice (the
         # user is closer to the mic than the robot's own speaker echo) cuts the
         # wait and is handled as a reply immediately.
-        self._barge_factor = float(os.environ.get("BARGE_IN_FACTOR", "2.5"))
+        self._barge_factor = float(os.environ.get("BARGE_IN_FACTOR", "3.0"))
+        # U67: follow-up windows may CHAIN at most this many turns without the
+        # wake word. Music/TV near the mic otherwise becomes a self-sustaining
+        # conversation: lyrics enter a follow-up window, the reply opens the
+        # next window, and so on forever (the 'Nordmeer' incident).
+        self._max_followup_chain = int(os.environ.get("FOLLOWUP_CHAIN_MAX", "2"))
+        self._followup_chain = 0
 
     @property
     def _barge_in(self) -> bool:
@@ -116,11 +122,16 @@ class VoiceLoop:
 
     def note_spoken(self, text: str) -> None:
         """Called when the robot speaks: guard against echo + open a follow-up
-        window so the user can reply without the wake word."""
+        window so the user can reply without the wake word. The follow-up
+        chain is capped (U67) — after a few wake-word-less turns the wake word
+        is required again, so ambient audio can't talk to itself forever."""
         now = time.monotonic()
         speak_s = min(12.0, 1.0 + len(text or "") / 15.0)  # ~15 chars/sec
         self._speaking_until = now + speak_s
-        self._followup_until = self._speaking_until + self._followup_s
+        if self._followup_chain < self._max_followup_chain:
+            self._followup_until = self._speaking_until + self._followup_s
+        else:
+            self._followup_until = 0.0  # chain exhausted → wake word required
 
     # -- config (read live so the Settings toggle applies) -------------
 
@@ -172,6 +183,12 @@ class VoiceLoop:
                 command = self._extract_command(text, in_followup)
                 if command is None:
                     continue
+                # U67: track the wake-word-less chain. Hearing the wake word
+                # resets it — a real user re-engaging restores full flow.
+                if self._wake and self._wake in text.lower():
+                    self._followup_chain = 0
+                elif in_followup:
+                    self._followup_chain += 1
                 if not command:  # wake word heard but nothing after it
                     command = await self._capture_command()
                     if not is_plausible_command(command):

@@ -76,15 +76,23 @@
       <template v-if="activeTab === 'skills'">
         <p class="conn-hint">Skills are procedures you taught the assistant. It proposes new ones from your feedback (🎓) — every write needs your approval. You edit freely here.</p>
         <div v-if="!skills.length && !editingSkill" class="conn-hint">No skills yet. Teach one via the 🎓 button in the conversation, or add one below.</div>
-        <div v-for="sk in skills" :key="sk.name" class="skill-row">
-          <div class="skill-info">
-            <strong>{{ sk.name }}</strong>
+        <div v-for="sk in skills" :key="sk.name" :class="['skill-card', !sk.enabled && 'skill-card--off']">
+          <div class="skill-card-head">
+            <span class="skill-card-name">{{ sk.name }}</span>
             <span v-if="sk.person" class="skill-scope">@{{ sk.person }}</span>
-            <span class="skill-desc">{{ sk.description }}</span>
+            <span class="skill-card-spacer" />
+            <label class="skill-toggle" :title="sk.enabled ? 'Active' : 'Disabled'">
+              <input type="checkbox" :checked="sk.enabled" @change="toggleSkill(sk)" />
+            </label>
+            <button class="btn-conn btn-ghost btn-small" @click="editSkill(sk)">Edit</button>
+            <button class="btn-conn btn-ghost btn-small" @click="removeSkill(sk.name)">Delete</button>
           </div>
-          <label class="skill-toggle"><input type="checkbox" :checked="sk.enabled" @change="toggleSkill(sk)" /> on</label>
-          <button class="btn-conn btn-ghost btn-small" @click="editSkill(sk)">Edit</button>
-          <button class="btn-conn btn-ghost btn-small" @click="removeSkill(sk.name)">Delete</button>
+          <p class="skill-card-desc">{{ sk.description }}</p>
+          <p v-if="sk.body" class="skill-card-body">{{ sk.body.length > 180 ? sk.body.slice(0, 180) + '…' : sk.body }}</p>
+          <div v-if="sk.triggers.length || sk.personas.length" class="skill-card-tags">
+            <span v-for="t in sk.triggers" :key="'t' + t" class="skill-tag">“{{ t }}”</span>
+            <span v-for="m in sk.personas" :key="'m' + m" class="skill-tag skill-tag--mode">{{ m }}</span>
+          </div>
         </div>
         <div v-if="editingSkill" class="skill-editor">
           <input v-model="editingSkill.name" class="field-input" placeholder="name (kebab-case)" :disabled="!skillIsNew" aria-label="Skill name" />
@@ -800,9 +808,24 @@ const ConnStatusBadge = defineComponent({
 .log-level { width: 62px; flex-shrink: 0; color: var(--text-faint); }
 .log-msg { white-space: pre-wrap; word-break: break-word; }
 
-.skill-row { display: flex; align-items: center; gap: 0.5rem; padding: 0.35rem 0; border-bottom: 1px solid var(--border); }
-.skill-info { flex: 1; display: flex; gap: 0.45rem; align-items: baseline; min-width: 0; }
-.skill-desc { color: var(--text-faint); font-size: 0.75rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.skill-card {
+  border: 1px solid var(--border-strong); border-radius: var(--radius-md);
+  padding: 0.7rem 0.85rem; background: var(--surface-2);
+  display: flex; flex-direction: column; gap: 0.35rem;
+}
+.skill-card--off { opacity: 0.55; }
+.skill-card-head { display: flex; align-items: center; gap: 0.5rem; }
+.skill-card-name { font-family: ui-monospace, monospace; font-weight: 600; font-size: 0.85rem; }
+.skill-card-spacer { flex: 1; }
+.skill-card-desc { margin: 0; font-size: 0.78rem; color: var(--text); }
+.skill-card-body { margin: 0; font-size: 0.74rem; color: var(--text-faint); white-space: pre-wrap; }
+.skill-card-tags { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+.skill-tag {
+  font-size: 0.68rem; padding: 0.1rem 0.45rem; border-radius: 999px;
+  background: var(--surface); border: 1px solid var(--border);
+  color: var(--text-faint);
+}
+.skill-tag--mode { color: var(--accent); border-color: var(--accent); }
 .skill-scope { color: var(--accent); font-size: 0.72rem; }
 .skill-toggle { font-size: 0.72rem; color: var(--text-faint); display: flex; gap: 0.25rem; align-items: center; }
 .skill-editor { display: flex; flex-direction: column; gap: 0.45rem; margin-top: 0.6rem; }

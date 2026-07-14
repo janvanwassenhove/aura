@@ -211,6 +211,11 @@ the human can unblock it.
 - [x] **U66 — skills toevoegen vanuit het persoonsscherm + 🎓-UX** · `pending`
   Persoonsprofiel kreeg een quick-add-rij onder SKILLS (naam + procedure → POST /skills met person-scope, beschrijving automatisch "X's way of working"). 🎓-knop: altijd klikbaar; met leeg invoerveld verschijnt nu een inline hint ("typ eerst je les…") i.p.v. stil niets doen — dat was het "🎓 reageert niet"-probleem (backend-endpoint werkte, curl 200).
 
+- [x] **U67 — zelfconversatie-fix + eerlijke muziek + skills-cards** · `pending`
+  (1) "Nordmeer-incident": Spotify speelde door de robotspeaker → de mic hoorde songteksten → elk follow-up-venster voedde de volgende beurt → oneindige zelfconversatie. Fix: follow-up-keten gecapt (FOLLOWUP_CHAIN_MAX=2 wake-word-loze beurten, daarna is het wake-word weer verplicht; het wake-word horen reset de keten) + BARGE_IN_FACTOR 2.5→3.0 (robotspeaker-echo). (2) "Favorieten"-leugen: de muziek-mock-directive verbiedt nu expliciet te claimen dát specifieke muziek speelt — media-key hervat alleen wat er al klaarstond; het antwoord moet naar Settings → Connections verwijzen voor echte favorieten/Sonos. (3) Skills-tab: cards i.p.v. rijen (naam + @persoon + beschrijving + body-preview + trigger/modus-chips, gedimd bij uit). Brain 136 (+1), connector 40, console 56 groen.
+- [ ] **U68 — Obsidian-achtige brain vault** · 🔒 DECIDE
+  Wens: kennis + skills als gelinkt "tweede brein" (Obsidian-stijl: [[links]], graph, browsebaar). Skills zijn al markdown-files (skills/ dir — letterlijk te openen in Obsidian). Persoonsdata is bewust AES-GCM-versleuteld op schijf — een plaintext-vault met persoonsprofielen doorbreekt dat model. DECIDE nodig: (a) vault met alleen skills+algemene notities (veilig, kan nu), (b) opt-in ontsleutelde export van persoonsnotities naar de vault (eigenaarskeuze, met waarschuwing), of (c) in-app graph-view over de versleutelde store (geen bestanden, meeste werk). Voorstel: (a) + in-app [[link]]-rendering tussen skills↔personen als eerste stap.
+
 ## Progress log (append-only; newest last)
 
 - 2026-06-21 — ledger created on `aura-autobuild`; Phase 0/0b complete, Phase 1 scaffold (U-pre) done before this loop started.
