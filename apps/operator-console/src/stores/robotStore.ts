@@ -62,23 +62,32 @@ export const useRobotStore = defineStore('robot', () => {
         timestamp: (event.timestamp as string) ?? new Date().toISOString(),
       }
     } else if (type === 'MotionStarted') {
-      isSpeaking.value = false
+      connected.value = true
       const entry: MotionLogEntry = {
         id: crypto.randomUUID(),
-        name: (event.motion_name as string) ?? 'unknown',
+        name: (event.motion_id as string) ?? (event.motion_name as string) ?? 'unknown',
         timestamp: new Date().toISOString(),
         status: 'started',
       }
       motionLog.value.unshift(entry)
       if (motionLog.value.length > 10) motionLog.value.pop()
     } else if (type === 'MotionCompleted') {
-      const entry = motionLog.value.find(e => e.name === event.motion_name && e.status === 'started')
+      const name = (event.motion_id as string) ?? (event.motion_name as string)
+      const entry = motionLog.value.find(e => e.name === name && e.status === 'started')
       if (entry) entry.status = 'completed'
-    } else if (type === 'SpeechStarted') {
+    } else if (type === 'MotionFailed') {
+      const name = (event.motion_id as string) ?? (event.motion_name as string)
+      const entry = motionLog.value.find(e => e.name === name && e.status === 'started')
+      if (entry) entry.status = 'failed'
+    } else if (type === 'SpeechStarted' || type === 'SpeechPlaybackStarted') {
+      connected.value = true
       isSpeaking.value = true
-      currentTranscript.value = ''
-    } else if (type === 'SpeechCompleted') {
+      currentTranscript.value = (event.text as string) ?? ''
+    } else if (type === 'SpeechCompleted' || type === 'SpeechPlaybackCompleted') {
       isSpeaking.value = false
+    } else if (type === 'BehaviorStateChanged') {
+      connected.value = true
+      behaviorState.value = (event.behavior_state as string) ?? behaviorState.value
     } else if (type === 'TranscriptUpdated') {
       currentTranscript.value = (event.transcript as string) ?? ''
     }

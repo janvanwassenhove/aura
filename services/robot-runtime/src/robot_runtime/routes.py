@@ -8,6 +8,7 @@ from fastapi.responses import JSONResponse
 from robot_runtime.adapters.fake import FakeRobotAdapter
 from robot_runtime.engine.behavior import BehaviorEngine
 from shared_events.broadcaster import WebSocketBroadcaster
+from shared_schemas.events.behavior import MotionCompleted, MotionFailed, MotionStarted
 from shared_schemas.robot.models import BehaviorState, MotionCommand, RobotMode
 
 router = APIRouter()
@@ -16,6 +17,7 @@ router = APIRouter()
 adapter: FakeRobotAdapter | None = None
 engine: BehaviorEngine | None = None
 broadcaster: WebSocketBroadcaster | None = None
+bus = None  # AsyncEventBus | None — set by main.py (U36d: motion events)
 offline_loop = None  # OfflineBehaviorLoop | None — set by main.py (U15)
 
 
@@ -100,7 +102,21 @@ async def speak(body: dict) -> JSONResponse:
 async def execute_motion(command: MotionCommand) -> JSONResponse:
     assert adapter is not None
     _touch()
-    await adapter.execute_motion(command)
+    # U36d: this route calls the adapter directly (full speed/amplitude
+    # control), so it must publish the motion events itself — the console's
+    # motion log listens for them.
+    if bus is not None:
+        await bus.publish(MotionStarted(session_id="robot", motion_id=command.motion_id))
+    try:
+        await adapter.execute_motion(command)
+    except Exception as exc:
+        if bus is not None:
+            await bus.publish(MotionFailed(
+                session_id="robot", motion_id=command.motion_id, reason=str(exc),
+            ))
+        return JSONResponse({"error": f"motion failed: {exc}"}, status_code=500)
+    if bus is not None:
+        await bus.publish(MotionCompleted(session_id="robot", motion_id=command.motion_id))
     return JSONResponse({"ok": True})
 
 
@@ -137,6 +153,7 @@ async def camera_stream() -> Response:
 
     async def _frames():
         while True:
+            _touch()  # a live stream to the console proves the brain link is up
             try:
                 jpeg = await grab()
             except RuntimeError:

@@ -103,6 +103,8 @@ class ReachyRobotAdapter(RobotAdapter):
             try:
                 mini.enable_motors()
                 mini.wake_up()
+                # The wake emote can end slightly off-pose — settle upright.
+                mini.goto_target(head=_NEUTRAL, antennas=[0.0, 0.0], duration=0.8)
             except Exception as exc:  # noqa: BLE001 — wake is best-effort
                 logger.warning("wake-up on connect failed: %s", exc)
             return mini
@@ -337,8 +339,20 @@ class ReachyRobotAdapter(RobotAdapter):
             go(head=_NEUTRAL, duration=dur * 3)
         elif motion == "wake_up":
             mini.wake_up()
+            go(head=_NEUTRAL, antennas=[0.0, 0.0], duration=0.8)  # settle upright
         elif motion == "sleep":
             mini.goto_sleep()
+        elif motion == "look_around":  # idle curiosity: glance at 2 spots, settle
+            import random
+
+            for _ in range(2):
+                mini.look_at_world(
+                    0.6,
+                    random.uniform(-0.45, 0.45),
+                    random.uniform(0.0, 0.35),
+                    duration=random.uniform(1.2, 1.8),
+                )
+            go(head=_NEUTRAL, duration=1.2)
         else:  # unknown id → gentle nod so behavior never crashes on vocabulary
             logger.warning("Unknown motion_id %r — defaulting to nod", cmd.motion_id)
             go(head=_rot("x", 0.2 * amp))

@@ -55,6 +55,7 @@ class BrainContext:
         self.knowledge_store = None
         self.pipeline = None
         self._perception = None
+        self._robot_bridge = None
         self._offline_queue = None
         self._webhook_dispatcher = None
         self._heartbeat = None
@@ -217,6 +218,17 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     _robot = RobotClient()
     robot_api.init(_robot)
 
+    # U36d: relay the robot's own event stream (speech/motion/behavior/mode)
+    # to the console — it only listens to the brain's WebSocket.
+    from aura_brain.robot_events import RobotEventBridge
+
+    ctx._robot_bridge = RobotEventBridge(
+        ctx.broadcaster,
+        os.environ.get("ROBOT_RUNTIME_URL", "http://robot-runtime:8001"),
+        robot_client=_robot,
+    )
+    ctx._robot_bridge.start()
+
     # U36: EMBODIMENT — every assistant reply is spoken out loud on the robot
     # with a gesture matched to the content (greeting→wave, question→tilt,
     # excitement→gesture, default→nod). Toggle with SPEAK_REPLIES=false.
@@ -351,6 +363,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     yield
 
+    if ctx._robot_bridge is not None:
+        await ctx._robot_bridge.stop()
     if ctx._perception is not None:
         await ctx._perception.stop()
     if ctx._heartbeat is not None:

@@ -36,10 +36,17 @@ def test_cue_amplitude_matches_persona() -> None:
         assert cue.amplitude == pytest.approx(1.0)
 
 
-def test_idle_timeline_has_two_cues_for_work() -> None:
+def test_idle_timeline_fidgets_or_looks_around(monkeypatch) -> None:
+    import robot_runtime.behavior.timeline_builder as tb
+
     cfg = get_persona_config(Persona.WORK)
-    timeline = create_idle_timeline(cfg)
-    assert len(timeline.cues) == 2
+    # Deterministic branches: fidget (2 cues) vs look-around (1 cue, U36d).
+    monkeypatch.setattr(tb.random, "random", lambda: 0.9)
+    fidget = create_idle_timeline(cfg)
+    assert len(fidget.cues) == 2
+    monkeypatch.setattr(tb.random, "random", lambda: 0.1)
+    curious = create_idle_timeline(cfg)
+    assert [c.motion_id for c in curious.cues] == ["look_around"]
 
 
 def test_silent_desk_idle_timeline_is_empty() -> None:
