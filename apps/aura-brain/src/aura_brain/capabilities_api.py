@@ -33,6 +33,8 @@ _CAPS: dict[str, tuple[str, str, str, str, bool]] = {
                    "Open apps you've allow-listed (e.g. VS Code). Each launch asks for approval.", True),
     "follow_me": ("HEAD_TRACKING", "true", "Follow me",
                   "The robot keeps looking at your face.", True),
+    "body_follow": ("BODY_FOLLOW", "false", "Turn body too",
+                    "The torso rotates along with the face, not just the head.", True),
     "speak_replies": ("SPEAK_REPLIES", "true", "Speak replies aloud",
                       "Say answers out loud on the robot with a gesture.", True),
     "gestures": ("GESTURES_ENABLED", "true", "React to gestures",

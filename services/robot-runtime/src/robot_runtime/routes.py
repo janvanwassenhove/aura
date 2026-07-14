@@ -171,6 +171,22 @@ async def set_tracking(body: dict) -> JSONResponse:
     return JSONResponse({"tracking": enabled})
 
 
+@router.post("/robot/body_follow")
+async def set_body_follow(body: dict) -> JSONResponse:
+    """U37: torso turns with the tracked face (automatic body yaw)."""
+    assert adapter is not None
+    _touch()
+    enabled = bool(body.get("enabled", True))
+    toggler = getattr(adapter, "set_body_follow", None)
+    if toggler is None:
+        return JSONResponse({"error": "adapter has no body follow"}, status_code=501)
+    try:
+        await toggler(enabled)
+    except Exception as exc:  # noqa: BLE001
+        return JSONResponse({"error": f"body follow failed: {exc}"}, status_code=500)
+    return JSONResponse({"body_follow": enabled})
+
+
 # ------------------------------------------------------------------
 # Volume (U36e: app-controlled speaker gain)
 # ------------------------------------------------------------------

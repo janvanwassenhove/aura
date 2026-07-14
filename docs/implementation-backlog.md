@@ -146,8 +146,8 @@ the human can unblock it.
 
 ---
 
-- [ ] **U37 — body-yaw follow (romp meedraaien)** · deps: U16
-  Eigen volglus in robot-runtime: gezichtspositie (get_tracked_face/DoA) → set_target_body_yaw zodat de romp meedraait i.p.v. alleen de nek (mechanisch beperkt). Gated BODY_FOLLOW. De ingebouwde SDK-tracking beweegt bewust alleen de kop — normaal gedrag.
+- [x] **U37 — body-yaw follow (romp meedraaien)** · deps: U16 · `pending`
+  Geen eigen volglus nodig: de SDK heeft `set_automatic_body_yaw(enabled)` — de daemon draait de romp zelf mee met het getrackte gezicht. Adapter `set_body_follow()` (+ herstel bij tracking-hertoggle, reset naar 0.0 bij uit), route `POST /robot/body_follow`, brain-proxy + `RobotClient.set_body_follow`, capability-toggle `body_follow` (BODY_FOLLOW, default uit, live hook). FakeRobotAdapter kreeg set_tracking/set_body_follow → tracking-route nu ook testbaar. Robot 48 (+3), brain 106 groen; live geverifieerd op de Pi (aan/uit → {"body_follow":true/false}).
 
 - [ ] **U39 — Spotify + Sonos muziekbesturing** · deps: U35
   Spotify-connector (OAuth Authorization Code + PKCE; play/pause/zoek/favorieten/afspeellijsten via Web API) + optionele Sonos-koppeling (lokale UPnP/Sonos API of Spotify Connect naar het Sonos-device). Tools: play_music/pause_music/next_track/list_playlists. Vergt eenmalige Spotify-app-registratie (developer.spotify.com) door de eigenaar. Genoteerd op verzoek — nog niet geïmplementeerd.
