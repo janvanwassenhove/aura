@@ -62,6 +62,10 @@ function brainEnv() {
   // the model files installed.
   env.STT_PROVIDER = 'null'
   env.TTS_PROVIDER = 'null'
+  // Face recognition: on by default — it only activates when the knowledge
+  // passphrase is set (wizard) and degrades to inert without the model stack.
+  env.RECOGNITION_ENABLED = env.RECOGNITION_ENABLED || 'true'
+  env.FACE_EMBEDDER = env.FACE_EMBEDDER || 'insightface'
   return env
 }
 

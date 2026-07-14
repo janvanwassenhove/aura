@@ -81,7 +81,14 @@ class InsightFaceEmbedder:
 
 def build_embedder(kind: str) -> FaceEmbedder:
     if kind == "insightface":
-        return InsightFaceEmbedder()
+        try:
+            return InsightFaceEmbedder()
+        except ImportError:
+            logger.warning(
+                "FACE_EMBEDDER=insightface but the model stack is not installed "
+                "(uv sync --package aura-brain --extra recognition) — recognition inert."
+            )
+            return NullEmbedder()
     return NullEmbedder()
 
 

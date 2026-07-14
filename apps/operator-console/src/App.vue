@@ -17,7 +17,10 @@
 
     <!-- Main grid: 3 columns -->
     <main class="app-grid">
-      <RobotPanel />
+      <div class="left-col">
+        <RobotPanel />
+        <VideoPanel />
+      </div>
       <ConversationPanel />
       <EventLogPanel />
     </main>
@@ -28,6 +31,7 @@
 import { onMounted, ref } from 'vue'
 import TitleBar from './components/TitleBar.vue'
 import RobotPanel from './components/RobotPanel.vue'
+import VideoPanel from './components/VideoPanel.vue'
 import ConversationPanel from './components/ConversationPanel.vue'
 import EventLogPanel from './components/EventLogPanel.vue'
 import ApprovalPanel from './components/ApprovalPanel.vue'
@@ -64,12 +68,13 @@ body {
 
 .app-grid {
   display: grid;
-  grid-template-columns: 280px 1fr 320px;
+  grid-template-columns: 300px 1fr 320px;
   gap: 1rem;
   padding: 1rem;
   flex: 1;
   min-height: 0;
 }
+.left-col { display: flex; flex-direction: column; min-height: 0; overflow-y: auto; }
 
 .panel {
   background: var(--surface);

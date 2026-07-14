@@ -88,6 +88,9 @@ class ReachyRobotAdapter(RobotAdapter):
         def _open() -> Any:
             from reachy_mini import ReachyMini  # lazy: optional dependency
 
+            if self._media_backend != "no_media":
+                self._prime_media()
+
             return ReachyMini(
                 host=self._host,
                 connection_mode=self._connection_mode,
@@ -212,7 +215,17 @@ class ReachyRobotAdapter(RobotAdapter):
             raise RuntimeError("camera unavailable: media backend disabled")
 
         def _grab() -> bytes:
-            jpeg = media.get_frame_jpeg()
+            import time
+
+            # The WebRTC/gstreamer pipeline needs a few seconds after (re)start
+            # before the first frame lands — poll briefly instead of failing.
+            jpeg = None
+            deadline = time.monotonic() + 5.0
+            while time.monotonic() < deadline:
+                jpeg = media.get_frame_jpeg()
+                if jpeg is not None:
+                    break
+                time.sleep(0.25)
             if jpeg is None:
                 raise RuntimeError("no camera frame available")
             # Contract says PNG bytes; transcode.
@@ -300,6 +313,35 @@ class ReachyRobotAdapter(RobotAdapter):
             go(head=_NEUTRAL)
 
     # ------------------------------------------------------------------
+
+    def _prime_media(self) -> None:
+        """Ask the daemon to power up the media pipeline BEFORE the SDK connects.
+
+        The daemon starts its WebRTC signaling server (:8443) lazily on
+        ``/api/media/acquire``; the SDK's MediaManager dials that port at init
+        and dies with ConnectionRefused if we don't prime it first.
+        """
+        import socket
+        import time
+        import urllib.request
+
+        try:
+            req = urllib.request.Request(
+                f"http://{self._host}:8000/api/media/acquire", method="POST"
+            )
+            urllib.request.urlopen(req, timeout=5.0).read()
+        except OSError as exc:
+            logger.warning("media acquire failed (%s) — continuing, SDK may retry", exc)
+            return
+        deadline = time.monotonic() + 12.0
+        while time.monotonic() < deadline:
+            try:
+                with socket.create_connection((self._host, 8443), timeout=1.0):
+                    logger.info("media signaling up on :8443")
+                    return
+            except OSError:
+                time.sleep(0.5)
+        logger.warning("media signaling (:8443) not up after acquire — SDK init may fail")
 
     def _media(self) -> Any:
         if self._mini is None:
