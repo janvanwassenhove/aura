@@ -230,11 +230,11 @@ function fmtTime(iso: string): string {
 </script>
 
 <style scoped>
-.qa-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.4rem; }
+.qa-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
 .qa-btn {
-  display: inline-flex; align-items: center; justify-content: center; gap: 0.3rem;
+  display: inline-flex; align-items: center; justify-content: center; gap: 0.35rem;
   background: var(--surface-3); border: 1px solid var(--border); border-radius: var(--radius-sm);
-  color: var(--text-muted); font-size: 0.78rem; padding: 0.35rem 0.5rem; cursor: pointer;
+  color: var(--text-muted); font-size: 0.78rem; padding: 0.45rem 0.5rem; cursor: pointer;
 }
 .qa-btn:hover:not(:disabled) { color: var(--text); border-color: var(--accent-border); }
 .qa-btn:disabled { opacity: 0.5; cursor: not-allowed; }

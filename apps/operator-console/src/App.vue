@@ -86,7 +86,7 @@ body {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  padding: 1rem;
+  padding: 1.15rem 1.15rem 1rem;
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -98,13 +98,13 @@ body {
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--text-muted);
-  margin-bottom: 0.75rem;
+  margin-bottom: 0.9rem;
 }
 
-.status-row { display: flex; justify-content: space-between; align-items: center; padding: 0.25rem 0; }
+.status-row { display: flex; justify-content: space-between; align-items: center; gap: 0.75rem; padding: 0.4rem 0; }
 .label { font-size: 0.8rem; color: var(--text-muted); }
 .value { font-size: 0.85rem; }
-.section-label { font-size: 0.75rem; color: var(--text-faint); text-transform: uppercase; margin-bottom: 0.4rem; }
+.section-label { font-size: 0.72rem; font-weight: 600; letter-spacing: 0.04em; color: var(--text-faint); text-transform: uppercase; margin: 0.3rem 0 0.55rem; }
 
 .badge { font-size: 0.7rem; padding: 0.15rem 0.5rem; border-radius: 999px; text-transform: uppercase; font-weight: 600; }
 .badge-blue { background: var(--accent); color: var(--on-accent); }
@@ -144,7 +144,7 @@ body {
 .tool-succeeded { background: var(--ok-bg-deep); color: var(--ok-text); }
 .tool-failed { background: var(--danger-bg); color: var(--danger-text); }
 
-.input-row { display: flex; gap: 0.5rem; }
+.input-row { display: flex; gap: 0.5rem; align-items: center; padding-top: 0.25rem; }
 .chat-input {
   flex: 1; padding: 0.4rem 0.75rem;
   background: var(--surface-3); border: 1px solid var(--border); border-radius: var(--radius);
@@ -184,7 +184,7 @@ body {
 .btn-grant { padding: 0.4rem 1.25rem; border-radius: var(--radius); background: var(--ok-bg); color: var(--ok-text); border: none; cursor: pointer; font-size: 0.85rem; }
 .btn-grant:hover { background: var(--ok); color: #fff; }
 
-.mt-3 { margin-top: 0.75rem; }
+.mt-3 { margin-top: 1.1rem; }
 .mb-2 { margin-bottom: 0.5rem; }
 .mb-3 { margin-bottom: 0.75rem; }
 .flex { display: flex; }

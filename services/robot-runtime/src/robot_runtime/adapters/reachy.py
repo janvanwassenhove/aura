@@ -271,6 +271,14 @@ class ReachyRobotAdapter(RobotAdapter):
                     x_old = np.linspace(0.0, 1.0, num=len(pcm), endpoint=False)
                     x_new = np.linspace(0.0, 1.0, num=n_out, endpoint=False)
                     pcm = np.interp(x_new, x_old, pcm).astype(np.float32)
+            # The Reachy mic array is low-sensitivity even at max hardware gain,
+            # so peak-normalize each capture toward a usable level (capped, so
+            # near-silence isn't blown up into noise). Whisper then hears speech.
+            peak = float(np.abs(pcm).max()) if len(pcm) else 0.0
+            if peak > 0.0015:
+                target = float(os.environ.get("MIC_TARGET_PEAK", "0.5"))
+                max_gain = float(os.environ.get("MIC_MAX_GAIN", "40"))
+                pcm = pcm * min(target / peak, max_gain)
             return (np.clip(pcm, -1.0, 1.0) * 32767).astype(np.int16).tobytes()
 
         return await asyncio.to_thread(_record)
