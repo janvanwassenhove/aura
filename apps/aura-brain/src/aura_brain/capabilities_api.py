@@ -41,6 +41,10 @@ _CAPS: dict[str, tuple[str, str, str, str, bool]] = {
                     "Recognize and greet known people. Needs the knowledge passphrase.", False),
     "maintenance": ("MAINTENANCE_ENABLED", "true", "Self-maintenance",
                     "Periodic self-checks and auto-recovery of the robot link.", True),
+    "computer_use": ("COMPUTER_USE_ENABLED", "false", "Control the screen",
+                     "Let AURA see the screen and drive the mouse/keyboard to "
+                     "operate any app. Off by default; needs an Anthropic API key; "
+                     "every use still asks for approval.", True),
 }
 
 _live_hooks: dict[str, Callable[[bool], None]] = {}

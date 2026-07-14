@@ -206,6 +206,7 @@ class OrchestratorPipeline:
         offline_queue=None,  # OfflineQueue | None — avoid circular import
         connector_client: httpx.AsyncClient | None = None,
         dev_agent: DevAgentTool | None = None,
+        computer_use=None,  # ComputerUseAgent | None — gated, default off (U50)
     ) -> None:
         self._bus = bus
         self._router = intent_router
@@ -220,6 +221,8 @@ class OrchestratorPipeline:
         self._connector_client = connector_client
         # U20: outbound dev-agent tool (None if not configured / DEV_AGENT_ENABLED not set).
         self._dev_agent = dev_agent
+        # U50: gated Computer Use agent (None unless COMPUTER_USE_ENABLED + key).
+        self._computer_use = computer_use
         # U19e: judgment/anticipation layer + active-person tracking.
         self._judgment = None  # JudgmentLayer | None — set via set_judgment_layer()
         self._active_person_id: str | None = None
@@ -395,6 +398,15 @@ class OrchestratorPipeline:
                     working_dir=arguments.get("working_dir"),
                     operation_type=arguments.get("operation_type"),
                 )
+            elif tool_name == "use_computer":
+                if self._computer_use is None:
+                    result_text = ("[use_computer: not available — enable Computer "
+                                   "Use in the capabilities panel and set an "
+                                   "ANTHROPIC_API_KEY]")
+                else:
+                    result_text = await self._computer_use.run(
+                        arguments.get("goal", ""), session_id,
+                    )
             elif tool_name == "open_in_vscode":
                 result_text = await _open_in_vscode(
                     arguments.get("path", ""), arguments.get("line"),

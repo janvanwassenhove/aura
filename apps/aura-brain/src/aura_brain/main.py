@@ -213,6 +213,17 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     capabilities_api.set_live_hook("speak_replies", lambda _on: None)
     capabilities_api.set_live_hook("app_launch", lambda _on: None)
 
+    # U50: gated Computer Use — screenshot + mouse/keyboard control of the laptop.
+    # Default OFF; needs ANTHROPIC_API_KEY + the [computeruse] extra (pyautogui).
+    def _apply_computer_use(enabled: bool) -> None:
+        from aura_brain.computer_use import create_default_agent
+
+        os.environ["COMPUTER_USE_ENABLED"] = "true" if enabled else "false"
+        ctx.pipeline._computer_use = create_default_agent() if enabled else None
+
+    _apply_computer_use(os.environ.get("COMPUTER_USE_ENABLED", "false").lower() == "true")
+    capabilities_api.set_live_hook("computer_use", _apply_computer_use)
+
     # U19e: judgment/anticipation layer — injects minimal personal context per turn.
     from shared_schemas.knowledge import JudgmentLayer
     from shared_schemas.events.perception import PersonRecognized
