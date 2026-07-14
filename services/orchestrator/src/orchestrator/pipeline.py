@@ -46,6 +46,54 @@ def _identity_prefix() -> str:
     )
 
 
+def _allowed_apps() -> dict[str, str]:
+    """Parse ALLOWED_APPS='name=command;name2=command2' into a dict.
+
+    Only apps the owner registered here can ever be launched — AURA can never
+    run an arbitrary executable as an "app".
+    """
+    apps: dict[str, str] = {}
+    for pair in os.environ.get("ALLOWED_APPS", "").split(";"):
+        pair = pair.strip()
+        if "=" in pair:
+            name, cmd = pair.split("=", 1)
+            apps[name.strip().lower()] = cmd.strip()
+    return apps
+
+
+async def _launch_app(name: str) -> str:
+    """Launch a pre-registered desktop app (U40). Approval-gated upstream."""
+    if os.environ.get("APP_LAUNCH_ENABLED", "true").lower() != "true":
+        return "[launch_app: app launching is disabled in Capabilities]"
+    key = (name or "").strip().lower()
+    if not key:
+        return "[launch_app: name is required]"
+    apps = _allowed_apps()
+    cmd = apps.get(key)
+    if cmd is None:
+        available = ", ".join(sorted(apps)) or "(none registered)"
+        return (f"[launch_app: {name!r} is not in your allow-list. "
+                f"Registered apps: {available}. Add it in Capabilities.]")
+    import shlex
+
+    argv = shlex.split(cmd, posix=(os.name != "nt"))
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            *argv,
+            stdout=asyncio.subprocess.DEVNULL,
+            stderr=asyncio.subprocess.DEVNULL,
+        )
+        # Don't wait for GUI apps to exit; just confirm it started.
+        await asyncio.sleep(0.3)
+        if proc.returncode not in (None, 0):
+            return f"[launch_app: {name} exited with code {proc.returncode}]"
+        return f"Launched {name}."
+    except FileNotFoundError:
+        return f"[launch_app: command for {name!r} not found — check its path in Capabilities]"
+    except Exception as exc:  # noqa: BLE001
+        return f"[launch_app: error — {exc}]"
+
+
 async def _open_in_vscode(path: str, line: int | None = None) -> str:
     """Open a file/folder in VS Code on the owner's machine (U35 slice).
 
@@ -279,6 +327,8 @@ class OrchestratorPipeline:
                 result_text = await _open_in_vscode(
                     arguments.get("path", ""), arguments.get("line"),
                 )
+            elif tool_name == "launch_app":
+                result_text = await _launch_app(arguments.get("name", ""))
             else:
                 result_text = await self._call_connector(tool_name, arguments)
             await self._bus.publish(ToolCallSucceeded(

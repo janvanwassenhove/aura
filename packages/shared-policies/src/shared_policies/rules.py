@@ -12,6 +12,7 @@ APPROVAL_REQUIRED: frozenset[str] = frozenset(
         "delete_calendar_event",
         "create_task",
         "delete_task",
+        "launch_app",  # starting an app on the laptop always asks the owner
     }
 )
 
@@ -22,6 +23,7 @@ MODE_TOOL_MAP: dict[str, frozenset[str]] = {
         {
             "run_dev_task",
             "open_in_vscode",
+            "launch_app",
             "list_calendar_events_today",
             "create_calendar_event",
             "delete_calendar_event",
