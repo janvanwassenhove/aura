@@ -391,6 +391,60 @@ class OpenAIComputerAgent:
             return f"[action {name} failed: {exc}]"
 
 
+class ScaledBackend:
+    """U70: downscale what the model SEES, upscale where it CLICKS.
+
+    Vision models internally resize huge screenshots (a 3440x1440 ultrawide
+    far exceeds their native input), which silently breaks 1:1 coordinates.
+    We present the screen at max COMPUTER_USE_MAX_DIM pixels on the long edge
+    and map the model's coordinates back to real pixels."""
+
+    def __init__(self, inner: InputBackend, max_dim: int | None = None) -> None:
+        self._inner = inner
+        max_dim = max_dim or int(os.environ.get("COMPUTER_USE_MAX_DIM", "1456"))
+        w, h = inner.size()
+        self._scale = min(1.0, max_dim / max(int(w), int(h)))
+        self._size = (round(w * self._scale), round(h * self._scale))
+
+    def size(self) -> tuple[int, int]:
+        return self._size
+
+    def screenshot(self) -> bytes:
+        data = self._inner.screenshot()
+        if self._scale >= 1.0:
+            return data
+        import io
+
+        from PIL import Image
+
+        img = Image.open(io.BytesIO(data))
+        img = img.resize(self._size, Image.LANCZOS)
+        buf = io.BytesIO()
+        img.save(buf, format="PNG")
+        return buf.getvalue()
+
+    def _up(self, v: int) -> int:
+        return round(v / self._scale)
+
+    def move(self, x: int, y: int) -> None:
+        self._inner.move(self._up(x), self._up(y))
+
+    def click(self, x: int, y: int, button: str = "left", count: int = 1) -> None:
+        self._inner.click(self._up(x), self._up(y), button, count)
+
+    def type_text(self, text: str) -> None:
+        self._inner.type_text(text)
+
+    def key(self, keys: str) -> None:
+        self._inner.key(keys)
+
+    def scroll(self, x: int, y: int, direction: str, amount: int) -> None:
+        self._inner.scroll(self._up(x), self._up(y), direction, amount)
+
+    def drag(self, x1: int, y1: int, x2: int, y2: int) -> None:
+        self._inner.drag(self._up(x1), self._up(y1), self._up(x2), self._up(y2))
+
+
 def create_default_agent():
     """Build the best available agent if enabled + configured; else None.
 
@@ -402,7 +456,7 @@ def create_default_agent():
     if os.environ.get("COMPUTER_USE_ENABLED", "false").lower() != "true":
         return None
     try:
-        backend = PyAutoGuiBackend()
+        backend = ScaledBackend(PyAutoGuiBackend())  # U70: coordinate-safe on big monitors
     except Exception as exc:  # noqa: BLE001 — pyautogui/display missing
         logger.warning("Computer Use enabled but backend unavailable (%s) — disabled.", exc)
         return None

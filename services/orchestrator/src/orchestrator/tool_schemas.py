@@ -309,8 +309,11 @@ LADDER_NOTE = (
     "MUSIC: you CAN open Spotify (launch_app 'spotify') and press play "
     "(media_control) — never claim you can't open apps. When asked to play "
     "music, ACT (launch + play) instead of asking which exact track; then "
-    "report honestly what you could not control (a specific song/playlist/"
-    "speaker needs the Spotify connection in Settings)."
+    "report honestly what you could not control. A SPECIFIC song/playlist "
+    "needs the Spotify connection in Settings — OR use_computer (if enabled "
+    "and approved): open Spotify, search the track on screen and play it. "
+    "That is a legitimate use of the GUI layer since no lower layer can "
+    "select a specific track."
 )
 
 
