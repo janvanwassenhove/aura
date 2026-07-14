@@ -168,7 +168,7 @@ the human can unblock it.
 - [x] **U44 — splash-encoding, restart-badge UX, audio-VU-meter** · deps: U40 · `0ccd410`
   (1) Splash: `data:text/html;charset=utf-8` + `&hellip;`/`&middot;` entities → geen mojibake ("startingâ€¦" fix). (2) Restart-badges: gestures + maintenance nu LIVE toggelbaar (hooks: gesture-detector attach/detach; maintenance-loop start/stop) — alleen recognition blijft restart; badge toont nu enkel bij een openstaande wijziging (client `pending`), niet permanent. (3) Audio: live VU-meter (WebAudio AnalyserNode, RMS→12 balkjes) tijdens opname + "no sound yet"-hint → je ZIET dat de mic hoort. Brain 86, console 56 groen; live geverifieerd (gestures/maintenance applied_live=true).
 
-- [x] **U45 — praten via Richie''s eigen mic + Knowledge editable** · deps: U36e · `<hash>`
+- [x] **U45 — praten via Richie''s eigen mic + Knowledge editable** · deps: U36e · `a2227b5`
   (1) Robot-mic: reachy `capture_audio` resamplet naar 16kHz mono s16le; nieuwe `POST /robot/listen` → WAV; RobotClient.listen; brain `POST /voice/listen` (neemt op op de Pi → transcribeert → pipeline-turn, antwoord gesproken op de robot). Bot-mic-knop in ConversationPanel ("Richie is listening on his own mic…"). Live geverifieerd: /robot/listen → geldige 16kHz WAV (86kB/3s); /voice/listen graceful bij stilte. (2) Knowledge editable: naam + rol inline bewerkbaar (blur→renamePerson/upsertPerson) en fact key+value inline bewerkbaar (blur→updateFact = add+delete). Robot 45, brain 86, console 56 groen.
 
 ## Progress log (append-only; newest last)
