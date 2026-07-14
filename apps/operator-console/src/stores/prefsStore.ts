@@ -22,6 +22,7 @@ export const usePrefsStore = defineStore('prefs', () => {
   const language = ref<Language>('auto')
   const voiceMode = ref<VoiceMode>('off')
   const wakeWord = ref('AURA')
+  const ttsVoice = ref('alloy')
   const saving = ref(false)
   const error = ref<string | null>(null)
 
@@ -33,14 +34,16 @@ export const usePrefsStore = defineStore('prefs', () => {
         assistantName.value = data.assistant_name ?? 'AURA'
         language.value = (data.language ?? 'auto') as Language
         voiceMode.value = (data.voice_mode ?? 'off') as VoiceMode
-        wakeWord.value = data.wake_word ?? assistantName.value
+        wakeWord.value = data.wake_word
+      ttsVoice.value = data.tts_voice ?? ttsVoice.value ?? assistantName.value
+        ttsVoice.value = data.tts_voice ?? 'alloy'
       }
     } catch { /* keep defaults */ }
   }
 
   async function save(fields: {
     assistant_name?: string; language?: Language;
-    voice_mode?: VoiceMode; wake_word?: string
+    voice_mode?: VoiceMode; wake_word?: string; tts_voice?: string
   }): Promise<boolean> {
     saving.value = true
     error.value = null
@@ -59,6 +62,7 @@ export const usePrefsStore = defineStore('prefs', () => {
       language.value = data.language
       voiceMode.value = data.voice_mode
       wakeWord.value = data.wake_word
+      ttsVoice.value = data.tts_voice ?? ttsVoice.value
       return true
     } catch {
       error.value = 'Could not reach the brain.'
@@ -68,5 +72,5 @@ export const usePrefsStore = defineStore('prefs', () => {
     }
   }
 
-  return { assistantName, language, voiceMode, wakeWord, saving, error, fetchPrefs, save }
+  return { assistantName, language, voiceMode, wakeWord, ttsVoice, saving, error, fetchPrefs, save }
 })

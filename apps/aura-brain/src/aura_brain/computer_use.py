@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import json
 import logging
 import os
 from typing import Any, Protocol, runtime_checkable
@@ -268,20 +269,153 @@ class PyAutoGuiBackend:
         return {"return": "enter", "super": "win", "cmd": "win", "meta": "win"}.get(k, k)
 
 
-def create_default_agent() -> ComputerUseAgent | None:
-    """Build the real agent if enabled + configured; else None.
+class OpenAIComputerAgent:
+    """U64: the same screenshot→act→verify loop driven by the OpenAI API —
+    no Anthropic key needed. Uses the vision + function-calling of the model
+    already configured for conversations (default gpt-4o)."""
 
-    Requires COMPUTER_USE_ENABLED=true, an ANTHROPIC_API_KEY, and the
-    ``[computeruse]`` extra (pyautogui). Any missing piece → disabled (None).
+    _TOOLS = [
+        {"type": "function", "function": {"name": n, "description": d, "parameters": p}}
+        for n, d, p in [
+            ("click", "Click at pixel coordinates.",
+             {"type": "object", "properties": {
+                 "x": {"type": "integer"}, "y": {"type": "integer"},
+                 "button": {"type": "string", "enum": ["left", "right", "middle"]},
+                 "count": {"type": "integer", "description": "1=single, 2=double"},
+             }, "required": ["x", "y"]}),
+            ("type_text", "Type a text string.",
+             {"type": "object", "properties": {"text": {"type": "string"}},
+              "required": ["text"]}),
+            ("press_key", "Press a key or combo, e.g. 'enter', 'ctrl+s'.",
+             {"type": "object", "properties": {"keys": {"type": "string"}},
+              "required": ["keys"]}),
+            ("scroll", "Scroll at a position.",
+             {"type": "object", "properties": {
+                 "x": {"type": "integer"}, "y": {"type": "integer"},
+                 "direction": {"type": "string", "enum": ["up", "down", "left", "right"]},
+                 "amount": {"type": "integer"}}, "required": ["direction"]}),
+            ("drag", "Drag from one point to another.",
+             {"type": "object", "properties": {
+                 "x1": {"type": "integer"}, "y1": {"type": "integer"},
+                 "x2": {"type": "integer"}, "y2": {"type": "integer"}},
+              "required": ["x1", "y1", "x2", "y2"]}),
+            ("wait", "Pause briefly (seconds, max 5).",
+             {"type": "object", "properties": {"seconds": {"type": "number"}}}),
+            ("done", "Finish: the goal is reached or cannot proceed.",
+             {"type": "object", "properties": {"summary": {"type": "string"}},
+              "required": ["summary"]}),
+        ]
+    ]
+
+    def __init__(self, backend: InputBackend, *, client: Any | None = None,
+                 model: str | None = None, max_steps: int = 25) -> None:
+        self._backend = backend
+        self._model = model or os.environ.get("COMPUTER_USE_OPENAI_MODEL", "gpt-4o")
+        self._max_steps = int(os.environ.get("COMPUTER_USE_MAX_STEPS", str(max_steps)))
+        if client is None:
+            from openai import AsyncOpenAI  # already a brain dependency
+
+            client = AsyncOpenAI()
+        self._client = client
+        w, h = backend.size()
+        self._size = (int(w), int(h))
+
+    async def _screenshot_message(self) -> dict:
+        data = await asyncio.to_thread(self._backend.screenshot)
+        b64 = base64.standard_b64encode(data).decode("ascii")
+        return {"role": "user", "content": [
+            {"type": "text", "text": "Current screen:"},
+            {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{b64}"}},
+        ]}
+
+    async def run(self, goal: str, session_id: str = "default") -> str:
+        messages: list[dict] = [
+            {"role": "system", "content": _SYSTEM + (
+                f"\nThe screen is {self._size[0]}x{self._size[1]} pixels; coordinates "
+                "map 1:1 to the screenshots. Work strictly via the provided tools; "
+                "call done(summary) when finished or stuck."
+            )},
+            {"role": "user", "content": goal},
+            await self._screenshot_message(),
+        ]
+        logger.info("OpenAIComputerAgent starting goal=%r (model=%s)", goal, self._model)
+        for step in range(self._max_steps):
+            resp = await self._client.chat.completions.create(
+                model=self._model, messages=messages, tools=self._TOOLS,
+                max_tokens=600,
+            )
+            msg = resp.choices[0].message
+            if not msg.tool_calls:
+                return msg.content or "Computer-use run finished with no summary."
+            messages.append({"role": "assistant", "content": msg.content,
+                             "tool_calls": [tc.model_dump() if hasattr(tc, "model_dump") else tc
+                                            for tc in msg.tool_calls]})
+            for tc in msg.tool_calls:
+                name = tc.function.name
+                try:
+                    args = json.loads(tc.function.arguments or "{}")
+                except json.JSONDecodeError:
+                    args = {}
+                if name == "done":
+                    return str(args.get("summary") or "Done.")
+                result = await self._act(name, args)
+                messages.append({"role": "tool", "tool_call_id": tc.id, "content": result})
+            messages.append(await self._screenshot_message())
+        return f"[stopped after {self._max_steps} steps — goal may be incomplete]"
+
+    async def _act(self, name: str, args: dict) -> str:
+        b = self._backend
+        logger.info("computer action (openai): %s %s", name, args)
+        try:
+            if name == "click":
+                await asyncio.to_thread(b.click, int(args["x"]), int(args["y"]),
+                                        args.get("button", "left"), int(args.get("count", 1)))
+            elif name == "type_text":
+                await asyncio.to_thread(b.type_text, str(args.get("text", "")))
+            elif name == "press_key":
+                await asyncio.to_thread(b.key, str(args.get("keys", "")))
+            elif name == "scroll":
+                x = int(args.get("x", self._size[0] // 2))
+                y = int(args.get("y", self._size[1] // 2))
+                await asyncio.to_thread(b.scroll, x, y,
+                                        args.get("direction", "down"), int(args.get("amount", 3)))
+            elif name == "drag":
+                await asyncio.to_thread(b.drag, int(args["x1"]), int(args["y1"]),
+                                        int(args["x2"]), int(args["y2"]))
+            elif name == "wait":
+                await asyncio.sleep(min(5.0, float(args.get("seconds", 1))))
+            else:
+                return f"[unsupported action: {name}]"
+            return "ok"
+        except Exception as exc:  # noqa: BLE001 — recoverable tool error
+            return f"[action {name} failed: {exc}]"
+
+
+def create_default_agent():
+    """Build the best available agent if enabled + configured; else None.
+
+    Provider ladder (U64): Anthropic's native computer-use when an
+    ANTHROPIC_API_KEY is set (best at this), otherwise an OpenAI-driven
+    vision loop on the OPENAI_API_KEY that conversations already use — no
+    extra account needed. Requires COMPUTER_USE_ENABLED=true and pyautogui.
     """
     if os.environ.get("COMPUTER_USE_ENABLED", "false").lower() != "true":
-        return None
-    if not os.environ.get("ANTHROPIC_API_KEY", "").strip():
-        logger.warning("Computer Use enabled but ANTHROPIC_API_KEY is not set — disabled.")
         return None
     try:
         backend = PyAutoGuiBackend()
     except Exception as exc:  # noqa: BLE001 — pyautogui/display missing
         logger.warning("Computer Use enabled but backend unavailable (%s) — disabled.", exc)
         return None
-    return ComputerUseAgent(backend)
+    if os.environ.get("ANTHROPIC_API_KEY", "").strip():
+        try:
+            return ComputerUseAgent(backend)
+        except Exception as exc:  # noqa: BLE001 — anthropic sdk missing
+            logger.warning("Anthropic computer-use unavailable (%s); trying OpenAI.", exc)
+    if os.environ.get("OPENAI_API_KEY", "").strip():
+        try:
+            return OpenAIComputerAgent(backend)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("OpenAI computer-use unavailable (%s) — disabled.", exc)
+            return None
+    logger.warning("Computer Use enabled but no ANTHROPIC_API_KEY or OPENAI_API_KEY — disabled.")
+    return None

@@ -247,6 +247,7 @@ def _prefs_snapshot() -> dict:
         "language": os.environ.get("ASSISTANT_LANGUAGE", "auto"),
         "voice_mode": os.environ.get("VOICE_MODE", "off"),
         "wake_word": os.environ.get("WAKE_WORD", os.environ.get("ASSISTANT_NAME", "AURA")),
+        "tts_voice": os.environ.get("TTS_VOICE", "alloy"),
     }
 
 
@@ -284,6 +285,17 @@ async def set_prefs(body: dict) -> JSONResponse:
                 status_code=422,
             )
         updates["VOICE_MODE"] = voice_mode
+    tts_voice = (body or {}).get("tts_voice")
+    if tts_voice is not None:
+        from aura_brain.voice import TTS_VOICES
+
+        tts_voice = tts_voice.strip().lower()
+        if tts_voice not in TTS_VOICES:
+            return JSONResponse(
+                {"error": f"tts_voice must be one of {sorted(TTS_VOICES)}"},
+                status_code=422,
+            )
+        updates["TTS_VOICE"] = tts_voice
     wake_word = (body or {}).get("wake_word")
     if wake_word is not None:
         wake_word = wake_word.strip()

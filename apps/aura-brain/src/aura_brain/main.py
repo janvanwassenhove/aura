@@ -303,16 +303,23 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
                 ))
             # U54: streamed speech — first sentence starts playing while the
             # rest is still being synthesized (SPEAK_STREAMING=false → old path).
+            # U65: the voice follows the global pref, with per-persona override.
             capped = text[:600]  # cap TTS cost
+            reply_voice = voice.resolve_voice(
+                str(persona_cfg.name) if persona_cfg is not None else None)
+
+            async def _synth(chunk: str) -> str:
+                return await voice.synthesize_b64(chunk, reply_voice)
+
             if os.environ.get("SPEAK_STREAMING", "true").lower() == "true":
                 from aura_brain.streaming import stream_speech
 
                 async def _speak_chunk(chunk: str, audio_b64: str) -> None:
                     await _robot.speak(chunk, audio_b64=audio_b64)
 
-                await stream_speech(capped, voice.synthesize_b64, _speak_chunk)
+                await stream_speech(capped, _synth, _speak_chunk)
             else:
-                audio_b64 = await voice.synthesize_b64(capped)
+                audio_b64 = await _synth(capped)
                 await _robot.speak(capped, audio_b64=audio_b64)
         except Exception as exc:  # robot offline → the console turn still shows
             logging.getLogger(__name__).debug("embodied reply failed: %s", exc)

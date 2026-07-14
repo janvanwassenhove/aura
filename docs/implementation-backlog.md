@@ -204,6 +204,13 @@ the human can unblock it.
 - [x] **U63 — persoonsprofiel: beschrijving + skills-referentie; Settings-layout** · `pending`
   Person kreeg een `description`-veld (vrije-tekst-portret, encrypted at rest, backward compatible) — bewerkbaar in het brein-paneel ("About", auto-save op blur) en geïnjecteerd in de judgment-context ("About them: …") zodat gesprekken erop personaliseren. PUT /knowledge/people kreeg merge-semantiek (alleen-description-update raakt naam/rol niet). Persoonsprofiel toont nu ook de SKILLS met die persoon-scope ("their way of working") met hint naar 🎓/Settings→Skills — profiel = één plek met alles wat AURA over iemand weet. Settings-modal: 36rem breed (tabs kapten af op 26rem met 6 tabs), tab-bar nowrap+scroll, ruimere body-padding. Brain 132 (+2), schemas 123, console 56 groen.
 
+- [x] **U64 — schermcontrole zonder Anthropic-key (OpenAI-fallback)** · `pending`
+  `OpenAIComputerAgent`: dezelfde screenshot→act→verify-loop, gedreven door de OpenAI-key die gesprekken al gebruiken (vision + function-calling, default gpt-4o, COMPUTER_USE_OPENAI_MODEL overridebaar). Provider-ladder in `create_default_agent`: Anthropic native als de key er is (beste in dit werk) → anders OpenAI → anders uit. Zelfde systeem-prompt/safety, zelfde step-cap, zelfde approval-gate. Capability-tekst bijgewerkt. Brain +3 tests (klik→done, step-cap, ladder).
+- [x] **U65 — stemkeuze (globaal + per persona)** · `pending`
+  `TTS_VOICES` (11 gpt-4o-mini-tts-stemmen) + `resolve_voice(persona)`: per-persona override via `TTS_VOICE_<MODE>` env, anders globale voorkeur `TTS_VOICE` (live gelezen). Prefs-API kreeg `tts_voice` (gevalideerd); Settings kreeg een "Robot voice"-dropdown met omschrijving per stem (Onyx — deep male, Nova — energetic female, …). `_embody_reply` synthesiseert met de persona-stem op beide TTS-paden (streamed + klassiek).
+- [x] **U66 — skills toevoegen vanuit het persoonsscherm + 🎓-UX** · `pending`
+  Persoonsprofiel kreeg een quick-add-rij onder SKILLS (naam + procedure → POST /skills met person-scope, beschrijving automatisch "X's way of working"). 🎓-knop: altijd klikbaar; met leeg invoerveld verschijnt nu een inline hint ("typ eerst je les…") i.p.v. stil niets doen — dat was het "🎓 reageert niet"-probleem (backend-endpoint werkte, curl 200).
+
 ## Progress log (append-only; newest last)
 
 - 2026-06-21 — ledger created on `aura-autobuild`; Phase 0/0b complete, Phase 1 scaffold (U-pre) done before this loop started.

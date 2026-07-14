@@ -45,8 +45,9 @@ _CAPS: dict[str, tuple[str, str, str, str, bool]] = {
                     "Periodic self-checks and auto-recovery of the robot link.", True),
     "computer_use": ("COMPUTER_USE_ENABLED", "false", "Control the screen",
                      "Let AURA see the screen and drive the mouse/keyboard to "
-                     "operate any app. Off by default; needs an Anthropic API key; "
-                     "every use still asks for approval.", True),
+                     "operate any app. Off by default; uses your existing OpenAI "
+                     "key (or Anthropic if set); every use still asks for "
+                     "approval.", True),
 }
 
 _live_hooks: dict[str, Callable[[bool], None]] = {}
