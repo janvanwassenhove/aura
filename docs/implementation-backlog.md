@@ -155,6 +155,13 @@ the human can unblock it.
 - [x] **U40 — capabilities/permissions center + app launcher** · deps: U20,U35 · `d943f88`
   Brain `/capabilities` (GET/POST toggles: dev_agent, app_launch, follow_me, speak_replies, gestures, recognition, maintenance; persist .env + live-apply hooks voor dev_agent/follow_me/speak_replies). `launch_app` orchestrator-tool + ALLOWED_APPS allow-list (name=command, argv-only, approval-gated, per-call env-check). Console CapabilitiesPanel (shield-knop titelbalk) met toggles + uitleg beveiligingsmodel + geregistreerde apps. Nooit een bypass van de approval-gate. Brain 86, orchestrator 143, policies 6, console 56 groen.
 
+- [x] **U39 — Spotify + Sonos muziekbesturing** · deps: U35 · `<hash>`
+  `connector_service/music.py` (SpotifyMusic: Web API met SPOTIFY_ACCESS_TOKEN; play/pause/next/playlists/devices/favorites; **Sonos via Spotify Connect** — targeten op device-naam, geen aparte Sonos-API; MOCK-modus zonder token). Routes `/connector/music/*` + orchestrator-tools (play_music/pause_music/next_track/list_music_playlists/list_speakers) in work+home-mode. Connector 32, policies 6, orchestrator 146 groen; live geverifieerd (list_speakers + play in mock). Echte weergave: eenmalig Spotify-token.
+- [x] **U41 — Claude Code dev-workflow hersteld** · deps: U20 · `d252950`
+  `_execute_claude` gebruikte niet-bestaande flags → echte headless-aanroep `claude -p prompt --output-format text --permission-mode acceptEdits`, cwd via subprocess, eigen 600s-timeout, shutil.which. "bouw een app met VS Code + Claude Code" draait nu een echte coding-sessie (na approval-escalatie).
+- [x] **U42 — gespreksgeheugen (echte dialoog)** · deps: U5 · `d252950`
+  Pipeline hield per turn GEEN geschiedenis bij → nu per-session rolling window (MAX_CONTEXT_TURNS*2), prior turns meegestuurd; conversationele identity-prefix (elk onderwerp, spraakvriendelijk). Live: "wat is mijn lievelingskleur?" onthouden over turns. Orchestrator 146 (6 nieuw).
+
 ## Progress log (append-only; newest last)
 
 - 2026-06-21 — ledger created on `aura-autobuild`; Phase 0/0b complete, Phase 1 scaffold (U-pre) done before this loop started.

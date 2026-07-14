@@ -49,6 +49,22 @@ TOOL_SCHEMAS: dict[str, dict] = {
         "List the user's recent OneDrive files (name, folder, size, modified).",
         _NO_ARGS,
     ),
+    "play_music": _fn(
+        "play_music",
+        "Play music on Spotify, optionally on a specific speaker (e.g. the "
+        "Sonos). Give a song/artist as 'query', a 'playlist' name, or set "
+        "'favorites' to play liked songs. Omit all to resume playback.",
+        {"type": "object", "properties": {
+            "query": {"type": "string", "description": "Song or artist to play."},
+            "playlist": {"type": "string", "description": "Playlist name to play."},
+            "favorites": {"type": "boolean", "description": "Play the user's liked songs."},
+            "device": {"type": "string", "description": "Speaker name, e.g. 'Sonos'. Defaults to the Sonos."},
+        }, "additionalProperties": False},
+    ),
+    "pause_music": _fn("pause_music", "Pause music playback.", _NO_ARGS),
+    "next_track": _fn("next_track", "Skip to the next track.", _NO_ARGS),
+    "list_music_playlists": _fn("list_music_playlists", "List the user's Spotify playlists.", _NO_ARGS),
+    "list_speakers": _fn("list_speakers", "List available Spotify/Sonos speakers.", _NO_ARGS),
     "send_mail": _fn(
         "send_mail", "Send an email. Sensitive — requires user approval.",
         {"type": "object", "properties": {

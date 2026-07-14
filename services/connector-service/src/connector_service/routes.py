@@ -113,6 +113,45 @@ async def onedrive_files() -> JSONResponse:
 
 
 # ------------------------------------------------------------------
+# Music (Spotify + Sonos via Spotify Connect, U39)
+# ------------------------------------------------------------------
+
+from connector_service.music import SpotifyMusic  # noqa: E402
+
+_music = SpotifyMusic()
+
+
+@router.get("/music/devices")
+async def music_devices() -> JSONResponse:
+    return JSONResponse({"result": await _music.list_devices()})
+
+
+@router.get("/music/playlists")
+async def music_playlists() -> JSONResponse:
+    return JSONResponse({"result": await _music.list_playlists()})
+
+
+@router.post("/music/play")
+async def music_play(body: dict) -> JSONResponse:
+    return JSONResponse({"result": await _music.play(
+        query=body.get("query"),
+        playlist=body.get("playlist"),
+        favorites=bool(body.get("favorites", False)),
+        device=body.get("device"),
+    )})
+
+
+@router.post("/music/pause")
+async def music_pause() -> JSONResponse:
+    return JSONResponse({"result": await _music.pause()})
+
+
+@router.post("/music/next")
+async def music_next() -> JSONResponse:
+    return JSONResponse({"result": await _music.next_track()})
+
+
+# ------------------------------------------------------------------
 # Tasks
 # ------------------------------------------------------------------
 
