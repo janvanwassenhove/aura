@@ -12,6 +12,7 @@
         <button :class="['tab-btn', activeTab === 'connections' && 'tab-btn--active']" @click="switchToConnections">Connections</button>
         <button :class="['tab-btn', activeTab === 'robot' && 'tab-btn--active']" @click="switchToRobot">Robot</button>
         <button :class="['tab-btn', activeTab === 'appearance' && 'tab-btn--active']" @click="activeTab = 'appearance'">Appearance</button>
+        <button :class="['tab-btn', activeTab === 'skills' && 'tab-btn--active']" @click="switchToSkills">Skills</button>
         <button :class="['tab-btn', activeTab === 'logs' && 'tab-btn--active']" @click="switchToLogs">Logs</button>
       </div>
 
@@ -69,6 +70,35 @@
           <button class="btn-cancel" @click="$emit('close')">Cancel</button>
           <button class="btn-apply" :disabled="llmStore.loading" @click="applyLLM">Apply</button>
         </div>
+      </template>
+
+      <!-- ── Skills tab (U62): what the owner taught the agent ── -->
+      <template v-if="activeTab === 'skills'">
+        <p class="conn-hint">Skills are procedures you taught the assistant. It proposes new ones from your feedback (🎓) — every write needs your approval. You edit freely here.</p>
+        <div v-if="!skills.length && !editingSkill" class="conn-hint">No skills yet. Teach one via the 🎓 button in the conversation, or add one below.</div>
+        <div v-for="sk in skills" :key="sk.name" class="skill-row">
+          <div class="skill-info">
+            <strong>{{ sk.name }}</strong>
+            <span v-if="sk.person" class="skill-scope">@{{ sk.person }}</span>
+            <span class="skill-desc">{{ sk.description }}</span>
+          </div>
+          <label class="skill-toggle"><input type="checkbox" :checked="sk.enabled" @change="toggleSkill(sk)" /> on</label>
+          <button class="btn-conn btn-ghost btn-small" @click="editSkill(sk)">Edit</button>
+          <button class="btn-conn btn-ghost btn-small" @click="removeSkill(sk.name)">Delete</button>
+        </div>
+        <div v-if="editingSkill" class="skill-editor">
+          <input v-model="editingSkill.name" class="field-input" placeholder="name (kebab-case)" :disabled="!skillIsNew" aria-label="Skill name" />
+          <input v-model="editingSkill.description" class="field-input" placeholder="One-line description" aria-label="Skill description" />
+          <input v-model="editingTriggers" class="field-input" placeholder="Triggers, comma-separated (e.g. deploy, release)" aria-label="Skill triggers" />
+          <input v-model="editingSkill.person" class="field-input" placeholder="Person id (optional — scopes to their digital twin)" aria-label="Skill person" />
+          <textarea v-model="editingSkill.body" class="field-input skill-body" rows="6" placeholder="The procedure, step by step…" aria-label="Skill body" />
+          <div class="conn-actions">
+            <button class="btn-conn btn-primary" :disabled="!editingSkill.name || !editingSkill.body" @click="saveSkill">Save</button>
+            <button class="btn-conn btn-ghost" @click="editingSkill = null">Cancel</button>
+          </div>
+          <p v-if="skillError" class="conn-error">{{ skillError }}</p>
+        </div>
+        <button v-else class="btn-conn btn-ghost" @click="newSkill">+ New skill</button>
       </template>
 
       <!-- ── Logs tab (U56): local ring buffer, nothing leaves this machine ── -->
@@ -416,7 +446,7 @@ async function applyLLM() {
 const connStore = useConnectionsStore()
 const themeStore = useThemeStore()
 const prefsStore = usePrefsStore()
-const activeTab = ref<'llm' | 'connections' | 'robot' | 'appearance' | 'logs'>('llm')
+const activeTab = ref<'llm' | 'connections' | 'robot' | 'appearance' | 'logs' | 'skills'>('llm')
 
 const localName = ref(prefsStore.assistantName)
 const localLang = ref(prefsStore.language)
@@ -517,6 +547,75 @@ async function fetchLogs(): Promise<void> {
   } finally {
     logsLoading.value = false
   }
+}
+
+// ── Skills tab (U62) ──
+interface SkillItem {
+  name: string; description: string; triggers: string[]
+  personas: string[]; person: string; enabled: boolean; body: string
+}
+const skills = ref<SkillItem[]>([])
+const editingSkill = ref<SkillItem | null>(null)
+const skillIsNew = ref(false)
+const editingTriggers = ref('')
+const skillError = ref('')
+
+async function fetchSkills(): Promise<void> {
+  try {
+    const resp = await fetch(`${BRAIN_URL_LOGS}/skills`)
+    skills.value = (await resp.json()).skills ?? []
+  } catch { skills.value = [] }
+}
+
+async function switchToSkills(): Promise<void> {
+  activeTab.value = 'skills'
+  await fetchSkills()
+}
+
+function newSkill(): void {
+  skillIsNew.value = true
+  editingTriggers.value = ''
+  editingSkill.value = { name: '', description: '', triggers: [], personas: [], person: '', enabled: true, body: '' }
+}
+
+function editSkill(sk: SkillItem): void {
+  skillIsNew.value = false
+  editingTriggers.value = sk.triggers.join(', ')
+  editingSkill.value = { ...sk }
+}
+
+async function saveSkill(): Promise<void> {
+  if (!editingSkill.value) return
+  skillError.value = ''
+  const payload = {
+    ...editingSkill.value,
+    triggers: editingTriggers.value.split(',').map(t => t.trim()).filter(Boolean),
+  }
+  const resp = await fetch(`${BRAIN_URL_LOGS}/skills`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  }).catch(() => null)
+  if (!resp || !resp.ok) {
+    skillError.value = resp ? String((await resp.json().catch(() => ({}))).error ?? `HTTP ${resp.status}`) : 'brain unreachable'
+    return
+  }
+  editingSkill.value = null
+  await fetchSkills()
+}
+
+async function toggleSkill(sk: SkillItem): Promise<void> {
+  await fetch(`${BRAIN_URL_LOGS}/skills`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ...sk, enabled: !sk.enabled }),
+  }).catch(() => {})
+  await fetchSkills()
+}
+
+async function removeSkill(name: string): Promise<void> {
+  await fetch(`${BRAIN_URL_LOGS}/skills/${name}`, { method: 'DELETE' }).catch(() => {})
+  await fetchSkills()
 }
 
 async function switchToLogs(): Promise<void> {
@@ -673,6 +772,14 @@ const ConnStatusBadge = defineComponent({
 .log-ts { color: var(--text-faint); flex-shrink: 0; }
 .log-level { width: 62px; flex-shrink: 0; color: var(--text-faint); }
 .log-msg { white-space: pre-wrap; word-break: break-word; }
+
+.skill-row { display: flex; align-items: center; gap: 0.5rem; padding: 0.35rem 0; border-bottom: 1px solid var(--border); }
+.skill-info { flex: 1; display: flex; gap: 0.45rem; align-items: baseline; min-width: 0; }
+.skill-desc { color: var(--text-faint); font-size: 0.75rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.skill-scope { color: var(--accent); font-size: 0.72rem; }
+.skill-toggle { font-size: 0.72rem; color: var(--text-faint); display: flex; gap: 0.25rem; align-items: center; }
+.skill-editor { display: flex; flex-direction: column; gap: 0.45rem; margin-top: 0.6rem; }
+.skill-body { font-family: ui-monospace, monospace; }
 
 .robot-row { display: flex; gap: 0.5rem; align-items: center; }
 .robot-row .field-input { flex: 1; }
