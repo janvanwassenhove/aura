@@ -291,12 +291,23 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         if not speak:
             return
         try:
-            audio_b64 = await voice.synthesize_b64(text[:600])  # cap TTS cost
             if gesture is not None:
                 await _robot.execute_motion(MotionCommand(
                     motion_id=gesture, speed=1.0, amplitude=amplitude, direction=None,
                 ))
-            await _robot.speak(text, audio_b64=audio_b64)
+            # U54: streamed speech — first sentence starts playing while the
+            # rest is still being synthesized (SPEAK_STREAMING=false → old path).
+            capped = text[:600]  # cap TTS cost
+            if os.environ.get("SPEAK_STREAMING", "true").lower() == "true":
+                from aura_brain.streaming import stream_speech
+
+                async def _speak_chunk(chunk: str, audio_b64: str) -> None:
+                    await _robot.speak(chunk, audio_b64=audio_b64)
+
+                await stream_speech(capped, voice.synthesize_b64, _speak_chunk)
+            else:
+                audio_b64 = await voice.synthesize_b64(capped)
+                await _robot.speak(capped, audio_b64=audio_b64)
         except Exception as exc:  # robot offline → the console turn still shows
             logging.getLogger(__name__).debug("embodied reply failed: %s", exc)
 

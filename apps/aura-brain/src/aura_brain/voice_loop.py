@@ -89,6 +89,14 @@ class VoiceLoop:
         self._task: asyncio.Task | None = None
         self._followup_until = 0.0
         self._speaking_until = 0.0
+        # U54: barge-in — while the robot talks, a clearly louder voice (the
+        # user is closer to the mic than the robot's own speaker echo) cuts the
+        # wait and is handled as a reply immediately.
+        self._barge_factor = float(os.environ.get("BARGE_IN_FACTOR", "2.5"))
+
+    @property
+    def _barge_in(self) -> bool:
+        return os.environ.get("BARGE_IN", "true").lower() == "true"
 
     # -- lifecycle -----------------------------------------------------
 
@@ -136,13 +144,23 @@ class VoiceLoop:
                     continue
 
                 now = time.monotonic()
-                if now < self._speaking_until:  # robot is talking → don't listen
-                    await asyncio.sleep(self._speaking_until - now)
-                    continue
-
-                wav, peak = await self._robot.listen(self._window_s)
-                if peak < self._speech_peak:
-                    continue  # silence — cheap skip, no STT
+                in_barge = False
+                if now < self._speaking_until:  # robot is talking
+                    if not self._barge_in:
+                        await asyncio.sleep(self._speaking_until - now)
+                        continue
+                    # U54: barge-in — keep listening in short windows; only a
+                    # clearly-louder voice counts (filters the robot's own echo).
+                    wav, peak = await self._robot.listen(min(2.0, self._window_s))
+                    if peak < self._speech_peak * self._barge_factor:
+                        continue
+                    self._speaking_until = 0.0  # user interrupted → stop waiting
+                    self._followup_until = time.monotonic() + self._followup_s
+                    in_barge = True
+                else:
+                    wav, peak = await self._robot.listen(self._window_s)
+                    if peak < self._speech_peak:
+                        continue  # silence — cheap skip, no STT
 
                 text = (await voice.transcribe(wav, filename="robot.wav") or "").strip()
                 if not is_plausible_command(text):
@@ -150,7 +168,7 @@ class VoiceLoop:
                         logger.debug("voice loop ignored implausible transcript: %r", text)
                     continue
 
-                in_followup = time.monotonic() < self._followup_until
+                in_followup = in_barge or time.monotonic() < self._followup_until
                 command = self._extract_command(text, in_followup)
                 if command is None:
                     continue
