@@ -129,9 +129,13 @@ class SpotifyMusic:
                 "TO ACTUALLY START MUSIC NOW: call launch_app with name 'spotify' "
                 "(if it isn't open yet), then call media_control with action "
                 "'play_pause' — that presses Play on the desktop Spotify app. "
-                f"Choosing {target} specifically or {what} by name needs a "
-                "SPOTIFY_ACCESS_TOKEN; if the user wants that, tell them so. "
-                "Do NOT claim music is playing until after media_control."
+                "IMPORTANT HONESTY RULES for your reply to the user: (1) the "
+                "media key only RESUMES whatever was already queued in Spotify — "
+                f"you have NO control over WHICH music plays, so NEVER claim "
+                f"that {what} or {target} is playing. (2) Say exactly this: you "
+                "pressed play on Spotify, and that picking favorites/playlists/"
+                "speakers needs the Spotify connection (Settings → Connections "
+                "→ Spotify/Sonos)."
             )
         try:
             device_id = await self._find_device_id(device)

@@ -147,3 +147,50 @@ async def test_soft_echo_does_not_barge_in(loop_env) -> None:
 
     assert pipeline.commands == []
     assert time.monotonic() < vl._speaking_until  # still in the speaking window
+
+
+async def test_followup_chain_caps_self_conversation(loop_env, monkeypatch) -> None:
+    """U67: music/lyrics near the mic must not talk to Richie forever —
+    after FOLLOWUP_CHAIN_MAX wake-word-less turns the wake word is required."""
+    monkeypatch.setenv("FOLLOWUP_CHAIN_MAX", "2")
+    monkeypatch.setenv("BARGE_IN", "false")
+    robot = _ScriptedRobot(peaks=[0.5])  # 'speech' every window (music playing)
+    pipeline = _Pipeline()
+    vl = VoiceLoop(robot, pipeline, _Bus(), speech_peak=0.03, followup_s=30.0)
+
+    async def fake_transcribe(_wav, filename="") -> str:
+        return "kommen von Nordmeer über"  # lyrics, no wake word
+
+    from aura_brain import voice
+    monkeypatch.setattr(voice, "transcribe", fake_transcribe)
+
+    # Simulate the conversation flow: reply → follow-up window → lyric turn.
+    vl._speaking_until = 0.0
+    vl.note_spoken("x")            # turn 1 reply → window opens (chain 0)
+    assert vl._followup_until > 0
+
+    task = asyncio.create_task(vl._run())
+    try:
+        for _ in range(300):
+            if len(pipeline.commands) >= 1:
+                break
+            await asyncio.sleep(0.01)
+        vl._speaking_until = 0.0   # skip echo-guard wait in the test
+        vl.note_spoken("y")        # turn 2 reply (chain 1) → window still opens
+        vl._speaking_until = 0.0
+        for _ in range(300):
+            if len(pipeline.commands) >= 2:
+                break
+            await asyncio.sleep(0.01)
+        vl._speaking_until = 0.0
+        vl.note_spoken("z")        # chain hit the cap → NO new window
+        vl._speaking_until = 0.0
+        assert vl._followup_until == 0.0
+        # More lyrics arrive but there's no follow-up window and no wake word:
+        before = len(pipeline.commands)
+        await asyncio.sleep(0.2)
+        assert len(pipeline.commands) == before  # the self-conversation stopped
+    finally:
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
