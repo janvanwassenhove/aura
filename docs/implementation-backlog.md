@@ -165,7 +165,7 @@ the human can unblock it.
 - [x] **U43 — desktop media control (Windows media-toetsen)** · deps: U40 · `d47bd6f`
   `media_control` orchestrator-tool: stuurt de Windows media/volume-toetsen (play_pause/next/previous/stop/volume/mute) via ctypes keybd_event → bedient de ECHTE draaiende app (Spotify/browser), geen token nodig; graceful op niet-Windows. Work+home-mode. Spotify-launcher default via `explorer.exe spotify:` (URI-protocol, geen exe-pad nodig). "volgende track" live geverifieerd (toets verzonden); "open Spotify + play" = launch_app (approval) → media_control. Orchestrator 150 (4 nieuw), policies 6 groen.
 
-- [x] **U44 — splash-encoding, restart-badge UX, audio-VU-meter** · deps: U40 · `<hash>`
+- [x] **U44 — splash-encoding, restart-badge UX, audio-VU-meter** · deps: U40 · `0ccd410`
   (1) Splash: `data:text/html;charset=utf-8` + `&hellip;`/`&middot;` entities → geen mojibake ("startingâ€¦" fix). (2) Restart-badges: gestures + maintenance nu LIVE toggelbaar (hooks: gesture-detector attach/detach; maintenance-loop start/stop) — alleen recognition blijft restart; badge toont nu enkel bij een openstaande wijziging (client `pending`), niet permanent. (3) Audio: live VU-meter (WebAudio AnalyserNode, RMS→12 balkjes) tijdens opname + "no sound yet"-hint → je ZIET dat de mic hoort. Brain 86, console 56 groen; live geverifieerd (gestures/maintenance applied_live=true).
 
 ## Progress log (append-only; newest last)
