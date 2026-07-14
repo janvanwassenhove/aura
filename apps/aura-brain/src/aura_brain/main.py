@@ -197,10 +197,20 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     )
 
     # U20: outbound dev-agent tool (gated by DEV_AGENT_ENABLED env var).
-    if os.environ.get("DEV_AGENT_ENABLED", "false").lower() == "true":
-        from orchestrator.dev_agent import DevAgentTool
+    from orchestrator.dev_agent import DevAgentTool
 
-        ctx.pipeline._dev_agent = DevAgentTool(approval_mgr, ctx.bus)
+    def _apply_dev_agent(enabled: bool) -> None:
+        ctx.pipeline._dev_agent = DevAgentTool(approval_mgr, ctx.bus) if enabled else None
+
+    _apply_dev_agent(os.environ.get("DEV_AGENT_ENABLED", "false").lower() == "true")
+
+    # U40: capabilities center — live-apply hooks for the toggles.
+    from aura_brain import capabilities_api
+
+    capabilities_api.set_live_hook("dev_agent", _apply_dev_agent)
+    # speak_replies + app_launch read the env per use → toggling env is enough.
+    capabilities_api.set_live_hook("speak_replies", lambda _on: None)
+    capabilities_api.set_live_hook("app_launch", lambda _on: None)
 
     # U19e: judgment/anticipation layer — injects minimal personal context per turn.
     from shared_schemas.knowledge import JudgmentLayer
@@ -230,17 +240,26 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     )
     ctx._robot_bridge.start()
 
+    # U40: follow-me toggle applies live via the robot proxy.
+    def _apply_follow_me(enabled: bool) -> None:
+        import asyncio as _asyncio
+
+        _asyncio.ensure_future(_robot.set_tracking(enabled))
+
+    capabilities_api.set_live_hook("follow_me", _apply_follow_me)
+
     # U36: EMBODIMENT — every assistant reply is spoken out loud on the robot
     # with a gesture matched to the content (greeting→wave, question→tilt,
     # excitement→gesture, default→nod). Toggle with SPEAK_REPLIES=false.
     from aura_brain import voice
     from aura_brain.embodiment import gesture_for
 
-    _speak_replies = os.environ.get("SPEAK_REPLIES", "true").lower() == "true"
-
     async def _embody_reply(event: ResponseDrafted) -> None:
         text = (event.response_text or "").strip()
-        if not _speak_replies or not text or text.startswith("[echo]"):
+        # Read the flag per reply so the Capabilities toggle applies live.
+        if os.environ.get("SPEAK_REPLIES", "true").lower() != "true":
+            return
+        if not text or text.startswith("[echo]"):
             return
         try:
             audio_b64 = await voice.synthesize_b64(text[:600])  # cap TTS cost
@@ -497,6 +516,9 @@ def create_app() -> FastAPI:
 
     from aura_brain import voice_api
     app.include_router(voice_api.router)  # U36e: console mic → voice turn
+
+    from aura_brain import capabilities_api
+    app.include_router(capabilities_api.router)  # U40: permissions center
 
     return app
 

@@ -69,6 +69,9 @@ function brainEnv() {
   // Laptop tools (U36g): the dev agent can read code freely and run tasks;
   // every write/commit/push still pops the approval dialog in this app.
   env.DEV_AGENT_ENABLED = env.DEV_AGENT_ENABLED || 'true'
+  // U40: pre-register safe desktop apps AURA may launch on request (each still
+  // asks for approval). Owner extends this via ALLOWED_APPS in .env.
+  env.ALLOWED_APPS = env.ALLOWED_APPS || 'vscode=code;code=code;notepad=notepad'
   return env
 }
 

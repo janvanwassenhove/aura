@@ -4,6 +4,7 @@
       :ws-status="wsStatus"
       @open-knowledge="showKnowledge = true"
       @open-settings="showSettings = true"
+      @open-capabilities="showCapabilities = true"
     />
 
     <!-- Approval overlay (rendered on top of everything) -->
@@ -14,6 +15,9 @@
 
     <!-- Knowledge transparency modal (ADR-008 §8: inspect/edit/erase profiles) -->
     <KnowledgePanel v-if="showKnowledge" @close="showKnowledge = false" />
+
+    <!-- Capabilities / permissions center (U40) -->
+    <CapabilitiesPanel v-if="showCapabilities" @close="showCapabilities = false" />
 
     <!-- Main grid: 3 columns -->
     <main class="app-grid">
@@ -37,12 +41,14 @@ import EventLogPanel from './components/EventLogPanel.vue'
 import ApprovalPanel from './components/ApprovalPanel.vue'
 import SettingsPanel from './components/SettingsPanel.vue'
 import KnowledgePanel from './components/KnowledgePanel.vue'
+import CapabilitiesPanel from './components/CapabilitiesPanel.vue'
 import { useEventBusWs } from './composables/useEventBusWs'
 import { useThemeStore } from './stores/themeStore'
 
 const { wsStatus, connect } = useEventBusWs()
 const showSettings = ref(false)
 const showKnowledge = ref(false)
+const showCapabilities = ref(false)
 const themeStore = useThemeStore()
 
 onMounted(() => {

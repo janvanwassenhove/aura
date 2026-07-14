@@ -17,6 +17,9 @@
     <div class="titlebar-drag" />
 
     <div class="titlebar-right">
+      <button class="titlebar-btn" title="Capabilities & permissions" @click="$emit('open-capabilities')">
+        <ShieldCheck :size="16" />
+      </button>
       <button class="titlebar-btn" title="Knowledge" @click="$emit('open-knowledge')">
         <Brain :size="16" />
       </button>
@@ -42,12 +45,12 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { onMounted } from 'vue'
-import { Bot, Brain, Cpu, Minus, Settings, Square, X } from 'lucide-vue-next'
+import { Bot, Brain, Cpu, Minus, Settings, ShieldCheck, Square, X } from 'lucide-vue-next'
 import { useRobotStore } from '../stores/robotStore'
 import { usePrefsStore } from '../stores/prefsStore'
 
 const props = defineProps<{ wsStatus: 'connecting' | 'open' | 'closed' }>()
-defineEmits<{ 'open-knowledge': []; 'open-settings': [] }>()
+defineEmits<{ 'open-knowledge': []; 'open-settings': []; 'open-capabilities': [] }>()
 
 const robotStore = useRobotStore()
 const prefsStore = usePrefsStore()

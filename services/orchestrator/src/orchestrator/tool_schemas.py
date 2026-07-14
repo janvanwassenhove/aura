@@ -99,6 +99,15 @@ TOOL_SCHEMAS: dict[str, dict] = {
             "due_at": {"type": "string", "description": "ISO-8601 due datetime."},
         }, "required": ["text", "due_at"]},
     ),
+    "launch_app": _fn(
+        "launch_app",
+        "Launch an allow-listed desktop app on the owner's laptop by its "
+        "registered name (e.g. 'vscode', 'spotify'). Only pre-approved apps "
+        "can be started, and each launch asks the owner for approval.",
+        {"type": "object", "properties": {
+            "name": {"type": "string", "description": "Registered app name."},
+        }, "required": ["name"], "additionalProperties": False},
+    ),
     "open_in_vscode": _fn(
         "open_in_vscode",
         "Open a file (optionally at a line) or a folder in VS Code on the "
