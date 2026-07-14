@@ -79,6 +79,10 @@ class RobotClient:
     async def set_tracking(self, enabled: bool) -> dict:
         return (await self._request("POST", "/robot/tracking", {"enabled": enabled})).json()
 
+    async def set_body_follow(self, enabled: bool) -> dict:
+        """U37: torso turns with the tracked face (automatic body yaw)."""
+        return (await self._request("POST", "/robot/body_follow", {"enabled": enabled})).json()
+
     async def listen(self, duration_s: float = 5.0) -> tuple[bytes, float]:
         """Record from the robot's mic. Returns (16 kHz mono WAV, raw peak).
 

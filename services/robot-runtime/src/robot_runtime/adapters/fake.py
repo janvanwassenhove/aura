@@ -41,6 +41,16 @@ class FakeRobotAdapter(RobotAdapter):
         self._played_audio: list[bytes] = []
         self._motions: list[MotionCommand] = []
         self._volume = 0.8
+        self._tracking = False
+        self._body_follow = False
+
+    async def set_tracking(self, enabled: bool) -> bool:
+        self._tracking = enabled
+        return enabled
+
+    async def set_body_follow(self, enabled: bool) -> bool:
+        self._body_follow = enabled
+        return enabled
 
     def set_volume(self, level: float) -> float:
         self._volume = max(0.0, min(1.0, level))

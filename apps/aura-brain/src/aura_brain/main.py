@@ -260,6 +260,14 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     capabilities_api.set_live_hook("follow_me", _apply_follow_me)
 
+    # U37: body-yaw follow — the torso turns with the tracked face.
+    def _apply_body_follow(enabled: bool) -> None:
+        import asyncio as _asyncio
+
+        _asyncio.ensure_future(_robot.set_body_follow(enabled))
+
+    capabilities_api.set_live_hook("body_follow", _apply_body_follow)
+
     # U36: EMBODIMENT — every assistant reply is spoken out loud on the robot
     # with a gesture matched to the content (greeting→wave, question→tilt,
     # excitement→gesture, default→nod). Toggle with SPEAK_REPLIES=false.

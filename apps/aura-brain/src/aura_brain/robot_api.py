@@ -96,6 +96,15 @@ async def tracking(body: dict) -> JSONResponse:
         return _unavailable(exc)
 
 
+@router.post("/body_follow")
+async def body_follow(body: dict) -> JSONResponse:
+    """U37: torso turns with the tracked face."""
+    try:
+        return JSONResponse(await _robot.set_body_follow(bool(body.get("enabled", True))))
+    except (httpx.HTTPError, OSError) as exc:
+        return _unavailable(exc)
+
+
 @router.get("/volume")
 async def get_volume() -> JSONResponse:
     try:

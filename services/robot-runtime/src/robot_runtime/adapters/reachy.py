@@ -84,6 +84,7 @@ class ReachyRobotAdapter(RobotAdapter):
         # Whether follow-me head tracking is active. Motions pause it so they
         # play at full amplitude, then resume it (U38-fix).
         self._tracking_on = False
+        self._body_follow = False  # U37: torso turns with the tracked face
         # Raw (pre-normalization) peak of the last mic capture — lets the voice
         # loop tell silence from speech cheaply, without transcribing (U47).
         self._last_raw_peak = 0.0
@@ -106,6 +107,8 @@ class ReachyRobotAdapter(RobotAdapter):
         def _toggle() -> None:
             if enabled:
                 self._mini.start_head_tracking()
+                if self._body_follow:  # re-apply torso follow with tracking
+                    self._mini.set_automatic_body_yaw(True)
             else:
                 self._mini.stop_head_tracking()
                 self._mini.goto_target(head=_NEUTRAL, duration=1.0)
@@ -113,6 +116,23 @@ class ReachyRobotAdapter(RobotAdapter):
         async with self._motion_lock:
             await asyncio.to_thread(_toggle)
         self._tracking_on = enabled
+        return enabled
+
+    async def set_body_follow(self, enabled: bool) -> bool:
+        """U37: turn the torso along with the face. The SDK's head tracking only
+        moves the neck (mechanically limited); automatic body yaw makes the
+        daemon rotate the body toward the tracked face as well."""
+        if self._mini is None:
+            raise RuntimeError("not connected")
+
+        def _apply() -> None:
+            self._mini.set_automatic_body_yaw(enabled)
+            if not enabled:
+                self._mini.set_target_body_yaw(0.0)  # settle the torso forward
+
+        async with self._motion_lock:
+            await asyncio.to_thread(_apply)
+        self._body_follow = enabled
         return enabled
 
     # ------------------------------------------------------------------
@@ -150,6 +170,14 @@ class ReachyRobotAdapter(RobotAdapter):
                     self._tracking_on = True
                 except Exception as exc:  # noqa: BLE001
                     logger.warning("head tracking not started: %s", exc)
+                # U37: BODY_FOLLOW — the daemon also rotates the torso toward
+                # the tracked face (head tracking alone only moves the neck).
+                if os.environ.get("BODY_FOLLOW", "false").lower() == "true":
+                    try:
+                        mini.set_automatic_body_yaw(True)
+                        self._body_follow = True
+                    except Exception as exc:  # noqa: BLE001
+                        logger.warning("body follow not started: %s", exc)
             return mini
 
         self._mini = await asyncio.to_thread(_open)
