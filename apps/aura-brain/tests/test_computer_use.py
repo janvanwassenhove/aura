@@ -261,3 +261,47 @@ async def test_provider_ladder_prefers_anthropic_then_openai(monkeypatch) -> Non
 
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     assert cu.create_default_agent() is None
+
+
+# ── U70: coordinate-safe scaling on big monitors ─────────────────────────
+
+from aura_brain.computer_use import ScaledBackend
+
+
+class _BigScreenBackend(FakeBackend):
+    def __init__(self) -> None:
+        super().__init__(size=(3440, 1440))
+
+    def screenshot(self) -> bytes:
+        # Real PNG so PIL can resize it.
+        import io
+        from PIL import Image
+        buf = io.BytesIO()
+        Image.new("RGB", (3440, 1440), (30, 30, 30)).save(buf, format="PNG")
+        self.calls.append(("screenshot",))
+        return buf.getvalue()
+
+
+def test_scaled_backend_downscales_view_and_upscales_clicks() -> None:
+    inner = _BigScreenBackend()
+    sb = ScaledBackend(inner, max_dim=1456)
+    w, h = sb.size()
+    assert w == 1456 and h == round(1440 * 1456 / 3440)  # model sees ≤1456px
+    sb.click(728, 305)  # model clicks the center of what IT sees
+    kind, x, y, *_ = inner.calls[-1]
+    assert kind == "click"
+    assert abs(x - 1720) <= 2 and abs(y - 720) <= 3  # lands on the real center
+
+    import io
+    from PIL import Image
+    img = Image.open(io.BytesIO(sb.screenshot()))
+    assert img.size == (w, h)  # the screenshot really is downscaled
+
+
+def test_scaled_backend_is_noop_on_small_screens() -> None:
+    inner = FakeBackend(size=(1280, 800))
+    sb = ScaledBackend(inner, max_dim=1456)
+    assert sb.size() == (1280, 800)
+    sb.click(100, 200)
+    assert ("click", 100, 200, "left", 1) in inner.calls
+    assert sb.screenshot() == FakeBackend.PNG  # untouched bytes

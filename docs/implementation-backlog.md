@@ -219,6 +219,9 @@ the human can unblock it.
 - [x] **U69 — music guard: lyrics kunnen géén gesprek meer worden** · `pending`
   Structurele fix bovenop U67 (die was nog niet herstart bij het NOFX-incident): zodra AURA zelf muziek start/bedient (ToolCallSucceeded op play_music/media_control/next_track → `note_music_started()`), gaan follow-up-vensters volledig uit voor MUSIC_GUARD_S (default 180s) — alleen het wake-word komt er nog doorheen (lyrics bevatten zelden "Richie"; getest dat wake-word-commando's blijven werken tijdens de guard). Plus promptfix in LADDER_NOTE: "je KUNT Spotify openen — claim nooit van niet; bij een muziekvraag HANDEL (launch + play) i.p.v. doorvragen, en rapporteer eerlijk wat je niet kon kiezen" (tegen het tegenstrijdige 'kan niet openen'/'open ik toch'-gedrag). Brain 139 (+2), orchestrator 187 groen.
 
+- [x] **U70 — Computer Use werkend gemaakt: pyautogui + schaal-laag + nummer-via-scherm** · `pending`
+  (1) Warning "No module named 'pyautogui'" → pyautogui in de venv geïnstalleerd (`uv pip install pyautogui`; backend live geverifieerd, scherm 3440×1440). (2) `ScaledBackend`: het model ziet screenshots op max COMPUTER_USE_MAX_DIM=1456px (vision-modellen herschalen ultrawide-screenshots intern → kliks zaten ernaast); kliks/drags/scrolls worden terug omhooggeschaald naar echte pixels; no-op op kleine schermen. (3) LADDER_NOTE: een specifiek nummer kiezen MAG via use_computer (Spotify openen, op het scherm zoeken, afspelen) — legitiem GUI-gebruik omdat geen lagere laag een specifiek nummer kan selecteren; approval blijft per gebruik. Brain 141 (+2), orchestrator 187 groen.
+
 ## Progress log (append-only; newest last)
 
 - 2026-06-21 — ledger created on `aura-autobuild`; Phase 0/0b complete, Phase 1 scaffold (U-pre) done before this loop started.
