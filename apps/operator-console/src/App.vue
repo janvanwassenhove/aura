@@ -2,9 +2,11 @@
   <div class="app-layout">
     <TitleBar
       :ws-status="wsStatus"
-      @open-knowledge="showBrain = true"
+      @open-knowledge="layoutStore.openRight('brain')"
       @open-settings="showSettings = true"
       @open-capabilities="showCapabilities = true"
+      @toggle-left="layoutStore.showLeft = !layoutStore.showLeft"
+      @toggle-right="layoutStore.showRight = !layoutStore.showRight"
     />
 
     <!-- Approval overlay (rendered on top of everything) -->
@@ -16,24 +18,38 @@
     <!-- Settings modal (LLM + Connections + Appearance tabs) -->
     <SettingsPanel v-if="showSettings" @close="showSettings = false" />
 
-    <!-- U72: commercial brain view — skills library + per-person brain -->
-    <BrainPanel v-if="showBrain" @close="showBrain = false"
-                @open-knowledge="showBrain = false; showKnowledge = true" />
-
     <!-- Knowledge transparency modal (ADR-008 §8: inspect/edit/erase profiles) -->
     <KnowledgePanel v-if="showKnowledge" @close="showKnowledge = false" />
 
     <!-- Capabilities / permissions center (U40) -->
     <CapabilitiesPanel v-if="showCapabilities" @close="showCapabilities = false" />
 
-    <!-- Main grid: 3 columns -->
-    <main class="app-grid">
-      <div class="left-col">
+    <!-- U76: VS Code-like workspace — toggleable, resizable docks -->
+    <main class="workspace">
+      <div v-if="layoutStore.showLeft" class="ws-left" :style="{ width: layoutStore.leftWidth + 'px' }">
         <RobotPanel />
         <VideoPanel />
       </div>
-      <ConversationPanel />
-      <EventLogPanel />
+      <div v-if="layoutStore.showLeft" class="ws-splitter" title="Drag to resize"
+           @pointerdown="startDrag('left', $event)" />
+      <div class="ws-center">
+        <ConversationPanel />
+      </div>
+      <div v-if="layoutStore.showRight" class="ws-splitter" title="Drag to resize"
+           @pointerdown="startDrag('right', $event)" />
+      <aside v-if="layoutStore.showRight" class="ws-right" :style="{ width: layoutStore.rightWidth + 'px' }">
+        <div class="ws-tabs" role="tablist">
+          <button role="tab" :class="['ws-tab', layoutStore.rightTab === 'brain' && 'ws-tab--active']"
+                  @click="layoutStore.rightTab = 'brain'">Brain</button>
+          <button role="tab" :class="['ws-tab', layoutStore.rightTab === 'events' && 'ws-tab--active']"
+                  @click="layoutStore.rightTab = 'events'">Events</button>
+        </div>
+        <div class="ws-right-body">
+          <BrainPanel v-if="layoutStore.rightTab === 'brain'" docked
+                      @open-knowledge="showKnowledge = true" />
+          <EventLogPanel v-else />
+        </div>
+      </aside>
     </main>
   </div>
 </template>
@@ -52,6 +68,7 @@ import KnowledgePanel from './components/KnowledgePanel.vue'
 import CapabilitiesPanel from './components/CapabilitiesPanel.vue'
 import SetupWizard from './components/SetupWizard.vue'
 import { useEventBusWs } from './composables/useEventBusWs'
+import { useLayoutStore } from './stores/layoutStore'
 import { useNavStore } from './stores/navStore'
 import { useSetupStore } from './stores/setupStore'
 import { useThemeStore } from './stores/themeStore'
@@ -59,15 +76,34 @@ import { useThemeStore } from './stores/themeStore'
 const { wsStatus, connect } = useEventBusWs()
 const showSettings = ref(false)
 const showKnowledge = ref(false)
-const showBrain = ref(false)
+const layoutStore = useLayoutStore()
+
+// U76: draggable splitters (VS Code-style resize).
+function startDrag(side: 'left' | 'right', ev: PointerEvent): void {
+  ev.preventDefault()
+  const startX = ev.clientX
+  const startW = side === 'left' ? layoutStore.leftWidth : layoutStore.rightWidth
+  const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v))
+  const move = (e: PointerEvent) => {
+    const dx = e.clientX - startX
+    if (side === 'left') layoutStore.leftWidth = clamp(startW + dx, 220, 560)
+    else layoutStore.rightWidth = clamp(startW - dx, 280, 900)
+  }
+  const up = () => {
+    window.removeEventListener('pointermove', move)
+    window.removeEventListener('pointerup', up)
+  }
+  window.addEventListener('pointermove', move)
+  window.addEventListener('pointerup', up)
+}
 const showCapabilities = ref(false)
 const showWizard = ref(false)
 const themeStore = useThemeStore()
 const setupStore = useSetupStore()
 const navStore = useNavStore()
 
-// U68: [[wikilink]] navigation — links open the right panel.
-watch(() => navStore.knowledgeRequest, (r) => { if (r) showBrain.value = true })
+// U68: [[wikilink]] navigation — links open the right dock / settings.
+watch(() => navStore.knowledgeRequest, (r) => { if (r) layoutStore.openRight('brain') })
 watch(() => navStore.skillsRequest, (r) => { if (r) showSettings.value = true })
 
 onMounted(async () => {
@@ -109,15 +145,37 @@ body {
 
 .app-layout { display: flex; flex-direction: column; height: 100vh; background: var(--bg); color: var(--text); }
 
-.app-grid {
-  display: grid;
-  grid-template-columns: 300px 1fr 320px;
-  gap: 1rem;
-  padding: 1rem;
+.workspace {
+  display: flex;
+  padding: 0.8rem;
+  gap: 0;
   flex: 1;
   min-height: 0;
 }
-.left-col { display: flex; flex-direction: column; min-height: 0; overflow-y: auto; }
+.ws-left { display: flex; flex-direction: column; min-height: 0; overflow-y: auto; flex-shrink: 0; }
+.ws-center { flex: 1; min-width: 20rem; min-height: 0; display: flex; flex-direction: column; }
+.ws-center > * { flex: 1; min-height: 0; }
+.ws-right {
+  flex-shrink: 0; min-height: 0; display: flex; flex-direction: column;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+.ws-splitter {
+  width: 9px; cursor: col-resize; flex-shrink: 0; position: relative;
+}
+.ws-splitter::after {
+  content: ''; position: absolute; inset: 0 3px;
+  border-radius: 2px; transition: background 0.12s;
+}
+.ws-splitter:hover::after { background: var(--accent); opacity: 0.55; }
+.ws-tabs { display: flex; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.ws-tab {
+  padding: 0.45rem 0.9rem; background: none; border: none; cursor: pointer;
+  color: var(--text-faint); font-size: 0.78rem; border-bottom: 2px solid transparent;
+}
+.ws-tab--active { color: var(--text); border-bottom-color: var(--accent); }
+.ws-right-body { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+.ws-right-body > * { flex: 1; min-height: 0; }
 
 .panel {
   background: var(--surface);
