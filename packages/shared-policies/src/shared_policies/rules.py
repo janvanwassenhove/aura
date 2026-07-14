@@ -15,6 +15,8 @@ APPROVAL_REQUIRED: frozenset[str] = frozenset(
         "launch_app",  # starting an app on the laptop always asks the owner
         "use_computer",  # screenshot + mouse/keyboard control always asks the owner
         "open_browser_url",  # navigating the owner's browser always asks
+        "run_powershell",  # arbitrary shell — always asks, per command
+        "write_file",  # writing to disk always asks
     }
 )
 
@@ -26,6 +28,10 @@ MODE_TOOL_MAP: dict[str, frozenset[str]] = {
             "run_dev_task",
             "use_computer",
             "open_in_vscode",
+            "run_powershell",
+            "read_file",
+            "write_file",
+            "git_prepare",
             "list_browser_tabs",
             "open_browser_url",
             "launch_app",

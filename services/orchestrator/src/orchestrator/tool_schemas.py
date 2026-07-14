@@ -145,6 +145,42 @@ TOOL_SCHEMAS: dict[str, dict] = {
             "line": {"type": "integer", "description": "1-based line number (optional)."},
         }, "required": ["path"], "additionalProperties": False},
     ),
+    "run_powershell": _fn(
+        "run_powershell",
+        "Run one PowerShell command on the owner's laptop (CLI layer). "
+        "Sensitive — requires owner approval per command. Prefer a dedicated "
+        "tool/API when one exists; prefer this over file writes or GUI control.",
+        {"type": "object", "properties": {
+            "command": {"type": "string", "description": "The PowerShell command."},
+            "working_dir": {"type": "string", "description": "Directory to run in (optional)."},
+        }, "required": ["command"], "additionalProperties": False},
+    ),
+    "read_file": _fn(
+        "read_file",
+        "Read a text file on the owner's laptop (file-system layer, read-only, "
+        "restricted to allowed roots). Free to use for analysis.",
+        {"type": "object", "properties": {
+            "path": {"type": "string", "description": "File path to read."},
+        }, "required": ["path"], "additionalProperties": False},
+    ),
+    "write_file": _fn(
+        "write_file",
+        "Write/overwrite a text file on the owner's laptop (file-system layer, "
+        "restricted to allowed roots). Sensitive — requires owner approval.",
+        {"type": "object", "properties": {
+            "path": {"type": "string", "description": "File path to write."},
+            "content": {"type": "string", "description": "Full new file content."},
+        }, "required": ["path", "content"], "additionalProperties": False},
+    ),
+    "git_prepare": _fn(
+        "git_prepare",
+        "Read-only git inspection to PREPARE actions: status, diff, diff_staged, "
+        "log. Committing/pushing goes through run_dev_task (approval-tiered).",
+        {"type": "object", "properties": {
+            "action": {"type": "string", "enum": ["status", "diff", "diff_staged", "log"]},
+            "working_dir": {"type": "string", "description": "Repo directory (optional)."},
+        }, "required": ["action"], "additionalProperties": False},
+    ),
     "list_browser_tabs": _fn(
         "list_browser_tabs",
         "List the open tabs (title + url) in the owner's Chrome browser. "
@@ -214,6 +250,33 @@ TOOL_SCHEMAS: dict[str, dict] = {
         },
     ),
 }
+
+
+# U58: automation-ladder layer per tool. The agent must always use the most
+# reliable layer available: api → cli → fs → browser → gui. GUI (Computer Use)
+# is the emergency exit, not the front door. Unlisted tools default to "api".
+TOOL_LAYERS: dict[str, str] = {
+    "run_dev_task": "cli",
+    "run_powershell": "cli",
+    "open_in_vscode": "cli",
+    "launch_app": "cli",
+    "media_control": "cli",
+    "read_file": "fs",
+    "write_file": "fs",
+    "git_prepare": "cli",
+    "list_browser_tabs": "browser",
+    "open_browser_url": "browser",
+    "use_computer": "gui",
+}
+
+LADDER_NOTE = (
+    "AUTOMATION LADDER — always pick the MOST RELIABLE layer that can do the "
+    "job: 1) api (connectors like calendar/mail/music), 2) cli (run_dev_task, "
+    "run_powershell, git_prepare, launch_app), 3) fs (read_file/write_file), "
+    "4) browser (list_browser_tabs/open_browser_url), 5) gui (use_computer — "
+    "the emergency exit, ONLY when no lower layer can possibly do it, and say "
+    "why). Escalate one step at a time; never start at the GUI."
+)
 
 
 def build_tool_specs(allowed_tools: frozenset[str]) -> list[dict]:
