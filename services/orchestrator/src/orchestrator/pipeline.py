@@ -421,6 +421,30 @@ class OrchestratorPipeline:
         await self._bus.publish(ResponseDrafted(session_id=session_id, response_text=reply))
         return reply
 
+    async def _save_skill(self, arguments: dict) -> str:
+        """U60 self-training: persist an owner-approved skill (gate fired upstream)."""
+        if self._skills is None:
+            return "[save_skill: skills are not configured on this install]"
+        from orchestrator.skills import Skill
+
+        name = str(arguments.get("name", "")).strip().lower()
+        existing = self._skills.get(name)
+        try:
+            skill = Skill(
+                name=name,
+                description=str(arguments.get("description", "")).strip(),
+                triggers=[str(t).strip().lower() for t in arguments.get("triggers", []) if str(t).strip()],
+                personas=[str(p).strip().lower() for p in arguments.get("personas", []) if str(p).strip()],
+                person=str(arguments.get("person", "")).strip(),
+                body=str(arguments.get("body", "")),
+            )
+            self._skills.save(skill)
+        except ValueError as exc:
+            return f"[save_skill: {exc}]"
+        verb = "Updated" if existing else "Learned new"
+        scope = f" for {skill.person}" if skill.person else ""
+        return f"{verb} skill '{skill.name}'{scope} — I'll follow it from now on."
+
     async def _final_answer(self, messages: list[dict], timing: dict,
                             tool_messages: list[dict] | None) -> str:
         """One tool-less synthesis call (stop / budget-exhausted paths)."""
@@ -511,6 +535,8 @@ class OrchestratorPipeline:
                     result_text = await self._computer_use.run(
                         arguments.get("goal", ""), session_id,
                     )
+            elif tool_name == "save_skill":
+                result_text = await self._save_skill(arguments)
             elif tool_name == "run_powershell":
                 result_text = await laptop_tools.run_powershell(
                     arguments.get("command", ""), arguments.get("working_dir"),

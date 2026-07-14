@@ -140,11 +140,16 @@ class SkillStore:
         """The skills section for the system prompt: full body for relevant
         skills (capped), one-line mentions for the rest."""
         skills = self.all()
+        training_note = (
+            "SELF-TRAINING: when the owner corrects your approach or shows you "
+            "their way of working, propose saving it with the save_skill tool "
+            "(the owner approves every write)."
+        )
         if not skills:
-            return ""
+            return training_note
         relevant = self.relevant(text, persona, person_id)[:_MAX_INJECTED]
         lines = ["SKILLS — procedures the owner taught you. Follow a relevant "
-                 "skill exactly; mention which skill you're using."]
+                 "skill exactly; mention which skill you're using. " + training_note]
         for s in relevant:
             lines.append(f"\n## Skill: {s.name} — {s.description}\n{s.body[:_MAX_BODY]}")
         others = [s for s in skills if s.enabled and s not in relevant]

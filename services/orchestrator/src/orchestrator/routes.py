@@ -155,6 +155,28 @@ async def agent_stop(body: dict | None = None) -> JSONResponse:
     return JSONResponse({"stopping": True, "session_id": session_id})
 
 
+@router.post("/orchestrator/agent/feedback")
+async def agent_feedback(body: dict) -> JSONResponse:
+    """U60 teach-mode: owner feedback on the agent's work. Runs a turn framed
+    as a lesson — the agent decides whether it should become a skill (via the
+    approval-gated save_skill tool) and replies with what it learned."""
+    if _pipeline is None:
+        return JSONResponse({"error": "pipeline not ready"}, status_code=503)
+    text = str((body or {}).get("text", "")).strip()
+    if not text:
+        return JSONResponse({"error": "text is required"}, status_code=422)
+    session_id = str((body or {}).get("session_id", "default"))
+    framed = (
+        "[TEACHING MOMENT — the owner is training you] The owner says: "
+        f"\"{text}\". Reflect on your recent work in this conversation. If this "
+        "is a reusable way of working, save it with save_skill (scoped to the "
+        "right person/personas, with good triggers). Then confirm in one or two "
+        "sentences what you learned and when you'll apply it."
+    )
+    reply = await _pipeline.orchestrate(framed, session_id)
+    return JSONResponse({"reply": reply, "session_id": session_id})
+
+
 @router.get("/orchestrator/config/llm", response_model=LLMConfigResponse)
 async def get_llm_config() -> LLMConfigResponse:
     """Return the current runtime LLM provider and model."""

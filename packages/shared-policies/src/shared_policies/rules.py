@@ -17,6 +17,7 @@ APPROVAL_REQUIRED: frozenset[str] = frozenset(
         "open_browser_url",  # navigating the owner's browser always asks
         "run_powershell",  # arbitrary shell — always asks, per command
         "write_file",  # writing to disk always asks
+        "save_skill",  # self-training: every skill write is owner-approved
     }
 )
 
@@ -32,6 +33,7 @@ MODE_TOOL_MAP: dict[str, frozenset[str]] = {
             "read_file",
             "write_file",
             "git_prepare",
+            "save_skill",
             "list_browser_tabs",
             "open_browser_url",
             "launch_app",
@@ -76,6 +78,7 @@ MODE_TOOL_MAP: dict[str, frozenset[str]] = {
             "use_computer",
             "list_browser_tabs",
             "open_browser_url",
+            "save_skill",
         }
     ),
     "presentation": frozenset(

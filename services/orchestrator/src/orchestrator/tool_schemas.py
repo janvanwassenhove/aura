@@ -145,6 +145,24 @@ TOOL_SCHEMAS: dict[str, dict] = {
             "line": {"type": "integer", "description": "1-based line number (optional)."},
         }, "required": ["path"], "additionalProperties": False},
     ),
+    "save_skill": _fn(
+        "save_skill",
+        "SELF-TRAINING: save or update a skill — a procedure the owner taught "
+        "you (from feedback, corrections, or a demonstrated way of working). "
+        "Sensitive — the owner approves every skill write and sees exactly "
+        "what you want to store. Scope to a person when it's THEIR way of "
+        "working (digital twin); add triggers so it activates at the right time.",
+        {"type": "object", "properties": {
+            "name": {"type": "string", "description": "kebab-case id, e.g. 'deploy-flow'."},
+            "description": {"type": "string", "description": "One line: what this skill covers."},
+            "body": {"type": "string", "description": "The procedure, step by step."},
+            "triggers": {"type": "array", "items": {"type": "string"},
+                         "description": "Substrings of requests where this applies."},
+            "personas": {"type": "array", "items": {"type": "string"},
+                         "description": "Limit to modes (work/home/presentation)."},
+            "person": {"type": "string", "description": "Person id when it's one person's way of working."},
+        }, "required": ["name", "description", "body"], "additionalProperties": False},
+    ),
     "run_powershell": _fn(
         "run_powershell",
         "Run one PowerShell command on the owner's laptop (CLI layer). "
