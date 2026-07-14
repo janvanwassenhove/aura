@@ -89,9 +89,148 @@ def _write_env(updates: dict[str, str]) -> bool:
 
 @router.get("/status")
 async def status() -> JSONResponse:
+    """U34: everything the onboarding wizard needs to decide what's left."""
+    people_count = 0
+    if _get_store is not None:
+        try:
+            people_count = len(await _get_store().list_people())
+        except Exception:  # noqa: BLE001 — store may be locked
+            people_count = 0
     return JSONResponse({
+        "setup_done": os.environ.get("SETUP_DONE", "false").lower() == "true",
         "encrypted": bool(_already_encrypted and _already_encrypted()),
+        "assistant_name": os.environ.get("ASSISTANT_NAME", "AURA"),
+        "robot_url": os.environ.get("ROBOT_RUNTIME_URL", ""),
+        "voice_mode": os.environ.get("VOICE_MODE", "off"),
+        "llm_provider": os.environ.get("LLM_PROVIDER", "openai"),
+        "openai_key_set": bool(os.environ.get("OPENAI_API_KEY")),
+        "openrouter_key_set": bool(os.environ.get("OPENROUTER_API_KEY")),
+        "gemini_key_set": bool(os.environ.get("GEMINI_API_KEY")),
+        "people_count": people_count,
     })
+
+
+# ── U34: wizard config writer (secrets write-only) ────────────────────
+
+_CONFIG_KEYS = {
+    # body key -> env var; secret keys are never echoed back
+    "robot_url": "ROBOT_RUNTIME_URL",
+    "llm_provider": "LLM_PROVIDER",
+    "llm_model": "LLM_MODEL",
+    "openai_api_key": "OPENAI_API_KEY",
+    "openrouter_api_key": "OPENROUTER_API_KEY",
+    "gemini_api_key": "GEMINI_API_KEY",
+}
+_SECRET_KEYS = {"openai_api_key", "openrouter_api_key", "gemini_api_key"}
+
+
+@router.post("/config")
+async def set_config(body: dict) -> JSONResponse:
+    """Write wizard config to env (+persist). Secrets are write-only: they are
+    stored, never logged and never returned. `setup_done: true` marks the
+    onboarding as finished so the wizard stops appearing."""
+    body = body or {}
+    updates: dict[str, str] = {}
+    for key, env_var in _CONFIG_KEYS.items():
+        value = body.get(key)
+        if value is None:
+            continue
+        value = str(value).strip()
+        if not value:
+            continue
+        updates[env_var] = value
+    if body.get("setup_done") is not None:
+        updates["SETUP_DONE"] = "true" if body["setup_done"] else "false"
+    if not updates:
+        return JSONResponse({"error": "nothing to update"}, status_code=422)
+    os.environ.update(updates)
+    persisted = _write_env(updates)
+    # Apply the LLM switch live (same path as the Settings panel).
+    if "LLM_PROVIDER" in updates:
+        try:
+            from orchestrator.config import update_config
+
+            provider = updates["LLM_PROVIDER"]
+            model = updates.get("LLM_MODEL", "") or {
+                "openrouter": os.environ.get("OPENROUTER_MODEL", "openai/gpt-oss-120b:free"),
+                "gemini": os.environ.get("GEMINI_MODEL", "gemini-2.5-flash"),
+                "echo": "",
+            }.get(provider, os.environ.get("OPENAI_MODEL", "gpt-4o-mini"))
+            update_config(provider, model)
+        except Exception as exc:  # noqa: BLE001 — env is set; live apply is best-effort
+            logger.debug("live LLM apply failed: %s", exc)
+    applied = sorted(k for k in updates if k not in
+                     {_CONFIG_KEYS[s] for s in _SECRET_KEYS})
+    secrets_set = sorted(_CONFIG_KEYS[s] for s in _SECRET_KEYS
+                         if _CONFIG_KEYS[s] in updates)
+    return JSONResponse({
+        "applied": applied,
+        "secrets_set": [s.lower() for s in secrets_set],  # names only, never values
+        "persisted": persisted,
+    })
+
+
+# ── U34: robot connectivity test + discovery ──────────────────────────
+
+
+async def _probe_robot(url: str, timeout: float = 2.5) -> dict:
+    import httpx
+
+    url = url.rstrip("/")
+    try:
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            resp = await client.get(f"{url}/robot/status")
+            resp.raise_for_status()
+            data = resp.json()
+        return {"url": url, "ok": True, "mode": data.get("mode"),
+                "battery_pct": data.get("battery_pct")}
+    except Exception as exc:  # noqa: BLE001 — probe reports, never raises
+        return {"url": url, "ok": False, "error": type(exc).__name__}
+
+
+@router.post("/test-robot")
+async def test_robot(body: dict) -> JSONResponse:
+    url = str((body or {}).get("url", "")).strip() or os.environ.get("ROBOT_RUNTIME_URL", "")
+    if not url:
+        return JSONResponse({"error": "no url given or configured"}, status_code=422)
+    return JSONResponse(await _probe_robot(url))
+
+
+@router.get("/discover")
+async def discover() -> JSONResponse:
+    """Find robot-runtime candidates: configured URL, mDNS name, then a quick
+    /24 subnet sweep on :8001 (sub-second timeouts, bounded concurrency)."""
+    import asyncio
+    import socket
+
+    candidates: list[str] = []
+    configured = os.environ.get("ROBOT_RUNTIME_URL", "").strip().rstrip("/")
+    if configured:
+        candidates.append(configured)
+    candidates.append("http://reachy-mini.local:8001")
+
+    # Subnet sweep: derive the local /24 from the primary interface.
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        local_ip = s.getsockname()[0]
+        s.close()
+        base = ".".join(local_ip.split(".")[:3])
+        candidates.extend(f"http://{base}.{i}:8001" for i in range(1, 255))
+    except OSError:
+        pass
+
+    seen: set[str] = set()
+    unique = [c for c in candidates if not (c in seen or seen.add(c))]
+    sem = asyncio.Semaphore(50)
+
+    async def probe(url: str) -> dict:
+        async with sem:
+            return await _probe_robot(url, timeout=0.8)
+
+    results = await asyncio.gather(*(probe(u) for u in unique))
+    found = [r for r in results if r["ok"]]
+    return JSONResponse({"found": found, "scanned": len(unique)})
 
 
 # ── Assistant preferences (U36h): call name + reply language ──────────

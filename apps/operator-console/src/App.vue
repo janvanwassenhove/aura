@@ -10,6 +10,9 @@
     <!-- Approval overlay (rendered on top of everything) -->
     <ApprovalPanel />
 
+    <!-- U34: full-screen onboarding on first run -->
+    <SetupWizard v-if="showWizard" @done="showWizard = false" />
+
     <!-- Settings modal (LLM + Connections + Appearance tabs) -->
     <SettingsPanel v-if="showSettings" @close="showSettings = false" />
 
@@ -42,18 +45,26 @@ import ApprovalPanel from './components/ApprovalPanel.vue'
 import SettingsPanel from './components/SettingsPanel.vue'
 import KnowledgePanel from './components/KnowledgePanel.vue'
 import CapabilitiesPanel from './components/CapabilitiesPanel.vue'
+import SetupWizard from './components/SetupWizard.vue'
 import { useEventBusWs } from './composables/useEventBusWs'
+import { useSetupStore } from './stores/setupStore'
 import { useThemeStore } from './stores/themeStore'
 
 const { wsStatus, connect } = useEventBusWs()
 const showSettings = ref(false)
 const showKnowledge = ref(false)
 const showCapabilities = ref(false)
+const showWizard = ref(false)
 const themeStore = useThemeStore()
+const setupStore = useSetupStore()
 
-onMounted(() => {
+onMounted(async () => {
   themeStore.apply()
   connect()
+  // U34: first-run onboarding — only when the brain is reachable and says
+  // setup was never completed. Brain offline → keep the normal dashboard.
+  await setupStore.fetchStatus()
+  if (setupStore.status && !setupStore.status.setup_done) showWizard.value = true
 })
 </script>
 

@@ -10,6 +10,7 @@
       <div class="settings-tabs">
         <button :class="['tab-btn', activeTab === 'llm' && 'tab-btn--active']" @click="activeTab = 'llm'">LLM</button>
         <button :class="['tab-btn', activeTab === 'connections' && 'tab-btn--active']" @click="switchToConnections">Connections</button>
+        <button :class="['tab-btn', activeTab === 'robot' && 'tab-btn--active']" @click="switchToRobot">Robot</button>
         <button :class="['tab-btn', activeTab === 'appearance' && 'tab-btn--active']" @click="activeTab = 'appearance'">Appearance</button>
       </div>
 
@@ -66,6 +67,37 @@
         <div class="settings-actions">
           <button class="btn-cancel" @click="$emit('close')">Cancel</button>
           <button class="btn-apply" :disabled="llmStore.loading" @click="applyLLM">Apply</button>
+        </div>
+      </template>
+
+      <!-- ── Robot tab (U34) ── -->
+      <template v-if="activeTab === 'robot'">
+        <div class="settings-field">
+          <label class="field-label" for="robot-url">Robot address</label>
+          <div class="robot-row">
+            <input id="robot-url" v-model="robotUrl" class="field-input" placeholder="http://192.168.0.178:8001" />
+            <button class="btn-conn btn-ghost" :disabled="robotTesting" @click="testRobotUrl">
+              <LoaderCircle v-if="robotTesting" :size="13" class="spinner" /> Test
+            </button>
+          </div>
+          <p v-if="robotTestResult" class="conn-hint">{{ robotTestResult }}</p>
+        </div>
+        <div class="settings-field">
+          <button class="btn-conn btn-ghost" :disabled="setupStore.discovering" @click="setupStore.discover()">
+            <LoaderCircle v-if="setupStore.discovering" :size="13" class="spinner" />
+            {{ setupStore.discovering ? 'Scanning the network…' : 'Scan my network for the robot' }}
+          </button>
+          <ul v-if="setupStore.found.length" class="robot-found">
+            <li v-for="f in setupStore.found" :key="f.url">
+              <button class="btn-conn btn-ghost btn-small" @click="robotUrl = f.url; testRobotUrl()">{{ f.url }}</button>
+            </li>
+          </ul>
+        </div>
+        <div class="settings-field">
+          <button class="btn-conn btn-primary" :disabled="!robotUrl || robotSaving" @click="saveRobotUrl">
+            <LoaderCircle v-if="robotSaving" :size="13" class="spinner" /> Save
+          </button>
+          <p v-if="robotSaved" class="conn-hint">Saved — applies to new robot connections.</p>
         </div>
       </template>
 
@@ -323,6 +355,7 @@ import {
 } from 'lucide-vue-next'
 import { useSettingsStore, type LLMProvider, type ModelOption } from '../stores/settingsStore'
 import { useConnectionsStore, type ConnectorStatus } from '../stores/connectionsStore'
+import { useSetupStore } from '../stores/setupStore'
 import { ACCENTS, useThemeStore } from '../stores/themeStore'
 import { LANGUAGES, usePrefsStore } from '../stores/prefsStore'
 
@@ -358,7 +391,7 @@ async function applyLLM() {
 const connStore = useConnectionsStore()
 const themeStore = useThemeStore()
 const prefsStore = usePrefsStore()
-const activeTab = ref<'llm' | 'connections' | 'appearance'>('llm')
+const activeTab = ref<'llm' | 'connections' | 'robot' | 'appearance'>('llm')
 
 const localName = ref(prefsStore.assistantName)
 const localLang = ref(prefsStore.language)
@@ -398,6 +431,44 @@ const showGitHubPat = ref(false)
 async function switchToConnections() {
   activeTab.value = 'connections'
   await connStore.refreshAllStatuses()
+}
+
+// ── Robot tab (U34) ──
+const setupStore = useSetupStore()
+const robotUrl = ref('')
+const robotTesting = ref(false)
+const robotSaving = ref(false)
+const robotSaved = ref(false)
+const robotTestResult = ref('')
+
+async function switchToRobot(): Promise<void> {
+  activeTab.value = 'robot'
+  await setupStore.fetchStatus()
+  if (!robotUrl.value) robotUrl.value = setupStore.status?.robot_url ?? ''
+}
+
+async function testRobotUrl(): Promise<void> {
+  robotTesting.value = true
+  robotTestResult.value = ''
+  try {
+    const r = await setupStore.testRobot(robotUrl.value)
+    robotTestResult.value = r.ok
+      ? `Connected — ${r.mode} (battery ${r.battery_pct}%)`
+      : `Not reachable (${r.error})`
+  } finally {
+    robotTesting.value = false
+  }
+}
+
+async function saveRobotUrl(): Promise<void> {
+  robotSaving.value = true
+  robotSaved.value = false
+  try {
+    const err = await setupStore.saveConfig({ robot_url: robotUrl.value.trim() })
+    robotSaved.value = err === null
+  } finally {
+    robotSaving.value = false
+  }
 }
 
 async function saveGitHub() {
@@ -537,6 +608,10 @@ const ConnStatusBadge = defineComponent({
 .conn-name { font-weight: 600; font-size: 0.88rem; }
 
 .conn-test-result { font-style: italic; }
+
+.robot-row { display: flex; gap: 0.5rem; align-items: center; }
+.robot-row .field-input { flex: 1; }
+.robot-found { list-style: none; margin: 0.4rem 0 0; padding: 0; display: flex; flex-direction: column; gap: 0.3rem; }
 
 .conn-status-badge {
   font-size: 0.7rem; padding: 0.12rem 0.45rem; border-radius: 9999px; font-weight: 500;
