@@ -31,6 +31,40 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
+# Whisper hallucinates set phrases from silence/noise. Reject these outright.
+_HALLUCINATIONS = {
+    "you", "thank you", "thank you.", "thanks", "thanks for watching",
+    "thanks for watching!", "bye", "bye.", "okay", "ok", ".", "..", "...",
+    "sous-titres réalisés par la communauté d'amara.org", "amara.org",
+    "untertitel", "untertitelung", "字幕", "字幕by", "so", "yeah", "the",
+    "merci", "merci d'avoir regardé", "bedankt voor het kijken",
+}
+
+# Accented Latin letters we still treat as "Latin" for the script check.
+_LATIN_EXTRA = set("àâäáãéèêëíìîïóòôöõúùûüçñ’'-")
+
+
+def is_plausible_command(text: str) -> bool:
+    """Guard against Whisper hallucinations on ambient noise/silence.
+
+    Rejects empty/very short strings, known hallucination phrases, and — for
+    Latin-script languages — transcripts that are mostly non-Latin (e.g. the
+    stray Cyrillic 'Бурын' hallucinated from room noise).
+    """
+    t = (text or "").strip()
+    if len(t) < 3:
+        return False
+    if t.lower() in _HALLUCINATIONS:
+        return False
+    lang = os.environ.get("ASSISTANT_LANGUAGE", "auto").lower()
+    if lang in ("auto", "en", "nl", "fr"):
+        letters = [c for c in t if c.isalpha()]
+        if letters:
+            latin = sum(1 for c in letters if c.isascii() or c.lower() in _LATIN_EXTRA)
+            if latin / len(letters) < 0.6:
+                return False
+    return True
+
 
 class VoiceLoop:
     def __init__(
@@ -111,7 +145,9 @@ class VoiceLoop:
                     continue  # silence — cheap skip, no STT
 
                 text = (await voice.transcribe(wav, filename="robot.wav") or "").strip()
-                if not text:
+                if not is_plausible_command(text):
+                    if text:
+                        logger.debug("voice loop ignored implausible transcript: %r", text)
                     continue
 
                 in_followup = time.monotonic() < self._followup_until
@@ -120,7 +156,7 @@ class VoiceLoop:
                     continue
                 if not command:  # wake word heard but nothing after it
                     command = await self._capture_command()
-                    if not command:
+                    if not is_plausible_command(command):
                         continue
 
                 await self._handle(command)

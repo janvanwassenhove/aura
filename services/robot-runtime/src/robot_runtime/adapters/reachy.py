@@ -282,7 +282,11 @@ class ReachyRobotAdapter(RobotAdapter):
             # near-silence isn't blown up into noise). Whisper then hears speech.
             peak = float(np.abs(pcm).max()) if len(pcm) else 0.0
             self._last_raw_peak = peak  # raw level for the voice loop's VAD
-            if peak > 0.0015:
+            # Only boost when there's clearly speech-level signal, so true
+            # silence stays quiet → Whisper returns empty instead of
+            # hallucinating a phrase from amplified room noise (U49).
+            gate = float(os.environ.get("MIC_NORMALIZE_GATE", "0.008"))
+            if peak > gate:
                 target = float(os.environ.get("MIC_TARGET_PEAK", "0.5"))
                 max_gain = float(os.environ.get("MIC_MAX_GAIN", "40"))
                 pcm = pcm * min(target / peak, max_gain)

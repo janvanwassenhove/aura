@@ -295,13 +295,23 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     ctx.bus.subscribe(ResponseDrafted, _voice_note_spoken)
 
+    _last_greeted: dict[str, float] = {}
+    _greet_cooldown = float(os.environ.get("GREET_COOLDOWN_S", "120"))
+
     async def _on_person_recognized(event: PersonRecognized) -> None:
         ctx.pipeline.set_active_person(event.person_id if event.known else None)
         # Greet a KNOWN person: personalized text (the pipeline injects their
         # profile facts via the judgment layer, U19e). The pipeline publishes
         # ResponseDrafted → the embodiment handler above speaks it + waves.
-        # The perception loop debounces: once per appearance, not per frame.
-        if event.known and event.display_name:
+        # A per-person cooldown avoids re-greeting when they briefly leave/return
+        # the frame (which was flooding speech and cutting off replies, U49).
+        if event.known and event.display_name and event.person_id:
+            import time as _time
+
+            now = _time.monotonic()
+            if now - _last_greeted.get(event.person_id, 0.0) < _greet_cooldown:
+                return
+            _last_greeted[event.person_id] = now
             name = event.display_name
             try:
                 await ctx.pipeline.orchestrate(
