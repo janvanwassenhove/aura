@@ -238,9 +238,13 @@ if (!app.requestSingleInstanceLock()) {
   app.on('second-instance', () => { if (mainWindow) { mainWindow.show(); mainWindow.focus() } })
 
   app.whenReady().then(async () => {
-    // U36e: allow the console to use the laptop microphone (voice input).
+    // U36e/U38: allow the console to use the laptop microphone (voice input).
+    // Both handlers are needed — getUserMedia checks synchronously AND requests.
     session.defaultSession.setPermissionRequestHandler((_wc, permission, cb) => {
-      cb(permission === 'media')
+      cb(permission === 'media' || permission === 'microphone')
+    })
+    session.defaultSession.setPermissionCheckHandler((_wc, permission) => {
+      return permission === 'media' || permission === 'microphone'
     })
     createWindow()
     const logPath = startBrain()

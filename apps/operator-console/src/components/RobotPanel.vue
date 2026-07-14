@@ -106,15 +106,15 @@
       <p v-if="actError" class="qa-error">{{ actError }}</p>
     </div>
 
-    <div class="mt-3">
+    <div class="mt-3 motion-section">
       <h3 class="section-label">Motion Log</h3>
-      <ul class="motion-log">
-        <li v-for="entry in robotStore.motionLog" :key="entry.id" class="motion-entry">
-          <span :class="['status-dot', `dot-${entry.status}`]" />
-          <span class="motion-name">{{ entry.name }}</span>
-          <span class="motion-time">{{ fmtTime(entry.timestamp) }}</span>
+      <ul class="motion-log-scroll">
+        <li v-for="entry in robotStore.motionLog" :key="entry.id" class="motion-row">
+          <span :class="['motion-dot', `mdot-${entry.status}`]" />
+          <span class="motion-row-name">{{ entry.name }}</span>
+          <span class="motion-row-time">{{ fmtTime(entry.timestamp) }}</span>
         </li>
-        <li v-if="robotStore.motionLog.length === 0" class="text-gray-400 text-sm">No motions yet</li>
+        <li v-if="robotStore.motionLog.length === 0" class="motion-empty">No motions yet</li>
       </ul>
     </div>
   </section>
@@ -252,6 +252,23 @@ function fmtTime(iso: string): string {
 }
 .toggle--on { background: var(--accent); border-color: var(--accent); }
 .toggle--on .toggle-knob { left: 16px; background: #fff; }
+
+.motion-section { min-height: 0; }
+.motion-log-scroll {
+  list-style: none; padding: 0; margin: 0;
+  max-height: 132px; overflow-y: auto;
+}
+.motion-row {
+  display: flex; align-items: center; gap: 0.5rem;
+  padding: 0.22rem 0; font-size: 0.8rem; line-height: 1.2;
+}
+.motion-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.mdot-started { background: var(--warn); }
+.mdot-completed { background: var(--ok); }
+.mdot-failed { background: var(--danger); }
+.motion-row-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.motion-row-time { color: var(--text-faint); font-variant-numeric: tabular-nums; }
+.motion-empty { color: var(--text-faint); font-size: 0.8rem; padding: 0.2rem 0; }
 .volume-slider { flex: 1; margin: 0 0.5rem; accent-color: var(--accent); }
 .volume-pct { font-size: 0.72rem; color: var(--text-faint); min-width: 2.2rem; text-align: right; }
 </style>

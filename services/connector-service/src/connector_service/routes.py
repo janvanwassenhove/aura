@@ -96,6 +96,23 @@ async def post_teams_message(body: dict) -> JSONResponse:
 
 
 # ------------------------------------------------------------------
+# OneDrive / files
+# ------------------------------------------------------------------
+
+
+@router.get("/onedrive/files")
+async def onedrive_files() -> JSONResponse:
+    connector = _require_connector()
+    lister = getattr(connector, "list_onedrive_files", None)
+    if lister is None:
+        return JSONResponse(
+            {"note": "This connector does not expose OneDrive files yet."},
+        )
+    files = await lister()
+    return JSONResponse(files)
+
+
+# ------------------------------------------------------------------
 # Tasks
 # ------------------------------------------------------------------
 

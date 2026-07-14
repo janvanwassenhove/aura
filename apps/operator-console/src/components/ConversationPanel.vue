@@ -39,6 +39,8 @@
       + tools {{ conversationStore.lastLatency.tool_ms.toFixed(0) }}ms)
     </div>
 
+    <p v-if="recording" class="mic-status mic-status--rec"><span class="rec-dot" /> Listening… tap the mic to send</p>
+    <p v-else-if="transcribing" class="mic-status">Transcribing your voice…</p>
     <p v-if="micError" class="mic-error">{{ micError }}</p>
     <form class="input-row" @submit.prevent="submit">
       <input
@@ -117,6 +119,15 @@ const transcribing = ref(false)
 const micError = ref('')
 let recorder: MediaRecorder | null = null
 let chunks: Blob[] = []
+let mimeType = 'audio/webm'
+
+function pickMimeType(): string {
+  const candidates = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus', 'audio/mp4']
+  for (const t of candidates) {
+    if (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported(t)) return t
+  }
+  return ''
+}
 
 async function toggleMic() {
   micError.value = ''
@@ -124,35 +135,59 @@ async function toggleMic() {
     recorder?.stop()
     return
   }
+  if (!navigator.mediaDevices?.getUserMedia) {
+    micError.value = 'No microphone API available in this window.'
+    return
+  }
+  let stream: MediaStream
   try {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+    stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+  } catch (err: any) {
+    micError.value = err?.name === 'NotAllowedError'
+      ? 'Microphone permission denied — allow it in your OS settings.'
+      : 'No microphone found — is one connected?'
+    return
+  }
+  try {
+    mimeType = pickMimeType()
     chunks = []
-    recorder = new MediaRecorder(stream, { mimeType: 'audio/webm' })
+    recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream)
     recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data) }
     recorder.onstop = async () => {
       stream.getTracks().forEach(t => t.stop())
       recording.value = false
-      await sendVoice(new Blob(chunks, { type: 'audio/webm' }))
+      await sendVoice(new Blob(chunks, { type: recorder?.mimeType || mimeType || 'audio/webm' }))
     }
     recorder.start()
     recording.value = true
   } catch {
-    micError.value = 'Microphone unavailable — check permissions.'
+    stream.getTracks().forEach(t => t.stop())
+    micError.value = 'Recording is not supported in this window.'
   }
 }
 
+function extFor(mime: string): string {
+  if (mime.includes('ogg')) return 'audio.ogg'
+  if (mime.includes('mp4')) return 'audio.mp4'
+  return 'audio.webm'
+}
+
 async function sendVoice(blob: Blob) {
-  if (blob.size < 1000) return // too short to contain speech
+  if (blob.size < 400) {
+    micError.value = 'That was too short — hold the mic while you speak.'
+    return
+  }
   transcribing.value = true
   try {
     const form = new FormData()
-    form.append('audio', blob, 'audio.webm')
+    form.append('audio', blob, extFor(blob.type))
     const resp = await fetch(`${BRAIN_URL}/voice/turn`, { method: 'POST', body: form })
     if (!resp.ok) {
       const body = await resp.json().catch(() => ({}))
       micError.value = body.error ?? `Voice turn failed (${resp.status})`
     }
-    // Turns render via the event stream (TranscriptUpdated + ResponseDrafted).
+    // On success the turns render via the event stream (TranscriptUpdated +
+    // ResponseDrafted) — no local add needed.
   } catch {
     micError.value = 'Could not reach the brain.'
   } finally {
@@ -187,6 +222,9 @@ onUnmounted(() => { if (recording.value) recorder?.stop() })
 .btn-mic:hover:not(:disabled) { color: var(--text); border-color: var(--accent-border); }
 .btn-mic--recording { background: var(--danger-bg); border-color: var(--danger); color: var(--danger); animation: pulse 1.2s infinite; }
 .mic-error { font-size: 0.72rem; color: var(--danger-text); margin: 0 0 0.3rem; }
+.mic-status { font-size: 0.72rem; color: var(--text-muted); margin: 0 0 0.3rem; display: flex; align-items: center; gap: 0.35rem; }
+.mic-status--rec { color: var(--danger); }
+.rec-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--danger); animation: pulse 1.2s infinite; }
 .spin { animation: spin 1s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 </style>

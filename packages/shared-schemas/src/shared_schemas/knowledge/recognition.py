@@ -18,7 +18,12 @@ from pathlib import Path
 
 from shared_schemas.knowledge import crypto
 
-_DEFAULT_THRESHOLD = 0.6  # cosine similarity above which a face counts as a match
+# Cosine similarity above which a face counts as a match. Tuned for insightface
+# ArcFace normed embeddings, where genuine same-person pairs sit ~0.4-0.8 and
+# different people <0.3. 0.6 was far too strict (real matches rejected → the
+# owner kept reading as "unknown"). Override with RECOGNITION_THRESHOLD.
+_DEFAULT_THRESHOLD = float(os.environ.get("RECOGNITION_THRESHOLD", "0.4"))
+_MAX_SAMPLES_PER_PERSON = 8  # keep several shots (angles/light) → robust matching
 
 
 def _cosine(a: list[float], b: list[float]) -> float:
@@ -43,22 +48,24 @@ class EmbeddingMatcher:
             raise ValueError("OMK must be 32 bytes (AES-256).")
         self._omk = omk
         self._threshold = threshold
-        self._enrolled: dict[str, bytes] = {}  # person_id -> encrypted embedding
+        # person_id -> list of encrypted embeddings (several shots per person).
+        self._enrolled: dict[str, list[bytes]] = {}
         # Optional disk persistence (ciphertext only — same rules as U29).
         self._path = Path(path) if path is not None else None
         if self._path is not None and self._path.exists():
             data = json.loads(self._path.read_text(encoding="utf-8"))
-            self._enrolled = {
-                pid: base64.b64decode(blob) for pid, blob in data.get("embeddings", {}).items()
-            }
+            for pid, val in data.get("embeddings", {}).items():
+                blobs = val if isinstance(val, list) else [val]  # v1 = single blob
+                self._enrolled[pid] = [base64.b64decode(b) for b in blobs]
 
     def _flush(self) -> None:
         if self._path is None:
             return
         data = {
-            "version": 1,
+            "version": 2,
             "embeddings": {
-                pid: base64.b64encode(blob).decode() for pid, blob in self._enrolled.items()
+                pid: [base64.b64encode(b).decode() for b in blobs]
+                for pid, blobs in self._enrolled.items()
             },
         }
         self._path.parent.mkdir(parents=True, exist_ok=True)
@@ -67,27 +74,34 @@ class EmbeddingMatcher:
         os.replace(tmp, self._path)
 
     def enroll(self, person_id: str, embedding: list[float]) -> None:
-        """Store (encrypted) a reference embedding for a known person."""
+        """Add an (encrypted) reference embedding. Keeps several shots per
+        person so lighting/angle differences still match; oldest fall off."""
         blob = crypto.encrypt(
             self._omk, json.dumps(embedding).encode(), aad=person_id.encode()
         )
-        self._enrolled[person_id] = blob
+        samples = self._enrolled.setdefault(person_id, [])
+        samples.append(blob)
+        del samples[:-_MAX_SAMPLES_PER_PERSON]  # cap
         self._flush()
 
     def forget(self, person_id: str) -> None:
         self._enrolled.pop(person_id, None)
         self._flush()  # erasure must reach disk too
 
+    def sample_count(self, person_id: str) -> int:
+        return len(self._enrolled.get(person_id, []))
+
     def identify(self, embedding: list[float]) -> tuple[str | None, float]:
-        """Return (person_id, confidence) for the best match, or (None, score)
-        if nothing clears the threshold (a stranger)."""
+        """Return (person_id, confidence) for the best match over ALL of each
+        person's samples, or (None, score) if nothing clears the threshold."""
         best_id: str | None = None
         best_score = 0.0
-        for pid, blob in self._enrolled.items():
-            ref = json.loads(crypto.decrypt(self._omk, blob, aad=pid.encode()))
-            score = _cosine(embedding, ref)
-            if score > best_score:
-                best_id, best_score = pid, score
+        for pid, blobs in self._enrolled.items():
+            for blob in blobs:
+                ref = json.loads(crypto.decrypt(self._omk, blob, aad=pid.encode()))
+                score = _cosine(embedding, ref)
+                if score > best_score:
+                    best_id, best_score = pid, score
         if best_id is not None and best_score >= self._threshold:
             return best_id, best_score
         return None, best_score
