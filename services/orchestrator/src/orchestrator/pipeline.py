@@ -251,6 +251,11 @@ class OrchestratorPipeline:
         # U57: agentic loop — owner steering (injected next round) + stop flags.
         self._steering: dict[str, list[str]] = {}
         self._stop_flags: set[str] = set()
+        # U59: owner-taught skills, injected into the system prompt when relevant.
+        self._skills = None  # SkillStore | None — set via set_skill_store()
+
+    def set_skill_store(self, store) -> None:
+        self._skills = store
 
     # -- U57: owner steering of a running loop --------------------------
 
@@ -332,6 +337,17 @@ class OrchestratorPipeline:
         system_prompt = _identity_prefix() + system_prompt
         if allowed:  # U58: the automation ladder governs every tool choice
             system_prompt += "\n\n" + LADDER_NOTE
+
+        # U59: owner-taught skills (relevant ones in full, the rest by name).
+        if self._skills is not None:
+            try:
+                block = self._skills.prompt_block(
+                    text, str(persona), self._active_person_id,
+                )
+                if block:
+                    system_prompt += "\n\n" + block
+            except Exception as exc:  # noqa: BLE001 — skills must never break a turn
+                logger.debug("skill injection failed: %s", exc)
 
         # U42: include recent turns so the robot holds a coherent dialogue.
         messages: list[dict] = [
