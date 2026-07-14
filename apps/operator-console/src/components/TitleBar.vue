@@ -17,6 +17,12 @@
     <div class="titlebar-drag" />
 
     <div class="titlebar-right">
+      <button class="titlebar-btn" title="Toggle left panel" aria-label="Toggle left panel" @click="$emit('toggle-left')">
+        <PanelLeft :size="15" />
+      </button>
+      <button class="titlebar-btn" title="Toggle right panel (Brain / Events)" aria-label="Toggle right panel" @click="$emit('toggle-right')">
+        <PanelRight :size="15" />
+      </button>
       <button class="titlebar-btn" title="Capabilities & permissions" aria-label="Capabilities and permissions" @click="$emit('open-capabilities')">
         <ShieldCheck :size="16" />
       </button>
@@ -45,12 +51,15 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { onMounted } from 'vue'
-import { Bot, Brain, Cpu, Minus, Settings, ShieldCheck, Square, X } from 'lucide-vue-next'
+import { Bot, Brain, Cpu, Minus, Settings, ShieldCheck, Square, X, PanelLeft, PanelRight } from 'lucide-vue-next'
 import { useRobotStore } from '../stores/robotStore'
 import { usePrefsStore } from '../stores/prefsStore'
 
 const props = defineProps<{ wsStatus: 'connecting' | 'open' | 'closed' }>()
-defineEmits<{ 'open-knowledge': []; 'open-settings': []; 'open-capabilities': [] }>()
+defineEmits<{
+  'open-knowledge': []; 'open-settings': []; 'open-capabilities': []
+  'toggle-left': []; 'toggle-right': []
+}>()
 
 const robotStore = useRobotStore()
 const prefsStore = usePrefsStore()

@@ -237,6 +237,9 @@ the human can unblock it.
 - [x] **U75 — scherm-overlay + abort + brain-graph** · `pending`
   (1) **Muis licht op**: `ComputerControlStarted/Ended`-events rond elke use_computer-run → console → Electron-IPC → click-through always-on-top overlay met gloeiende cursor-ring (volgt de muis, 40ms) en banner "AURA bestuurt het scherm — druk Esc om af te breken". (2) **Abort**: `request_abort()` op beide computer-agents (checkt per stap) + wall-clock-timeout COMPUTER_USE_TIMEOUT_S=180s + `POST /orchestrator/computeruse/abort`; afbreekbaar via Esc (globalShortcut zolang de overlay staat, werkt in élke app) én een Abort-knop in de conversatie-strip. (3) **Graph**: `BrainGraph.vue` — dependency-vrije force-directed canvas-constellatie in het Brain-paneel (rail-item "Graph"): personen amber, skills blauw, feiten als kleine sterren; edges uit persoon-scope, [[wikilinks]] en feiten; hover-tooltip, klik → persoon/skill openen. Schemas 123, orchestrator 187, computer-use 13, console 56 groen.
 
+- [x] **U76 — VS Code-achtige workspace: Brain als dokbaar paneel** · `pending`
+  Geen popup meer: de main-layout is een **workspace** met versleepbare splitters (pointer-drag, min/max-clamps) en een **rechter dock met tabs Brain | Events**. Brain-paneel kreeg een `docked`-modus (zelfde component: rail met personen/skills/graph, smaller in dock) — de brein-knop en [[persoon]]-links openen nu de dock (verbreedt automatisch naar 480px voor Brain). Titelbalk kreeg VS Code-stijl **layout-toggles** (PanelLeft/PanelRight-iconen) om linker- en rechterpaneel te tonen/verbergen. Breedtes, zichtbaarheid en actieve tab persistent in localStorage (`layoutStore`, aura-layout-v1). EventLog verhuisde van vaste kolom naar de Events-tab. Console 56 groen, build clean.
+
 ## Progress log (append-only; newest last)
 
 - 2026-06-21 — ledger created on `aura-autobuild`; Phase 0/0b complete, Phase 1 scaffold (U-pre) done before this loop started.

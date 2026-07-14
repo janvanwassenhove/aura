@@ -1,12 +1,12 @@
 <template>
-  <div class="brain-overlay" @click.self="$emit('close')">
-    <div class="brain-modal">
+  <div :class="docked ? 'brain-docked' : 'brain-overlay'" @click.self="onBackdrop">
+    <div :class="docked ? 'brain-dock-inner' : 'brain-modal'">
       <header class="brain-header">
         <span class="brain-title"><Brain :size="17" /> {{ prefs.assistantName }}'s brain</span>
         <button class="brain-sec-btn" @click="$emit('open-knowledge')">
           <ShieldCheck :size="13" /> Security &amp; faces
         </button>
-        <button class="brain-close" aria-label="Close" @click="$emit('close')"><X :size="15" /></button>
+        <button v-if="!docked" class="brain-close" aria-label="Close" @click="$emit('close')"><X :size="15" /></button>
       </header>
 
       <div class="brain-body">
@@ -155,7 +155,12 @@ import { useKnowledgeStore } from '../stores/knowledgeStore'
 import { useNavStore } from '../stores/navStore'
 import { usePrefsStore } from '../stores/prefsStore'
 
-defineEmits<{ (e: 'close'): void; (e: 'open-knowledge'): void }>()
+const props = defineProps<{ docked?: boolean }>()
+const emit = defineEmits<{ (e: 'close'): void; (e: 'open-knowledge'): void }>()
+
+function onBackdrop(): void {
+  if (!props.docked) emit('close')
+}
 
 const store = useKnowledgeStore()
 const prefs = usePrefsStore()
@@ -294,6 +299,14 @@ onMounted(async () => {
 </script>
 
 <style scoped>
+/* U76: docked mode — fills the workspace dock instead of a modal overlay. */
+.brain-docked { height: 100%; min-height: 0; display: flex; }
+.brain-dock-inner {
+  flex: 1; min-width: 0; min-height: 0;
+  display: flex; flex-direction: column; overflow: hidden;
+}
+.brain-docked .brain-rail { width: 12rem; }
+
 .brain-overlay {
   position: fixed; inset: 0; z-index: 120;
   background: color-mix(in srgb, var(--bg) 60%, transparent);
