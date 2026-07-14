@@ -9,7 +9,8 @@
         :class="['turn', turn.role === 'user' ? 'turn-user' : 'turn-assistant']"
       >
         <div class="turn-header">
-          <span class="turn-role">{{ turn.role === 'user' ? 'You' : 'AURA' }}</span>
+          <RichieAvatar v-if="turn.role !== 'user'" :size="20" class="turn-avatar" />
+          <span class="turn-role">{{ turn.role === 'user' ? 'You' : assistantName }}</span>
           <span class="turn-time">{{ fmtTime(turn.timestamp) }}</span>
         </div>
         <div class="turn-text">{{ turn.text }}</div>
@@ -18,7 +19,9 @@
         </div>
       </div>
       <div v-if="conversationStore.isProcessing" class="turn turn-assistant">
-        <div class="turn-text animate-pulse">AURA is thinking…</div>
+        <div class="turn-text animate-pulse">
+          <RichieAvatar :size="18" class="turn-avatar richie-thinking" /> {{ assistantName }} is thinking…
+        </div>
       </div>
       <div v-if="conversationStore.turns.length === 0" class="getting-started">
         <h3 class="gs-title"><Sparkles :size="14" /> Talk to your robot</h3>
@@ -129,13 +132,17 @@
 </template>
 
 <script setup lang="ts">
-import { onUnmounted, ref, watch, nextTick } from 'vue'
+import { computed, onUnmounted, ref, watch, nextTick } from 'vue'
 import { Bot, GraduationCap, LoaderCircle, Mic, Sparkles, Square, Wrench } from 'lucide-vue-next'
+import RichieAvatar from './RichieAvatar.vue'
 import { useConversationStore } from '../stores/conversationStore'
+import { usePrefsStore } from '../stores/prefsStore'
 
 const BRAIN_URL = import.meta.env.VITE_BRAIN_URL ?? import.meta.env.VITE_ORCHESTRATOR_URL ?? 'http://localhost:8000'
 
 const conversationStore = useConversationStore()
+const prefsStore = usePrefsStore()
+const assistantName = computed(() => prefsStore.assistantName || 'AURA')
 const scrollEl = ref<HTMLElement | null>(null)
 
 const suggestions = [
@@ -392,4 +399,9 @@ onUnmounted(() => { if (recording.value) recorder?.stop(); stopLevelMeter() })
 .btn-agent:disabled { opacity: 0.5; cursor: default; }
 .btn-agent--stop { color: var(--danger-text, #e5484d); border-color: var(--danger-text, #e5484d); }
 .agent-strip--screen { border-color: var(--accent); box-shadow: 0 0 12px color-mix(in srgb, var(--accent) 35%, transparent); }
+
+/* U78: Richie avatar in turns */
+.turn-avatar { margin-right: 0.15rem; flex-shrink: 0; }
+.richie-thinking { animation: richie-bob 1.4s ease-in-out infinite; }
+@keyframes richie-bob { 0%, 100% { transform: translateY(0) rotate(-2deg); } 50% { transform: translateY(-2px) rotate(2deg); } }
 </style>

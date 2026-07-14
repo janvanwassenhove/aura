@@ -243,6 +243,9 @@ the human can unblock it.
 - [x] **U77 — bottom-dock Events, per-persoon bronnen, RobotPanel-fix, meedansen** · `pending`
   (1) **Events onderaan** (terminal-stijl): horizontale splitter onder de chat, verticaal resizable (110–520px), PanelBottom-toggle in de titelbalk; rechter dock is nu puur Brain. (2) **Bronnen per persoon**: SOURCES-sectie in het persoon-brein (instagram/facebook/x-twitter/linkedin/blog/website/gmail/github + handle/url) — opgeslagen als `source:<kind>`-facts: encrypted at rest én automatisch in de gespreks-context via de judgment layer; groene chips, apart van gewone facts. Actief ingesteld ophalen/lezen van die bronnen = latere unit. (3) **RobotPanel afgekapt**: flex-children kregen `flex-shrink: 0` zodat de linkerkolom écht scrollt i.p.v. clipt. (4) **Meedansen**: zodra AURA muziek start danst Richie mee — losse loop van nod/tilt/shake/gesture/wave met random amplitude/tempo, DANCE_DURATION_S=25, DANCE_ON_MUSIC=true (uitzetbaar), best-effort. Brain 142, console 56 groen.
 
+- [x] **U78 — Richie-avatar in de conversatie** · `pending`
+  `RichieAvatar.vue`: vector-portret van Richie Mini (witte kop, coil-antennes, donkere goggles, schouders — naar de aangeleverde illustratie; theme-aware via CSS-vars) bij elke assistent-beurt in de chat, met de ingestelde roepnaam i.p.v. hardcoded "AURA". De "is thinking…"-bubbel kreeg een zachtjes wiebelende Richie. Wil de eigenaar de échte artwork-PNG: in src/assets droppen en in RichieAvatar.vue swappen (genoteerd in de component). Console 56 groen.
+
 ## Progress log (append-only; newest last)
 
 - 2026-06-21 — ledger created on `aura-autobuild`; Phase 0/0b complete, Phase 1 scaffold (U-pre) done before this loop started.
