@@ -111,9 +111,20 @@ class WebSocketBroadcaster:
             for event_type in _ALL_EVENT_TYPES:
                 self._bus.unsubscribe(event_type, self._broadcast)
 
+    async def broadcast_raw(self, payload: str) -> None:
+        """Send a pre-serialized event JSON to all clients.
+
+        Used by bridges that relay events from ANOTHER process's bus (e.g. the
+        brain forwarding robot-runtime events to the console) without
+        re-validating them against local schemas.
+        """
+        await self._send_all(payload)
+
     async def _broadcast(self, event: BaseEvent) -> None:
+        await self._send_all(event.model_dump_json())
+
+    async def _send_all(self, payload: str) -> None:
         dead: list[WebSocket] = []
-        payload = event.model_dump_json()
         for ws in list(self._connections):
             if ws.client_state == WebSocketState.DISCONNECTED:
                 dead.append(ws)

@@ -52,6 +52,12 @@ def create_idle_timeline(persona_config: PersonaConfig) -> MotionTimeline:
         return MotionTimeline(cues=[])
 
     amplitude = profile.amplitude * 0.3
+    # Curiosity: about a third of idle moments the robot looks around the room
+    # instead of fidgeting in place (U36d).
+    if random.random() < 0.35:
+        return MotionTimeline(cues=[
+            MotionCue(offset_ms=0, motion_id="look_around", speed=0.3, amplitude=amplitude),
+        ])
     motion_id = random.choice(profile.motion_ids)
     cues = [
         MotionCue(offset_ms=0, motion_id=motion_id, speed=0.3, amplitude=amplitude),

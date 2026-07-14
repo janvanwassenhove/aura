@@ -62,6 +62,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     routes.adapter = adapter
     routes.engine = engine
     routes.broadcaster = broadcaster
+    routes.bus = bus  # U36d: direct-motion events
     routes.offline_loop = offline_loop
 
     yield
