@@ -143,11 +143,34 @@ async def test_gesture_publishes_event_with_cooldown() -> None:
     assert gestures[0].gesture == 'open_palm'
 
 
-async def test_no_matcher_means_no_recognition_events() -> None:
+async def test_no_matcher_treats_every_face_as_unknown() -> None:
     bus = FakeBus()
     loop = PerceptionLoop(bus, None, FakeRobot(), ScriptedEmbedder([JAN_FACE]))
     await loop.tick()
-    assert bus.published == []  # gestures off, recognition off → silent
+    (event,) = bus.published  # U36f: unknown-face overlay works pre-secure
+    assert event.known is False and event.person_id is None
+
+
+async def test_unknown_face_lands_in_sighting_log() -> None:
+    from aura_brain.sightings import SightingLog
+
+    log = SightingLog(capture_cooldown_s=0.0)
+    bus = FakeBus()
+
+    class PngRobot(FakeRobot):
+        async def camera_frame(self) -> bytes:
+            import io
+
+            from PIL import Image
+
+            buf = io.BytesIO()
+            Image.new('RGB', (64, 36)).save(buf, format='PNG')
+            return buf.getvalue()
+
+    loop = PerceptionLoop(bus, None, PngRobot(), ScriptedEmbedder([JAN_FACE]),
+                          sighting_log=log)
+    await loop.tick()
+    assert len(log.list()) == 1
 
 
 async def test_set_matcher_upgrades_running_loop() -> None:
