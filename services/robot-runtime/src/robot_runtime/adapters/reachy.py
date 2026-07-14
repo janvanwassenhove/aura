@@ -165,16 +165,25 @@ class ReachyRobotAdapter(RobotAdapter):
         else:
             logger.info("Reachy speak (no audio payload): %r", text[:80])
 
-    async def play_audio(self, audio_bytes: bytes) -> None:
+    async def play_audio(self, audio_bytes: bytes, sample_rate: int = 24_000) -> None:
+        """Play PCM s16le mono. Default rate 24 kHz (OpenAI TTS output)."""
         media = self._media()
         if media is None:
             logger.warning("play_audio skipped: media backend disabled")
             return
 
         def _play() -> None:
-            samples = np.frombuffer(audio_bytes, dtype=np.int16)
+            # s16le → float32 [-1, 1], resampled to the device output rate
+            # (push_audio_sample wants float32; channels are adapted by the SDK).
+            pcm = np.frombuffer(audio_bytes, dtype=np.int16).astype(np.float32) / 32768.0
+            out_rate = media.get_output_audio_samplerate()
+            if out_rate and out_rate > 0 and out_rate != sample_rate:
+                n_out = int(len(pcm) * out_rate / sample_rate)
+                x_old = np.linspace(0.0, 1.0, num=len(pcm), endpoint=False)
+                x_new = np.linspace(0.0, 1.0, num=n_out, endpoint=False)
+                pcm = np.interp(x_new, x_old, pcm).astype(np.float32)
             media.start_playing()
-            media.push_audio_sample(samples)
+            media.push_audio_sample(pcm)
 
         async with self._motion_lock:  # don't fight a wake_up emote's sound
             await asyncio.to_thread(_play)

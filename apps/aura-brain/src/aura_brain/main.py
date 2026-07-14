@@ -219,22 +219,36 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     async def _on_person_recognized(event: PersonRecognized) -> None:
         ctx.pipeline.set_active_person(event.person_id if event.known else None)
-        # Greet a KNOWN person: wave + spoken hello + a visible turn in the
-        # console. The perception loop debounces, so this fires once per
-        # appearance — not per frame (U18). Recognition identifies; the
-        # greeting reveals nothing sensitive.
+        # Greet a KNOWN person: personalized text (the pipeline injects their
+        # profile facts via the judgment layer, U19e), spoken out loud via
+        # brain-side TTS, plus a wave. The perception loop debounces, so this
+        # fires once per appearance — not per frame (U18).
         if event.known and event.display_name:
-            greeting = f"Hello {event.display_name}! Good to see you."
+            name = event.display_name
+            greeting = f"Hello {name}! Good to see you."
+            try:
+                reply = await ctx.pipeline.orchestrate(
+                    f"(system note: {name} just walked up to you and you "
+                    f"recognized their face.) Greet {name} warmly by name in "
+                    f"one short spoken sentence — personal, no lists, no markdown.",
+                    session_id,
+                )
+                if reply and not reply.startswith("[echo]"):
+                    greeting = reply
+            except Exception as exc:
+                logging.getLogger(__name__).debug("personalized greeting failed: %s", exc)
+                await ctx.bus.publish(ResponseDrafted(
+                    session_id=session_id, response_text=greeting,
+                ))
+            from aura_brain import voice
+
             try:
                 await _robot.execute_motion(
                     MotionCommand(motion_id="wave", speed=1.0, amplitude=0.6, direction=None)
                 )
-                await _robot.speak(greeting)
-            except Exception as exc:  # robot offline → still greet in the console
+                await _robot.speak(greeting, audio_b64=await voice.synthesize_b64(greeting))
+            except Exception as exc:  # robot offline → the console turn still shows
                 logging.getLogger(__name__).debug("greeting robot call failed: %s", exc)
-            await ctx.bus.publish(ResponseDrafted(
-                session_id=session_id, response_text=greeting,
-            ))
 
     ctx.bus.subscribe(PersonRecognized, _on_person_recognized)
 

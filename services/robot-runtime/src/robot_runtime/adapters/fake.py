@@ -38,6 +38,7 @@ class FakeRobotAdapter(RobotAdapter):
         self._behavior_state = BehaviorState.IDLE
         self._battery_pct: float = 100.0
         self._spoken: list[str] = []
+        self._played_audio: list[bytes] = []
         self._motions: list[MotionCommand] = []
 
     # ------------------------------------------------------------------
@@ -80,6 +81,8 @@ class FakeRobotAdapter(RobotAdapter):
     async def speak(self, text: str, audio_bytes: bytes | None = None) -> None:
         logger.info("FakeRobot speaking: %r", text[:80])
         self._spoken.append(text)
+        if audio_bytes is not None:
+            self._played_audio.append(audio_bytes)
         await asyncio.sleep(len(text) * 0.01)  # simulate ~10 ms per char
 
     async def play_audio(self, audio_bytes: bytes) -> None:
@@ -131,6 +134,10 @@ class FakeRobotAdapter(RobotAdapter):
     @property
     def spoken_texts(self) -> list[str]:
         return list(self._spoken)
+
+    @property
+    def played_audio(self) -> list[bytes]:
+        return list(self._played_audio)
 
     @property
     def executed_motions(self) -> list[MotionCommand]:

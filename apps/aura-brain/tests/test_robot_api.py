@@ -14,6 +14,7 @@ class FakeRobotClient:
     def __init__(self, *, up: bool = True) -> None:
         self.up = up
         self.motions: list = []
+        self.spoken: list[tuple[str, str | None]] = []
 
     def _check(self) -> None:
         if not self.up:
@@ -30,6 +31,11 @@ class FakeRobotClient:
     async def execute_motion(self, command) -> bool:
         self._check()
         self.motions.append(command)
+        return True
+
+    async def speak(self, text: str, audio_b64: str | None = None) -> bool:
+        self._check()
+        self.spoken.append((text, audio_b64))
         return True
 
 
@@ -62,6 +68,38 @@ def test_motion_forwards_command(client_and_robot) -> None:
     resp = client.post("/robot/motion", json={"motion_id": "wave", "amplitude": 0.6})
     assert resp.status_code == 200 and resp.json()["ok"] is True
     assert robot.motions[0].motion_id == "wave"
+
+
+def test_say_synthesizes_and_speaks(client_and_robot, monkeypatch) -> None:
+    from aura_brain import voice
+
+    async def fake_tts(text: str) -> str:
+        return "UEND-b64"
+
+    monkeypatch.setattr(voice, "synthesize_b64", fake_tts)
+    client, robot = client_and_robot
+    resp = client.post("/robot/say", json={"text": "Hallo Jan!"})
+    assert resp.status_code == 200
+    assert resp.json() == {"ok": True, "voiced": True}
+    assert robot.spoken == [("Hallo Jan!", "UEND-b64")]
+
+
+def test_say_degrades_to_text_only_without_tts(client_and_robot, monkeypatch) -> None:
+    from aura_brain import voice
+
+    async def no_tts(text: str) -> None:
+        return None
+
+    monkeypatch.setattr(voice, "synthesize_b64", no_tts)
+    client, robot = client_and_robot
+    resp = client.post("/robot/say", json={"text": "stil"})
+    assert resp.json() == {"ok": True, "voiced": False}
+    assert robot.spoken == [("stil", None)]
+
+
+def test_say_requires_text(client_and_robot) -> None:
+    client, _ = client_and_robot
+    assert client.post("/robot/say", json={}).status_code == 422
 
 
 def test_unreachable_robot_returns_503() -> None:

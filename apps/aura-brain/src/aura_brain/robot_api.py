@@ -63,3 +63,22 @@ async def motion(command: MotionCommand) -> JSONResponse:
     except (httpx.HTTPError, OSError) as exc:
         return _unavailable(exc)
     return JSONResponse({"ok": ok})
+
+
+@router.post("/say")
+async def say(body: dict) -> JSONResponse:
+    """Make the robot SAY something out loud: brain-side TTS → robot speaker.
+
+    Degrades to text-only (console/log) when no TTS is configured.
+    """
+    text = (body or {}).get("text", "").strip()
+    if not text:
+        return JSONResponse({"error": "text is required"}, status_code=422)
+    from aura_brain import voice
+
+    audio_b64 = await voice.synthesize_b64(text)
+    try:
+        ok = await _robot.speak(text, audio_b64=audio_b64)
+    except (httpx.HTTPError, OSError) as exc:
+        return _unavailable(exc)
+    return JSONResponse({"ok": ok, "voiced": audio_b64 is not None})
