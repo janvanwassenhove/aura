@@ -6,13 +6,22 @@
     </div>
 
     <div class="video-frame">
-      <img v-if="frameUrl" :src="frameUrl" alt="Robot camera" class="video-img" />
-      <div v-else class="video-placeholder">
+      <!-- MJPEG stream: the <img> renders continuous frames natively -->
+      <img
+        v-show="state === 'live'"
+        :key="streamKey"
+        :src="streamUrl"
+        alt="Robot camera"
+        class="video-img"
+        @load="state = 'live'"
+        @error="onStreamError"
+      />
+      <div v-if="state !== 'live'" class="video-placeholder">
         <VideoOff :size="28" class="mb-2" />
         <p v-if="state === 'connecting'">Connecting to the robot camera…</p>
         <template v-else>
           <p>No camera feed.</p>
-          <p class="hint">Is the robot on? The camera starts ~10 s after the robot boots.</p>
+          <p class="hint">Is the robot on? The camera starts ~10 s after the robot boots. Retrying…</p>
         </template>
       </div>
 
@@ -27,8 +36,8 @@
 
     <!-- Recognition / enrollment -->
     <div v-if="recognitionEnabled === false" class="hint mt-2">
-      Face recognition is off. Enable it via the setup wizard
-      (knowledge passphrase required — faces are stored encrypted).
+      Face recognition is off — open <strong>Knowledge</strong> (brain icon, top right)
+      and secure it with a passphrase to enable.
     </div>
     <form v-else-if="recognitionEnabled" class="enroll-row mt-2" @submit.prevent="enroll">
       <input v-model="enrollId" class="filter-input" placeholder="person id (e.g. jan)" />
@@ -46,39 +55,28 @@ import { ScanFace, UserCheck, UserX, Video, VideoOff } from 'lucide-vue-next'
 import { useRobotStore } from '../stores/robotStore'
 
 const BRAIN_URL = import.meta.env.VITE_BRAIN_URL ?? import.meta.env.VITE_ORCHESTRATOR_URL ?? 'http://localhost:8000'
-const FRAME_INTERVAL_MS = 1000
 
 const robotStore = useRobotStore()
 const recognized = computed(() => robotStore.lastRecognized)
 
-const frameUrl = ref<string | null>(null)
 const state = ref<'connecting' | 'live' | 'off'>('connecting')
+const streamKey = ref(0)
+const streamUrl = computed(() => `${BRAIN_URL}/robot/camera/stream?r=${streamKey.value}`)
 const recognitionEnabled = ref<boolean | null>(null)
 const enrollId = ref('')
 const enrolling = ref(false)
 const enrollMessage = ref('')
 const enrollOk = ref(false)
 
-let timer: ReturnType<typeof setTimeout> | null = null
-let stopped = false
+let retryTimer: ReturnType<typeof setTimeout> | null = null
 
-async function fetchFrame() {
-  try {
-    const resp = await fetch(`${BRAIN_URL}/robot/camera/frame`, { cache: 'no-store' })
-    if (resp.ok) {
-      const blob = await resp.blob()
-      const next = URL.createObjectURL(blob)
-      if (frameUrl.value) URL.revokeObjectURL(frameUrl.value)
-      frameUrl.value = next
-      state.value = 'live'
-    } else {
-      state.value = 'off'
-    }
-  } catch {
-    state.value = 'off'
-  } finally {
-    if (!stopped) timer = setTimeout(fetchFrame, FRAME_INTERVAL_MS)
-  }
+function onStreamError() {
+  state.value = 'off'
+  if (retryTimer) clearTimeout(retryTimer)
+  retryTimer = setTimeout(() => {
+    state.value = 'connecting'
+    streamKey.value++ // remount the <img> → reconnect the stream
+  }, 4000)
 }
 
 async function fetchRecognitionStatus() {
@@ -112,16 +110,8 @@ async function enroll() {
   }
 }
 
-onMounted(() => {
-  fetchFrame()
-  fetchRecognitionStatus()
-})
-
-onUnmounted(() => {
-  stopped = true
-  if (timer) clearTimeout(timer)
-  if (frameUrl.value) URL.revokeObjectURL(frameUrl.value)
-})
+onMounted(fetchRecognitionStatus)
+onUnmounted(() => { if (retryTimer) clearTimeout(retryTimer) })
 </script>
 
 <style scoped>

@@ -70,6 +70,10 @@ def set_omk_loaded(loaded: bool) -> None:
         _tier = UnlockTier.SENSITIVE
 
 
+def is_omk_loaded() -> bool:
+    return _omk_loaded
+
+
 # ------------------------------------------------------------------
 # Tier helpers
 # ------------------------------------------------------------------
