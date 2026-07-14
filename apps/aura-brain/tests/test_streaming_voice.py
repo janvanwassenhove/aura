@@ -194,3 +194,56 @@ async def test_followup_chain_caps_self_conversation(loop_env, monkeypatch) -> N
         task.cancel()
         with pytest.raises(asyncio.CancelledError):
             await task
+
+
+async def test_music_guard_suspends_followup_windows(loop_env, monkeypatch) -> None:
+    """U69: after AURA starts music, replies open NO follow-up window — only
+    the wake word gets through, so lyrics can't become conversation at all."""
+    monkeypatch.setenv("MUSIC_GUARD_S", "60")
+    robot = _ScriptedRobot(peaks=[0.5])
+    pipeline = _Pipeline()
+    vl = VoiceLoop(robot, pipeline, _Bus(), speech_peak=0.03)
+
+    vl.note_music_started()          # AURA pressed play
+    vl.note_spoken("Ik heb Spotify gestart en op play gedrukt.")
+    vl._speaking_until = 0.0         # skip echo wait for the test
+    assert vl._followup_until == 0.0  # no window while music plays
+
+    async def lyrics(_wav, filename="") -> str:
+        return "Meine Damen und Herren, vielen Dank"
+
+    from aura_brain import voice
+    monkeypatch.setattr(voice, "transcribe", lyrics)
+
+    task = asyncio.create_task(vl._run())
+    await asyncio.sleep(0.2)
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+    assert pipeline.commands == []   # lyrics ignored — wake word required
+
+
+async def test_wake_word_still_works_during_music_guard(loop_env, monkeypatch) -> None:
+    monkeypatch.setenv("WAKE_WORD", "richie")
+    robot = _ScriptedRobot(peaks=[0.5])
+    pipeline = _Pipeline()
+    vl = VoiceLoop(robot, pipeline, _Bus(), speech_peak=0.03)
+    vl.note_music_started()
+
+    async def spoken(_wav, filename="") -> str:
+        return "Richie, zet de muziek zachter"
+
+    from aura_brain import voice
+    monkeypatch.setattr(voice, "transcribe", spoken)
+
+    task = asyncio.create_task(vl._run())
+    try:
+        for _ in range(200):
+            if pipeline.commands:
+                break
+            await asyncio.sleep(0.01)
+    finally:
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+    assert pipeline.commands == ["zet de muziek zachter"]

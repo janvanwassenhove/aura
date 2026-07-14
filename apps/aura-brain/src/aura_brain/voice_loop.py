@@ -99,6 +99,18 @@ class VoiceLoop:
         # next window, and so on forever (the 'Nordmeer' incident).
         self._max_followup_chain = int(os.environ.get("FOLLOWUP_CHAIN_MAX", "2"))
         self._followup_chain = 0
+        # U69: while AURA itself just started music, the mic hears lyrics —
+        # suspend follow-up windows entirely; only the wake word counts.
+        self._music_guard_s = float(os.environ.get("MUSIC_GUARD_S", "180"))
+        self._music_until = 0.0
+
+    def note_music_started(self) -> None:
+        """Called when a music tool ran: lyrics are about to hit the mic.
+        Follow-up windows are suspended for MUSIC_GUARD_S; wake-word commands
+        keep working (lyrics rarely contain the robot's name)."""
+        self._music_until = time.monotonic() + self._music_guard_s
+        self._followup_until = 0.0
+        logger.info("music guard active for %.0fs — wake word required", self._music_guard_s)
 
     @property
     def _barge_in(self) -> bool:
@@ -128,7 +140,9 @@ class VoiceLoop:
         now = time.monotonic()
         speak_s = min(12.0, 1.0 + len(text or "") / 15.0)  # ~15 chars/sec
         self._speaking_until = now + speak_s
-        if self._followup_chain < self._max_followup_chain:
+        if now < self._music_until:
+            self._followup_until = 0.0  # music playing → wake word required (U69)
+        elif self._followup_chain < self._max_followup_chain:
             self._followup_until = self._speaking_until + self._followup_s
         else:
             self._followup_until = 0.0  # chain exhausted → wake word required

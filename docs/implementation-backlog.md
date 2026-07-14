@@ -216,6 +216,9 @@ the human can unblock it.
 - [x] **U68 — brain vault (optie a) + [[link]]-rendering in-app** · DECIDE: eigenaar koos (a)+links · `pending`
   Vault: de skills-map is nu een self-describing Obsidian-compatibele vault (auto-README bij eerste save, uitgesloten van de skill-loader); persoonsdata blijft versleuteld in-app. [[links]]: `WikiText.vue` rendert `[[target]]` als klikbare links; `navStore` regelt kruisnavigatie (klik `[[jan]]` in een skill → Knowledge-paneel op die persoon; klik een skillnaam/`[[skill]]` in een profiel → Settings→Skills met de editor open; @persoon-badge op skill-cards klikbaar). Backlinks: skills die `[[persoon]]` vermelden verschijnen in het profiel met "backlink"-chip (naast scope-skills). Beschrijving-veld kreeg live linkpreview + hint. Editor-placeholder legt [[..]] uit. Orchestrator 187, brain 137, console 56 groen. Vervolgstap (c: graph-view) blijft open als latere iteratie.
 
+- [x] **U69 — music guard: lyrics kunnen géén gesprek meer worden** · `pending`
+  Structurele fix bovenop U67 (die was nog niet herstart bij het NOFX-incident): zodra AURA zelf muziek start/bedient (ToolCallSucceeded op play_music/media_control/next_track → `note_music_started()`), gaan follow-up-vensters volledig uit voor MUSIC_GUARD_S (default 180s) — alleen het wake-word komt er nog doorheen (lyrics bevatten zelden "Richie"; getest dat wake-word-commando's blijven werken tijdens de guard). Plus promptfix in LADDER_NOTE: "je KUNT Spotify openen — claim nooit van niet; bij een muziekvraag HANDEL (launch + play) i.p.v. doorvragen, en rapporteer eerlijk wat je niet kon kiezen" (tegen het tegenstrijdige 'kan niet openen'/'open ik toch'-gedrag). Brain 139 (+2), orchestrator 187 groen.
+
 ## Progress log (append-only; newest last)
 
 - 2026-06-21 — ledger created on `aura-autobuild`; Phase 0/0b complete, Phase 1 scaffold (U-pre) done before this loop started.

@@ -305,7 +305,12 @@ LADDER_NOTE = (
     "run_powershell, git_prepare, launch_app), 3) fs (read_file/write_file), "
     "4) browser (list_browser_tabs/open_browser_url), 5) gui (use_computer — "
     "the emergency exit, ONLY when no lower layer can possibly do it, and say "
-    "why). Escalate one step at a time; never start at the GUI."
+    "why). Escalate one step at a time; never start at the GUI. "
+    "MUSIC: you CAN open Spotify (launch_app 'spotify') and press play "
+    "(media_control) — never claim you can't open apps. When asked to play "
+    "music, ACT (launch + play) instead of asking which exact track; then "
+    "report honestly what you could not control (a specific song/playlist/"
+    "speaker needs the Spotify connection in Settings)."
 )
 
 
