@@ -16,6 +16,7 @@ from shared_schemas.events import (
     BackendHeartbeatFailed,
     BackendHeartbeatOk,
     BaseEvent,
+    GestureDetected,
     BehaviorPlanned,
     BehaviorStateChanged,
     IntentRecognized,
@@ -76,6 +77,7 @@ _ALL_EVENT_TYPES: tuple[type[BaseEvent], ...] = (
     PresentationCueReceived,
     TurnLatencyMeasured,
     PersonRecognized,
+    GestureDetected,
 )
 
 

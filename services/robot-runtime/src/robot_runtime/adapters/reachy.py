@@ -79,6 +79,15 @@ class ReachyRobotAdapter(RobotAdapter):
         self._mode = RobotMode.OFFLINE
         self._behavior_state = BehaviorState.IDLE
         self._motion_lock = asyncio.Lock()
+        # Speaker gain 0.0–1.0, applied to every PCM sample (U36e volume).
+        self._volume = float(os.environ.get("ROBOT_VOLUME", "0.8"))
+
+    def set_volume(self, level: float) -> float:
+        self._volume = max(0.0, min(1.0, level))
+        return self._volume
+
+    def get_volume(self) -> float:
+        return self._volume
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -178,6 +187,7 @@ class ReachyRobotAdapter(RobotAdapter):
             # s16le → float32 [-1, 1], resampled to the device output rate
             # (push_audio_sample wants float32; channels are adapted by the SDK).
             pcm = np.frombuffer(audio_bytes, dtype=np.int16).astype(np.float32) / 32768.0
+            pcm = pcm * self._volume  # U36e: app-controlled speaker gain
             out_rate = media.get_output_audio_samplerate()
             if out_rate and out_rate > 0 and out_rate != sample_rate:
                 n_out = int(len(pcm) * out_rate / sample_rate)

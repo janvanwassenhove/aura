@@ -8,6 +8,14 @@ from typing import Literal
 from shared_schemas.events.base import BaseEvent
 
 
+class GestureDetected(BaseEvent):
+    """A hand gesture seen by the robot camera (U36e). Transient — never stored."""
+
+    event_type: Literal["GestureDetected"] = "GestureDetected"
+    gesture: str  # e.g. "open_palm" (a wave/hi), "thumbs_up"
+    confidence: float = 0.0
+
+
 class PersonRecognized(BaseEvent):
     """Emitted when the perception layer matches (or fails to match) a face.
 

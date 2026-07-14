@@ -88,6 +88,24 @@ async def motion(command: MotionCommand) -> JSONResponse:
     return JSONResponse({"ok": ok})
 
 
+@router.get("/volume")
+async def get_volume() -> JSONResponse:
+    try:
+        return JSONResponse(await _robot.get_volume())
+    except (httpx.HTTPError, OSError) as exc:
+        return _unavailable(exc)
+
+
+@router.post("/volume")
+async def set_volume(body: dict) -> JSONResponse:
+    try:
+        return JSONResponse(await _robot.set_volume(float(body.get("volume", 0.8))))
+    except (TypeError, ValueError):
+        return JSONResponse({"error": "volume must be a number 0..1"}, status_code=422)
+    except (httpx.HTTPError, OSError) as exc:
+        return _unavailable(exc)
+
+
 @router.post("/say")
 async def say(body: dict) -> JSONResponse:
     """Make the robot SAY something out loud: brain-side TTS → robot speaker.

@@ -75,3 +75,9 @@ class RobotClient:
     async def camera_frame(self) -> bytes:
         """One PNG frame from the robot's camera (U18 perception loop)."""
         return (await self._request("GET", "/robot/camera/frame")).content
+
+    async def get_volume(self) -> dict:
+        return (await self._request("GET", "/robot/volume")).json()
+
+    async def set_volume(self, level: float) -> dict:
+        return (await self._request("POST", "/robot/volume", {"volume": level})).json()

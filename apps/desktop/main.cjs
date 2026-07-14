@@ -12,7 +12,7 @@
  * Brain logs: %APPDATA%/aura-desktop/brain.log (also in the terminal).
  */
 
-const { app, BrowserWindow, Menu, Tray, dialog, ipcMain, shell, nativeImage } = require('electron')
+const { app, BrowserWindow, Menu, Tray, dialog, ipcMain, session, shell, nativeImage } = require('electron')
 const { spawn, execSync } = require('child_process')
 const http = require('http')
 const fs = require('fs')
@@ -235,6 +235,10 @@ if (!app.requestSingleInstanceLock()) {
   app.on('second-instance', () => { if (mainWindow) { mainWindow.show(); mainWindow.focus() } })
 
   app.whenReady().then(async () => {
+    // U36e: allow the console to use the laptop microphone (voice input).
+    session.defaultSession.setPermissionRequestHandler((_wc, permission, cb) => {
+      cb(permission === 'media')
+    })
     createWindow()
     const logPath = startBrain()
     try {

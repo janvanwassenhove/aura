@@ -36,3 +36,23 @@ async def synthesize_b64(text: str) -> str | None:
     except Exception as exc:  # noqa: BLE001 — voice is best-effort, never fatal
         logger.warning("TTS synthesis failed: %s", exc)
         return None
+
+
+async def transcribe(data: bytes, filename: str = "audio.webm") -> str | None:
+    """Speech → text via OpenAI (U36e voice input). None when unavailable."""
+    if not os.environ.get("OPENAI_API_KEY"):
+        return None
+    try:
+        import io
+
+        from openai import AsyncOpenAI
+
+        client = AsyncOpenAI()
+        result = await client.audio.transcriptions.create(
+            model=os.environ.get("STT_MODEL", "gpt-4o-mini-transcribe"),
+            file=(filename, io.BytesIO(data)),
+        )
+        return result.text
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("transcription failed: %s", exc)
+        return None

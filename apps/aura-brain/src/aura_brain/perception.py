@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 from typing import Any, Protocol
 
 from shared_schemas.events.perception import PersonRecognized
@@ -79,6 +80,81 @@ class InsightFaceEmbedder:
         return [float(x) for x in face.normed_embedding]
 
 
+_HAND_MODEL_URL = (
+    "https://storage.googleapis.com/mediapipe-models/hand_landmarker/"
+    "hand_landmarker/float16/latest/hand_landmarker.task"
+)
+
+
+class HandGestureDetector:
+    """Open-palm ('hi!') detection via mediapipe hand landmarks (U36e).
+
+    No stored data, no identity — a transient reaction trigger only. Uses a
+    landmark heuristic (four fingers extended, hand upright). The small
+    hand-landmarker model (~8 MB) downloads once to ./data/models/.
+    """
+
+    name = "mediapipe-hands"
+
+    def __init__(self) -> None:
+        from pathlib import Path
+
+        from mediapipe.tasks import python as mp_python  # lazy: [gestures] extra
+        from mediapipe.tasks.python import vision
+
+        model_path = Path(os.environ.get(
+            "GESTURE_MODEL_PATH", "./data/models/hand_landmarker.task",
+        ))
+        if not model_path.exists():
+            import urllib.request
+
+            model_path.parent.mkdir(parents=True, exist_ok=True)
+            logger.info("downloading hand-landmarker model (once) → %s", model_path)
+            urllib.request.urlretrieve(_HAND_MODEL_URL, model_path)  # noqa: S310
+
+        self._landmarker = vision.HandLandmarker.create_from_options(
+            vision.HandLandmarkerOptions(
+                base_options=mp_python.BaseOptions(model_asset_path=str(model_path)),
+                num_hands=1,
+                min_hand_detection_confidence=0.6,
+            )
+        )
+
+    def detect(self, png_bytes: bytes) -> str | None:
+        """Return a gesture name ('open_palm') or None."""
+        import io
+
+        import mediapipe as mp
+        import numpy as np
+        from PIL import Image
+
+        img = np.asarray(Image.open(io.BytesIO(png_bytes)).convert("RGB"))
+        result = self._landmarker.detect(
+            mp.Image(image_format=mp.ImageFormat.SRGB, data=img)
+        )
+        if not result.hand_landmarks:
+            return None
+        lm = result.hand_landmarks[0]
+        # Fingers extended: tip above (smaller y than) its middle joint.
+        extended = sum(1 for tip, pip in ((8, 6), (12, 10), (16, 14), (20, 18))
+                       if lm[tip].y < lm[pip].y)
+        # Hand raised: wrist below the middle-finger base (hand pointing up).
+        upright = lm[0].y > lm[9].y
+        if extended >= 4 and upright:
+            return "open_palm"
+        return None
+
+
+def build_gesture_detector():
+    """HandGestureDetector, or None when mediapipe is unavailable/broken."""
+    try:
+        return HandGestureDetector()
+    except Exception as exc:  # noqa: BLE001 — gestures must never block startup
+        logger.info("gesture detector unavailable (%s) — reactions inert "
+                    "(uv sync --package aura-brain --extra gestures)", exc)
+        return None
+
+
 def build_embedder(kind: str) -> FaceEmbedder:
     if kind == "insightface":
         try:
@@ -98,12 +174,14 @@ class PerceptionLoop:
     def __init__(
         self,
         bus: Any,
-        matcher: Any,          # EmbeddingMatcher
+        matcher: Any,          # EmbeddingMatcher | None (recognition off)
         robot: Any,            # RobotClient (needs .camera_frame())
         embedder: FaceEmbedder,
         knowledge_store: Any = None,  # for display_name lookup
         interval_s: float = 2.0,
         session_id: str = "default",
+        gesture_detector: Any = None,  # HandGestureDetector | None (U36e)
+        gesture_cooldown_s: float = 8.0,
     ) -> None:
         self._bus = bus
         self._matcher = matcher
@@ -112,8 +190,16 @@ class PerceptionLoop:
         self._store = knowledge_store
         self._interval = interval_s
         self._session_id = session_id
+        self._gestures = gesture_detector
+        self._gesture_cooldown = gesture_cooldown_s
+        self._last_gesture_at = 0.0
         self._task: asyncio.Task | None = None
         self._last_seen: str | None = None  # person_id | _ABSENT | None(=never)
+
+    def set_matcher(self, matcher: Any, embedder: FaceEmbedder) -> None:
+        """Upgrade a running loop with recognition (in-app secure enable)."""
+        self._matcher = matcher
+        self._embedder = embedder
 
     def start(self) -> None:
         if self._task is None:
@@ -141,8 +227,15 @@ class PerceptionLoop:
             await asyncio.sleep(self._interval)
 
     async def tick(self) -> None:
-        """One frame → embedding → match → (maybe) event. Public for tests."""
+        """One frame → gestures + recognition → (maybe) events. Public for tests."""
         frame = await self._robot.camera_frame()
+
+        # Gestures (U36e): transient reaction trigger, no identity required.
+        if self._gestures is not None:
+            await self._detect_gesture(frame)
+
+        if self._matcher is None:
+            return  # recognition not enabled (yet)
         embedding = await asyncio.to_thread(self._embedder.embed, frame)
 
         if embedding is None:
@@ -151,6 +244,26 @@ class PerceptionLoop:
 
         person_id, confidence = self._matcher.identify(embedding)
         await self._transition(person_id or "", person_id, confidence)
+
+    async def _detect_gesture(self, frame: bytes) -> None:
+        import time
+
+        if time.monotonic() - self._last_gesture_at < self._gesture_cooldown:
+            return
+        try:
+            gesture = await asyncio.to_thread(self._gestures.detect, frame)
+        except Exception as exc:  # noqa: BLE001 — detector hiccups are non-fatal
+            logger.debug("gesture detect failed: %s", exc)
+            return
+        if gesture is None:
+            return
+        self._last_gesture_at = time.monotonic()
+        from shared_schemas.events.perception import GestureDetected
+
+        await self._bus.publish(GestureDetected(
+            session_id=self._session_id, gesture=gesture, confidence=0.8,
+        ))
+        logger.info("GestureDetected: %s", gesture)
 
     async def _transition(self, seen_key: str, person_id: str | None, confidence: float) -> None:
         if seen_key == self._last_seen:
