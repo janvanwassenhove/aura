@@ -67,3 +67,20 @@ class AuthRequiredEvent(BaseEvent):
     user_id: str
     provider: str  # e.g. "m365", "google", "github"
     reason: str = ""  # e.g. "refresh_token_expired"
+
+
+class AgentRoundStarted(BaseEvent):
+    """U57: one reasoning round of the agentic loop began."""
+
+    event_type: Literal["AgentRoundStarted"] = "AgentRoundStarted"
+    round_no: int
+    max_rounds: int
+
+
+class AgentRoundCompleted(BaseEvent):
+    """U57: a round finished — which tools ran and whether the loop is done."""
+
+    event_type: Literal["AgentRoundCompleted"] = "AgentRoundCompleted"
+    round_no: int
+    tool_names: list[str] = []
+    done: bool = False

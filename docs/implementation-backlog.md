@@ -188,8 +188,8 @@ the human can unblock it.
 
 ## Agentic fase (plan: [agentic-plan.md](agentic-plan.md))
 
-- [ ] **U57 — agentic loop core** · deps: — · ESSENTIEEL
-  Pipeline-_run wordt een echte multi-ronde loop (redeneren → tools → resultaat → volgende ronde; stop bij finaal antwoord / AGENT_MAX_ROUNDS / eigenaars-stop). AgentRoundStarted/Completed-events op de bus. Steering: POST /orchestrator/agent/steer + /agent/stop. Approval-gate per tool-call blijft. Tests met gescripte LLM.
+- [x] **U57 — agentic loop core** · deps: — · ESSENTIEEL · `pending`
+  `_orchestrate_impl` is nu een echte multi-ronde loop: redeneren → tools kiezen → (approval-gate per call, elke ronde) → uitvoeren → resultaten terug in de context → volgende ronde; stopt bij finaal antwoord (geen tool-calls meer), AGENT_MAX_ROUNDS (default 8, dan geforceerde tool-loze synthese "budget op"), of eigenaars-stop (afronden na huidige ronde). `AgentRoundStarted/Completed`-events (shared-schemas) op de bus → console-eventlog. Steering: `pipeline.steer()` + `POST /orchestrator/agent/steer` (guidance wordt volgende ronde als system-note geïnjecteerd), `request_stop()` + `POST /orchestrator/agent/stop`. Ronde-1-gedrag identiek aan voorheen (alle 154 bestaande tests bleven groen). +5 looptests (multi-ronde, budget, steering mid-loop, stop mid-loop, approval×2 over 2 rondes). Orchestrator 159, schemas 123, brain 128 groen.
 - [ ] **U58 — tool-ladder + basistools** · deps: U57
   Layer-metadata per tool + ladder-instructie in de prompt (API→CLI→FS→browser→GUI; Computer Use = nooduitgang). Nieuwe tools: run_powershell (gated), read_file (pad-begrensd), write_file (gated), git_prepare, run_tests/run_build-presets.
 - [ ] **U59 — skills-systeem** · deps: U57

@@ -17,6 +17,8 @@ from shared_schemas.events.behavior import (
 )
 from shared_schemas.events.conversation import IntentRecognized, ResponseDrafted
 from shared_schemas.events.orchestrator import (
+    AgentRoundCompleted,
+    AgentRoundStarted,
     ApprovalDenied,
     ApprovalGranted,
     ApprovalRequested,
@@ -53,6 +55,8 @@ __all__ = [
     "IntentRecognized",
     "ResponseDrafted",
     # orchestrator
+    "AgentRoundCompleted",
+    "AgentRoundStarted",
     "ToolCallRequested",
     "ToolCallSucceeded",
     "ToolCallFailed",

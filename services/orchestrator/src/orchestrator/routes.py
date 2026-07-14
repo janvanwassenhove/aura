@@ -127,6 +127,34 @@ def _llm_config_response(cfg) -> LLMConfigResponse:
     )
 
 
+# ------------------------------------------------------------------
+# U57: agentic loop — owner steering & stop
+# ------------------------------------------------------------------
+
+
+@router.post("/orchestrator/agent/steer")
+async def agent_steer(body: dict) -> JSONResponse:
+    """Queue owner guidance for the running loop (injected next round)."""
+    if _pipeline is None:
+        return JSONResponse({"error": "pipeline not ready"}, status_code=503)
+    text = str((body or {}).get("text", "")).strip()
+    if not text:
+        return JSONResponse({"error": "text is required"}, status_code=422)
+    session_id = str((body or {}).get("session_id", "default"))
+    _pipeline.steer(session_id, text)
+    return JSONResponse({"queued": True, "session_id": session_id})
+
+
+@router.post("/orchestrator/agent/stop")
+async def agent_stop(body: dict | None = None) -> JSONResponse:
+    """Ask the running loop to wrap up after the current round."""
+    if _pipeline is None:
+        return JSONResponse({"error": "pipeline not ready"}, status_code=503)
+    session_id = str((body or {}).get("session_id", "default"))
+    _pipeline.request_stop(session_id)
+    return JSONResponse({"stopping": True, "session_id": session_id})
+
+
 @router.get("/orchestrator/config/llm", response_model=LLMConfigResponse)
 async def get_llm_config() -> LLMConfigResponse:
     """Return the current runtime LLM provider and model."""
