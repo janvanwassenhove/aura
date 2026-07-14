@@ -35,6 +35,25 @@
     </div>
 
     <div class="mt-3">
+      <h3 class="section-label">Quick Actions</h3>
+      <div class="qa-grid">
+        <button class="qa-btn" :disabled="acting" title="Wave the antennas" @click="act('wave')">
+          <Hand :size="13" /> Wave
+        </button>
+        <button class="qa-btn" :disabled="acting" title="Nod the head" @click="act('nod')">
+          <MoveVertical :size="13" /> Nod
+        </button>
+        <button class="qa-btn" :disabled="acting" title="Lively gesture" @click="act('gesture')">
+          <Sparkles :size="13" /> Gesture
+        </button>
+        <button class="qa-btn" :disabled="acting" title="Take a bow" @click="act('bow')">
+          <ChevronsDown :size="13" /> Bow
+        </button>
+      </div>
+      <p v-if="actError" class="qa-error">{{ actError }}</p>
+    </div>
+
+    <div class="mt-3">
       <h3 class="section-label">Motion Log</h3>
       <ul class="motion-log">
         <li v-for="entry in robotStore.motionLog" :key="entry.id" class="motion-entry">
@@ -49,12 +68,46 @@
 </template>
 
 <script setup lang="ts">
-import { Volume2, VolumeX } from 'lucide-vue-next'
+import { ref } from 'vue'
+import { ChevronsDown, Hand, MoveVertical, Sparkles, Volume2, VolumeX } from 'lucide-vue-next'
 import { useRobotStore } from '../stores/robotStore'
 
+const BRAIN_URL = import.meta.env.VITE_BRAIN_URL ?? import.meta.env.VITE_ORCHESTRATOR_URL ?? 'http://localhost:8000'
+
 const robotStore = useRobotStore()
+const acting = ref(false)
+const actError = ref('')
+
+async function act(motionId: string) {
+  acting.value = true
+  actError.value = ''
+  try {
+    const resp = await fetch(`${BRAIN_URL}/robot/motion`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ motion_id: motionId, speed: 1.0, amplitude: 0.6 }),
+    })
+    if (!resp.ok) actError.value = 'Robot unreachable — is it switched on?'
+  } catch {
+    actError.value = 'Robot unreachable — is it switched on?'
+  } finally {
+    acting.value = false
+  }
+}
 
 function fmtTime(iso: string): string {
   return new Date(iso).toLocaleTimeString()
 }
 </script>
+
+<style scoped>
+.qa-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.4rem; }
+.qa-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 0.3rem;
+  background: var(--surface-3); border: 1px solid var(--border); border-radius: var(--radius-sm);
+  color: var(--text-muted); font-size: 0.78rem; padding: 0.35rem 0.5rem; cursor: pointer;
+}
+.qa-btn:hover:not(:disabled) { color: var(--text); border-color: var(--accent-border); }
+.qa-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.qa-error { font-size: 0.72rem; color: var(--danger-text); margin-top: 0.3rem; }
+</style>

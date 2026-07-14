@@ -20,8 +20,16 @@
       <div v-if="conversationStore.isProcessing" class="turn turn-assistant">
         <div class="turn-text animate-pulse">AURA is thinking…</div>
       </div>
-      <div v-if="conversationStore.turns.length === 0" class="text-gray-400 text-sm">
-        No conversation yet. Type below to start.
+      <div v-if="conversationStore.turns.length === 0" class="getting-started">
+        <h3 class="gs-title"><Sparkles :size="14" /> Talk to your robot</h3>
+        <p class="gs-line">Type below and press <strong>Send</strong> — the reply appears here.</p>
+        <div class="gs-suggestions">
+          <button v-for="s in suggestions" :key="s" class="gs-chip" @click="trySuggestion(s)">{{ s }}</button>
+        </div>
+        <p class="gs-line gs-muted">
+          Make the robot move with the <strong>Quick Actions</strong> on the left, watch what it
+          sees in <strong>Robot Camera</strong>, and teach it your face with <strong>This is me</strong>.
+        </p>
       </div>
     </div>
 
@@ -52,11 +60,22 @@
 
 <script setup lang="ts">
 import { ref, watch, nextTick } from 'vue'
-import { Wrench } from 'lucide-vue-next'
+import { Sparkles, Wrench } from 'lucide-vue-next'
 import { useConversationStore } from '../stores/conversationStore'
 
 const conversationStore = useConversationStore()
 const scrollEl = ref<HTMLElement | null>(null)
+
+const suggestions = [
+  'What can you do?',
+  'What meetings do I have today?',
+  'Tell me a fun fact',
+]
+
+async function trySuggestion(text: string) {
+  conversationStore.pendingText = text
+  await submit()
+}
 
 async function submit() {
   const text = conversationStore.pendingText.trim()
@@ -77,3 +96,19 @@ function fmtTime(iso: string): string {
   return new Date(iso).toLocaleTimeString()
 }
 </script>
+
+<style scoped>
+.getting-started {
+  border: 1px dashed var(--border); border-radius: var(--radius);
+  padding: 0.9rem 1rem; color: var(--text-muted); font-size: 0.82rem;
+}
+.gs-title { display: flex; align-items: center; gap: 0.4rem; font-weight: 600; color: var(--text); margin-bottom: 0.4rem; }
+.gs-line { margin: 0.25rem 0; }
+.gs-muted { color: var(--text-faint); font-size: 0.76rem; }
+.gs-suggestions { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0.5rem 0; }
+.gs-chip {
+  background: var(--surface-3); border: 1px solid var(--border); border-radius: 999px;
+  color: var(--text-muted); font-size: 0.75rem; padding: 0.25rem 0.7rem; cursor: pointer;
+}
+.gs-chip:hover { color: var(--text); border-color: var(--accent-border); }
+</style>

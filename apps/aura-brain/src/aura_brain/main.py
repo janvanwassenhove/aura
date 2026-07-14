@@ -24,6 +24,7 @@ The brain↔robot-runtime boundary stays a network hop (the Pi) and is never mer
 
 from __future__ import annotations
 
+import logging
 import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -206,8 +207,34 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     _judgment = JudgmentLayer(ctx.knowledge_store)
     ctx.pipeline.set_judgment_layer(_judgment)
 
+    # U36: robot proxy for the console (video panel + quick actions) and the
+    # greet-on-recognition flow. One RobotClient serves both.
+    from aura_brain import robot_api
+    from aura_brain.robot_client import RobotClient
+    from shared_schemas.events.conversation import ResponseDrafted
+    from shared_schemas.robot.models import MotionCommand
+
+    _robot = RobotClient()
+    robot_api.init(_robot)
+
     async def _on_person_recognized(event: PersonRecognized) -> None:
         ctx.pipeline.set_active_person(event.person_id if event.known else None)
+        # Greet a KNOWN person: wave + spoken hello + a visible turn in the
+        # console. The perception loop debounces, so this fires once per
+        # appearance — not per frame (U18). Recognition identifies; the
+        # greeting reveals nothing sensitive.
+        if event.known and event.display_name:
+            greeting = f"Hello {event.display_name}! Good to see you."
+            try:
+                await _robot.execute_motion(
+                    MotionCommand(motion_id="wave", speed=1.0, amplitude=0.6, direction=None)
+                )
+                await _robot.speak(greeting)
+            except Exception as exc:  # robot offline → still greet in the console
+                logging.getLogger(__name__).debug("greeting robot call failed: %s", exc)
+            await ctx.bus.publish(ResponseDrafted(
+                session_id=session_id, response_text=greeting,
+            ))
 
     ctx.bus.subscribe(PersonRecognized, _on_person_recognized)
 
@@ -341,6 +368,9 @@ def create_app() -> FastAPI:
 
     from aura_brain import recognition_api
     app.include_router(recognition_api.router)  # U18
+
+    from aura_brain import robot_api
+    app.include_router(robot_api.router)  # U36: console → robot proxy
 
     return app
 
