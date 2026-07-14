@@ -227,6 +227,20 @@ class ReachyRobotAdapter(RobotAdapter):
     # Vision
     # ------------------------------------------------------------------
 
+    async def get_camera_frame_jpeg(self) -> bytes:
+        """Raw JPEG straight from the SDK — no transcode, for the MJPEG stream."""
+        media = self._media()
+        if media is None:
+            raise RuntimeError("camera unavailable: media backend disabled")
+
+        def _grab_jpeg() -> bytes:
+            jpeg = media.get_frame_jpeg()
+            if jpeg is None:
+                raise RuntimeError("no camera frame available")
+            return bytes(jpeg)
+
+        return await asyncio.to_thread(_grab_jpeg)
+
     async def get_camera_frame(self) -> bytes:
         media = self._media()
         if media is None:

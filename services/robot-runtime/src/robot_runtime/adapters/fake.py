@@ -107,6 +107,15 @@ class FakeRobotAdapter(RobotAdapter):
         img.save(buf, format="PNG")
         return buf.getvalue()
 
+    async def get_camera_frame_jpeg(self) -> bytes:
+        """Synthetic grey JPEG (for the MJPEG stream)."""
+        frame = np.full(_FAKE_FRAME_SHAPE, 128, dtype=np.uint8)
+        from PIL import Image
+        img = Image.fromarray(frame)
+        buf = io.BytesIO()
+        img.save(buf, format="JPEG")
+        return buf.getvalue()
+
     # ------------------------------------------------------------------
     # Motion
     # ------------------------------------------------------------------

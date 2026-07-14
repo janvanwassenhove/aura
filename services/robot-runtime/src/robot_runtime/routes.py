@@ -120,6 +120,40 @@ async def camera_frame() -> Response:
     return Response(content=png, media_type="image/png")
 
 
+_STREAM_FPS = 8.0
+
+
+@router.get("/robot/camera/stream")
+async def camera_stream() -> Response:
+    """MJPEG stream (multipart/x-mixed-replace) — smooth live video for the
+    console. One consumer per connection; frames straight from the adapter."""
+    assert adapter is not None
+    _touch()
+    import asyncio
+
+    from fastapi.responses import StreamingResponse
+
+    grab = getattr(adapter, "get_camera_frame_jpeg", adapter.get_camera_frame)
+
+    async def _frames():
+        while True:
+            try:
+                jpeg = await grab()
+            except RuntimeError:
+                await asyncio.sleep(1.0)
+                continue
+            yield (
+                b"--frame\r\nContent-Type: image/jpeg\r\n"
+                b"Content-Length: " + str(len(jpeg)).encode() + b"\r\n\r\n"
+                + jpeg + b"\r\n"
+            )
+            await asyncio.sleep(1.0 / _STREAM_FPS)
+
+    return StreamingResponse(
+        _frames(), media_type="multipart/x-mixed-replace; boundary=frame",
+    )
+
+
 # ------------------------------------------------------------------
 # Mode
 # ------------------------------------------------------------------

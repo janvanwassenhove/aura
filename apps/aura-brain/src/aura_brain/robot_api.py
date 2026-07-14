@@ -43,6 +43,29 @@ async def status() -> JSONResponse:
         return _unavailable(exc)
 
 
+@router.get("/camera/stream")
+async def camera_stream() -> Response:
+    """Proxy the robot's MJPEG stream to the console (single origin)."""
+    from fastapi.responses import StreamingResponse
+
+    base_url = getattr(_robot, "_base_url", "http://robot-runtime:8001")
+    client = httpx.AsyncClient(timeout=httpx.Timeout(10.0, read=None))
+
+    async def _relay():
+        try:
+            async with client.stream("GET", f"{base_url}/robot/camera/stream") as resp:
+                async for chunk in resp.aiter_bytes():
+                    yield chunk
+        except (httpx.HTTPError, OSError):
+            return  # robot gone — the <img> onerror handler retries
+        finally:
+            await client.aclose()
+
+    return StreamingResponse(
+        _relay(), media_type="multipart/x-mixed-replace; boundary=frame",
+    )
+
+
 @router.get("/camera/frame")
 async def camera_frame() -> Response:
     try:

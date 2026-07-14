@@ -217,38 +217,50 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     _robot = RobotClient()
     robot_api.init(_robot)
 
+    # U36: EMBODIMENT — every assistant reply is spoken out loud on the robot
+    # with a gesture matched to the content (greeting→wave, question→tilt,
+    # excitement→gesture, default→nod). Toggle with SPEAK_REPLIES=false.
+    from aura_brain import voice
+    from aura_brain.embodiment import gesture_for
+
+    _speak_replies = os.environ.get("SPEAK_REPLIES", "true").lower() == "true"
+
+    async def _embody_reply(event: ResponseDrafted) -> None:
+        text = (event.response_text or "").strip()
+        if not _speak_replies or not text or text.startswith("[echo]"):
+            return
+        try:
+            audio_b64 = await voice.synthesize_b64(text[:600])  # cap TTS cost
+            await _robot.execute_motion(MotionCommand(
+                motion_id=gesture_for(text), speed=1.0, amplitude=0.5, direction=None,
+            ))
+            await _robot.speak(text, audio_b64=audio_b64)
+        except Exception as exc:  # robot offline → the console turn still shows
+            logging.getLogger(__name__).debug("embodied reply failed: %s", exc)
+
+    ctx.bus.subscribe(ResponseDrafted, _embody_reply)
+
     async def _on_person_recognized(event: PersonRecognized) -> None:
         ctx.pipeline.set_active_person(event.person_id if event.known else None)
         # Greet a KNOWN person: personalized text (the pipeline injects their
-        # profile facts via the judgment layer, U19e), spoken out loud via
-        # brain-side TTS, plus a wave. The perception loop debounces, so this
-        # fires once per appearance — not per frame (U18).
+        # profile facts via the judgment layer, U19e). The pipeline publishes
+        # ResponseDrafted → the embodiment handler above speaks it + waves.
+        # The perception loop debounces: once per appearance, not per frame.
         if event.known and event.display_name:
             name = event.display_name
-            greeting = f"Hello {name}! Good to see you."
             try:
-                reply = await ctx.pipeline.orchestrate(
+                await ctx.pipeline.orchestrate(
                     f"(system note: {name} just walked up to you and you "
                     f"recognized their face.) Greet {name} warmly by name in "
                     f"one short spoken sentence — personal, no lists, no markdown.",
                     session_id,
                 )
-                if reply and not reply.startswith("[echo]"):
-                    greeting = reply
             except Exception as exc:
                 logging.getLogger(__name__).debug("personalized greeting failed: %s", exc)
                 await ctx.bus.publish(ResponseDrafted(
-                    session_id=session_id, response_text=greeting,
+                    session_id=session_id,
+                    response_text=f"Hello {name}! Good to see you.",
                 ))
-            from aura_brain import voice
-
-            try:
-                await _robot.execute_motion(
-                    MotionCommand(motion_id="wave", speed=1.0, amplitude=0.6, direction=None)
-                )
-                await _robot.speak(greeting, audio_b64=await voice.synthesize_b64(greeting))
-            except Exception as exc:  # robot offline → the console turn still shows
-                logging.getLogger(__name__).debug("greeting robot call failed: %s", exc)
 
     ctx.bus.subscribe(PersonRecognized, _on_person_recognized)
 
@@ -279,31 +291,48 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     )
 
     # --- U18: live perception loop — camera → face embedding → PersonRecognized.
-    # Needs encryption (embeddings are biometric data) so it requires the
-    # knowledge passphrase; gated by RECOGNITION_ENABLED.
-    from aura_brain import recognition_api
+    # Needs encryption (embeddings are biometric data). Started at boot when the
+    # passphrase is in the env, or later via /setup/secure (in-app enable).
+    from aura_brain import recognition_api, setup_api
 
-    if os.environ.get("RECOGNITION_ENABLED", "false").lower() == "true" and _kpass:
+    def _start_recognition(omk: bytes) -> None:
         from aura_brain.perception import PerceptionLoop, build_embedder
         from shared_schemas.knowledge.recognition import EmbeddingMatcher
 
         _rec_matcher = EmbeddingMatcher(
-            crypto.derive_omk(_kpass, _salt),
-            path=os.environ.get("RECOGNITION_DB_PATH", "./data/recognition.enc.json"),
+            omk, path=os.environ.get("RECOGNITION_DB_PATH", "./data/recognition.enc.json"),
         )
         _rec_embedder = build_embedder(os.environ.get("FACE_EMBEDDER", "null"))
-        _rec_robot = RobotClient()
         ctx._perception = PerceptionLoop(
-            ctx.bus, _rec_matcher, _rec_robot, _rec_embedder,
+            ctx.bus, _rec_matcher, _robot, _rec_embedder,
             knowledge_store=ctx.knowledge_store,
             interval_s=float(os.environ.get("RECOGNITION_INTERVAL_S", "2.0")),
             session_id=session_id,
         )
         ctx._perception.start()
         recognition_api.init(
-            _rec_matcher, _rec_embedder, _rec_robot, ctx.knowledge_store,
+            _rec_matcher, _rec_embedder, _robot, ctx.knowledge_store,
             loop=ctx._perception,
         )
+
+    def _swap_knowledge_store(new_store) -> None:
+        """Live-swap to the encrypted store (in-app secure enable, U34-slice)."""
+        from shared_schemas.knowledge import JudgmentLayer as _JL
+
+        ctx.knowledge_store = new_store
+        knowledge_api.set_store(new_store)
+        knowledge_api.set_omk_loaded(True)
+        ctx.pipeline.set_judgment_layer(_JL(new_store))
+
+    if os.environ.get("RECOGNITION_ENABLED", "false").lower() == "true" and _kpass:
+        _start_recognition(crypto.derive_omk(_kpass, _salt))
+
+    setup_api.init(
+        get_store=lambda: ctx.knowledge_store,
+        swap_store=_swap_knowledge_store,
+        start_recognition=_start_recognition,
+        already_encrypted=lambda: knowledge_api.is_omk_loaded(),
+    )
 
     # --- U14: heartbeat watches the REAL failure surface — the brain↔robot link
     # and upstream internet — not sibling containers (which no longer exist after
@@ -385,6 +414,9 @@ def create_app() -> FastAPI:
 
     from aura_brain import robot_api
     app.include_router(robot_api.router)  # U36: console → robot proxy
+
+    from aura_brain import setup_api
+    app.include_router(setup_api.router)  # U34: in-app secure/setup
 
     return app
 

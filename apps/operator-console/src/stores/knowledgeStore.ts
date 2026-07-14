@@ -153,6 +153,57 @@ export const useKnowledgeStore = defineStore('knowledge', () => {
     }
   }
 
+  // ── In-app secure enable (U34-slice) + face recognition ──
+
+  const recognitionEnabled = ref<boolean | null>(null)
+
+  async function fetchRecognition(): Promise<void> {
+    try {
+      const resp = await fetch(`${BRAIN_URL}/recognition/status`)
+      recognitionEnabled.value = resp.ok ? (await resp.json()).enabled === true : false
+    } catch {
+      recognitionEnabled.value = false
+    }
+  }
+
+  async function secure(passphrase: string, remember: boolean): Promise<boolean> {
+    error.value = null
+    try {
+      const resp = await fetch(`${BRAIN_URL}/setup/secure`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ passphrase, remember }),
+      })
+      const body = await resp.json().catch(() => ({}))
+      if (!resp.ok) {
+        error.value = body.error ?? `Securing failed (${resp.status})`
+        return false
+      }
+      await fetchTier()
+      await fetchRecognition()
+      return true
+    } catch {
+      error.value = 'Could not reach the brain.'
+      return false
+    }
+  }
+
+  async function teachFace(personId: string): Promise<string> {
+    try {
+      const resp = await fetch(`${BRAIN_URL}/recognition/enroll`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ person_id: personId }),
+      })
+      const body = await resp.json().catch(() => ({}))
+      return resp.ok
+        ? `Face learned — the robot now recognizes ${body.enrolled}.`
+        : (body.error ?? `Enrollment failed (${resp.status})`)
+    } catch {
+      return 'Could not reach the brain.'
+    }
+  }
+
   function clearDetail() {
     detail.value = null
   }
@@ -168,9 +219,10 @@ export const useKnowledgeStore = defineStore('knowledge', () => {
   }
 
   return {
-    people, detail, tier, omkLoaded, locked, loading, error,
+    people, detail, tier, omkLoaded, locked, loading, error, recognitionEnabled,
     fetchTier, fetchPeople, inspectPerson, upsertPerson,
     addFact, deleteFact, forgetPerson, setConsent, lock,
+    fetchRecognition, secure, teachFace,
     clearDetail, $reset,
   }
 })

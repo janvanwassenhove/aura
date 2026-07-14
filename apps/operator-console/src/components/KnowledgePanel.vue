@@ -21,6 +21,27 @@
 
       <div v-if="store.error" class="knowledge-error">{{ store.error }}</div>
 
+      <!-- Secure banner: shown until the knowledge store is encrypted -->
+      <div v-if="!store.omkLoaded" class="secure-banner">
+        <div class="secure-text">
+          <ShieldAlert :size="15" class="secure-icon" />
+          <div>
+            <strong>Not yet secured.</strong> Set a passphrase to encrypt everything
+            AURA knows — this also unlocks <strong>face recognition</strong> so the
+            robot can greet you by name.
+          </div>
+        </div>
+        <form class="secure-form" @submit.prevent="doSecure">
+          <input v-model="securePass" type="password" class="field-input" placeholder="Choose a passphrase (min 8 chars)" autocomplete="new-password" />
+          <label class="secure-remember">
+            <input v-model="secureRemember" type="checkbox" /> Remember on this laptop (auto-unlock)
+          </label>
+          <button class="btn-apply" type="submit" :disabled="securePass.length < 8 || securing">
+            {{ securing ? 'Securing…' : 'Secure & enable recognition' }}
+          </button>
+        </form>
+      </div>
+
       <div class="knowledge-body">
         <!-- Left: people list -->
         <div class="people-col">
@@ -64,7 +85,21 @@
               Minor — explicit facts only; no passive learning without consent (ADR-008 §10).
             </p>
 
-            <div class="col-title">Explicit facts</div>
+            <!-- Teach face: look at the robot, click, done -->
+            <div v-if="store.recognitionEnabled" class="teach-face-row">
+              <button class="btn-teach" :disabled="teaching" @click="doTeachFace">
+                <ScanFace :size="14" />
+                {{ teaching ? 'Looking…' : `Teach ${store.detail.person.display_name}'s face` }}
+              </button>
+              <span class="teach-hint">Look straight at the robot's camera, then click.</span>
+            </div>
+            <p v-if="teachMessage" class="teach-msg">{{ teachMessage }}</p>
+
+            <div class="col-title">Facts</div>
+            <p class="facts-hint">
+              Things AURA should remember — they make greetings and conversations
+              personal. Example: <em>favorite coffee</em> → <em>espresso</em>.
+            </p>
             <ul class="fact-list">
               <li v-for="f in store.detail.facts" :key="f.fact_id" class="fact-row">
                 <span class="fact-key">{{ f.key }}</span>
@@ -74,10 +109,16 @@
               <li v-if="store.detail.facts.length === 0" class="empty-hint">No facts recorded.</li>
             </ul>
 
+            <div class="fact-suggestions">
+              <button
+                v-for="s in factSuggestions" :key="s" type="button" class="fact-chip"
+                @click="newFactKey = s"
+              >{{ s }}</button>
+            </div>
             <form class="add-fact-form" @submit.prevent="addFact">
-              <input v-model="newFactKey" class="field-input" placeholder="key" required />
-              <input v-model="newFactValue" class="field-input" placeholder="value" required />
-              <button type="submit" class="btn-apply">Add fact</button>
+              <input v-model="newFactKey" class="field-input" placeholder="what (e.g. hobby)" required />
+              <input v-model="newFactValue" class="field-input" placeholder="answer (e.g. cycling)" required />
+              <button type="submit" class="btn-apply">Add</button>
             </form>
 
             <div class="col-title">Observed signals <span class="provenance-hint">(learned, decaying)</span></div>
@@ -101,7 +142,7 @@
 
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
-import { Brain, Lock, LockOpen, X } from 'lucide-vue-next'
+import { Brain, Lock, LockOpen, ScanFace, ShieldAlert, X } from 'lucide-vue-next'
 import { useKnowledgeStore } from '../stores/knowledgeStore'
 
 defineEmits<{ close: [] }>()
@@ -114,9 +155,39 @@ const newPersonRole = ref('guest')
 const newFactKey = ref('')
 const newFactValue = ref('')
 
+const factSuggestions = ['favorite coffee', 'hobby', 'birthday', 'works on', 'favorite music']
+
+const securePass = ref('')
+const secureRemember = ref(true)
+const securing = ref(false)
+const teaching = ref(false)
+const teachMessage = ref('')
+
+async function doSecure() {
+  securing.value = true
+  try {
+    const ok = await store.secure(securePass.value, secureRemember.value)
+    if (ok) securePass.value = ''
+  } finally {
+    securing.value = false
+  }
+}
+
+async function doTeachFace() {
+  if (!store.detail) return
+  teaching.value = true
+  teachMessage.value = ''
+  try {
+    teachMessage.value = await store.teachFace(store.detail.person.person_id)
+  } finally {
+    teaching.value = false
+  }
+}
+
 onMounted(async () => {
   await store.fetchTier()
   await store.fetchPeople()
+  await store.fetchRecognition()
 })
 
 async function addPerson() {
@@ -241,4 +312,36 @@ function confirmForget() {
 .empty-hint { color: var(--text-faint); font-size: 0.78rem; padding: 0.3rem 0; }
 .detail-placeholder { margin: auto; }
 .provenance-hint { text-transform: none; color: var(--text-faint); }
+
+/* Secure banner */
+.secure-banner {
+  margin: 0.6rem 1rem 0; padding: 0.7rem 0.85rem; border-radius: var(--radius);
+  background: var(--warn-bg); border: 1px solid var(--warn);
+}
+.secure-text { display: flex; gap: 0.5rem; color: var(--warn-text); font-size: 0.78rem; }
+.secure-icon { flex-shrink: 0; margin-top: 0.1rem; }
+.secure-form { display: flex; gap: 0.5rem; align-items: center; margin-top: 0.55rem; flex-wrap: wrap; }
+.secure-form .field-input { flex: 1; min-width: 12rem; }
+.secure-remember { display: inline-flex; align-items: center; gap: 0.3rem; font-size: 0.72rem; color: var(--warn-text); }
+
+/* Teach face */
+.teach-face-row { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.5rem; }
+.btn-teach {
+  display: inline-flex; align-items: center; gap: 0.35rem;
+  background: var(--accent); color: var(--on-accent); border: none;
+  border-radius: var(--radius-sm); font-size: 0.78rem; padding: 0.35rem 0.75rem; cursor: pointer;
+}
+.btn-teach:hover:not(:disabled) { background: var(--accent-hover); }
+.btn-teach:disabled { opacity: 0.6; }
+.teach-hint { font-size: 0.7rem; color: var(--text-faint); }
+.teach-msg { font-size: 0.74rem; color: var(--ok); margin-top: 0.3rem; }
+
+/* Facts UX */
+.facts-hint { font-size: 0.72rem; color: var(--text-faint); margin: 0 0 0.35rem; }
+.fact-suggestions { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-bottom: 0.35rem; }
+.fact-chip {
+  background: var(--surface-3); border: 1px solid var(--border); border-radius: 999px;
+  color: var(--text-muted); font-size: 0.68rem; padding: 0.15rem 0.55rem; cursor: pointer;
+}
+.fact-chip:hover { color: var(--text); border-color: var(--accent-border); }
 </style>
