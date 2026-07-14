@@ -47,3 +47,49 @@ def test_unknown_person_is_404() -> None:
     app = create_app()
     with TestClient(app) as client:
         assert client.get("/knowledge/people/nobody").status_code == 404
+
+
+def test_person_description_and_skill_references() -> None:
+    """U63: describe a person + see their skills from their profile."""
+    from aura_brain import skills_api
+    from orchestrator.skills import Skill, SkillStore
+    import tempfile
+
+    app = create_app()
+    with TestClient(app) as client, tempfile.TemporaryDirectory() as tmp:
+        skills_api.init(SkillStore(tmp))
+        assert client.put("/knowledge/people/elke", json={
+            "display_name": "Elke", "role": "family",
+            "description": "my partner; prefers short answers",
+        }).status_code == 200
+
+        # Description-only update MERGES: name/role untouched.
+        assert client.put("/knowledge/people/elke", json={
+            "description": "my partner; loves ska; prefers short answers",
+        }).status_code == 200
+        body = client.get("/knowledge/people/elke").json()
+        assert body["person"]["display_name"] == "Elke"
+        assert body["person"]["role"] == "family"
+        assert "loves ska" in body["person"]["description"]
+
+        # A skill scoped to this person shows up in their profile.
+        skills_api.get_store().save(Skill(
+            name="playlist-for-elke", description="how Elke likes music picked",
+            person="elke", body="Skate punk first.",
+        ))
+        body = client.get("/knowledge/people/elke").json()
+        assert [s["name"] for s in body["skills"]] == ["playlist-for-elke"]
+
+        # Another person's profile does not list it.
+        assert client.put("/knowledge/people/jan2", json={"display_name": "Jan"}).status_code == 200
+        assert client.get("/knowledge/people/jan2").json()["skills"] == []
+
+
+def test_description_lands_in_judgment_context() -> None:
+    """The portrait personalizes conversations via the judgment layer."""
+    from shared_schemas.knowledge import Person, PersonContext
+
+    person = Person(person_id="elke", display_name="Elke", role="family",
+                    description="my partner; prefers short answers")
+    note = PersonContext(person=person).to_system_note()
+    assert "About them: my partner; prefers short answers" in note
