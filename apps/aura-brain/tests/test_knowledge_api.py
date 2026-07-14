@@ -93,3 +93,23 @@ def test_description_lands_in_judgment_context() -> None:
                     description="my partner; prefers short answers")
     note = PersonContext(person=person).to_system_note()
     assert "About them: my partner; prefers short answers" in note
+
+
+def test_wikilink_mentions_appear_as_backlinks() -> None:
+    """U68: a skill that mentions [[person]] shows in their profile as backlink."""
+    from aura_brain import skills_api
+    from orchestrator.skills import Skill, SkillStore
+    import tempfile
+
+    app = create_app()
+    with TestClient(app) as client, tempfile.TemporaryDirectory() as tmp:
+        skills_api.init(SkillStore(tmp))
+        assert client.put("/knowledge/people/jan3", json={"display_name": "Jan"}).status_code == 200
+        skills_api.get_store().save(Skill(
+            name="weekly-report", description="how the weekly report goes",
+            body="Collect input, then ask [[jan3]] to review before sending.",
+        ))
+        body = client.get("/knowledge/people/jan3").json()
+        assert body["skills"] == [{"name": "weekly-report",
+                                   "description": "how the weekly report goes",
+                                   "enabled": True, "via": "mention"}]

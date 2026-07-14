@@ -136,10 +136,13 @@
               v-model="editDescription"
               class="field-input desc-input"
               rows="2"
-              placeholder="Describe this person — role in your life, style, preferences… (used to personalize conversations)"
+              placeholder="Describe this person — role in your life, style, preferences… Use [[skill-name]] or [[person-id]] to link. (Used to personalize conversations.)"
               aria-label="Person description"
               @blur="saveDescription"
             />
+            <p v-if="editDescription.includes('[[')" class="desc-preview">
+              <WikiText :text="editDescription" @open="openWikiTarget" />
+            </p>
 
             <!-- Teach face: look at the robot, click, done -->
             <div v-if="store.recognitionEnabled" class="teach-face-row">
@@ -200,8 +203,9 @@
             <div class="col-title">Skills — their way of working</div>
             <ul class="fact-list">
               <li v-for="sk in store.detail.skills ?? []" :key="sk.name" class="fact-row skill-ref-row">
-                <span class="skill-ref-name">{{ sk.name }}</span>
+                <button class="skill-ref-name" title="Open in Settings → Skills" @click="navStore.openSkills(sk.name)">{{ sk.name }}</button>
                 <span class="skill-ref-desc">{{ sk.description }}</span>
+                <span v-if="(sk as any).via === 'mention'" class="skill-ref-via" title="This skill mentions this person via a [[link]]">backlink</span>
                 <span v-if="!sk.enabled" class="skill-ref-off">off</span>
               </li>
               <li v-if="!(store.detail.skills ?? []).length" class="empty-hint">
@@ -228,11 +232,28 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref, watch } from 'vue'
 import { Brain, Lock, LockOpen, ScanFace, ShieldAlert, UserPlus, X } from 'lucide-vue-next'
+import WikiText from './WikiText.vue'
+import { useNavStore } from '../stores/navStore'
 import { useKnowledgeStore, type KnowledgeFact } from '../stores/knowledgeStore'
 
 defineEmits<{ close: [] }>()
 
 const store = useKnowledgeStore()
+const navStore = useNavStore()
+
+// U68: a [[target]] resolves to a person when the id/name matches; else a skill.
+function openWikiTarget(target: string): void {
+  const t = target.toLowerCase()
+  const person = store.people.find(
+    p => p.person_id.toLowerCase() === t || p.display_name.toLowerCase() === t)
+  if (person) { store.inspectPerson(person.person_id); return }
+  navStore.openSkills(target)
+}
+
+// Opened via a [[wikilink]] elsewhere → jump straight to that person.
+watch(() => navStore.knowledgeRequest, async (r) => {
+  if (r) await store.inspectPerson(r.personId)
+}, { immediate: true })
 
 // Editable name/role — synced whenever a different person is inspected (U45).
 const editName = ref('')
@@ -536,7 +557,10 @@ function confirmForget() {
 
 .desc-input { resize: vertical; font-size: 0.8rem; line-height: 1.4; }
 .skill-ref-row { gap: 0.5rem; align-items: baseline; }
-.skill-ref-name { font-family: ui-monospace, monospace; font-size: 0.78rem; color: var(--accent); }
+.skill-ref-name { font-family: ui-monospace, monospace; font-size: 0.78rem; color: var(--accent);
+  background: none; border: none; cursor: pointer; padding: 0; text-decoration: underline dotted; text-underline-offset: 2px; }
+.skill-ref-via { font-size: 0.66rem; padding: 0.05rem 0.4rem; border-radius: 999px; border: 1px solid var(--border-strong); color: var(--text-faint); }
+.desc-preview { margin: 0.1rem 0 0; font-size: 0.78rem; color: var(--text-faint); }
 .skill-ref-desc { color: var(--text-faint); font-size: 0.75rem; flex: 1; }
 .skill-ref-off { font-size: 0.7rem; color: var(--warn, #d9a441); }
 </style>

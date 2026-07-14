@@ -35,7 +35,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, watch } from 'vue'
 import TitleBar from './components/TitleBar.vue'
 import RobotPanel from './components/RobotPanel.vue'
 import VideoPanel from './components/VideoPanel.vue'
@@ -47,6 +47,7 @@ import KnowledgePanel from './components/KnowledgePanel.vue'
 import CapabilitiesPanel from './components/CapabilitiesPanel.vue'
 import SetupWizard from './components/SetupWizard.vue'
 import { useEventBusWs } from './composables/useEventBusWs'
+import { useNavStore } from './stores/navStore'
 import { useSetupStore } from './stores/setupStore'
 import { useThemeStore } from './stores/themeStore'
 
@@ -57,6 +58,11 @@ const showCapabilities = ref(false)
 const showWizard = ref(false)
 const themeStore = useThemeStore()
 const setupStore = useSetupStore()
+const navStore = useNavStore()
+
+// U68: [[wikilink]] navigation — links open the right panel.
+watch(() => navStore.knowledgeRequest, (r) => { if (r) showKnowledge.value = true })
+watch(() => navStore.skillsRequest, (r) => { if (r) showSettings.value = true })
 
 onMounted(async () => {
   themeStore.apply()
