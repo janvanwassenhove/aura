@@ -17,6 +17,7 @@ export interface Capability {
 export const useCapabilitiesStore = defineStore('capabilities', () => {
   const capabilities = ref<Capability[]>([])
   const allowedApps = ref<string[]>([])
+  const pending = ref<string[]>([]) // keys toggled that need a restart to apply
   const loading = ref(false)
   const error = ref<string | null>(null)
   const notice = ref<string | null>(null)
@@ -59,6 +60,9 @@ export const useCapabilitiesStore = defineStore('capabilities', () => {
       }
       if (body.restart_required) {
         notice.value = `"${cap?.label ?? key}" will take effect after the next restart.`
+        if (!pending.value.includes(key)) pending.value.push(key)
+      } else {
+        pending.value = pending.value.filter(k => k !== key)
       }
     } catch {
       if (cap) cap.enabled = !enabled
@@ -66,5 +70,5 @@ export const useCapabilitiesStore = defineStore('capabilities', () => {
     }
   }
 
-  return { capabilities, allowedApps, loading, error, notice, fetchCapabilities, toggle }
+  return { capabilities, allowedApps, pending, loading, error, notice, fetchCapabilities, toggle }
 })

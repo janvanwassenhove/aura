@@ -381,6 +381,16 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     if _gesture_detector is not None or _boot_embedder.name != "null":
         ctx._perception.start()
 
+    # U43-fix: gestures toggle live — attach/detach the detector on the loop.
+    def _apply_gestures(enabled: bool) -> None:
+        if enabled and _gesture_detector is not None:
+            ctx._perception._gestures = _gesture_detector
+            ctx._perception.start()
+        else:
+            ctx._perception._gestures = None
+
+    capabilities_api.set_live_hook("gestures", _apply_gestures)
+
     def _start_recognition(omk: bytes) -> None:
         from shared_schemas.knowledge.recognition import EmbeddingMatcher
 
@@ -415,16 +425,32 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     )
 
     # --- U36g: self-maintenance loop — the brain checks & heals itself.
-    if os.environ.get("MAINTENANCE_ENABLED", "true").lower() == "true":
-        from aura_brain.maintenance import MaintenanceLoop
+    from aura_brain.maintenance import MaintenanceLoop
 
-        ctx._maintenance = MaintenanceLoop(
+    def _make_maintenance() -> MaintenanceLoop:
+        return MaintenanceLoop(
             ctx.bus, _robot,
             knowledge_encrypted=knowledge_api.is_omk_loaded,
             session_id=session_id,
             interval_s=float(os.environ.get("MAINTENANCE_INTERVAL_S", "300")),
         )
+
+    if os.environ.get("MAINTENANCE_ENABLED", "true").lower() == "true":
+        ctx._maintenance = _make_maintenance()
         ctx._maintenance.start()
+
+    # U43-fix: maintenance toggles live — start/stop the loop.
+    def _apply_maintenance(enabled: bool) -> None:
+        import asyncio as _asyncio
+
+        if enabled and ctx._maintenance is None:
+            ctx._maintenance = _make_maintenance()
+            ctx._maintenance.start()
+        elif not enabled and ctx._maintenance is not None:
+            _asyncio.ensure_future(ctx._maintenance.stop())
+            ctx._maintenance = None
+
+    capabilities_api.set_live_hook("maintenance", _apply_maintenance)
 
     # --- U14: heartbeat watches the REAL failure surface — the brain↔robot link
     # and upstream internet — not sibling containers (which no longer exist after

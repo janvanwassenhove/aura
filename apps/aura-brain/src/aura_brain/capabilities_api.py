@@ -36,11 +36,11 @@ _CAPS: dict[str, tuple[str, str, str, str, bool]] = {
     "speak_replies": ("SPEAK_REPLIES", "true", "Speak replies aloud",
                       "Say answers out loud on the robot with a gesture.", True),
     "gestures": ("GESTURES_ENABLED", "true", "React to gestures",
-                 "Wave back to an open palm, celebrate a thumbs-up.", False),
+                 "Wave back to an open palm, celebrate a thumbs-up.", True),
     "recognition": ("RECOGNITION_ENABLED", "true", "Face recognition",
                     "Recognize and greet known people. Needs the knowledge passphrase.", False),
     "maintenance": ("MAINTENANCE_ENABLED", "true", "Self-maintenance",
-                    "Periodic self-checks and auto-recovery of the robot link.", False),
+                    "Periodic self-checks and auto-recovery of the robot link.", True),
 }
 
 _live_hooks: dict[str, Callable[[bool], None]] = {}
