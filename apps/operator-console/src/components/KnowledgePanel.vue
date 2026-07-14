@@ -110,7 +110,20 @@
         <div class="detail-col">
           <template v-if="store.detail">
             <div class="detail-header">
-              <span class="detail-name">{{ store.detail.person.display_name }}</span>
+              <div class="name-edit">
+                <input
+                  v-model="editName"
+                  class="field-input detail-name-input"
+                  title="Edit name — saved when you click away"
+                  @change="saveName"
+                />
+                <select v-model="editRole" class="field-select role-edit" @change="saveName">
+                  <option value="owner">owner</option>
+                  <option value="family">family</option>
+                  <option value="guest">guest</option>
+                  <option value="minor">minor</option>
+                </select>
+              </div>
               <button class="btn-forget" @click="confirmForget">Forget person</button>
             </div>
             <p v-if="store.detail.person.role === 'minor'" class="minor-note">
@@ -134,8 +147,18 @@
             </p>
             <ul class="fact-list">
               <li v-for="f in store.detail.facts" :key="f.fact_id" class="fact-row">
-                <span class="fact-key">{{ f.key }}</span>
-                <span class="fact-value">{{ f.value }}</span>
+                <input
+                  class="fact-edit fact-edit-key"
+                  :value="f.key"
+                  title="Edit — saved when you click away"
+                  @change="(e) => saveFact(f, (e.target as HTMLInputElement).value, f.value)"
+                />
+                <input
+                  class="fact-edit fact-edit-value"
+                  :value="f.value"
+                  title="Edit — saved when you click away"
+                  @change="(e) => saveFact(f, f.key, (e.target as HTMLInputElement).value)"
+                />
                 <button class="btn-delete" title="Delete fact (step-up when encrypted)" @click="store.deleteFact(f.fact_id, store.detail!.person.person_id)"><X :size="12" /></button>
               </li>
               <li v-if="store.detail.facts.length === 0" class="empty-hint">No facts recorded.</li>
@@ -173,13 +196,35 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref } from 'vue'
+import { onMounted, onUnmounted, ref, watch } from 'vue'
 import { Brain, Lock, LockOpen, ScanFace, ShieldAlert, UserPlus, X } from 'lucide-vue-next'
-import { useKnowledgeStore } from '../stores/knowledgeStore'
+import { useKnowledgeStore, type KnowledgeFact } from '../stores/knowledgeStore'
 
 defineEmits<{ close: [] }>()
 
 const store = useKnowledgeStore()
+
+// Editable name/role — synced whenever a different person is inspected (U45).
+const editName = ref('')
+const editRole = ref('guest')
+watch(() => store.detail?.person.person_id, () => {
+  editName.value = store.detail?.person.display_name ?? ''
+  editRole.value = store.detail?.person.role ?? 'guest'
+})
+
+async function saveName() {
+  if (!store.detail) return
+  const name = editName.value.trim()
+  if (!name) { editName.value = store.detail.person.display_name; return }
+  await store.renamePerson(store.detail.person.person_id, name, editRole.value)
+}
+
+async function saveFact(fact: KnowledgeFact, key: string, value: string) {
+  if (!store.detail) return
+  const k = key.trim(), v = value.trim()
+  if (!k || !v || (k === fact.key && v === fact.value)) return
+  await store.updateFact(store.detail.person.person_id, fact.fact_id, k, v)
+}
 
 const newPersonId = ref('')
 const newPersonName = ref('')
@@ -337,6 +382,17 @@ function confirmForget() {
 .detail-col { display: flex; flex-direction: column; min-width: 0; }
 .detail-header { display: flex; align-items: center; justify-content: space-between; }
 .detail-name { font-size: 1rem; font-weight: 600; }
+.name-edit { display: flex; gap: 0.4rem; align-items: center; flex: 1; }
+.detail-name-input { font-size: 0.95rem; font-weight: 600; flex: 1; min-width: 0; }
+.role-edit { width: auto; font-size: 0.75rem; padding: 0.25rem 0.4rem; }
+.fact-edit {
+  background: transparent; border: 1px solid transparent; border-radius: var(--radius-sm);
+  color: var(--text); font-size: 0.8rem; padding: 0.2rem 0.35rem; outline: none; min-width: 0;
+}
+.fact-edit:hover { border-color: var(--border); }
+.fact-edit:focus { border-color: var(--accent-border); background: var(--surface-3); }
+.fact-edit-key { color: var(--accent-soft); font-family: monospace; width: 40%; }
+.fact-edit-value { flex: 1; }
 .btn-forget {
   background: var(--danger-bg-hover); color: var(--danger-text); border: none; border-radius: var(--radius-sm);
   font-size: 0.75rem; padding: 0.25rem 0.7rem; cursor: pointer;

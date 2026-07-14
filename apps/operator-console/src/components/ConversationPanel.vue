@@ -46,6 +46,7 @@
       </span>
       <span v-if="micLevel < 0.02" class="vu-hint">(no sound yet — speak up)</span>
     </div>
+    <p v-else-if="robotListening" class="mic-status mic-status--rec"><span class="rec-dot" /> Richie is listening on his own mic…</p>
     <p v-else-if="transcribing" class="mic-status">Transcribing your voice…</p>
     <p v-if="micError" class="mic-error">{{ micError }}</p>
     <form class="input-row" @submit.prevent="submit">
@@ -59,13 +60,23 @@
       <button
         type="button"
         :class="['btn-mic', recording && 'btn-mic--recording']"
-        :disabled="transcribing"
-        :title="recording ? 'Stop & send' : 'Talk to the robot'"
+        :disabled="transcribing || robotListening"
+        :title="recording ? 'Stop & send' : 'Talk using the laptop mic'"
         @click="toggleMic"
       >
         <LoaderCircle v-if="transcribing" :size="15" class="spin" />
         <Square v-else-if="recording" :size="13" />
         <Mic v-else :size="15" />
+      </button>
+      <button
+        type="button"
+        :class="['btn-mic', robotListening && 'btn-mic--recording']"
+        :disabled="recording || transcribing || robotListening"
+        title="Talk using Richie's own microphone"
+        @click="listenViaRobot"
+      >
+        <LoaderCircle v-if="robotListening" :size="15" class="spin" />
+        <Bot v-else :size="15" />
       </button>
       <button
         type="submit"
@@ -80,7 +91,7 @@
 
 <script setup lang="ts">
 import { onUnmounted, ref, watch, nextTick } from 'vue'
-import { LoaderCircle, Mic, Sparkles, Square, Wrench } from 'lucide-vue-next'
+import { Bot, LoaderCircle, Mic, Sparkles, Square, Wrench } from 'lucide-vue-next'
 import { useConversationStore } from '../stores/conversationStore'
 
 const BRAIN_URL = import.meta.env.VITE_BRAIN_URL ?? import.meta.env.VITE_ORCHESTRATOR_URL ?? 'http://localhost:8000'
@@ -231,6 +242,32 @@ async function sendVoice(blob: Blob) {
     micError.value = 'Could not reach the brain.'
   } finally {
     transcribing.value = false
+  }
+}
+
+// Talk via the ROBOT's own microphone (U45): the Pi records, the brain
+// transcribes, the reply is spoken back on the robot.
+const robotListening = ref(false)
+
+async function listenViaRobot() {
+  if (robotListening.value) return
+  robotListening.value = true
+  micError.value = ''
+  try {
+    const resp = await fetch(`${BRAIN_URL}/voice/listen`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ duration_s: 5 }),
+    })
+    if (!resp.ok) {
+      const body = await resp.json().catch(() => ({}))
+      micError.value = body.error ?? `Robot mic failed (${resp.status})`
+    }
+    // Turns render via the event stream (TranscriptUpdated + ResponseDrafted).
+  } catch {
+    micError.value = 'Could not reach the brain.'
+  } finally {
+    robotListening.value = false
   }
 }
 

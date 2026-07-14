@@ -119,6 +119,22 @@ export const useKnowledgeStore = defineStore('knowledge', () => {
     return resp !== null
   }
 
+  async function updateFact(personId: string, factId: string, key: string, value: string): Promise<boolean> {
+    // No update endpoint — replace: add the new fact, then delete the old one.
+    const added = await addFact(personId, key, value)
+    if (added) await deleteFact(factId, personId)
+    return added
+  }
+
+  async function renamePerson(personId: string, displayName: string, role: string): Promise<boolean> {
+    const ok = await upsertPerson(personId, displayName, role)
+    if (ok && detail.value?.person.person_id === personId) {
+      detail.value.person.display_name = displayName
+      detail.value.person.role = role
+    }
+    return ok
+  }
+
   async function deleteFact(factId: string, personId: string): Promise<boolean> {
     // Destructive — the brain requires a phone step-up when encryption is active (ADR-008 §9).
     const resp = await _request(`/facts/${encodeURIComponent(factId)}`, { method: 'DELETE' })
@@ -264,7 +280,7 @@ export const useKnowledgeStore = defineStore('knowledge', () => {
     people, detail, tier, omkLoaded, locked, loading, error, recognitionEnabled,
     sightings,
     fetchTier, fetchPeople, inspectPerson, upsertPerson,
-    addFact, deleteFact, forgetPerson, setConsent, lock,
+    addFact, updateFact, deleteFact, renamePerson, forgetPerson, setConsent, lock,
     fetchRecognition, secure, teachFace,
     fetchSightings, sightingImageUrl, tagSighting, dismissSighting,
     clearDetail, $reset,

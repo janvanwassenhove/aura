@@ -121,6 +121,33 @@ async def execute_motion(command: MotionCommand) -> JSONResponse:
 
 
 # ------------------------------------------------------------------
+# Microphone (U45: capture from the robot's onboard mic → WAV)
+# ------------------------------------------------------------------
+
+
+@router.post("/robot/listen")
+async def listen(body: dict) -> Response:
+    """Record from the robot's microphone and return a 16 kHz mono WAV."""
+    assert adapter is not None
+    _touch()
+    duration = float((body or {}).get("duration_s", 5.0))
+    duration = max(1.0, min(duration, 15.0))
+    pcm = await adapter.capture_audio(duration_s=duration)
+    if not pcm:
+        return JSONResponse({"error": "no audio captured (is the mic enabled?)"}, status_code=503)
+    import io
+    import wave
+
+    buf = io.BytesIO()
+    with wave.open(buf, "wb") as w:
+        w.setnchannels(1)
+        w.setsampwidth(2)
+        w.setframerate(16_000)
+        w.writeframes(pcm)
+    return Response(content=buf.getvalue(), media_type="audio/wav")
+
+
+# ------------------------------------------------------------------
 # Head tracking (U36g: follow the person)
 # ------------------------------------------------------------------
 

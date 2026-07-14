@@ -79,6 +79,11 @@ class RobotClient:
     async def set_tracking(self, enabled: bool) -> dict:
         return (await self._request("POST", "/robot/tracking", {"enabled": enabled})).json()
 
+    async def listen(self, duration_s: float = 5.0) -> bytes:
+        """Record from the robot's mic; returns 16 kHz mono WAV bytes."""
+        resp = await self._request("POST", "/robot/listen", {"duration_s": duration_s})
+        return resp.content
+
     async def get_volume(self) -> dict:
         return (await self._request("GET", "/robot/volume")).json()
 
