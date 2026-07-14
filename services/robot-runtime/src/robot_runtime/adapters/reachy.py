@@ -81,6 +81,9 @@ class ReachyRobotAdapter(RobotAdapter):
         self._motion_lock = asyncio.Lock()
         # Speaker gain 0.0–1.0, applied to every PCM sample (U36e volume).
         self._volume = float(os.environ.get("ROBOT_VOLUME", "0.8"))
+        # Whether follow-me head tracking is active. Motions pause it so they
+        # play at full amplitude, then resume it (U38-fix).
+        self._tracking_on = False
 
     def set_volume(self, level: float) -> float:
         self._volume = max(0.0, min(1.0, level))
@@ -103,6 +106,7 @@ class ReachyRobotAdapter(RobotAdapter):
 
         async with self._motion_lock:
             await asyncio.to_thread(_toggle)
+        self._tracking_on = enabled
         return enabled
 
     # ------------------------------------------------------------------
@@ -137,6 +141,7 @@ class ReachyRobotAdapter(RobotAdapter):
             if os.environ.get("HEAD_TRACKING", "true").lower() == "true":
                 try:
                     mini.start_head_tracking()
+                    self._tracking_on = True
                 except Exception as exc:  # noqa: BLE001
                     logger.warning("head tracking not started: %s", exc)
             return mini
@@ -318,7 +323,30 @@ class ReachyRobotAdapter(RobotAdapter):
         if self._mini is None:
             raise RuntimeError("not connected")
         async with self._motion_lock:
-            await asyncio.to_thread(self._run_motion, command)
+            await asyncio.to_thread(self._run_motion_tracked, command)
+
+    def _run_motion_tracked(self, command: MotionCommand) -> None:
+        """Run a motion at FULL amplitude: pause follow-me tracking (which
+        would otherwise pull the head straight back to the face and dampen the
+        move), play it, then resume tracking. Sync; runs inside the lock."""
+        paused = False
+        # wake_up/sleep/look_around manage the head themselves; don't touch them.
+        if self._tracking_on and command.motion_id.lower() not in (
+            "wake_up", "sleep", "look_around", "point"
+        ):
+            try:
+                self._mini.stop_head_tracking()
+                paused = True
+            except Exception:  # noqa: BLE001
+                pass
+        try:
+            self._run_motion(command)
+        finally:
+            if paused:
+                try:
+                    self._mini.start_head_tracking()
+                except Exception:  # noqa: BLE001
+                    pass
 
     async def execute_timeline(self, timeline: MotionTimeline) -> None:
         for cue in timeline.cues:
