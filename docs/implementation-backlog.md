@@ -186,6 +186,21 @@ the human can unblock it.
 - [x] **U50 — gated Computer Use (scherm zien + muis/toetsenbord besturen)** · deps: U40 · `pending`
   Antwoord op "secure OpenClaw"-vraag: Anthropic's eigen computer-use tool (`computer_20251124`, beta-header `computer-use-2025-11-24`, Opus 4.8) laat AURA elk desktop-app bedienen — screenshot → één actie → screenshot ter verificatie — als launch_app/media_control niet volstaan. `ComputerUseAgent` (loop met injecteerbare Anthropic-client + `InputBackend`-protocol; `PyAutoGuiBackend` als echte Windows-driver). Nieuwe `use_computer` orchestrator-tool → in `APPROVAL_REQUIRED` + work/home-modi (approval-gate NOOIT omzeild). Capability-toggle `computer_use` **standaard UIT**, vereist `ANTHROPIC_API_KEY` + `[computeruse]` extra (anthropic+pyautogui+pillow); live-hook in main. Step-cap (`COMPUTER_USE_MAX_STEPS`), per-actie logging, systeemprompt verbiedt zelf wachtwoorden/betalingen/onomkeerbare acties (spiegelt globale safety). 8 nieuwe tests (fakes, geen anthropic/pyautogui nodig); brain+orchestrator+policies groen.
 
+## Agentic fase (plan: [agentic-plan.md](agentic-plan.md))
+
+- [ ] **U57 — agentic loop core** · deps: — · ESSENTIEEL
+  Pipeline-_run wordt een echte multi-ronde loop (redeneren → tools → resultaat → volgende ronde; stop bij finaal antwoord / AGENT_MAX_ROUNDS / eigenaars-stop). AgentRoundStarted/Completed-events op de bus. Steering: POST /orchestrator/agent/steer + /agent/stop. Approval-gate per tool-call blijft. Tests met gescripte LLM.
+- [ ] **U58 — tool-ladder + basistools** · deps: U57
+  Layer-metadata per tool + ladder-instructie in de prompt (API→CLI→FS→browser→GUI; Computer Use = nooduitgang). Nieuwe tools: run_powershell (gated), read_file (pad-begrensd), write_file (gated), git_prepare, run_tests/run_build-presets.
+- [ ] **U59 — skills-systeem** · deps: U57
+  skills/<naam>.md met frontmatter (triggers, personas, persoon); loader + prompt-injectie; /skills CRUD-API + console-paneel.
+- [ ] **U60 — self-training & teach-mode** · deps: U59
+  Feedback op een loop → skill-diff-voorstel (wegschrijven approval-gated); teach-mode → lessen als persoon-feiten/skills. Digital-twin-opbouw per persoon.
+- [ ] **U61 — hooks & subagents** · deps: U57
+  Declaratieve pre/post-tool-hooks (bv. pre-push → tests); delegate_subtask-tool spawnt scoped sub-loop (beperkte tools, eigen rondebudget).
+- [ ] **U62 — console agent-UX** · deps: U57
+  Agent-paneel: rondes live, steer-invoer, stop-knop; skills-editor (U59) en trainingsfeedback (U60) UI.
+
 ## Progress log (append-only; newest last)
 
 - 2026-06-21 — ledger created on `aura-autobuild`; Phase 0/0b complete, Phase 1 scaffold (U-pre) done before this loop started.
