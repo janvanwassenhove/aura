@@ -1,0 +1,10 @@
+// AURA preload — the only bridge between the console (renderer) and Electron.
+// Exposes window controls for the custom title bar; nothing else.
+const { contextBridge, ipcRenderer } = require('electron')
+
+contextBridge.exposeInMainWorld('aura', {
+  isElectron: true,
+  minimize: () => ipcRenderer.send('win:minimize'),
+  toggleMaximize: () => ipcRenderer.send('win:toggleMaximize'),
+  close: () => ipcRenderer.send('win:close'),
+})

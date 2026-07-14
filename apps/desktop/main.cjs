@@ -12,7 +12,7 @@
  * Brain logs: %APPDATA%/aura-desktop/brain.log (also in the terminal).
  */
 
-const { app, BrowserWindow, Menu, Tray, dialog, shell, nativeImage } = require('electron')
+const { app, BrowserWindow, Menu, Tray, dialog, ipcMain, shell, nativeImage } = require('electron')
 const { spawn, execSync } = require('child_process')
 const http = require('http')
 const fs = require('fs')
@@ -157,11 +157,14 @@ function serveConsole() {
 // Window, tray, menu
 // ---------------------------------------------------------------------------
 
+// Splash: lined bot icon (lucide "bot" path), draggable since the window is frameless.
 const SPLASH_HTML = `data:text/html,
-<body style="margin:0;background:%230f172a;color:%23e2e8f0;font-family:sans-serif;
+<body style="margin:0;background:%230f172a;color:%23e2e8f0;font-family:sans-serif;-webkit-app-region:drag;
 display:flex;align-items:center;justify-content:center;height:100vh;flex-direction:column">
-<div style="font-size:2.2rem">🤖</div>
-<h2 style="margin:.6rem 0 0">AURA is starting…</h2>
+<svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="%2393c5fd" stroke-width="1.5"
+stroke-linecap="round" stroke-linejoin="round"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/>
+<path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/></svg>
+<h2 style="margin:.8rem 0 0;font-weight:600">AURA is starting…</h2>
 <p style="color:%2394a3b8;font-size:.9rem">brain · connectors · knowledge (encrypted)</p></body>`
 
 function trayIcon() {
@@ -176,11 +179,24 @@ function createWindow() {
     height: 900,
     title: 'AURA Operator Console',
     backgroundColor: '#0f172a',
-    autoHideMenuBar: false,
-    webPreferences: { contextIsolation: true, nodeIntegration: false },
+    frame: false, // U33: the console draws its own title bar
+    icon: path.join(__dirname, 'build', 'icon.png'),
+    webPreferences: {
+      contextIsolation: true,
+      nodeIntegration: false,
+      preload: path.join(__dirname, 'preload.cjs'),
+    },
   })
   mainWindow.loadURL(SPLASH_HTML)
   mainWindow.on('closed', () => { mainWindow = null })
+
+  // Window controls for the custom title bar (see preload.cjs).
+  ipcMain.on('win:minimize', () => mainWindow?.minimize())
+  ipcMain.on('win:toggleMaximize', () => {
+    if (!mainWindow) return
+    mainWindow.isMaximized() ? mainWindow.unmaximize() : mainWindow.maximize()
+  })
+  ipcMain.on('win:close', () => mainWindow?.close())
 
   const menu = Menu.buildFromTemplate([
     {

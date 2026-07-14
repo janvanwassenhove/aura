@@ -6,7 +6,7 @@
       class="approval-modal"
     >
       <div class="approval-header">
-        <span class="approval-icon">⚠️</span>
+        <span class="approval-icon"><TriangleAlert :size="20" /></span>
         <h3>Approval Required</h3>
       </div>
       <div class="approval-body">
@@ -36,6 +36,7 @@
 
 <script setup lang="ts">
 import { onMounted, onUnmounted } from 'vue'
+import { TriangleAlert } from 'lucide-vue-next'
 import { useApprovalStore } from '../stores/approvalStore'
 
 const approvalStore = useApprovalStore()

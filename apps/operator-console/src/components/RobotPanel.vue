@@ -15,7 +15,9 @@
     <div class="status-row">
       <span class="label">Speaking</span>
       <span :class="['indicator', robotStore.isSpeaking ? 'indicator-active' : 'indicator-idle']">
-        {{ robotStore.isSpeaking ? '🔊 Speaking' : 'Silent' }}
+        <Volume2 v-if="robotStore.isSpeaking" :size="14" />
+        <VolumeX v-else :size="14" />
+        {{ robotStore.isSpeaking ? 'Speaking' : 'Silent' }}
       </span>
     </div>
 
@@ -47,6 +49,7 @@
 </template>
 
 <script setup lang="ts">
+import { Volume2, VolumeX } from 'lucide-vue-next'
 import { useRobotStore } from '../stores/robotStore'
 
 const robotStore = useRobotStore()
