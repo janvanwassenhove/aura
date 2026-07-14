@@ -590,12 +590,21 @@ class OrchestratorPipeline:
             elif tool_name == "use_computer":
                 if self._computer_use is None:
                     result_text = ("[use_computer: not available — enable Computer "
-                                   "Use in the capabilities panel and set an "
-                                   "ANTHROPIC_API_KEY]")
+                                   "Use in the capabilities panel (works with your "
+                                   "OpenAI or Anthropic key)]")
                 else:
-                    result_text = await self._computer_use.run(
-                        arguments.get("goal", ""), session_id,
+                    from shared_schemas.events.orchestrator import (
+                        ComputerControlEnded, ComputerControlStarted,
                     )
+
+                    goal = arguments.get("goal", "")
+                    await self._bus.publish(ComputerControlStarted(
+                        session_id=session_id, goal=goal[:200]))
+                    try:
+                        result_text = await self._computer_use.run(goal, session_id)
+                    finally:
+                        await self._bus.publish(ComputerControlEnded(
+                            session_id=session_id, summary=str(result_text)[:200] if 'result_text' in dir() else ""))
             elif tool_name == "save_skill":
                 result_text = await self._save_skill(arguments)
             elif tool_name == "delegate_subtask":

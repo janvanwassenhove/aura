@@ -18,6 +18,8 @@ export const useConversationStore = defineStore('conversation', () => {
   const lastLatency = ref<{ total_ms: number; llm_ms: number; tool_ms: number } | null>(null)
   // U62: live agentic-loop state (AgentRoundStarted/Completed, U57).
   const agentRound = ref<{ round: number; max: number; tools: string[] } | null>(null)
+  // U75: AURA is driving the screen (mouse glow overlay + abort button).
+  const screenControl = ref(false)
 
   const conversationUrl = import.meta.env.VITE_CONVERSATION_URL ?? 'http://localhost:8002'
   const orchestratorUrl =
@@ -83,6 +85,12 @@ export const useConversationStore = defineStore('conversation', () => {
     } else if (type === 'AgentRoundCompleted') {
       if (event.done) agentRound.value = null
       else if (agentRound.value) agentRound.value.tools = (event.tool_names as string[]) ?? []
+    } else if (type === 'ComputerControlStarted') {
+      screenControl.value = true
+      ;(window as any).aura?.screenControl?.(true)
+    } else if (type === 'ComputerControlEnded') {
+      screenControl.value = false
+      ;(window as any).aura?.screenControl?.(false)
     } else if (type === 'TurnLatencyMeasured') {
       // U23: per-turn latency instrumentation.
       lastLatency.value = {
@@ -139,6 +147,11 @@ export const useConversationStore = defineStore('conversation', () => {
     }).catch(() => {})
   }
 
+  async function abortScreenControl(): Promise<void> {
+    await fetch(`${orchestratorUrl}/orchestrator/computeruse/abort`, { method: 'POST' })
+      .catch(() => {})
+  }
+
   async function stopAgent(): Promise<void> {
     await fetch(`${orchestratorUrl}/orchestrator/agent/stop`, {
       method: 'POST',
@@ -165,5 +178,6 @@ export const useConversationStore = defineStore('conversation', () => {
   }
 
   return { turns, pendingText, isProcessing, sessionId, lastLatency, agentRound,
+           screenControl, abortScreenControl,
            addTurn, applyEvent, submitTurn, steerAgent, stopAgent, teach, $reset }
 })

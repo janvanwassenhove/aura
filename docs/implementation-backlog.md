@@ -234,6 +234,9 @@ the human can unblock it.
 - [x] **U74 — upgrade naar gpt-5.1 (chat + schermbesturing)** · `pending`
   De key blijkt gpt-5/5.1/5.2 te hebben. Omgezet: `OPENAI_MODEL=gpt-5.1` (conversaties, agentic loop, tool-keuzes — moet de doelloze uitweidingen en inconsistente tool-claims flink verminderen) en `COMPUTER_USE_OPENAI_MODEL=gpt-5.1` (visueel sterker dan gpt-4o voor de Spotify-GUI-runs). Compat-fix: de OpenAI-computer-agent gebruikt nu `max_completion_tokens` (gpt-5.x weigert `max_tokens`; werkt ook op gpt-4o). Alles instelbaar gebleven via Settings → LLM / env. Brain-computer-use-tests 13 groen.
 
+- [x] **U75 — scherm-overlay + abort + brain-graph** · `pending`
+  (1) **Muis licht op**: `ComputerControlStarted/Ended`-events rond elke use_computer-run → console → Electron-IPC → click-through always-on-top overlay met gloeiende cursor-ring (volgt de muis, 40ms) en banner "AURA bestuurt het scherm — druk Esc om af te breken". (2) **Abort**: `request_abort()` op beide computer-agents (checkt per stap) + wall-clock-timeout COMPUTER_USE_TIMEOUT_S=180s + `POST /orchestrator/computeruse/abort`; afbreekbaar via Esc (globalShortcut zolang de overlay staat, werkt in élke app) én een Abort-knop in de conversatie-strip. (3) **Graph**: `BrainGraph.vue` — dependency-vrije force-directed canvas-constellatie in het Brain-paneel (rail-item "Graph"): personen amber, skills blauw, feiten als kleine sterren; edges uit persoon-scope, [[wikilinks]] en feiten; hover-tooltip, klik → persoon/skill openen. Schemas 123, orchestrator 187, computer-use 13, console 56 groen.
+
 ## Progress log (append-only; newest last)
 
 - 2026-06-21 — ledger created on `aura-autobuild`; Phase 0/0b complete, Phase 1 scaffold (U-pre) done before this loop started.

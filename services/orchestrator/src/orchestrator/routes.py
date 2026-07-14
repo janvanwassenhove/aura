@@ -145,6 +145,16 @@ async def agent_steer(body: dict) -> JSONResponse:
     return JSONResponse({"queued": True, "session_id": session_id})
 
 
+@router.post("/orchestrator/computeruse/abort")
+async def computeruse_abort() -> JSONResponse:
+    """U75: abort the running screen-control action immediately."""
+    agent = getattr(_pipeline, "_computer_use", None) if _pipeline else None
+    if agent is None or not hasattr(agent, "request_abort"):
+        return JSONResponse({"error": "no screen-control agent active"}, status_code=404)
+    agent.request_abort()
+    return JSONResponse({"aborting": True})
+
+
 @router.post("/orchestrator/agent/stop")
 async def agent_stop(body: dict | None = None) -> JSONResponse:
     """Ask the running loop to wrap up after the current round."""

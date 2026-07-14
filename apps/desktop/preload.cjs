@@ -7,4 +7,7 @@ contextBridge.exposeInMainWorld('aura', {
   minimize: () => ipcRenderer.send('win:minimize'),
   toggleMaximize: () => ipcRenderer.send('win:toggleMaximize'),
   close: () => ipcRenderer.send('win:close'),
+  // U75: the console tells Electron when AURA controls the screen so the
+  // overlay (glowing cursor ring + abort banner) can show.
+  screenControl: (active) => ipcRenderer.send('aura:screen-control', !!active),
 })

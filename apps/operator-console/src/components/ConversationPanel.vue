@@ -39,6 +39,14 @@
       + tools {{ conversationStore.lastLatency.tool_ms.toFixed(0) }}ms)
     </div>
 
+    <!-- U75: screen-control banner with abort -->
+    <div v-if="conversationStore.screenControl" class="agent-strip agent-strip--screen" role="status">
+      <LoaderCircle :size="13" class="spin" />
+      <span class="agent-round">AURA controls the screen (Esc also aborts)</span>
+      <span style="flex:1" />
+      <button type="button" class="btn-agent btn-agent--stop" @click="conversationStore.abortScreenControl()">Abort</button>
+    </div>
+
     <!-- U62: live agentic-loop strip — rounds, steer input, stop -->
     <div v-if="conversationStore.agentRound" class="agent-strip" role="status">
       <LoaderCircle :size="13" class="spin" />
@@ -383,4 +391,5 @@ onUnmounted(() => { if (recording.value) recorder?.stop(); stopLevelMeter() })
 }
 .btn-agent:disabled { opacity: 0.5; cursor: default; }
 .btn-agent--stop { color: var(--danger-text, #e5484d); border-color: var(--danger-text, #e5484d); }
+.agent-strip--screen { border-color: var(--accent); box-shadow: 0 0 12px color-mix(in srgb, var(--accent) 35%, transparent); }
 </style>
