@@ -18,8 +18,16 @@ const http = require('http')
 const fs = require('fs')
 const path = require('path')
 
-const REPO_ROOT = path.resolve(__dirname, '..', '..')
-const CONSOLE_DIST = path.join(REPO_ROOT, 'apps', 'operator-console', 'dist')
+// U37-installer: a packaged (NSIS) install carries the Python workspace under
+// resources/aura and the built console under resources/console; a dev checkout
+// runs straight from the repo.
+const IS_PACKAGED = app.isPackaged
+const REPO_ROOT = IS_PACKAGED
+  ? path.join(process.resourcesPath, 'aura')
+  : path.resolve(__dirname, '..', '..')
+const CONSOLE_DIST = IS_PACKAGED
+  ? path.join(process.resourcesPath, 'console')
+  : path.join(REPO_ROOT, 'apps', 'operator-console', 'dist')
 const ENV_FILE = path.join(REPO_ROOT, 'infra', 'dev', '.env')
 // 8020, not 8000: Pollen's "Reachy Mini Control" desktop app squats on 8000.
 const BRAIN_PORT = 8020
@@ -76,6 +84,44 @@ function brainEnv() {
   env.ALLOWED_APPS = env.ALLOWED_APPS ||
     'vscode=code;code=code;notepad=notepad;spotify=explorer.exe spotify:'
   return env
+}
+
+// ---------------------------------------------------------------------------
+// First-run bootstrap (U37-installer): a packaged install needs uv + a synced
+// Python environment before the brain can start. Dev checkouts skip this.
+// ---------------------------------------------------------------------------
+
+function hasUv() {
+  try { execSync('uv --version', { stdio: 'ignore', shell: true }); return true }
+  catch { return false }
+}
+
+async function ensureBootstrap(splashWindow) {
+  if (!IS_PACKAGED) return
+  const marker = path.join(app.getPath('userData'), '.bootstrap-done')
+  if (fs.existsSync(marker) && hasUv()) return
+
+  const say = (msg) => {
+    if (splashWindow && !splashWindow.isDestroyed()) {
+      splashWindow.webContents.executeJavaScript(
+        `document.querySelector('h2').textContent = ${JSON.stringify(msg)}`,
+      ).catch(() => {})
+    }
+  }
+
+  if (!hasUv()) {
+    say('Installing the Python runtime (one-time)…')
+    // Official uv installer; puts uv.exe on the user PATH for future runs.
+    execSync('powershell -NoProfile -ExecutionPolicy Bypass -Command "irm https://astral.sh/uv/install.ps1 | iex"',
+      { stdio: 'ignore', shell: true, timeout: 300_000 })
+    // Current process PATH doesn't pick up the new location automatically.
+    process.env.PATH = `${process.env.USERPROFILE}\\.local\\bin;${process.env.PATH}`
+    if (!hasUv()) throw new Error('uv installation failed — install it from https://astral.sh/uv and restart AURA')
+  }
+
+  say('Preparing AURA (one-time, a few minutes)…')
+  execSync('uv sync --all-packages', { cwd: REPO_ROOT, stdio: 'ignore', shell: true, timeout: 900_000 })
+  fs.writeFileSync(marker, new Date().toISOString())
 }
 
 // ---------------------------------------------------------------------------
@@ -255,13 +301,15 @@ if (!app.requestSingleInstanceLock()) {
       return permission === 'media' || permission === 'microphone'
     })
     createWindow()
-    const logPath = startBrain()
+    let logPath = ''
     try {
+      await ensureBootstrap(mainWindow)  // packaged first run: uv + sync
+      logPath = startBrain()
       await serveConsole()
       await waitForBrain()
       if (mainWindow) mainWindow.loadURL(`http://localhost:${CONSOLE_PORT}`)
     } catch (err) {
-      dialog.showErrorBox('AURA failed to start', `${err.message}\nBrain log: ${logPath}`)
+      dialog.showErrorBox('AURA failed to start', `${err.message}${logPath ? `\nBrain log: ${logPath}` : ''}`)
     }
   })
 

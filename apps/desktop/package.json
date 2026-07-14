@@ -1,13 +1,89 @@
 {
   "name": "aura-desktop",
-  "version": "0.1.0",
-  "description": "AURA desktop app — brain + operator console in one window",
+  "version": "1.0.0",
+  "description": "AURA desktop app \u2014 brain + operator console in one window",
+  "author": "Jan Van Wassenhove",
   "main": "main.cjs",
   "scripts": {
     "start": "electron .",
-    "build:console": "cd ../operator-console && npm run build"
+    "build:console": "cd ../operator-console && npm run build",
+    "dist": "npm run build:console && electron-builder --win nsis"
   },
   "devDependencies": {
-    "electron": "^33.0.0"
+    "electron": "^33.0.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "dev.aura.desktop",
+    "productName": "AURA",
+    "files": [
+      "main.cjs",
+      "preload.cjs",
+      "build/**"
+    ],
+    "extraResources": [
+      {
+        "from": "../operator-console/dist",
+        "to": "console"
+      },
+      {
+        "from": "../../pyproject.toml",
+        "to": "aura/pyproject.toml"
+      },
+      {
+        "from": "../../uv.lock",
+        "to": "aura/uv.lock"
+      },
+      {
+        "from": "../../packages",
+        "to": "aura/packages",
+        "filter": [
+          "**/*",
+          "!**/__pycache__/**",
+          "!**/.pytest_cache/**",
+          "!**/tests/**"
+        ]
+      },
+      {
+        "from": "../../services",
+        "to": "aura/services",
+        "filter": [
+          "**/*",
+          "!**/__pycache__/**",
+          "!**/.pytest_cache/**",
+          "!**/tests/**"
+        ]
+      },
+      {
+        "from": "../../apps/aura-brain",
+        "to": "aura/apps/aura-brain",
+        "filter": [
+          "**/*",
+          "!**/__pycache__/**",
+          "!**/.pytest_cache/**",
+          "!**/tests/**"
+        ]
+      },
+      {
+        "from": "../../infra",
+        "to": "aura/infra",
+        "filter": [
+          "**/*",
+          "!**/.env"
+        ]
+      }
+    ],
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "shortcutName": "AURA"
+    }
   }
 }
