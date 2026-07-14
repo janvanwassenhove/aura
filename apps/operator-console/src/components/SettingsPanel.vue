@@ -79,7 +79,7 @@
         <div v-for="sk in skills" :key="sk.name" :class="['skill-card', !sk.enabled && 'skill-card--off']">
           <div class="skill-card-head">
             <span class="skill-card-name">{{ sk.name }}</span>
-            <span v-if="sk.person" class="skill-scope">@{{ sk.person }}</span>
+            <button v-if="sk.person" class="skill-scope skill-scope--link" :title="`Open ${sk.person} in Knowledge`" @click="navStore.openPerson(sk.person)">@{{ sk.person }}</button>
             <span class="skill-card-spacer" />
             <label class="skill-toggle" :title="sk.enabled ? 'Active' : 'Disabled'">
               <input type="checkbox" :checked="sk.enabled" @change="toggleSkill(sk)" />
@@ -87,8 +87,8 @@
             <button class="btn-conn btn-ghost btn-small" @click="editSkill(sk)">Edit</button>
             <button class="btn-conn btn-ghost btn-small" @click="removeSkill(sk.name)">Delete</button>
           </div>
-          <p class="skill-card-desc">{{ sk.description }}</p>
-          <p v-if="sk.body" class="skill-card-body">{{ sk.body.length > 180 ? sk.body.slice(0, 180) + '…' : sk.body }}</p>
+          <p class="skill-card-desc"><WikiText :text="sk.description" @open="openWikiTarget" /></p>
+          <p v-if="sk.body" class="skill-card-body"><WikiText :text="sk.body.length > 180 ? sk.body.slice(0, 180) + '…' : sk.body" @open="openWikiTarget" /></p>
           <div v-if="sk.triggers.length || sk.personas.length" class="skill-card-tags">
             <span v-for="t in sk.triggers" :key="'t' + t" class="skill-tag">“{{ t }}”</span>
             <span v-for="m in sk.personas" :key="'m' + m" class="skill-tag skill-tag--mode">{{ m }}</span>
@@ -99,7 +99,7 @@
           <input v-model="editingSkill.description" class="field-input" placeholder="One-line description" aria-label="Skill description" />
           <input v-model="editingTriggers" class="field-input" placeholder="Triggers, comma-separated (e.g. deploy, release)" aria-label="Skill triggers" />
           <input v-model="editingSkill.person" class="field-input" placeholder="Person id (optional — scopes to their digital twin)" aria-label="Skill person" />
-          <textarea v-model="editingSkill.body" class="field-input skill-body" rows="6" placeholder="The procedure, step by step…" aria-label="Skill body" />
+          <textarea v-model="editingSkill.body" class="field-input skill-body" rows="6" placeholder="The procedure, step by step… Link with [[person-id]] or [[other-skill]] — links become clickable and show up as backlinks on the person's profile." aria-label="Skill body" />
           <div class="conn-actions">
             <button class="btn-conn btn-primary" :disabled="!editingSkill.name || !editingSkill.body" @click="saveSkill">Save</button>
             <button class="btn-conn btn-ghost" @click="editingSkill = null">Cancel</button>
@@ -424,7 +424,9 @@ import {
   MessageSquare, Moon, Music, RefreshCw, Settings, Sun, X,
 } from 'lucide-vue-next'
 import { useSettingsStore, type LLMProvider, type ModelOption } from '../stores/settingsStore'
+import WikiText from './WikiText.vue'
 import { useConnectionsStore, type ConnectorStatus } from '../stores/connectionsStore'
+import { useNavStore } from '../stores/navStore'
 import { useSetupStore } from '../stores/setupStore'
 import { ACCENTS, useThemeStore } from '../stores/themeStore'
 import { LANGUAGES, usePrefsStore } from '../stores/prefsStore'
@@ -599,6 +601,26 @@ async function fetchSkills(): Promise<void> {
     skills.value = (await resp.json()).skills ?? []
   } catch { skills.value = [] }
 }
+
+const navStore = useNavStore()
+
+// U68: [[target]] in a skill → person when known in Knowledge, else a skill here.
+function openWikiTarget(target: string): void {
+  const t = target.trim().toLowerCase()
+  const skill = skills.value.find(sk => sk.name === t)
+  if (skill) { editSkill(skill); return }
+  navStore.openPerson(t)
+}
+
+// Opened via a [[wikilink]] elsewhere → jump to the Skills tab (and editor).
+watch(() => navStore.skillsRequest, async (r) => {
+  if (!r) return
+  await switchToSkills()
+  if (r.skillName) {
+    const skill = skills.value.find(sk => sk.name === r.skillName)
+    if (skill) editSkill(skill)
+  }
+}, { immediate: true })
 
 async function switchToSkills(): Promise<void> {
   activeTab.value = 'skills'
@@ -827,6 +849,8 @@ const ConnStatusBadge = defineComponent({
 }
 .skill-tag--mode { color: var(--accent); border-color: var(--accent); }
 .skill-scope { color: var(--accent); font-size: 0.72rem; }
+.skill-scope--link { background: none; border: none; cursor: pointer; padding: 0;
+  text-decoration: underline dotted; text-underline-offset: 2px; }
 .skill-toggle { font-size: 0.72rem; color: var(--text-faint); display: flex; gap: 0.25rem; align-items: center; }
 .skill-editor { display: flex; flex-direction: column; gap: 0.45rem; margin-top: 0.6rem; }
 .skill-body { font-family: ui-monospace, monospace; }

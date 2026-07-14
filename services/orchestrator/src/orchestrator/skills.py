@@ -116,6 +116,8 @@ class SkillStore:
         self._skills = {}
         if self._dir.exists():
             for f in sorted(self._dir.glob("*.md")):
+                if f.name.lower() == "readme.md":  # vault doc, not a skill (U68)
+                    continue
                 try:
                     skill = _parse(f.read_text(encoding="utf-8"), f.stem)
                     self._skills[skill.name] = skill
@@ -160,10 +162,23 @@ class SkillStore:
 
     # -- mutations (CRUD API + self-training, U60) ------------------------
 
+    _VAULT_README = (
+        "# AURA brain vault\n\n"
+        "Every `.md` file here is one skill the owner taught the assistant.\n"
+        "This folder is a plain markdown vault — open it in Obsidian if you\n"
+        "like: `[[person-id]]` / `[[skill-name]]` links work there AND render\n"
+        "as clickable links in the AURA app (with backlinks on the person's\n"
+        "profile). Person data itself is NOT stored here — profiles stay\n"
+        "encrypted inside the app (see docs/user-guide.md).\n"
+    )
+
     def save(self, skill: Skill) -> Skill:
         if not _NAME_RE.match(skill.name):
             raise ValueError("name must be kebab-case: a-z, 0-9 and dashes (max 64)")
         self._dir.mkdir(parents=True, exist_ok=True)
+        readme = self._dir / "README.md"
+        if not readme.exists():  # U68: make the vault self-describing
+            readme.write_text(self._VAULT_README, encoding="utf-8")
         path = self._dir / f"{skill.name}.md"
         path.write_text(skill.to_markdown(), encoding="utf-8")
         self._loaded_at = 0.0  # force reload

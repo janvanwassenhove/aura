@@ -139,9 +139,15 @@ async def inspect_person(person_id: str, _: None = Depends(_require_sensitive)) 
 
         skill_store = skills_api.get_store()
         if skill_store is not None:
+            # Scoped skills (their way of working) + skills that MENTION this
+            # person via an Obsidian-style [[link]] in their body (U68).
+            mention = f"[[{person_id}]]".lower()
             skills = [
-                {"name": sk.name, "description": sk.description, "enabled": sk.enabled}
-                for sk in skill_store.all() if sk.person == person_id
+                {"name": sk.name, "description": sk.description,
+                 "enabled": sk.enabled,
+                 "via": "scope" if sk.person == person_id else "mention"}
+                for sk in skill_store.all()
+                if sk.person == person_id or mention in sk.body.lower()
             ]
     except Exception:  # noqa: BLE001 — skills are optional context
         skills = []
