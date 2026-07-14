@@ -1,0 +1,65 @@
+# U37-installer: tag v* → run all suites → build the NSIS installer → GitHub Release.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install uv
+        run: pip install uv
+      - name: Sync workspace
+        run: uv sync --all-packages
+      - name: Python suites
+        run: |
+          uv run --package shared-schemas pytest packages/shared-schemas/tests -q
+          uv run --package shared-events pytest packages/shared-events/tests -q
+          uv run --package shared-policies pytest packages/shared-policies/tests -q
+          uv run --package shared-personas pytest packages/shared-personas/tests -q
+          uv run --package robot-runtime pytest services/robot-runtime/tests -q
+          uv run --package memory-service pytest services/memory-service/tests -q
+          uv run --package orchestrator pytest services/orchestrator/tests -q
+          uv run --package conversation-runtime pytest services/conversation-runtime/tests -q
+          uv run --package connector-service pytest services/connector-service/tests -q
+          uv run --package aura-brain --extra dev pytest apps/aura-brain/tests -q
+      - name: Console suite
+        working-directory: apps/operator-console
+        run: |
+          npm ci
+          npm test
+          npm run build
+
+  installer:
+    needs: test
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Build console
+        working-directory: apps/operator-console
+        run: |
+          npm ci
+          npm run build
+      - name: Build NSIS installer
+        working-directory: apps/desktop
+        run: |
+          npm ci
+          npx electron-builder --win nsis --publish never
+      - name: Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: apps/desktop/dist/*.exe
+          generate_release_notes: true
+          draft: false
