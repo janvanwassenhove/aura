@@ -35,6 +35,15 @@
     </div>
 
     <div class="status-row mt-3">
+      <span class="label volume-label"><Eye :size="14" /> Follow me</span>
+      <button
+        :class="['toggle', tracking && 'toggle--on']"
+        :title="tracking ? 'Stop following faces' : 'Follow the nearest face'"
+        @click="toggleTracking"
+      ><span class="toggle-knob" /></button>
+    </div>
+
+    <div class="status-row">
       <span class="label volume-label">
         <VolumeX v-if="volume === 0" :size="14" />
         <Volume1 v-else-if="volume < 0.5" :size="14" />
@@ -71,6 +80,28 @@
         <button class="qa-btn" :disabled="acting" title="Take a bow" @click="act('bow')">
           <ChevronsDown :size="13" /> Bow
         </button>
+        <button class="qa-btn" :disabled="acting" title="Glance around the room" @click="act('look_around')">
+          <Eye :size="13" /> Look around
+        </button>
+        <button class="qa-btn" :disabled="acting" title="Shake head" @click="act('shake')">
+          <MoveHorizontal :size="13" /> Shake
+        </button>
+      </div>
+
+      <h3 class="section-label mt-3">Speak &amp; Move</h3>
+      <div class="qa-grid">
+        <button class="qa-btn" :disabled="acting" title="Wave + say hi" @click="perform('hi')">
+          <Hand :size="13" /> Say hi
+        </button>
+        <button class="qa-btn" :disabled="acting" title="Bow + introduce itself" @click="perform('intro')">
+          <Bot :size="13" /> Introduce
+        </button>
+        <button class="qa-btn" :disabled="acting" title="Gesture + tell a joke" @click="perform('joke')">
+          <Laugh :size="13" /> Joke
+        </button>
+        <button class="qa-btn" :disabled="acting" title="Nod + compliment" @click="perform('compliment')">
+          <ThumbsUp :size="13" /> Compliment
+        </button>
       </div>
       <p v-if="actError" class="qa-error">{{ actError }}</p>
     </div>
@@ -91,7 +122,10 @@
 
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
-import { ChevronsDown, Hand, Moon, MoveVertical, Power, Sparkles, Volume1, Volume2, VolumeX } from 'lucide-vue-next'
+import {
+  Bot, ChevronsDown, Eye, Hand, Laugh, Moon, MoveHorizontal, MoveVertical,
+  Power, Sparkles, ThumbsUp, Volume1, Volume2, VolumeX,
+} from 'lucide-vue-next'
 import { useRobotStore } from '../stores/robotStore'
 
 const BRAIN_URL = import.meta.env.VITE_BRAIN_URL ?? import.meta.env.VITE_ORCHESTRATOR_URL ?? 'http://localhost:8000'
@@ -100,6 +134,61 @@ const robotStore = useRobotStore()
 const acting = ref(false)
 const actError = ref('')
 const volume = ref(0.8)
+
+const tracking = ref(true) // adapter enables head tracking on connect
+
+async function toggleTracking() {
+  tracking.value = !tracking.value
+  try {
+    await fetch(`${BRAIN_URL}/robot/tracking`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enabled: tracking.value }),
+    })
+  } catch {
+    tracking.value = !tracking.value // revert on failure
+  }
+}
+
+// Speak & Move combos (U36g): text + gesture in one action.
+const PERFORMANCES: Record<string, { text: string[]; motion: string }> = {
+  hi: { text: ['Hi there! Great to see you.'], motion: 'wave' },
+  intro: {
+    text: ['Hello! I am AURA, your robot assistant. I can chat, manage your calendar and tasks, recognize faces, and help you code.'],
+    motion: 'bow',
+  },
+  joke: {
+    text: [
+      'Why did the robot go on holiday? It needed to recharge its batteries!',
+      'I would tell you a UDP joke… but you might not get it.',
+      'My favorite music? Heavy metal, obviously.',
+    ],
+    motion: 'gesture',
+  },
+  compliment: {
+    text: ['You are doing great today — keep it up!'], motion: 'nod',
+  },
+}
+
+async function perform(kind: string) {
+  const p = PERFORMANCES[kind]
+  if (!p) return
+  acting.value = true
+  actError.value = ''
+  try {
+    const text = p.text[Math.floor(Math.random() * p.text.length)]
+    const resp = await fetch(`${BRAIN_URL}/robot/say`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text, motion_id: p.motion }),
+    })
+    if (!resp.ok) actError.value = 'Robot unreachable — is it switched on?'
+  } catch {
+    actError.value = 'Robot unreachable — is it switched on?'
+  } finally {
+    acting.value = false
+  }
+}
 
 async function applyVolume() {
   try {
@@ -152,6 +241,17 @@ function fmtTime(iso: string): string {
 .qa-error { font-size: 0.72rem; color: var(--danger-text); margin-top: 0.3rem; }
 
 .volume-label { display: inline-flex; align-items: center; gap: 0.3rem; }
+
+.toggle {
+  width: 34px; height: 18px; border-radius: 999px; border: 1px solid var(--border);
+  background: var(--surface-3); cursor: pointer; position: relative; padding: 0;
+}
+.toggle-knob {
+  position: absolute; top: 1px; left: 2px; width: 14px; height: 14px;
+  border-radius: 50%; background: var(--text-faint); transition: all 0.15s;
+}
+.toggle--on { background: var(--accent); border-color: var(--accent); }
+.toggle--on .toggle-knob { left: 16px; background: #fff; }
 .volume-slider { flex: 1; margin: 0 0.5rem; accent-color: var(--accent); }
 .volume-pct { font-size: 0.72rem; color: var(--text-faint); min-width: 2.2rem; text-align: right; }
 </style>

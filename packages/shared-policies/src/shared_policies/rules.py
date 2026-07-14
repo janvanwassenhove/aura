@@ -21,6 +21,7 @@ MODE_TOOL_MAP: dict[str, frozenset[str]] = {
     "work": frozenset(
         {
             "run_dev_task",
+            "open_in_vscode",
             "list_calendar_events_today",
             "create_calendar_event",
             "delete_calendar_event",

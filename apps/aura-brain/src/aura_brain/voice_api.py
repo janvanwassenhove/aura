@@ -19,11 +19,12 @@ router = APIRouter(prefix="/voice", tags=["voice"])
 _pipeline: Any = None
 _bus: Any = None
 _session_id: str = "default"
+_robot: Any = None  # for the listening acknowledgment nod (U36g)
 
 
-def init(pipeline: Any, bus: Any, session_id: str) -> None:
-    global _pipeline, _bus, _session_id
-    _pipeline, _bus, _session_id = pipeline, bus, session_id
+def init(pipeline: Any, bus: Any, session_id: str, robot: Any = None) -> None:
+    global _pipeline, _bus, _session_id, _robot
+    _pipeline, _bus, _session_id, _robot = pipeline, bus, session_id, robot
 
 
 @router.post("/turn")
@@ -35,6 +36,17 @@ async def voice_turn(audio: UploadFile) -> JSONResponse:
     data = await audio.read()
     if not data:
         return JSONResponse({"error": "empty audio"}, status_code=422)
+
+    # U36g: human listening behavior — a small acknowledging nod while the
+    # brain works on what you said. Fire-and-forget; never blocks the turn.
+    if _robot is not None:
+        import asyncio
+
+        from shared_schemas.robot.models import MotionCommand
+
+        asyncio.ensure_future(_robot.execute_motion(MotionCommand(
+            motion_id="nod", speed=0.6, amplitude=0.3, direction=None,
+        )))
 
     transcript = await voice.transcribe(data, filename=audio.filename or "audio.webm")
     if not transcript or not transcript.strip():

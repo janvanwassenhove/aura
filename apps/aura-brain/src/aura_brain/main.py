@@ -56,6 +56,7 @@ class BrainContext:
         self.pipeline = None
         self._perception = None
         self._robot_bridge = None
+        self._maintenance = None
         self._offline_queue = None
         self._webhook_dispatcher = None
         self._heartbeat = None
@@ -255,7 +256,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # U36e: voice input — the console mic posts audio here.
     from aura_brain import voice_api
 
-    voice_api.init(ctx.pipeline, ctx.bus, session_id)
+    voice_api.init(ctx.pipeline, ctx.bus, session_id, robot=_robot)
 
     async def _on_person_recognized(event: PersonRecognized) -> None:
         ctx.pipeline.set_active_person(event.person_id if event.known else None)
@@ -284,12 +285,18 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # U36e: react to hand gestures — an open palm ("hi!") gets a wave back.
     from shared_schemas.events.perception import GestureDetected
 
+    _GESTURE_REACTIONS = {
+        "open_palm": "wave",     # you wave → it waves back
+        "thumbs_up": "gesture",  # you approve → it celebrates
+    }
+
     async def _on_gesture(event: GestureDetected) -> None:
-        if event.gesture != "open_palm":
+        motion = _GESTURE_REACTIONS.get(event.gesture)
+        if motion is None:
             return
         try:
             await _robot.execute_motion(MotionCommand(
-                motion_id="wave", speed=1.2, amplitude=0.7, direction=None,
+                motion_id=motion, speed=1.2, amplitude=0.7, direction=None,
             ))
         except Exception as exc:
             logging.getLogger(__name__).debug("gesture reaction failed: %s", exc)
@@ -388,6 +395,18 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         already_encrypted=lambda: knowledge_api.is_omk_loaded(),
     )
 
+    # --- U36g: self-maintenance loop — the brain checks & heals itself.
+    if os.environ.get("MAINTENANCE_ENABLED", "true").lower() == "true":
+        from aura_brain.maintenance import MaintenanceLoop
+
+        ctx._maintenance = MaintenanceLoop(
+            ctx.bus, _robot,
+            knowledge_encrypted=knowledge_api.is_omk_loaded,
+            session_id=session_id,
+            interval_s=float(os.environ.get("MAINTENANCE_INTERVAL_S", "300")),
+        )
+        ctx._maintenance.start()
+
     # --- U14: heartbeat watches the REAL failure surface — the brain↔robot link
     # and upstream internet — not sibling containers (which no longer exist after
     # the collapse). Gated by env so it doesn't flap during tests.
@@ -405,6 +424,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     yield
 
+    if ctx._maintenance is not None:
+        await ctx._maintenance.stop()
     if ctx._robot_bridge is not None:
         await ctx._robot_bridge.stop()
     if ctx._perception is not None:

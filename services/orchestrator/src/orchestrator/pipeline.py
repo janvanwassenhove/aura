@@ -28,6 +28,35 @@ from shared_schemas.robot.models import RobotMode
 logger = logging.getLogger(__name__)
 
 # Tool name → connector-service path (method, path)
+async def _open_in_vscode(path: str, line: int | None = None) -> str:
+    """Open a file/folder in VS Code on the owner's machine (U35 slice).
+
+    Read-class desktop integration: shows code, changes nothing. Arguments go
+    as an argv list — no shell interpolation.
+    """
+    if not path:
+        return "[open_in_vscode: path is required]"
+    import shutil
+
+    code_bin = shutil.which("code")  # resolves code.cmd on Windows
+    if code_bin is None:
+        return "[open_in_vscode: 'code' CLI not found — install VS Code and enable the shell command]"
+    target = f"{path}:{line}" if line else path
+    argv = [code_bin, "-g", target] if line else [code_bin, target]
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            *argv,
+            stdout=asyncio.subprocess.DEVNULL,
+            stderr=asyncio.subprocess.DEVNULL,
+        )
+        await asyncio.wait_for(proc.wait(), timeout=15)
+        return f"Opened {target} in VS Code."
+    except FileNotFoundError:
+        return "[open_in_vscode: 'code' CLI not found — install VS Code and enable the shell command]"
+    except Exception as exc:  # noqa: BLE001
+        return f"[open_in_vscode: error — {exc}]"
+
+
 _TOOL_ROUTES: dict[str, tuple[str, str]] = {
     "list_calendar_events_today": ("GET", "/calendar/today"),
     "create_calendar_event":      ("POST", "/calendar/events"),
@@ -225,6 +254,10 @@ class OrchestratorPipeline:
                     session_id=session_id,
                     working_dir=arguments.get("working_dir"),
                     operation_type=arguments.get("operation_type"),
+                )
+            elif tool_name == "open_in_vscode":
+                result_text = await _open_in_vscode(
+                    arguments.get("path", ""), arguments.get("line"),
                 )
             else:
                 result_text = await self._call_connector(tool_name, arguments)
