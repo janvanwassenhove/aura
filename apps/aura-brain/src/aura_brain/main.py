@@ -335,14 +335,24 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     else:
         _gesture_detector = None
 
+    # The face embedder runs from boot: it powers the unknown-visitor log
+    # (U36f) even before recognition is enabled; it stores nothing itself.
+    _boot_embedder = build_embedder(os.environ.get("FACE_EMBEDDER", "null"))
+
+    from aura_brain.sightings import SightingLog
+
+    _sighting_log = SightingLog()
+    recognition_api.set_sightings(_sighting_log)
+
     ctx._perception = PerceptionLoop(
-        ctx.bus, None, _robot, build_embedder("null"),
+        ctx.bus, None, _robot, _boot_embedder,
         knowledge_store=ctx.knowledge_store,
         interval_s=float(os.environ.get("RECOGNITION_INTERVAL_S", "2.0")),
         session_id=session_id,
         gesture_detector=_gesture_detector,
+        sighting_log=_sighting_log,
     )
-    if _gesture_detector is not None:
+    if _gesture_detector is not None or _boot_embedder.name != "null":
         ctx._perception.start()
 
     def _start_recognition(omk: bytes) -> None:
@@ -351,12 +361,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         _rec_matcher = EmbeddingMatcher(
             omk, path=os.environ.get("RECOGNITION_DB_PATH", "./data/recognition.enc.json"),
         )
-        _rec_embedder = build_embedder(os.environ.get("FACE_EMBEDDER", "null"))
-        ctx._perception.set_matcher(_rec_matcher, _rec_embedder)
+        ctx._perception.set_matcher(_rec_matcher, _boot_embedder)
         ctx._perception._store = ctx.knowledge_store  # may have been swapped
-        ctx._perception.start()  # no-op when already running for gestures
+        ctx._perception.start()  # no-op when already running
         recognition_api.init(
-            _rec_matcher, _rec_embedder, _robot, ctx.knowledge_store,
+            _rec_matcher, _boot_embedder, _robot, ctx.knowledge_store,
             loop=ctx._perception,
         )
 

@@ -61,6 +61,38 @@
             </li>
           </ul>
 
+          <!-- Unknown visitors (U36f): tag to train recognition -->
+          <template v-if="store.sightings.length > 0">
+            <div class="col-title">Unknown visitors</div>
+            <p class="facts-hint">
+              Seen by the robot but not recognized. Tag them to teach AURA —
+              kept in memory only, gone after a restart.
+            </p>
+            <div v-for="s in store.sightings" :key="s.sighting_id" class="sighting-card">
+              <img :src="store.sightingImageUrl(s.sighting_id)" class="sighting-img" alt="Unknown visitor" />
+              <div class="sighting-meta">
+                <span class="sighting-time">
+                  {{ s.count }}× · {{ new Date(s.last_seen * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }}
+                </span>
+                <div class="sighting-actions">
+                  <select v-model="tagTargets[s.sighting_id]" class="field-select sighting-select">
+                    <option value="" disabled>Who is this?</option>
+                    <option v-for="p in store.people" :key="p.person_id" :value="p.person_id">{{ p.display_name }}</option>
+                  </select>
+                  <button
+                    class="btn-apply sighting-btn" :disabled="!tagTargets[s.sighting_id]"
+                    title="Tag & train recognition"
+                    @click="doTagSighting(s.sighting_id)"
+                  ><UserPlus :size="12" /></button>
+                  <button class="btn-delete" title="Dismiss" @click="store.dismissSighting(s.sighting_id)">
+                    <X :size="12" />
+                  </button>
+                </div>
+              </div>
+            </div>
+            <p v-if="tagMessage" class="teach-msg">{{ tagMessage }}</p>
+          </template>
+
           <form class="add-person-form" @submit.prevent="addPerson">
             <input v-model="newPersonId" class="field-input" placeholder="id (e.g. jan)" required />
             <input v-model="newPersonName" class="field-input" placeholder="Display name" required />
@@ -141,8 +173,8 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
-import { Brain, Lock, LockOpen, ScanFace, ShieldAlert, X } from 'lucide-vue-next'
+import { onMounted, onUnmounted, ref } from 'vue'
+import { Brain, Lock, LockOpen, ScanFace, ShieldAlert, UserPlus, X } from 'lucide-vue-next'
 import { useKnowledgeStore } from '../stores/knowledgeStore'
 
 defineEmits<{ close: [] }>()
@@ -184,11 +216,26 @@ async function doTeachFace() {
   }
 }
 
+const tagTargets = ref<Record<string, string>>({})
+const tagMessage = ref('')
+
+async function doTagSighting(sightingId: string) {
+  const personId = tagTargets.value[sightingId]
+  if (!personId) return
+  tagMessage.value = await store.tagSighting(sightingId, personId)
+}
+
+let sightingsTimer: ReturnType<typeof setInterval> | null = null
+
 onMounted(async () => {
   await store.fetchTier()
   await store.fetchPeople()
   await store.fetchRecognition()
+  await store.fetchSightings()
+  sightingsTimer = setInterval(() => store.fetchSightings(), 15_000)
 })
+
+onUnmounted(() => { if (sightingsTimer) clearInterval(sightingsTimer) })
 
 async function addPerson() {
   const ok = await store.upsertPerson(newPersonId.value.trim(), newPersonName.value.trim(), newPersonRole.value)
@@ -344,4 +391,18 @@ function confirmForget() {
   color: var(--text-muted); font-size: 0.68rem; padding: 0.15rem 0.55rem; cursor: pointer;
 }
 .fact-chip:hover { color: var(--text); border-color: var(--accent-border); }
+
+/* Unknown visitors (U36f) */
+.sighting-card {
+  display: flex; gap: 0.5rem; align-items: center;
+  border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 0.35rem; margin-bottom: 0.4rem; background: var(--surface-2);
+}
+.sighting-img { width: 74px; height: 42px; object-fit: cover; border-radius: var(--radius-sm); }
+.sighting-meta { flex: 1; min-width: 0; }
+.sighting-time { font-size: 0.68rem; color: var(--text-faint); }
+.sighting-actions { display: flex; gap: 0.3rem; align-items: center; margin-top: 0.25rem; }
+.sighting-select { flex: 1; font-size: 0.72rem; padding: 0.2rem 0.35rem; }
+.sighting-btn { display: inline-flex; padding: 0.3rem 0.45rem; }
+.sighting-btn:disabled { opacity: 0.45; cursor: not-allowed; }
 </style>

@@ -182,6 +182,7 @@ class PerceptionLoop:
         session_id: str = "default",
         gesture_detector: Any = None,  # HandGestureDetector | None (U36e)
         gesture_cooldown_s: float = 8.0,
+        sighting_log: Any = None,      # SightingLog | None (U36f)
     ) -> None:
         self._bus = bus
         self._matcher = matcher
@@ -192,6 +193,7 @@ class PerceptionLoop:
         self._session_id = session_id
         self._gestures = gesture_detector
         self._gesture_cooldown = gesture_cooldown_s
+        self._sightings = sighting_log
         self._last_gesture_at = 0.0
         self._task: asyncio.Task | None = None
         self._last_seen: str | None = None  # person_id | _ABSENT | None(=never)
@@ -234,15 +236,21 @@ class PerceptionLoop:
         if self._gestures is not None:
             await self._detect_gesture(frame)
 
-        if self._matcher is None:
-            return  # recognition not enabled (yet)
         embedding = await asyncio.to_thread(self._embedder.embed, frame)
 
         if embedding is None:
             await self._transition(_ABSENT, None, 0.0)
             return
 
-        person_id, confidence = self._matcher.identify(embedding)
+        if self._matcher is not None:
+            person_id, confidence = self._matcher.identify(embedding)
+        else:
+            person_id, confidence = None, 0.0  # recognition not enabled (yet)
+
+        # U36f: log unrecognized passers-by (in-memory only) for easy tagging.
+        if person_id is None and self._sightings is not None:
+            self._sightings.record(frame, embedding)
+
         await self._transition(person_id or "", person_id, confidence)
 
     async def _detect_gesture(self, frame: bytes) -> None:

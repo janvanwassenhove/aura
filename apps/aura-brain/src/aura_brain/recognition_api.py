@@ -25,11 +25,17 @@ _embedder: Any = None     # FaceEmbedder | None
 _robot: Any = None        # RobotClient | None
 _store: Any = None        # KnowledgeStore | None
 _loop: Any = None         # PerceptionLoop | None
+_sightings: Any = None    # SightingLog | None (U36f — set at boot, works pre-secure)
 
 
 def init(matcher: Any, embedder: Any, robot: Any, store: Any, loop: Any = None) -> None:
     global _matcher, _embedder, _robot, _store, _loop
     _matcher, _embedder, _robot, _store, _loop = matcher, embedder, robot, store, loop
+
+
+def set_sightings(log: Any) -> None:
+    global _sightings
+    _sightings = log
 
 
 @router.get("/status")
@@ -80,3 +86,62 @@ async def forget(person_id: str) -> JSONResponse:
         return JSONResponse({"error": "recognition disabled"}, status_code=503)
     _matcher.forget(person_id)
     return JSONResponse({"forgotten": person_id})
+
+
+# ------------------------------------------------------------------
+# Unknown-visitor sightings (U36f) — in-memory, tag to train recognition
+# ------------------------------------------------------------------
+
+
+@router.get("/sightings")
+async def list_sightings() -> JSONResponse:
+    if _sightings is None:
+        return JSONResponse({"sightings": []})
+    return JSONResponse({"sightings": _sightings.list()})
+
+
+@router.get("/sightings/{sighting_id}/image")
+async def sighting_image(sighting_id: str):
+    from fastapi import Response
+
+    entry = _sightings.get(sighting_id) if _sightings is not None else None
+    if entry is None:
+        return JSONResponse({"error": "unknown sighting"}, status_code=404)
+    return Response(content=entry.thumbnail, media_type="image/jpeg",
+                    headers={"Cache-Control": "no-store"})
+
+
+@router.post("/sightings/{sighting_id}/tag")
+async def tag_sighting(sighting_id: str, body: dict) -> JSONResponse:
+    """Tag an unknown visitor as a known person → their face is enrolled
+    (encrypted) and future recognition improves."""
+    if _sightings is None:
+        return JSONResponse({"error": "sightings disabled"}, status_code=503)
+    if _matcher is None:
+        return JSONResponse(
+            {"error": "recognition is not enabled — secure knowledge first "
+                      "(Knowledge panel)"},
+            status_code=409,
+        )
+    entry = _sightings.get(sighting_id)
+    if entry is None:
+        return JSONResponse({"error": "unknown sighting"}, status_code=404)
+    person_id = (body or {}).get("person_id", "").strip().lower()
+    if not person_id:
+        return JSONResponse({"error": "person_id is required"}, status_code=422)
+    if _store is not None and await _store.get_person(person_id) is None:
+        return JSONResponse(
+            {"error": f"unknown person {person_id!r} — add them to knowledge first"},
+            status_code=404,
+        )
+    _matcher.enroll(person_id, entry.embedding)
+    # This sighting (and any others of the same face) now match → clean up.
+    purged = _sightings.purge_matching(_matcher)
+    return JSONResponse({"tagged": person_id, "purged_sightings": purged})
+
+
+@router.delete("/sightings/{sighting_id}")
+async def dismiss_sighting(sighting_id: str) -> JSONResponse:
+    if _sightings is None or not _sightings.remove(sighting_id):
+        return JSONResponse({"error": "unknown sighting"}, status_code=404)
+    return JSONResponse({"dismissed": sighting_id})

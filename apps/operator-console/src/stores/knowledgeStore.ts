@@ -188,6 +188,48 @@ export const useKnowledgeStore = defineStore('knowledge', () => {
     }
   }
 
+  // ── Unknown-visitor sightings (U36f) ──
+
+  const sightings = ref<{ sighting_id: string; first_seen: number; last_seen: number; count: number }[]>([])
+
+  async function fetchSightings(): Promise<void> {
+    try {
+      const resp = await fetch(`${BRAIN_URL}/recognition/sightings`)
+      sightings.value = resp.ok ? (await resp.json()).sightings ?? [] : []
+    } catch {
+      sightings.value = []
+    }
+  }
+
+  function sightingImageUrl(id: string): string {
+    return `${BRAIN_URL}/recognition/sightings/${id}/image?t=${Date.now()}`
+  }
+
+  async function tagSighting(sightingId: string, personId: string): Promise<string> {
+    try {
+      const resp = await fetch(`${BRAIN_URL}/recognition/sightings/${sightingId}/tag`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ person_id: personId }),
+      })
+      const body = await resp.json().catch(() => ({}))
+      if (resp.ok) {
+        await fetchSightings()
+        return `Tagged as ${body.tagged} — recognition improved.`
+      }
+      return body.error ?? `Tagging failed (${resp.status})`
+    } catch {
+      return 'Could not reach the brain.'
+    }
+  }
+
+  async function dismissSighting(sightingId: string): Promise<void> {
+    try {
+      await fetch(`${BRAIN_URL}/recognition/sightings/${sightingId}`, { method: 'DELETE' })
+    } catch { /* ignore */ }
+    await fetchSightings()
+  }
+
   async function teachFace(personId: string): Promise<string> {
     try {
       const resp = await fetch(`${BRAIN_URL}/recognition/enroll`, {
@@ -220,9 +262,11 @@ export const useKnowledgeStore = defineStore('knowledge', () => {
 
   return {
     people, detail, tier, omkLoaded, locked, loading, error, recognitionEnabled,
+    sightings,
     fetchTier, fetchPeople, inspectPerson, upsertPerson,
     addFact, deleteFact, forgetPerson, setConsent, lock,
     fetchRecognition, secure, teachFace,
+    fetchSightings, sightingImageUrl, tagSighting, dismissSighting,
     clearDetail, $reset,
   }
 })
