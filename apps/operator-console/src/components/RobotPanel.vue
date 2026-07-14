@@ -34,6 +34,22 @@
       <span v-else class="value text-gray-400">Unknown face</span>
     </div>
 
+    <div class="status-row mt-3">
+      <span class="label volume-label">
+        <VolumeX v-if="volume === 0" :size="14" />
+        <Volume1 v-else-if="volume < 0.5" :size="14" />
+        <Volume2 v-else :size="14" />
+        Volume
+      </span>
+      <input
+        v-model.number="volume"
+        type="range" min="0" max="1" step="0.05"
+        class="volume-slider"
+        @change="applyVolume"
+      />
+      <span class="volume-pct">{{ Math.round(volume * 100) }}%</span>
+    </div>
+
     <div class="mt-3">
       <h3 class="section-label">Quick Actions</h3>
       <div class="qa-grid">
@@ -74,8 +90,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
-import { ChevronsDown, Hand, Moon, MoveVertical, Power, Sparkles, Volume2, VolumeX } from 'lucide-vue-next'
+import { onMounted, ref } from 'vue'
+import { ChevronsDown, Hand, Moon, MoveVertical, Power, Sparkles, Volume1, Volume2, VolumeX } from 'lucide-vue-next'
 import { useRobotStore } from '../stores/robotStore'
 
 const BRAIN_URL = import.meta.env.VITE_BRAIN_URL ?? import.meta.env.VITE_ORCHESTRATOR_URL ?? 'http://localhost:8000'
@@ -83,6 +99,24 @@ const BRAIN_URL = import.meta.env.VITE_BRAIN_URL ?? import.meta.env.VITE_ORCHEST
 const robotStore = useRobotStore()
 const acting = ref(false)
 const actError = ref('')
+const volume = ref(0.8)
+
+async function applyVolume() {
+  try {
+    await fetch(`${BRAIN_URL}/robot/volume`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ volume: volume.value }),
+    })
+  } catch { /* robot offline — slider stays local */ }
+}
+
+onMounted(async () => {
+  try {
+    const resp = await fetch(`${BRAIN_URL}/robot/volume`)
+    if (resp.ok) volume.value = (await resp.json()).volume ?? 0.8
+  } catch { /* keep default */ }
+})
 
 async function act(motionId: string) {
   acting.value = true
@@ -116,4 +150,8 @@ function fmtTime(iso: string): string {
 .qa-btn:hover:not(:disabled) { color: var(--text); border-color: var(--accent-border); }
 .qa-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .qa-error { font-size: 0.72rem; color: var(--danger-text); margin-top: 0.3rem; }
+
+.volume-label { display: inline-flex; align-items: center; gap: 0.3rem; }
+.volume-slider { flex: 1; margin: 0 0.5rem; accent-color: var(--accent); }
+.volume-pct { font-size: 0.72rem; color: var(--text-faint); min-width: 2.2rem; text-align: right; }
 </style>

@@ -121,6 +121,32 @@ async def execute_motion(command: MotionCommand) -> JSONResponse:
 
 
 # ------------------------------------------------------------------
+# Volume (U36e: app-controlled speaker gain)
+# ------------------------------------------------------------------
+
+
+@router.get("/robot/volume")
+async def get_volume() -> JSONResponse:
+    assert adapter is not None
+    level = getattr(adapter, "get_volume", lambda: 1.0)()
+    return JSONResponse({"volume": level})
+
+
+@router.post("/robot/volume")
+async def set_volume(body: dict) -> JSONResponse:
+    assert adapter is not None
+    _touch()
+    try:
+        level = float(body.get("volume"))
+    except (TypeError, ValueError):
+        return JSONResponse({"error": "volume must be a number 0..1"}, status_code=422)
+    setter = getattr(adapter, "set_volume", None)
+    if setter is None:
+        return JSONResponse({"error": "adapter has no volume control"}, status_code=501)
+    return JSONResponse({"volume": setter(level)})
+
+
+# ------------------------------------------------------------------
 # Camera (U18: one frame per request; the brain's perception loop polls)
 # ------------------------------------------------------------------
 

@@ -39,14 +39,26 @@
       + tools {{ conversationStore.lastLatency.tool_ms.toFixed(0) }}ms)
     </div>
 
+    <p v-if="micError" class="mic-error">{{ micError }}</p>
     <form class="input-row" @submit.prevent="submit">
       <input
         v-model="conversationStore.pendingText"
         type="text"
-        placeholder="Type a message…"
+        placeholder="Type a message… or use the mic"
         :disabled="conversationStore.isProcessing"
         class="chat-input"
       />
+      <button
+        type="button"
+        :class="['btn-mic', recording && 'btn-mic--recording']"
+        :disabled="transcribing"
+        :title="recording ? 'Stop & send' : 'Talk to the robot'"
+        @click="toggleMic"
+      >
+        <LoaderCircle v-if="transcribing" :size="15" class="spin" />
+        <Square v-else-if="recording" :size="13" />
+        <Mic v-else :size="15" />
+      </button>
       <button
         type="submit"
         :disabled="conversationStore.isProcessing || !conversationStore.pendingText.trim()"
@@ -59,9 +71,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, nextTick } from 'vue'
-import { Sparkles, Wrench } from 'lucide-vue-next'
+import { onUnmounted, ref, watch, nextTick } from 'vue'
+import { LoaderCircle, Mic, Sparkles, Square, Wrench } from 'lucide-vue-next'
 import { useConversationStore } from '../stores/conversationStore'
+
+const BRAIN_URL = import.meta.env.VITE_BRAIN_URL ?? import.meta.env.VITE_ORCHESTRATOR_URL ?? 'http://localhost:8000'
 
 const conversationStore = useConversationStore()
 const scrollEl = ref<HTMLElement | null>(null)
@@ -95,6 +109,58 @@ watch(
 function fmtTime(iso: string): string {
   return new Date(iso).toLocaleTimeString()
 }
+
+// ── Voice input (U36e): record on the laptop mic, transcribe in the brain ──
+
+const recording = ref(false)
+const transcribing = ref(false)
+const micError = ref('')
+let recorder: MediaRecorder | null = null
+let chunks: Blob[] = []
+
+async function toggleMic() {
+  micError.value = ''
+  if (recording.value) {
+    recorder?.stop()
+    return
+  }
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+    chunks = []
+    recorder = new MediaRecorder(stream, { mimeType: 'audio/webm' })
+    recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data) }
+    recorder.onstop = async () => {
+      stream.getTracks().forEach(t => t.stop())
+      recording.value = false
+      await sendVoice(new Blob(chunks, { type: 'audio/webm' }))
+    }
+    recorder.start()
+    recording.value = true
+  } catch {
+    micError.value = 'Microphone unavailable — check permissions.'
+  }
+}
+
+async function sendVoice(blob: Blob) {
+  if (blob.size < 1000) return // too short to contain speech
+  transcribing.value = true
+  try {
+    const form = new FormData()
+    form.append('audio', blob, 'audio.webm')
+    const resp = await fetch(`${BRAIN_URL}/voice/turn`, { method: 'POST', body: form })
+    if (!resp.ok) {
+      const body = await resp.json().catch(() => ({}))
+      micError.value = body.error ?? `Voice turn failed (${resp.status})`
+    }
+    // Turns render via the event stream (TranscriptUpdated + ResponseDrafted).
+  } catch {
+    micError.value = 'Could not reach the brain.'
+  } finally {
+    transcribing.value = false
+  }
+}
+
+onUnmounted(() => { if (recording.value) recorder?.stop() })
 </script>
 
 <style scoped>
@@ -111,4 +177,16 @@ function fmtTime(iso: string): string {
   color: var(--text-muted); font-size: 0.75rem; padding: 0.25rem 0.7rem; cursor: pointer;
 }
 .gs-chip:hover { color: var(--text); border-color: var(--accent-border); }
+
+.btn-mic {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 38px; border-radius: var(--radius);
+  background: var(--surface-3); border: 1px solid var(--border);
+  color: var(--text-muted); cursor: pointer;
+}
+.btn-mic:hover:not(:disabled) { color: var(--text); border-color: var(--accent-border); }
+.btn-mic--recording { background: var(--danger-bg); border-color: var(--danger); color: var(--danger); animation: pulse 1.2s infinite; }
+.mic-error { font-size: 0.72rem; color: var(--danger-text); margin: 0 0 0.3rem; }
+.spin { animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
 </style>

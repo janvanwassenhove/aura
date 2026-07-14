@@ -20,6 +20,8 @@ dependencies = [
     "identity-service",
     "fastapi>=0.111",
     "uvicorn[standard]>=0.29",
+    # U36e: multipart uploads for the voice-turn endpoint
+    "python-multipart>=0.0.9",
 ]
 
 [project.optional-dependencies]
@@ -35,6 +37,12 @@ dev = [
 recognition = [
     "insightface>=0.7",
     "onnxruntime>=1.18",
+    "pillow>=10.0",
+    "numpy>=1.26",
+]
+# Hand-gesture reactions (U36e): uv sync --package aura-brain --extra gestures
+gestures = [
+    "mediapipe>=0.10.14",
     "pillow>=10.0",
     "numpy>=1.26",
 ]

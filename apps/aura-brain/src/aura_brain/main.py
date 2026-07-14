@@ -252,6 +252,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     ctx.bus.subscribe(ResponseDrafted, _embody_reply)
 
+    # U36e: voice input — the console mic posts audio here.
+    from aura_brain import voice_api
+
+    voice_api.init(ctx.pipeline, ctx.bus, session_id)
+
     async def _on_person_recognized(event: PersonRecognized) -> None:
         ctx.pipeline.set_active_person(event.person_id if event.known else None)
         # Greet a KNOWN person: personalized text (the pipeline injects their
@@ -275,6 +280,21 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
                 ))
 
     ctx.bus.subscribe(PersonRecognized, _on_person_recognized)
+
+    # U36e: react to hand gestures — an open palm ("hi!") gets a wave back.
+    from shared_schemas.events.perception import GestureDetected
+
+    async def _on_gesture(event: GestureDetected) -> None:
+        if event.gesture != "open_palm":
+            return
+        try:
+            await _robot.execute_motion(MotionCommand(
+                motion_id="wave", speed=1.2, amplitude=0.7, direction=None,
+            ))
+        except Exception as exc:
+            logging.getLogger(__name__).debug("gesture reaction failed: %s", exc)
+
+    ctx.bus.subscribe(GestureDetected, _on_gesture)
 
     # U27: the presenter drives the robot (speech + synced gesture) over the
     # brain↔robot boundary via RobotClient.
@@ -306,22 +326,35 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # Needs encryption (embeddings are biometric data). Started at boot when the
     # passphrase is in the env, or later via /setup/secure (in-app enable).
     from aura_brain import recognition_api, setup_api
+    from aura_brain.perception import PerceptionLoop, build_embedder, build_gesture_detector
+
+    # One perception loop serves BOTH gestures (no identity, always available)
+    # and face recognition (added once the store is encrypted).
+    if os.environ.get("GESTURES_ENABLED", "true").lower() == "true":
+        _gesture_detector = build_gesture_detector()
+    else:
+        _gesture_detector = None
+
+    ctx._perception = PerceptionLoop(
+        ctx.bus, None, _robot, build_embedder("null"),
+        knowledge_store=ctx.knowledge_store,
+        interval_s=float(os.environ.get("RECOGNITION_INTERVAL_S", "2.0")),
+        session_id=session_id,
+        gesture_detector=_gesture_detector,
+    )
+    if _gesture_detector is not None:
+        ctx._perception.start()
 
     def _start_recognition(omk: bytes) -> None:
-        from aura_brain.perception import PerceptionLoop, build_embedder
         from shared_schemas.knowledge.recognition import EmbeddingMatcher
 
         _rec_matcher = EmbeddingMatcher(
             omk, path=os.environ.get("RECOGNITION_DB_PATH", "./data/recognition.enc.json"),
         )
         _rec_embedder = build_embedder(os.environ.get("FACE_EMBEDDER", "null"))
-        ctx._perception = PerceptionLoop(
-            ctx.bus, _rec_matcher, _robot, _rec_embedder,
-            knowledge_store=ctx.knowledge_store,
-            interval_s=float(os.environ.get("RECOGNITION_INTERVAL_S", "2.0")),
-            session_id=session_id,
-        )
-        ctx._perception.start()
+        ctx._perception.set_matcher(_rec_matcher, _rec_embedder)
+        ctx._perception._store = ctx.knowledge_store  # may have been swapped
+        ctx._perception.start()  # no-op when already running for gestures
         recognition_api.init(
             _rec_matcher, _rec_embedder, _robot, ctx.knowledge_store,
             loop=ctx._perception,
@@ -431,6 +464,9 @@ def create_app() -> FastAPI:
 
     from aura_brain import setup_api
     app.include_router(setup_api.router)  # U34: in-app secure/setup
+
+    from aura_brain import voice_api
+    app.include_router(voice_api.router)  # U36e: console mic → voice turn
 
     return app
 

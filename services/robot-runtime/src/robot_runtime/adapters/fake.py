@@ -40,6 +40,14 @@ class FakeRobotAdapter(RobotAdapter):
         self._spoken: list[str] = []
         self._played_audio: list[bytes] = []
         self._motions: list[MotionCommand] = []
+        self._volume = 0.8
+
+    def set_volume(self, level: float) -> float:
+        self._volume = max(0.0, min(1.0, level))
+        return self._volume
+
+    def get_volume(self) -> float:
+        return self._volume
 
     # ------------------------------------------------------------------
     # Lifecycle

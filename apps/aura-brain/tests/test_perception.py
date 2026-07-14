@@ -125,6 +125,41 @@ async def test_reappearance_after_absence_fires_again() -> None:
     assert len(bus.published) == 2  # greet, (absent: silent), greet again
 
 
+async def test_gesture_publishes_event_with_cooldown() -> None:
+    class PalmDetector:
+        name = 'fake'
+        def detect(self, frame):
+            return 'open_palm'
+
+    bus = FakeBus()
+    loop = PerceptionLoop(
+        bus, None, FakeRobot(), NullEmbedder(),
+        gesture_detector=PalmDetector(), gesture_cooldown_s=60.0,
+    )
+    await loop.tick()
+    await loop.tick()  # within cooldown → no second event
+    gestures = [e for e in bus.published if getattr(e, 'gesture', None)]
+    assert len(gestures) == 1
+    assert gestures[0].gesture == 'open_palm'
+
+
+async def test_no_matcher_means_no_recognition_events() -> None:
+    bus = FakeBus()
+    loop = PerceptionLoop(bus, None, FakeRobot(), ScriptedEmbedder([JAN_FACE]))
+    await loop.tick()
+    assert bus.published == []  # gestures off, recognition off → silent
+
+
+async def test_set_matcher_upgrades_running_loop() -> None:
+    bus = FakeBus()
+    loop = PerceptionLoop(bus, None, FakeRobot(), NullEmbedder())
+    matcher = EmbeddingMatcher(OMK)
+    matcher.enroll('jan', JAN_FACE)
+    loop.set_matcher(matcher, ScriptedEmbedder([JAN_FACE]))
+    await loop.tick()
+    assert bus.published[0].person_id == 'jan'
+
+
 async def test_null_embedder_is_default() -> None:
     assert isinstance(build_embedder("null"), NullEmbedder)
     assert isinstance(build_embedder("anything-else"), NullEmbedder)

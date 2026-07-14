@@ -1,0 +1,54 @@
+"""Voice input (U36e): the console microphone talks to the robot.
+
+POST /voice/turn (multipart audio) →
+  1. speech → text (OpenAI transcription; the brain holds the key),
+  2. the transcript is published as TranscriptUpdated (console user turn),
+  3. one pipeline turn — the reply is published as ResponseDrafted, which the
+     embodiment handler speaks out loud on the robot with a gesture.
+"""
+
+from __future__ import annotations
+
+from typing import Any
+
+from fastapi import APIRouter, UploadFile
+from fastapi.responses import JSONResponse
+
+router = APIRouter(prefix="/voice", tags=["voice"])
+
+_pipeline: Any = None
+_bus: Any = None
+_session_id: str = "default"
+
+
+def init(pipeline: Any, bus: Any, session_id: str) -> None:
+    global _pipeline, _bus, _session_id
+    _pipeline, _bus, _session_id = pipeline, bus, session_id
+
+
+@router.post("/turn")
+async def voice_turn(audio: UploadFile) -> JSONResponse:
+    if _pipeline is None:
+        return JSONResponse({"error": "voice not initialised"}, status_code=503)
+    from aura_brain import voice
+
+    data = await audio.read()
+    if not data:
+        return JSONResponse({"error": "empty audio"}, status_code=422)
+
+    transcript = await voice.transcribe(data, filename=audio.filename or "audio.webm")
+    if not transcript or not transcript.strip():
+        return JSONResponse(
+            {"error": "could not understand the audio — is a microphone connected "
+                      "and OPENAI_API_KEY set?"},
+            status_code=422,
+        )
+    transcript = transcript.strip()
+
+    from shared_schemas.events.audio import TranscriptUpdated
+
+    await _bus.publish(TranscriptUpdated(
+        session_id=_session_id, transcript=transcript, is_final=True,
+    ))
+    reply = await _pipeline.orchestrate(transcript, _session_id)
+    return JSONResponse({"transcript": transcript, "reply": reply})
