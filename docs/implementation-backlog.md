@@ -110,7 +110,8 @@ the human can unblock it.
   `streaming.py`: `split_speech_chunks` (zinsgrenzen, min 60 tekens, staart-cap) + `stream_speech` — chunk N+1 wordt gesynthetiseerd TERWIJL chunk N op de robot speelt → eerste audio na één korte TTS-call i.p.v. één lange. `_embody_reply` gebruikt het gestreamde pad (SPEAK_STREAMING, default aan). Barge-in in de VoiceLoop: tijdens het spreken luistert de lus in korte vensters; een duidelijk luidere stem (BARGE_IN_FACTOR×gate, filtert speaker-echo) kapt de wachttijd en wordt direct als reply behandeld (BARGE_IN, default aan). Brain 125 (+8) groen. Rest van U24 (echte streaming-STT over een live socket) blijft 🔒 SECRET+HW bij U22.
 - [x] **U25 — parallel tool calling** · deps: U5 · `afdb299`
   Tool loop split into a sequential gate pass + a concurrent (asyncio.gather) execution pass for independent tools; approval-gated tools still serialize. A multi-tool turn pays the slowest tool, not the sum. Orchestrator 115, brain 13 green.
-- [ ] **U26 — on-Pi budget guard** · 🔒 HW · deps: U16
+- [x] **U26 — on-Pi budget guard** · deps: U16 · `pending`
+  `budget_guard.py`: BudgetGuard samplet CPU (/proc/stat-delta), geheugen (/proc/meminfo) en SoC-temperatuur (thermal_zone0) elke 5s; boven budget (BUDGET_CPU_PCT=85 / BUDGET_MEM_PCT=90 / BUDGET_TEMP_C=75) → CONSTRAINED. De offline-idle-lus slaat idle-animaties over zolang constrained (Pi krijgt headroom); `GET /robot/budget` toont de status voor de console. Readers injecteerbaar (getest off-Pi; degradeert naar unconstrained op niet-Linux). Robot 54 (+6) groen; live op de Pi geverifieerd (temp 47°C, mem 16%, unconstrained).
 
 ## Phase 4 — presentations & polish
 

@@ -19,6 +19,7 @@ engine: BehaviorEngine | None = None
 broadcaster: WebSocketBroadcaster | None = None
 bus = None  # AsyncEventBus | None — set by main.py (U36d: motion events)
 offline_loop = None  # OfflineBehaviorLoop | None — set by main.py (U15)
+budget_guard = None  # BudgetGuard | None — set by main.py (U26)
 
 
 def _touch() -> None:
@@ -169,6 +170,14 @@ async def set_tracking(body: dict) -> JSONResponse:
     except Exception as exc:  # noqa: BLE001
         return JSONResponse({"error": f"tracking failed: {exc}"}, status_code=500)
     return JSONResponse({"tracking": enabled})
+
+
+@router.get("/robot/budget")
+async def budget() -> JSONResponse:
+    """U26: on-Pi resource budget (CPU/mem/temp) and constrained state."""
+    if budget_guard is None:
+        return JSONResponse({"constrained": False, "reasons": [], "budgets": {}})
+    return JSONResponse(budget_guard.status())
 
 
 @router.post("/robot/body_follow")

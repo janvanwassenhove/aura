@@ -48,6 +48,9 @@ class OfflineBehaviorLoop:
         self._last_seen = time.monotonic()
         self._offline = False
         self._task: asyncio.Task | None = None
+        # U26: when set and constrained, idle animations are skipped so the Pi
+        # sheds non-essential load while hot/saturated.
+        self.budget_guard = None
 
     def touch(self) -> None:
         """Record a sign of life from the brain (called on every command)."""
@@ -71,8 +74,10 @@ class OfflineBehaviorLoop:
                     from_mode=RobotMode.ONLINE, to_mode=RobotMode.OFFLINE,
                 ))
                 await self._engine.speak(_OFFLINE_NOTICE)
-            # Keep moving so the robot never looks frozen while cut off.
-            await self._engine.add_motion(self._idle_motion)
+            # Keep moving so the robot never looks frozen while cut off —
+            # unless the budget guard says the Pi needs the headroom (U26).
+            if self.budget_guard is None or not self.budget_guard.constrained:
+                await self._engine.add_motion(self._idle_motion)
         elif self._offline:
             self._offline = False
             logger.info("Brain link restored — leaving offline behavior")
