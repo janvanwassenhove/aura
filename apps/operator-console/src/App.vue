@@ -2,7 +2,7 @@
   <div class="app-layout">
     <TitleBar
       :ws-status="wsStatus"
-      @open-knowledge="showKnowledge = true"
+      @open-knowledge="showBrain = true"
       @open-settings="showSettings = true"
       @open-capabilities="showCapabilities = true"
     />
@@ -15,6 +15,10 @@
 
     <!-- Settings modal (LLM + Connections + Appearance tabs) -->
     <SettingsPanel v-if="showSettings" @close="showSettings = false" />
+
+    <!-- U72: commercial brain view — skills library + per-person brain -->
+    <BrainPanel v-if="showBrain" @close="showBrain = false"
+                @open-knowledge="showBrain = false; showKnowledge = true" />
 
     <!-- Knowledge transparency modal (ADR-008 §8: inspect/edit/erase profiles) -->
     <KnowledgePanel v-if="showKnowledge" @close="showKnowledge = false" />
@@ -43,6 +47,7 @@ import ConversationPanel from './components/ConversationPanel.vue'
 import EventLogPanel from './components/EventLogPanel.vue'
 import ApprovalPanel from './components/ApprovalPanel.vue'
 import SettingsPanel from './components/SettingsPanel.vue'
+import BrainPanel from './components/BrainPanel.vue'
 import KnowledgePanel from './components/KnowledgePanel.vue'
 import CapabilitiesPanel from './components/CapabilitiesPanel.vue'
 import SetupWizard from './components/SetupWizard.vue'
@@ -54,6 +59,7 @@ import { useThemeStore } from './stores/themeStore'
 const { wsStatus, connect } = useEventBusWs()
 const showSettings = ref(false)
 const showKnowledge = ref(false)
+const showBrain = ref(false)
 const showCapabilities = ref(false)
 const showWizard = ref(false)
 const themeStore = useThemeStore()
@@ -61,7 +67,7 @@ const setupStore = useSetupStore()
 const navStore = useNavStore()
 
 // U68: [[wikilink]] navigation — links open the right panel.
-watch(() => navStore.knowledgeRequest, (r) => { if (r) showKnowledge.value = true })
+watch(() => navStore.knowledgeRequest, (r) => { if (r) showBrain.value = true })
 watch(() => navStore.skillsRequest, (r) => { if (r) showSettings.value = true })
 
 onMounted(async () => {

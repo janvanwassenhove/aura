@@ -225,6 +225,9 @@ the human can unblock it.
 - [x] **U71 — starter-skill: specifiek nummer via het scherm** · `pending`
   Antwoord op "kan hij dat niet aanleren in een skill?" — ja, precies daarvoor: `skills/spotify-specifiek-nummer.md` geseed (triggers: spotify/speel/nummer/…, work+home). De skill verbiedt gokken met media_control bij een specifieke vraag en schrijft de use_computer-procedure voor (ctrl+k → zoek '<artiest> <nummer>' → play bovenste resultaat → screenshot-verificatie → eerlijk rapporteren welk nummer speelt). Geverifieerd: triggert + wordt volledig in de prompt geïnjecteerd. De eigenaar kan hem bijschaven in Settings → Skills; de agent stelt zelf verbeteringen voor via save_skill (approval-gated). De 23:40-zelfconversatie draaide nóg op de pre-U67/U69-brain (6 beurten — kan niet meer na herstart: keten-cap 2 + music guard).
 
+- [x] **U72 — Brain-paneel: skills-bibliotheek + brein per persoon (commerciële layout)** · `pending`
+  Nieuw `BrainPanel.vue` achter de brein-knop in de titelbalk: links een rail met avatar-initialen (Skills library + personen met rol-badges), rechts (a) de **skills-bibliotheek** — "General skills" als hover-cards in een grid + per-persoon-groepen ("Jan's way of working"), inline nieuwe skill toevoegen, potlood → Settings-editor, [[links]] klikbaar; (b) het **brein per persoon** — hero met avatar/rol, About (auto-save + linkpreview), feiten als chips met × en inline toevoegen, hun skills (incl. backlink-chips) met persoon-gescopete quick-add. "Security & faces"-knop opent het oude Knowledge-paneel (lock/tier/enroll/unknown visitors blijven daar). [[persoon]]-links elders openen nu dit paneel. Console 56 groen, build clean.
+
 ## Progress log (append-only; newest last)
 
 - 2026-06-21 — ledger created on `aura-autobuild`; Phase 0/0b complete, Phase 1 scaffold (U-pre) done before this loop started.
