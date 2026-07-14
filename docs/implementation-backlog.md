@@ -177,7 +177,7 @@ the human can unblock it.
 - [x] **U47 — hands-free wake-word + doorpraat-conversatie** · deps: U45,U46 · `c1702f1`
   `VoiceLoop` (brain): draait continu op de robotmic, gedrag via env (VOICE_MODE=off|wake_word, WAKE_WORD, live leesbaar). VAD via raw mic-peak (X-Audio-Peak header van /robot/listen) → stilte overslaan zonder STT-kosten. Wake-word start ("Richie, …" → commando = rest); na ÉLK gesproken antwoord (ook een begroeting) opent een follow-up-venster zodat je zonder wake-word kunt doorpraten; echo-guard (wacht tot de robot klaar is met spreken). Instelling in Settings→Appearance (Hands-free: off/wake word + wake-word-veld) via /setup/prefs (voice_mode+wake_word, persist). Live geverifieerd: loop pollt /robot/listen elke ~4s in wake_word-modus. Brain 92, robot 45, console 56 groen.
 
-- [x] **U48 — eerlijke Spotify-mock + "altijd toestaan"-geheugen** · deps: U39,U40 · `<hash>`
+- [x] **U48 — eerlijke Spotify-mock + "altijd toestaan"-geheugen** · deps: U39,U40 · `e25f181`
   (1) Mock `play_music` liegt niet meer over succes → geeft "NOT PLAYED, geen account verbonden" + wijst op media-key-fallback of token; AURA meldt nu eerlijk dat het niet speelt. (2) ApprovalManager auto-approve-set (AUTO_APPROVE_TOOLS env + .env-persist): grant(remember=True) → onthoudt tool → volgende keer geen dialoog; `/orchestrator/approval/auto` GET + `/auto/{tool}` POST. ApprovalPanel: "Always allow"-checkbox bij Grant. CapabilitiesPanel: "Always-allowed actions"-lijst met revoke (terug naar vragen). Live geverifieerd: eerlijk antwoord + auto-approve set/lijst/revoke. Orchestrator 154, connector 32, console 56 groen.
 
 ## Progress log (append-only; newest last)
