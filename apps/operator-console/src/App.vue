@@ -7,6 +7,7 @@
       @open-capabilities="showCapabilities = true"
       @toggle-left="layoutStore.showLeft = !layoutStore.showLeft"
       @toggle-right="layoutStore.showRight = !layoutStore.showRight"
+      @toggle-bottom="layoutStore.showBottom = !layoutStore.showBottom"
     />
 
     <!-- Approval overlay (rendered on top of everything) -->
@@ -33,21 +34,19 @@
       <div v-if="layoutStore.showLeft" class="ws-splitter" title="Drag to resize"
            @pointerdown="startDrag('left', $event)" />
       <div class="ws-center">
-        <ConversationPanel />
+        <div class="ws-center-main"><ConversationPanel /></div>
+        <div v-if="layoutStore.showBottom" class="ws-hsplitter" title="Drag to resize"
+             @pointerdown="startVDrag($event)" />
+        <div v-if="layoutStore.showBottom" class="ws-bottom"
+             :style="{ height: layoutStore.bottomHeight + 'px' }">
+          <EventLogPanel />
+        </div>
       </div>
       <div v-if="layoutStore.showRight" class="ws-splitter" title="Drag to resize"
            @pointerdown="startDrag('right', $event)" />
       <aside v-if="layoutStore.showRight" class="ws-right" :style="{ width: layoutStore.rightWidth + 'px' }">
-        <div class="ws-tabs" role="tablist">
-          <button role="tab" :class="['ws-tab', layoutStore.rightTab === 'brain' && 'ws-tab--active']"
-                  @click="layoutStore.rightTab = 'brain'">Brain</button>
-          <button role="tab" :class="['ws-tab', layoutStore.rightTab === 'events' && 'ws-tab--active']"
-                  @click="layoutStore.rightTab = 'events'">Events</button>
-        </div>
         <div class="ws-right-body">
-          <BrainPanel v-if="layoutStore.rightTab === 'brain'" docked
-                      @open-knowledge="showKnowledge = true" />
-          <EventLogPanel v-else />
+          <BrainPanel docked @open-knowledge="showKnowledge = true" />
         </div>
       </aside>
     </main>
@@ -79,6 +78,21 @@ const showKnowledge = ref(false)
 const layoutStore = useLayoutStore()
 
 // U76: draggable splitters (VS Code-style resize).
+function startVDrag(ev: PointerEvent): void {
+  ev.preventDefault()
+  const startY = ev.clientY
+  const startH = layoutStore.bottomHeight
+  const move = (e: PointerEvent) => {
+    layoutStore.bottomHeight = Math.max(110, Math.min(520, startH - (e.clientY - startY)))
+  }
+  const up = () => {
+    window.removeEventListener('pointermove', move)
+    window.removeEventListener('pointerup', up)
+  }
+  window.addEventListener('pointermove', move)
+  window.addEventListener('pointerup', up)
+}
+
 function startDrag(side: 'left' | 'right', ev: PointerEvent): void {
   ev.preventDefault()
   const startX = ev.clientX
@@ -154,7 +168,15 @@ body {
 }
 .ws-left { display: flex; flex-direction: column; min-height: 0; overflow-y: auto; flex-shrink: 0; }
 .ws-center { flex: 1; min-width: 20rem; min-height: 0; display: flex; flex-direction: column; }
-.ws-center > * { flex: 1; min-height: 0; }
+.ws-center-main { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.ws-center-main > * { flex: 1; min-height: 0; }
+.ws-bottom { flex-shrink: 0; min-height: 0; display: flex; flex-direction: column; }
+.ws-bottom > * { flex: 1; min-height: 0; }
+.ws-hsplitter { height: 9px; cursor: row-resize; flex-shrink: 0; position: relative; }
+.ws-hsplitter::after { content: ''; position: absolute; inset: 3px 0; border-radius: 2px; transition: background 0.12s; }
+.ws-hsplitter:hover::after { background: var(--accent); opacity: 0.55; }
+/* U77: left-column panels must not shrink-clip — the column scrolls instead. */
+.ws-left > * { flex-shrink: 0; }
 .ws-right {
   flex-shrink: 0; min-height: 0; display: flex; flex-direction: column;
   background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg);

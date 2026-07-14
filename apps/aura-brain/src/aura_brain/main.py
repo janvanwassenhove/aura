@@ -24,6 +24,7 @@ The brain↔robot-runtime boundary stays a network hop (the Pi) and is never mer
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 from collections.abc import AsyncIterator
@@ -355,9 +356,34 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     _MUSIC_TOOLS = {"play_music", "media_control", "next_track", "use_computer"}
 
+    _dance_task: list = [None]  # single slot — one dance at a time
+
+    async def _dance() -> None:
+        """U77: groove along while the music plays — a loose loop of moves.
+        DANCE_ON_MUSIC=false switches it off; stops early when a reply speaks."""
+        import random
+        import time as _time
+
+        moves = ["nod", "tilt", "shake", "gesture", "wave"]
+        end = _time.monotonic() + float(os.environ.get("DANCE_DURATION_S", "25"))
+        try:
+            while _time.monotonic() < end:
+                await _robot.execute_motion(MotionCommand(
+                    motion_id=random.choice(moves), speed=1.2,
+                    amplitude=0.7 + random.random() * 0.3, direction=None,
+                ))
+                await asyncio.sleep(0.8 + random.random() * 0.6)
+        except Exception:  # noqa: BLE001 — robot offline etc.: dance is best-effort
+            pass
+
     async def _voice_note_music(event) -> None:
         if event.tool_name in _MUSIC_TOOLS and ctx._voice_loop is not None:
             ctx._voice_loop.note_music_started()
+            if os.environ.get("DANCE_ON_MUSIC", "true").lower() == "true":
+                if _dance_task[0] is None or _dance_task[0].done():
+                    import asyncio as _a
+
+                    _dance_task[0] = _a.ensure_future(_dance())
 
     ctx.bus.subscribe(_TCS, _voice_note_music)
 
