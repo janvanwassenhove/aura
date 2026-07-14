@@ -1,0 +1,130 @@
+/* AURA design tokens (U33)
+ *
+ * Single source of truth for every color/radius/shadow in the console.
+ * Themes are switched by `data-theme` on <html>; the accent by `data-accent`.
+ * Components must use var(--…) — no raw hex values in component styles.
+ */
+
+:root,
+:root[data-theme='dark'] {
+  /* Surfaces */
+  --bg: #0f172a;
+  --surface: #1e293b;
+  --surface-2: #172033;
+  --surface-3: #0f172a;
+  --surface-hover: #253349;
+
+  /* Lines */
+  --border: #334155;
+  --border-strong: #475569;
+
+  /* Text */
+  --text: #e2e8f0;
+  --text-muted: #94a3b8;
+  --text-faint: #64748b;
+
+  /* Status: success */
+  --ok: #22c55e;
+  --ok-text: #86efac;
+  --ok-bg: #14532d;
+  --ok-bg-deep: #052e16;
+
+  /* Status: warning */
+  --warn: #f59e0b;
+  --warn-text: #fde68a;
+  --warn-bg: #78350f;
+
+  /* Status: danger */
+  --danger: #ef4444;
+  --danger-text: #fca5a5;
+  --danger-bg: #450a0a;
+  --danger-bg-hover: #7f1d1d;
+
+  /* Status: info/special (minors, presentation) */
+  --info: #a855f7;
+  --info-text: #e9d5ff;
+  --info-bg: #581c87;
+
+  /* Overlay + shadow */
+  --overlay: rgba(0, 0, 0, 0.6);
+  --shadow-modal: 0 25px 50px rgba(0, 0, 0, 0.5);
+
+  /* Shape */
+  --radius-sm: 0.25rem;
+  --radius: 0.375rem;
+  --radius-lg: 0.5rem;
+  --radius-xl: 0.75rem;
+}
+
+:root[data-theme='light'] {
+  --bg: #f1f5f9;
+  --surface: #ffffff;
+  --surface-2: #f8fafc;
+  --surface-3: #eef2f7;
+  --surface-hover: #e2e8f0;
+
+  --border: #cbd5e1;
+  --border-strong: #94a3b8;
+
+  --text: #0f172a;
+  --text-muted: #475569;
+  --text-faint: #94a3b8;
+
+  --ok: #16a34a;
+  --ok-text: #166534;
+  --ok-bg: #dcfce7;
+  --ok-bg-deep: #bbf7d0;
+
+  --warn: #d97706;
+  --warn-text: #92400e;
+  --warn-bg: #fef3c7;
+
+  --danger: #dc2626;
+  --danger-text: #991b1b;
+  --danger-bg: #fee2e2;
+  --danger-bg-hover: #fecaca;
+
+  --info: #9333ea;
+  --info-text: #6b21a8;
+  --info-bg: #f3e8ff;
+
+  --overlay: rgba(15, 23, 42, 0.35);
+  --shadow-modal: 0 25px 50px rgba(15, 23, 42, 0.25);
+}
+
+/* Accent — selectable independent of theme. Blue is the default. */
+:root,
+:root[data-accent='blue'] {
+  --accent: #2563eb;
+  --accent-hover: #1d4ed8;
+  --accent-soft: #93c5fd;
+  --accent-border: #60a5fa;
+  --on-accent: #ffffff;
+}
+:root[data-accent='green'] {
+  --accent: #16a34a;
+  --accent-hover: #15803d;
+  --accent-soft: #86efac;
+  --accent-border: #4ade80;
+  --on-accent: #ffffff;
+}
+:root[data-accent='purple'] {
+  --accent: #9333ea;
+  --accent-hover: #7e22ce;
+  --accent-soft: #d8b4fe;
+  --accent-border: #c084fc;
+  --on-accent: #ffffff;
+}
+:root[data-accent='amber'] {
+  --accent: #d97706;
+  --accent-hover: #b45309;
+  --accent-soft: #fcd34d;
+  --accent-border: #fbbf24;
+  --on-accent: #ffffff;
+}
+
+/* Light theme keeps accent-soft readable on white surfaces */
+:root[data-theme='light'][data-accent='blue'] { --accent-soft: #1d4ed8; }
+:root[data-theme='light'][data-accent='green'] { --accent-soft: #15803d; }
+:root[data-theme='light'][data-accent='purple'] { --accent-soft: #7e22ce; }
+:root[data-theme='light'][data-accent='amber'] { --accent-soft: #b45309; }

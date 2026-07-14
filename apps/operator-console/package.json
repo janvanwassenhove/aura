@@ -10,6 +10,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "lucide-vue-next": "^1.0.0",
     "pinia": "^3.0.4",
     "vue": "^3.4.0"
   },

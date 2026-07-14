@@ -14,7 +14,7 @@
         </div>
         <div class="turn-text">{{ turn.text }}</div>
         <div v-if="turn.toolCall" :class="['tool-badge', `tool-${turn.toolCall.status}`]">
-          🔧 {{ turn.toolCall.name }} — {{ turn.toolCall.status }}
+          <Wrench :size="11" /> {{ turn.toolCall.name }} — {{ turn.toolCall.status }}
         </div>
       </div>
       <div v-if="conversationStore.isProcessing" class="turn turn-assistant">
@@ -52,6 +52,7 @@
 
 <script setup lang="ts">
 import { ref, watch, nextTick } from 'vue'
+import { Wrench } from 'lucide-vue-next'
 import { useConversationStore } from '../stores/conversationStore'
 
 const conversationStore = useConversationStore()

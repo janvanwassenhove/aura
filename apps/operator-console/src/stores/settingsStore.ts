@@ -89,7 +89,7 @@ export const useSettingsStore = defineStore('settings', () => {
       openaiKeySet.value = data.openai_key_set ?? false
       openrouterKeySet.value = data.openrouter_key_set ?? false
       geminiKeySet.value = data.gemini_key_set ?? false
-      successMessage.value = 'Applied ✓'
+      successMessage.value = 'Applied'
       return true
     } catch (err: unknown) {
       error.value = err instanceof Error ? err.message : 'Failed to apply config'

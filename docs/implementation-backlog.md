@@ -131,8 +131,8 @@ the human can unblock it.
 
 ## Phase 6 — commercial desktop app v1.0  (plan: [desktop-v1-plan.md](desktop-v1-plan.md))
 
-- [ ] **U33 — design system, theming & custom titelbalk** · deps: U32
-  Design tokens (CSS vars, dark/light/accent, persist), alle emoji → lucide lined icons, frameless window + eigen titelbalk (drag, min/max/close via preload-IPC, robotnaam + statusdots), line-art app-icoon + splash. Console-suite groen.
+- [x] **U33 — design system, theming & custom titelbalk** · deps: U32 · `<hash>`
+  `styles/tokens.css` (volledige var-set, dark/light + 4 accenten via data-theme/data-accent) + `themeStore` (localStorage-persist) + Appearance-tab in Settings. Alle emoji → lucide lined icons (TitleBar/Robot/Conversation/Approval/Knowledge/Settings; status-glyphs ●○✕⟳ ook vervangen). Frameless window + `TitleBar.vue` (drag-region, naam+statusdots, min/max/close via preload contextBridge IPC; verbergt vensterknoppen in gewone browser). Line-art bot-icoon (PIL → png+ico) + splash in huisstijl. Dode `ConnectionsPanel.vue` verwijderd. Console 53 groen (8 nieuwe themeStore-tests), build clean, app live geverifieerd.
 - [ ] **U34 — in-app onboarding & robot-setupwizard (+ rename)** · deps: U33
   `GET /setup/status`, `POST /setup/config` (secrets write-only), `POST /setup/test-robot`, `GET /setup/discover` (reachy-mini.local + subnet-scan). Full-screen wizard bij incomplete setup: naam robot (ASSISTANT_NAME → prompts/titelbalk/begroetingen), robot vinden+testen, LLM, voice, security, mensen. Robot-tab in Settings.
 - [ ] **U35 — connecties: eerlijke statussen + Chrome & VS Code control** · deps: —
