@@ -44,6 +44,8 @@ MODE_TOOL_MAP: dict[str, frozenset[str]] = {
             "next_track",
             "list_music_playlists",
             "list_speakers",
+            "media_control",
+            "launch_app",
         }
     ),
     "home": frozenset(
@@ -58,6 +60,8 @@ MODE_TOOL_MAP: dict[str, frozenset[str]] = {
             "next_track",
             "list_music_playlists",
             "list_speakers",
+            "media_control",
+            "launch_app",
         }
     ),
     "presentation": frozenset(

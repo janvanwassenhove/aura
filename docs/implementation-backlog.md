@@ -162,6 +162,9 @@ the human can unblock it.
 - [x] **U42 — gespreksgeheugen (echte dialoog)** · deps: U5 · `d252950`
   Pipeline hield per turn GEEN geschiedenis bij → nu per-session rolling window (MAX_CONTEXT_TURNS*2), prior turns meegestuurd; conversationele identity-prefix (elk onderwerp, spraakvriendelijk). Live: "wat is mijn lievelingskleur?" onthouden over turns. Orchestrator 146 (6 nieuw).
 
+- [x] **U43 — desktop media control (Windows media-toetsen)** · deps: U40 · `<hash>`
+  `media_control` orchestrator-tool: stuurt de Windows media/volume-toetsen (play_pause/next/previous/stop/volume/mute) via ctypes keybd_event → bedient de ECHTE draaiende app (Spotify/browser), geen token nodig; graceful op niet-Windows. Work+home-mode. Spotify-launcher default via `explorer.exe spotify:` (URI-protocol, geen exe-pad nodig). "volgende track" live geverifieerd (toets verzonden); "open Spotify + play" = launch_app (approval) → media_control. Orchestrator 150 (4 nieuw), policies 6 groen.
+
 ## Progress log (append-only; newest last)
 
 - 2026-06-21 — ledger created on `aura-autobuild`; Phase 0/0b complete, Phase 1 scaffold (U-pre) done before this loop started.

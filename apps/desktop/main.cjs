@@ -71,7 +71,10 @@ function brainEnv() {
   env.DEV_AGENT_ENABLED = env.DEV_AGENT_ENABLED || 'true'
   // U40: pre-register safe desktop apps AURA may launch on request (each still
   // asks for approval). Owner extends this via ALLOWED_APPS in .env.
-  env.ALLOWED_APPS = env.ALLOWED_APPS || 'vscode=code;code=code;notepad=notepad'
+  // Spotify opens via its URI protocol handler (works for the Store/desktop
+  // app without knowing its exe path); explorer resolves the protocol.
+  env.ALLOWED_APPS = env.ALLOWED_APPS ||
+    'vscode=code;code=code;notepad=notepad;spotify=explorer.exe spotify:'
   return env
 }
 
