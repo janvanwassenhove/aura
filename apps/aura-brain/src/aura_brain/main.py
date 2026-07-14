@@ -272,7 +272,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # with a gesture matched to the content (greeting→wave, question→tilt,
     # excitement→gesture, default→nod). Toggle with SPEAK_REPLIES=false.
     from aura_brain import voice
-    from aura_brain.embodiment import gesture_for
+    from aura_brain.embodiment import embodiment_plan
 
     async def _embody_reply(event: ResponseDrafted) -> None:
         text = (event.response_text or "").strip()
@@ -281,11 +281,21 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             return
         if not text or text.startswith("[echo]"):
             return
+        # U51: the active mode shapes the embodiment — silent_desk stays mute
+        # and still, work nods with restraint, presentation/demo go expressive.
+        try:
+            persona_cfg = ctx.pipeline.persona_config
+        except Exception:  # noqa: BLE001 — never let persona lookup kill speech
+            persona_cfg = None
+        speak, gesture, amplitude = embodiment_plan(text, persona_cfg)
+        if not speak:
+            return
         try:
             audio_b64 = await voice.synthesize_b64(text[:600])  # cap TTS cost
-            await _robot.execute_motion(MotionCommand(
-                motion_id=gesture_for(text), speed=1.0, amplitude=0.5, direction=None,
-            ))
+            if gesture is not None:
+                await _robot.execute_motion(MotionCommand(
+                    motion_id=gesture, speed=1.0, amplitude=amplitude, direction=None,
+                ))
             await _robot.speak(text, audio_b64=audio_b64)
         except Exception as exc:  # robot offline → the console turn still shows
             logging.getLogger(__name__).debug("embodied reply failed: %s", exc)
