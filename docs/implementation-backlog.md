@@ -129,6 +129,21 @@ the human can unblock it.
 - [x] **U21-fix — offline tier repaired after provider simplification** · `6abfa90`
   `_offline_reply` passed removed provider=/model= kwargs to `openai_chat` (TypeError). Now calls a local OpenAI-compatible server via `local_chat(OFFLINE_LLM_BASE_URL, OFFLINE_LLM_MODEL)`; regex fallback last. Orchestrator 138 green.
 
+## Phase 6 — commercial desktop app v1.0  (plan: [desktop-v1-plan.md](desktop-v1-plan.md))
+
+- [ ] **U33 — design system, theming & custom titelbalk** · deps: U32
+  Design tokens (CSS vars, dark/light/accent, persist), alle emoji → lucide lined icons, frameless window + eigen titelbalk (drag, min/max/close via preload-IPC, robotnaam + statusdots), line-art app-icoon + splash. Console-suite groen.
+- [ ] **U34 — in-app onboarding & robot-setupwizard (+ rename)** · deps: U33
+  `GET /setup/status`, `POST /setup/config` (secrets write-only), `POST /setup/test-robot`, `GET /setup/discover` (reachy-mini.local + subnet-scan). Full-screen wizard bij incomplete setup: naam robot (ASSISTANT_NAME → prompts/titelbalk/begroetingen), robot vinden+testen, LLM, voice, security, mensen. Robot-tab in Settings.
+- [ ] **U35 — connecties: eerlijke statussen + Chrome & VS Code control** · deps: —
+  MOCK-badge i.p.v. groen "Connected", Test-knop per connector, GitHub device-flow + PAT, Google met eigen client-ID (begeleide setup), Slack auth.test. NIEUW: Chrome-connector (CDP :9222 — tabs/lezen vrij, navigeren gated) en VS Code-connector (`code -g file:line`, workspaces) als orchestrator-tools. Token-in-log greptest.
+- [ ] **U36 — belichaamde conversatie (modi, begroeting, code-samenwerking)** · deps: U34
+  ResponseDrafted → robot-gebaar (nod/gesture/wave op modus+lengte); PersonRecognized(known) → begroetingsturn + wave, onbekend → guarded; modus-gedragsprofielen (tools/toon per modus, config); work-modus koppelt dev-agent aan VS Code-connector.
+- [ ] **U37 — installer & release-pipeline** · deps: U33–U36 · 🔒 DECIDE (GitHub-repo)
+  electron-builder NSIS + first-run bootstrap (uv auto-install + sync, voortgang), semver + CHANGELOG, GitHub Actions op tag v*: suites → installer → Playwright-screenshots → release-notes uit ledger → GitHub Release (installer+screenshots+notes), electron-updater opt-in.
+- [ ] **U38 — commercial polish & QA** · deps: U37
+  Lege/fout/loading-states overal, a11y-pass (contrast beide thema's, focus, aria), Playwright E2E-smoke in CI, log-viewer (geen telemetrie), user-guide NL/EN met release-screenshots.
+
 ---
 
 ## Progress log (append-only; newest last)
