@@ -23,25 +23,40 @@ export const useConversationStore = defineStore('conversation', () => {
     turns.value.push(turn)
   }
 
+  // Turns arrive twice by design: once from the HTTP round-trip (submitTurn)
+  // and once as bus events over the WebSocket. Treat an identical role+text
+  // within a short window as the same turn.
+  const DEDUPE_WINDOW_MS = 15_000
+  function isRecentDuplicate(role: 'user' | 'assistant', text: string): boolean {
+    const now = Date.now()
+    return turns.value.slice(-8).some(
+      t => t.role === role && t.text === text
+        && now - new Date(t.timestamp).getTime() < DEDUPE_WINDOW_MS,
+    )
+  }
+
   function applyEvent(event: Record<string, unknown>) {
     const type = event.event_type as string
     if (type === 'TranscriptUpdated' && event.is_final) {
-      const existing = turns.value.find(t => t.id === (event.session_id as string) + '-user-latest')
-      if (!existing) {
+      const text = event.transcript as string
+      if (!isRecentDuplicate('user', text)) {
         addTurn({
-          id: (event.session_id as string) + '-user-latest',
+          id: crypto.randomUUID(),
           role: 'user',
-          text: event.transcript as string,
+          text,
           timestamp: (event.timestamp as string) ?? new Date().toISOString(),
         })
       }
     } else if (type === 'ResponseDrafted') {
-      addTurn({
-        id: crypto.randomUUID(),
-        role: 'assistant',
-        text: event.response_text as string,
-        timestamp: (event.timestamp as string) ?? new Date().toISOString(),
-      })
+      const text = event.response_text as string
+      if (!isRecentDuplicate('assistant', text)) {
+        addTurn({
+          id: crypto.randomUUID(),
+          role: 'assistant',
+          text,
+          timestamp: (event.timestamp as string) ?? new Date().toISOString(),
+        })
+      }
     } else if (type === 'ToolCallRequested') {
       const last = turns.value.at(-1)
       if (last?.role === 'assistant') {
@@ -78,7 +93,10 @@ export const useConversationStore = defineStore('conversation', () => {
       if (response.ok) {
         const data = await response.json()
         if (!sessionId.value) sessionId.value = data.session_id
-        addTurn({ id: crypto.randomUUID(), role: 'assistant', text: data.reply, timestamp: new Date().toISOString() })
+        // The WS event may have rendered this reply already (race) — dedupe.
+        if (!isRecentDuplicate('assistant', data.reply)) {
+          addTurn({ id: crypto.randomUUID(), role: 'assistant', text: data.reply, timestamp: new Date().toISOString() })
+        }
       }
     } catch (err) {
       addTurn({ id: crypto.randomUUID(), role: 'assistant', text: '[error: could not reach conversation service]', timestamp: new Date().toISOString() })

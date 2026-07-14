@@ -26,6 +26,32 @@ describe('conversationStore', () => {
     expect(store.turns[0].text).toBe('Hi there')
   })
 
+  it('dedupes an identical ResponseDrafted arriving twice (HTTP + WS echo)', () => {
+    const store = useConversationStore()
+    const ts = new Date().toISOString()
+    // Local HTTP add first, then the same text echoes back over the WS — twice.
+    store.addTurn({ id: 'local', role: 'assistant', text: 'Same answer', timestamp: ts })
+    store.applyEvent({ event_type: 'ResponseDrafted', response_text: 'Same answer', timestamp: ts })
+    store.applyEvent({ event_type: 'ResponseDrafted', response_text: 'Same answer', timestamp: ts })
+    expect(store.turns).toHaveLength(1)
+  })
+
+  it('dedupes the user turn echoed as TranscriptUpdated', () => {
+    const store = useConversationStore()
+    const ts = new Date().toISOString()
+    store.addTurn({ id: 'local-user', role: 'user', text: 'hello robot', timestamp: ts })
+    store.applyEvent({ event_type: 'TranscriptUpdated', is_final: true, transcript: 'hello robot', session_id: 's1', timestamp: ts })
+    expect(store.turns).toHaveLength(1)
+  })
+
+  it('still allows repeating the same text in a LATER exchange', () => {
+    const store = useConversationStore()
+    const old = new Date(Date.now() - 60_000).toISOString()  // > dedupe window
+    store.addTurn({ id: 'old', role: 'assistant', text: 'Sure!', timestamp: old })
+    store.applyEvent({ event_type: 'ResponseDrafted', response_text: 'Sure!', timestamp: new Date().toISOString() })
+    expect(store.turns).toHaveLength(2)
+  })
+
   it('applyEvent ToolCallRequested marks last assistant turn', () => {
     const store = useConversationStore()
     store.addTurn({ id: '2', role: 'assistant', text: 'Let me check...', timestamp: new Date().toISOString() })

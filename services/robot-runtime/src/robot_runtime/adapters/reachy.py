@@ -91,12 +91,21 @@ class ReachyRobotAdapter(RobotAdapter):
             if self._media_backend != "no_media":
                 self._prime_media()
 
-            return ReachyMini(
+            mini = ReachyMini(
                 host=self._host,
                 connection_mode=self._connection_mode,
                 media_backend=self._media_backend,
                 log_level="WARNING",
             )
+            # After a daemon (re)start the motors are compliant — every motion
+            # command would silently do nothing. Wake the robot so commands
+            # always have a visible effect.
+            try:
+                mini.enable_motors()
+                mini.wake_up()
+            except Exception as exc:  # noqa: BLE001 — wake is best-effort
+                logger.warning("wake-up on connect failed: %s", exc)
+            return mini
 
         self._mini = await asyncio.to_thread(_open)
         self._mode = RobotMode.ONLINE
