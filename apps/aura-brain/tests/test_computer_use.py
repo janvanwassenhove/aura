@@ -186,3 +186,78 @@ async def test_max_steps_env_override(monkeypatch) -> None:
     ])
     await ComputerUseAgent(backend, client=client, max_steps=99).run("loop")
     assert len(client.calls) == 2
+
+
+# ── U64: OpenAI-driven fallback (no Anthropic key needed) ───────────────
+
+from types import SimpleNamespace
+
+from aura_brain.computer_use import OpenAIComputerAgent
+
+
+def _oa_tc(tc_id: str, name: str, arguments: dict) -> SimpleNamespace:
+    return SimpleNamespace(
+        id=tc_id,
+        function=SimpleNamespace(name=name, arguments=__import__("json").dumps(arguments)),
+        model_dump=lambda: {"id": tc_id, "type": "function",
+                            "function": {"name": name,
+                                         "arguments": __import__("json").dumps(arguments)}},
+    )
+
+
+class FakeOpenAI:
+    def __init__(self, scripted: list) -> None:
+        self._scripted = scripted
+        self.calls: list[dict] = []
+        self.chat = SimpleNamespace(completions=SimpleNamespace(create=self._create))
+
+    async def _create(self, **kwargs):
+        self.calls.append(kwargs)
+        msg = self._scripted[min(len(self.calls) - 1, len(self._scripted) - 1)]
+        return SimpleNamespace(choices=[SimpleNamespace(message=msg)])
+
+
+async def test_openai_agent_clicks_then_finishes() -> None:
+    backend = FakeBackend()
+    client = FakeOpenAI([
+        SimpleNamespace(content=None, tool_calls=[
+            _oa_tc("t1", "click", {"x": 40, "y": 60}),
+        ]),
+        SimpleNamespace(content=None, tool_calls=[
+            _oa_tc("t2", "done", {"summary": "Spotify is playing."}),
+        ]),
+    ])
+    agent = OpenAIComputerAgent(backend, client=client, max_steps=5)
+    summary = await agent.run("start music")
+    assert summary == "Spotify is playing."
+    assert ("click", 40, 60, "left", 1) in backend.calls
+    # Each round feeds a fresh screenshot to the model (vision loop).
+    imgs = [m for call in client.calls for m in call["messages"]
+            if isinstance(m.get("content"), list)
+            and any(c.get("type") == "image_url" for c in m["content"])]
+    assert imgs
+
+
+async def test_openai_agent_step_cap(monkeypatch) -> None:
+    monkeypatch.setenv("COMPUTER_USE_MAX_STEPS", "2")
+    backend = FakeBackend()
+    client = FakeOpenAI([
+        SimpleNamespace(content=None, tool_calls=[_oa_tc("t", "wait", {"seconds": 0})]),
+    ])
+    out = await OpenAIComputerAgent(backend, client=client).run("loop forever")
+    assert "stopped after 2 steps" in out
+
+
+async def test_provider_ladder_prefers_anthropic_then_openai(monkeypatch) -> None:
+    from aura_brain import computer_use as cu
+
+    monkeypatch.setenv("COMPUTER_USE_ENABLED", "true")
+    monkeypatch.setattr(cu, "PyAutoGuiBackend", lambda: FakeBackend())
+
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+    agent = cu.create_default_agent()
+    assert isinstance(agent, cu.OpenAIComputerAgent)
+
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    assert cu.create_default_agent() is None

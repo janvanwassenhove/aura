@@ -69,6 +69,7 @@
     <p v-else-if="robotListening" class="mic-status mic-status--rec"><span class="rec-dot" /> Richie is listening on his own mic…</p>
     <p v-else-if="transcribing" class="mic-status">Transcribing your voice…</p>
     <p v-if="micError" class="mic-error">{{ micError }}</p>
+    <p v-if="teachHint" class="mic-status">🎓 {{ teachHint }}</p>
     <form class="input-row" @submit.prevent="submit">
       <input
         v-model="conversationStore.pendingText"
@@ -101,8 +102,8 @@
       <button
         type="button"
         class="btn-mic"
-        :disabled="conversationStore.isProcessing || !conversationStore.pendingText.trim()"
-        title="Teach: send this as training feedback — the agent may propose a skill (you approve)"
+        :disabled="conversationStore.isProcessing"
+        title="Teach: send the typed text as training feedback — the agent may propose a skill (you approve)"
         aria-label="Teach the assistant"
         @click="sendTeach"
       >
@@ -176,9 +177,16 @@ function sendSteer(): void {
   steerText.value = ''
 }
 
+const teachHint = ref('')
+
 function sendTeach(): void {
   const text = conversationStore.pendingText.trim()
-  if (!text) return
+  if (!text) {
+    teachHint.value = 'Type the lesson in the input first, then press the cap — e.g. "always run tests before deploying".'
+    setTimeout(() => { teachHint.value = '' }, 6000)
+    return
+  }
+  teachHint.value = ''
   conversationStore.pendingText = ''
   conversationStore.teach(text)
 }

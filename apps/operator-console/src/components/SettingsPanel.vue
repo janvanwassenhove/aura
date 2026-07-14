@@ -171,6 +171,13 @@
             </select>
           </div>
           <div class="settings-field">
+            <label class="field-label" for="tts-voice">Robot voice</label>
+            <select id="tts-voice" v-model="localTtsVoice" class="field-select">
+              <option v-for="v in TTS_VOICES" :key="v.id" :value="v.id">{{ v.label }}</option>
+            </select>
+            <p class="conn-hint">Global voice. Per mode: set <code>TTS_VOICE_WORK</code> / <code>TTS_VOICE_HOME</code> / … in the env.</p>
+          </div>
+          <div class="settings-field">
             <label class="field-label" for="voice-mode">Hands-free listening</label>
             <select id="voice-mode" v-model="localVoiceMode" class="field-select">
               <option value="off">Off — use the mic button</option>
@@ -452,6 +459,22 @@ const localName = ref(prefsStore.assistantName)
 const localLang = ref(prefsStore.language)
 const localVoiceMode = ref(prefsStore.voiceMode)
 const localWake = ref(prefsStore.wakeWord)
+const localTtsVoice = ref(prefsStore.ttsVoice)
+
+// U65: gpt-4o-mini-tts voices with a human hint per voice.
+const TTS_VOICES = [
+  { id: 'alloy',   label: 'Alloy — neutral (default)' },
+  { id: 'ash',     label: 'Ash — warm male' },
+  { id: 'ballad',  label: 'Ballad — soft male' },
+  { id: 'coral',   label: 'Coral — warm female' },
+  { id: 'echo',    label: 'Echo — clear male' },
+  { id: 'fable',   label: 'Fable — bright, story-teller' },
+  { id: 'onyx',    label: 'Onyx — deep male' },
+  { id: 'nova',    label: 'Nova — energetic female' },
+  { id: 'sage',    label: 'Sage — calm female' },
+  { id: 'shimmer', label: 'Shimmer — soft female' },
+  { id: 'verse',   label: 'Verse — expressive' },
+]
 const prefsSaved = ref(false)
 
 onMounted(async () => {
@@ -460,6 +483,7 @@ onMounted(async () => {
   localLang.value = prefsStore.language
   localVoiceMode.value = prefsStore.voiceMode
   localWake.value = prefsStore.wakeWord
+  localTtsVoice.value = prefsStore.ttsVoice
 })
 
 async function savePrefs() {
@@ -469,6 +493,7 @@ async function savePrefs() {
     language: localLang.value,
     voice_mode: localVoiceMode.value,
     wake_word: localWake.value.trim() || localName.value.trim() || 'AURA',
+    tts_voice: localTtsVoice.value,
   })
   if (ok) { prefsSaved.value = true; setTimeout(() => { prefsSaved.value = false }, 2000) }
 }

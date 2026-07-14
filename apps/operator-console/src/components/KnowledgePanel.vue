@@ -206,9 +206,15 @@
               </li>
               <li v-if="!(store.detail.skills ?? []).length" class="empty-hint">
                 No skills for this person yet — teach one via the 🎓 button in the
-                conversation, or add one in Settings → Skills with this person's id.
+                conversation, or add one right here.
               </li>
             </ul>
+            <div class="skill-add-row">
+              <input v-model="newSkillName" class="field-input" placeholder="skill-name (kebab-case)" aria-label="New skill name" />
+              <input v-model="newSkillBody" class="field-input skill-add-body" placeholder="the procedure, e.g. 'Play skate punk first, then ska.'" aria-label="New skill procedure" />
+              <button class="btn-add" :disabled="!newSkillName.trim() || !newSkillBody.trim()" @click="addSkill">Add</button>
+            </div>
+            <p v-if="skillAddError" class="mic-error">{{ skillAddError }}</p>
           </template>
           <div v-else class="empty-hint detail-placeholder">
             Select a person to inspect everything AURA knows about them.
@@ -237,6 +243,35 @@ watch(() => store.detail?.person.person_id, () => {
   editRole.value = store.detail?.person.role ?? 'guest'
   editDescription.value = store.detail?.person.description ?? ''
 })
+
+// U66: quick-add a skill scoped to this person (their way of working).
+const newSkillName = ref('')
+const newSkillBody = ref('')
+const skillAddError = ref('')
+
+async function addSkill() {
+  if (!store.detail) return
+  skillAddError.value = ''
+  const BRAIN = import.meta.env.VITE_BRAIN_URL ?? import.meta.env.VITE_ORCHESTRATOR_URL ?? 'http://localhost:8000'
+  const resp = await fetch(`${BRAIN}/skills`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      name: newSkillName.value.trim().toLowerCase(),
+      description: `${store.detail.person.display_name}'s way of working`,
+      person: store.detail.person.person_id,
+      body: newSkillBody.value.trim(),
+    }),
+  }).catch(() => null)
+  if (!resp || !resp.ok) {
+    const data = resp ? await resp.json().catch(() => ({})) : {}
+    skillAddError.value = String(data.error ?? 'could not save skill')
+    return
+  }
+  newSkillName.value = ''
+  newSkillBody.value = ''
+  await store.inspectPerson(store.detail.person.person_id)
+}
 
 async function saveDescription() {
   if (!store.detail) return
@@ -495,7 +530,10 @@ function confirmForget() {
 .sighting-btn { display: inline-flex; padding: 0.3rem 0.45rem; }
 .sighting-btn:disabled { opacity: 0.45; cursor: not-allowed; }
 
-/* U63: person description + skill references */
+/* U63/U66: person description + skill references + quick-add */
+.skill-add-row { display: flex; gap: 0.4rem; margin-top: 0.4rem; }
+.skill-add-body { flex: 1; }
+
 .desc-input { resize: vertical; font-size: 0.8rem; line-height: 1.4; }
 .skill-ref-row { gap: 0.5rem; align-items: baseline; }
 .skill-ref-name { font-family: ui-monospace, monospace; font-size: 0.78rem; color: var(--accent); }

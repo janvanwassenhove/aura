@@ -17,21 +17,44 @@ logger = logging.getLogger(__name__)
 _tts: Any = None  # cached provider
 
 
-async def synthesize_b64(text: str) -> str | None:
+# U65: available TTS voices (gpt-4o-mini-tts). The default is set globally
+# via TTS_VOICE (Settings) and can differ per persona via TTS_VOICE_<MODE>.
+TTS_VOICES = ("alloy", "ash", "ballad", "coral", "echo", "fable",
+              "onyx", "nova", "sage", "shimmer", "verse")
+
+_tts_cache: dict[str, object] = {}
+
+
+def resolve_voice(persona: str | None = None) -> str:
+    """The voice for this reply: persona override -> global pref -> alloy."""
+    if persona:
+        per = os.environ.get(f"TTS_VOICE_{persona.upper()}", "").strip().lower()
+        if per in TTS_VOICES:
+            return per
+    voice = os.environ.get("TTS_VOICE", "alloy").strip().lower()
+    return voice if voice in TTS_VOICES else "alloy"
+
+
+async def synthesize_b64(text: str, voice: str | None = None) -> str | None:
     """Return base64 PCM (s16le mono 24 kHz) for ``text``, or None if TTS is
-    unavailable (no key / provider error)."""
-    global _tts
+    unavailable (no key / provider error). ``voice`` defaults to the global
+    preference (read live, so the Settings dropdown applies immediately)."""
     if not os.environ.get("OPENAI_API_KEY"):
         return None
+    voice = (voice or resolve_voice()).lower()
+    if voice not in TTS_VOICES:
+        voice = "alloy"
     try:
-        if _tts is None:
+        provider = _tts_cache.get(voice)
+        if provider is None:
             from conversation_runtime.providers.openai_provider import OpenAITTSProvider
 
-            _tts = OpenAITTSProvider(
+            provider = OpenAITTSProvider(
                 model=os.environ.get("TTS_MODEL", "gpt-4o-mini-tts"),
-                voice=os.environ.get("TTS_VOICE", "alloy"),
+                voice=voice,
             )
-        pcm = await _tts.synthesize(text)
+            _tts_cache[voice] = provider
+        pcm = await provider.synthesize(text)
         return base64.b64encode(pcm).decode()
     except Exception as exc:  # noqa: BLE001 — voice is best-effort, never fatal
         logger.warning("TTS synthesis failed: %s", exc)
