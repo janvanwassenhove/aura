@@ -4,9 +4,9 @@ import { ref } from 'vue'
 const IDENTITY_URL = import.meta.env.VITE_IDENTITY_URL ?? 'http://localhost:8006'
 const CONNECTOR_URL = import.meta.env.VITE_CONNECTOR_URL ?? 'http://localhost:8004'
 
-export type ConnectorStatus = 'ok' | 'unauthenticated' | 'unavailable' | 'unknown'
+export type ConnectorStatus = 'ok' | 'mock' | 'unauthenticated' | 'unavailable' | 'unknown'
 
-export type Provider = 'microsoft' | 'google' | 'github' | 'slack'
+export type Provider = 'microsoft' | 'google' | 'github' | 'slack' | 'music'
 
 export interface ProviderState {
   provider: Provider
@@ -21,6 +21,9 @@ export interface ProviderState {
   error?: string
   /** True when the service returned 503 "credentials not configured" — show setup wizard */
   needsSetup?: boolean
+  /** U52: result of the last per-connector probe (Test button) */
+  testResult?: string
+  testing?: boolean
 }
 
 export const useConnectionsStore = defineStore('connections', () => {
@@ -29,6 +32,7 @@ export const useConnectionsStore = defineStore('connections', () => {
     google: 'google',
     github: 'github',
     slack: 'slack',
+    music: 'music',
   }
 
   const providers = ref<ProviderState[]>([
@@ -36,6 +40,7 @@ export const useConnectionsStore = defineStore('connections', () => {
     { provider: 'google',    label: 'Google Workspace', status: 'unknown', authPending: false },
     { provider: 'github',    label: 'GitHub',           status: 'unknown', authPending: false },
     { provider: 'slack',     label: 'Slack',            status: 'unknown', authPending: false },
+    { provider: 'music',     label: 'Spotify / Sonos',  status: 'unknown', authPending: false },
   ])
 
   const userId = ref<string>('default')
@@ -79,6 +84,7 @@ export const useConnectionsStore = defineStore('connections', () => {
   async function fetchIdentityStatus(): Promise<void> {
     for (const ps of providers.value) {
       if (ps.status !== 'unknown') continue // already known from connector-service
+      if (ps.provider === 'music') continue // music status comes from connector health only
       try {
         const resp = await fetch(
           `${IDENTITY_URL}/identity/token/${userId.value}/${connectorKey[ps.provider]}`,
@@ -358,10 +364,28 @@ export const useConnectionsStore = defineStore('connections', () => {
     }
   }
 
+  // U52: one cheap real call per connector so the owner can verify a
+  // connection actually works instead of trusting a green badge.
+  async function testProvider(p: Provider): Promise<void> {
+    const ps = _ps(p)
+    ps.testing = true
+    ps.testResult = undefined
+    try {
+      const resp = await fetch(`${CONNECTOR_URL}/connector/test/${connectorKey[p]}`, { method: 'POST' })
+      const data = await _json(resp)
+      ps.testResult = String(data.detail ?? (resp.ok ? 'ok' : `HTTP ${resp.status}`))
+    } catch {
+      ps.testResult = 'connector-service unreachable'
+    } finally {
+      ps.testing = false
+    }
+  }
+
   return {
     providers,
     userId,
     loading,
+    testProvider,
     refreshAllStatuses,
     startMicrosoftAuth,
     pollMicrosoftAuth,

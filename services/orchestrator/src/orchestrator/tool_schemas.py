@@ -145,6 +145,20 @@ TOOL_SCHEMAS: dict[str, dict] = {
             "line": {"type": "integer", "description": "1-based line number (optional)."},
         }, "required": ["path"], "additionalProperties": False},
     ),
+    "list_browser_tabs": _fn(
+        "list_browser_tabs",
+        "List the open tabs (title + url) in the owner's Chrome browser. "
+        "Read-only. Chrome must run with --remote-debugging-port=9222.",
+        _NO_ARGS,
+    ),
+    "open_browser_url": _fn(
+        "open_browser_url",
+        "Open a URL in a new Chrome tab on the owner's laptop. Sensitive — "
+        "navigating the owner's browser requires approval.",
+        {"type": "object", "properties": {
+            "url": {"type": "string", "description": "http(s) URL to open."},
+        }, "required": ["url"], "additionalProperties": False},
+    ),
     "use_computer": _fn(
         "use_computer",
         (

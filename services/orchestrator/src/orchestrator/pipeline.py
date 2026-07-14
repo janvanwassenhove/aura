@@ -191,6 +191,8 @@ _TOOL_ROUTES: dict[str, tuple[str, str]] = {
     "complete_todo":              ("POST", "/todos/{id}/complete"),
     "list_reminders":             ("GET", "/reminders"),
     "create_reminder":            ("POST", "/reminders"),
+    "list_browser_tabs":          ("GET", "/browser/tabs"),
+    "open_browser_url":           ("POST", "/browser/open"),
 }
 
 

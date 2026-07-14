@@ -29,6 +29,7 @@ logger = logging.getLogger(__name__)
 
 class ConnectorStatus(str, Enum):
     OK = "ok"
+    MOCK = "mock"  # U52: honest badge — canned data, not a real account
     UNAUTHENTICATED = "unauthenticated"
     UNAVAILABLE = "unavailable"
 
@@ -68,7 +69,11 @@ class ConnectorRegistry:
     def _build_one(self, key: str) -> ConnectorEntry:
         try:
             connector = self._create_connector(key)
-            return ConnectorEntry(key=key, connector=connector, status=ConnectorStatus.OK)
+            # U52: honest statuses — a mock connector must never show as
+            # "Connected". Mocks self-identify by class name or an `is_mock` flag.
+            is_mock = getattr(connector, "is_mock", False) or type(connector).__name__.startswith("Mock")
+            status = ConnectorStatus.MOCK if is_mock else ConnectorStatus.OK
+            return ConnectorEntry(key=key, connector=connector, status=status)
         except _AuthMissingError as exc:
             logger.warning(
                 "Connector %r starting in UNAUTHENTICATED state: %s "
@@ -147,9 +152,11 @@ class ConnectorRegistry:
         statuses = {e.status for e in self._entries.values()}
         if not statuses:
             return ConnectorStatus.UNAVAILABLE.value
-        if all(s == ConnectorStatus.OK for s in statuses):
+        # A MOCK connector is functional (honest canned data), just not real.
+        functional = {ConnectorStatus.OK, ConnectorStatus.MOCK}
+        if all(s in functional for s in statuses):
             return "ok"
-        if any(s == ConnectorStatus.OK for s in statuses):
+        if any(s in functional for s in statuses):
             return "degraded"
         return "unavailable"
 
