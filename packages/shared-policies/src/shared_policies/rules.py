@@ -39,6 +39,11 @@ MODE_TOOL_MAP: dict[str, frozenset[str]] = {
             "complete_todo",
             "list_reminders",
             "create_reminder",
+            "play_music",
+            "pause_music",
+            "next_track",
+            "list_music_playlists",
+            "list_speakers",
         }
     ),
     "home": frozenset(
@@ -48,6 +53,11 @@ MODE_TOOL_MAP: dict[str, frozenset[str]] = {
             "complete_todo",
             "list_reminders",
             "create_reminder",
+            "play_music",
+            "pause_music",
+            "next_track",
+            "list_music_playlists",
+            "list_speakers",
         }
     ),
     "presentation": frozenset(
