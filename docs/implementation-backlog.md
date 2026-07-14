@@ -171,6 +171,9 @@ the human can unblock it.
 - [x] **U45 — praten via Richie''s eigen mic + Knowledge editable** · deps: U36e · `a2227b5`
   (1) Robot-mic: reachy `capture_audio` resamplet naar 16kHz mono s16le; nieuwe `POST /robot/listen` → WAV; RobotClient.listen; brain `POST /voice/listen` (neemt op op de Pi → transcribeert → pipeline-turn, antwoord gesproken op de robot). Bot-mic-knop in ConversationPanel ("Richie is listening on his own mic…"). Live geverifieerd: /robot/listen → geldige 16kHz WAV (86kB/3s); /voice/listen graceful bij stilte. (2) Knowledge editable: naam + rol inline bewerkbaar (blur→renamePerson/upsertPerson) en fact key+value inline bewerkbaar (blur→updateFact = add+delete). Robot 45, brain 86, console 56 groen.
 
+- [x] **U46 — mic-versterking + UI ademruimte** · deps: U45 · `<hash>`
+  Robot-mic: de Reachy-mic-array is weinig gevoelig zelfs op max ALSA-gain (RMS 0.0008 ≈ stilte) → adaptieve peak-normalisatie in capture_audio (target 0.5, gain-cap 40, MIC_TARGET_PEAK/MIC_MAX_GAIN env). Live: opname nu RMS 0.08 / piek 0.5 (bruikbaar voor Whisper, was ~100× te stil). UI: ruimere spacing (panel-padding, status-row-gap, section-labels, mt-3, quick-action-knoppen) — minder gedrongen. Robot 45 groen, console build clean.
+
 ## Progress log (append-only; newest last)
 
 - 2026-06-21 — ledger created on `aura-autobuild`; Phase 0/0b complete, Phase 1 scaffold (U-pre) done before this loop started.
