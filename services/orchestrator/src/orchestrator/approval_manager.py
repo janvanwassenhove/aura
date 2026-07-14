@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -54,12 +55,39 @@ class ApprovalManager:
         self._bus = bus
         self._session_id = session_id
         self._pending: dict[str, _PendingApproval] = {}
+        # "Always allow" memory (U48): tool actions the owner chose to
+        # auto-approve. Loaded from AUTO_APPROVE_TOOLS, persisted on change.
+        self._auto: set[str] = {
+            t.strip() for t in os.environ.get("AUTO_APPROVE_TOOLS", "").split(",") if t.strip()
+        }
 
     def needs_approval(self, tool_name: str) -> bool:
-        return tool_name in APPROVAL_REQUIRED
+        return tool_name in APPROVAL_REQUIRED and tool_name not in self._auto
+
+    def auto_approved(self) -> list[str]:
+        return sorted(self._auto)
+
+    def set_auto(self, tool_name: str, enabled: bool) -> None:
+        if enabled:
+            self._auto.add(tool_name)
+        else:
+            self._auto.discard(tool_name)
+        self._persist_auto()
+
+    def _persist_auto(self) -> None:
+        os.environ["AUTO_APPROVE_TOOLS"] = ",".join(sorted(self._auto))
+        try:  # best-effort .env persistence (shared with the brain's writer)
+            from aura_brain.setup_api import _write_env
+
+            _write_env({"AUTO_APPROVE_TOOLS": os.environ["AUTO_APPROVE_TOOLS"]})
+        except Exception:  # noqa: BLE001 — orchestrator may run standalone
+            pass
 
     async def request_approval(self, tool_name: str, arguments: dict) -> bool:
         """Request user approval. Raises ApprovalTimeout or ApprovalDeniedError."""
+        if tool_name in self._auto:  # remembered "always allow"
+            logger.info("Auto-approved (remembered): %s", tool_name)
+            return True
         approval_id = str(uuid.uuid4())
         loop = asyncio.get_event_loop()
         pending = _PendingApproval(
@@ -94,11 +122,13 @@ class ApprovalManager:
 
         return True
 
-    async def grant(self, approval_id: str) -> None:
+    async def grant(self, approval_id: str, remember: bool = False) -> None:
         pending = self._pending.pop(approval_id, None)
         if pending is None:
             logger.warning("Grant for unknown approval_id %s", approval_id)
             return
+        if remember:  # "always allow this" → skip future prompts for this tool
+            self.set_auto(pending.tool_name, True)
         if not pending.future.done():
             pending.future.set_result(True)
         await self._bus.publish(

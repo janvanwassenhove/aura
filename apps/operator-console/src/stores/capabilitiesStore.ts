@@ -17,6 +17,7 @@ export interface Capability {
 export const useCapabilitiesStore = defineStore('capabilities', () => {
   const capabilities = ref<Capability[]>([])
   const allowedApps = ref<string[]>([])
+  const autoApproved = ref<string[]>([]) // "always allow" remembered actions
   const pending = ref<string[]>([]) // keys toggled that need a restart to apply
   const loading = ref(false)
   const error = ref<string | null>(null)
@@ -70,5 +71,26 @@ export const useCapabilitiesStore = defineStore('capabilities', () => {
     }
   }
 
-  return { capabilities, allowedApps, pending, loading, error, notice, fetchCapabilities, toggle }
+  async function fetchAutoApprovals(): Promise<void> {
+    try {
+      const resp = await fetch(`${BRAIN_URL}/orchestrator/approval/auto`)
+      autoApproved.value = resp.ok ? (await resp.json()).auto_approved ?? [] : []
+    } catch { autoApproved.value = [] }
+  }
+
+  async function revokeAuto(tool: string): Promise<void> {
+    try {
+      const resp = await fetch(`${BRAIN_URL}/orchestrator/approval/auto/${tool}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled: false }),
+      })
+      if (resp.ok) autoApproved.value = (await resp.json()).auto_approved ?? []
+    } catch { /* ignore */ }
+  }
+
+  return {
+    capabilities, allowedApps, autoApproved, pending, loading, error, notice,
+    fetchCapabilities, toggle, fetchAutoApprovals, revokeAuto,
+  }
 })

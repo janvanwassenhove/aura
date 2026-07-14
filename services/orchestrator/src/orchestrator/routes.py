@@ -310,9 +310,10 @@ async def get_context() -> JSONResponse:
 
 
 @router.post("/orchestrator/approval/{approval_id}/grant")
-async def grant_approval(approval_id: str) -> JSONResponse:
+async def grant_approval(approval_id: str, body: dict | None = None) -> JSONResponse:
     assert _approval_mgr is not None
-    await _approval_mgr.grant(approval_id)
+    remember = bool((body or {}).get("remember", False))
+    await _approval_mgr.grant(approval_id, remember=remember)
     return JSONResponse({"ok": True})
 
 
@@ -321,6 +322,19 @@ async def deny_approval(approval_id: str) -> JSONResponse:
     assert _approval_mgr is not None
     await _approval_mgr.deny(approval_id)
     return JSONResponse({"ok": True})
+
+
+@router.get("/orchestrator/approval/auto")
+async def list_auto_approvals() -> JSONResponse:
+    assert _approval_mgr is not None
+    return JSONResponse({"auto_approved": _approval_mgr.auto_approved()})
+
+
+@router.post("/orchestrator/approval/auto/{tool_name}")
+async def set_auto_approval(tool_name: str, body: dict | None = None) -> JSONResponse:
+    assert _approval_mgr is not None
+    _approval_mgr.set_auto(tool_name, bool((body or {}).get("enabled", False)))
+    return JSONResponse({"auto_approved": _approval_mgr.auto_approved()})
 
 
 # ------------------------------------------------------------------

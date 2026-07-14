@@ -119,8 +119,18 @@ class SpotifyMusic:
     ) -> str:
         target = device or self._default_device
         if self.mock:
-            what = query or playlist or ("your favorites" if favorites else "music")
-            return f"Playing {what} on {target} (mock — set SPOTIFY_ACCESS_TOKEN for real playback)."
+            what = query or playlist or ("their favorites" if favorites else "music")
+            # Be HONEST: nothing actually plays without a Spotify token. Tell the
+            # assistant so it doesn't claim success, and offer the real fallback.
+            return (
+                f"NOT PLAYED. Spotify isn't connected to an account here, so I "
+                f"cannot start {what} or pick {target} automatically. Two options: "
+                f"(1) I can open Spotify and press Play on whatever is loaded "
+                f"(use launch_app then media_control play_pause) — but I can't "
+                f"choose the Sonos or a specific playlist that way; or (2) add a "
+                f"SPOTIFY_ACCESS_TOKEN for real playback + Sonos targeting. Tell "
+                f"the user this honestly; do not claim the music is playing."
+            )
         try:
             device_id = await self._find_device_id(device)
             if device_id is None:

@@ -25,21 +25,26 @@
         <div class="approval-countdown">
           Expires at {{ fmtTime(request.timeoutAt) }}
         </div>
+        <label class="approval-remember">
+          <input v-model="remember[request.approvalId]" type="checkbox" />
+          Always allow “{{ request.toolName }}” (manage in Capabilities)
+        </label>
       </div>
       <div class="approval-actions">
         <button class="btn-deny" @click="approvalStore.deny(request.approvalId)">Deny</button>
-        <button class="btn-grant" @click="approvalStore.grant(request.approvalId)">Grant</button>
+        <button class="btn-grant" @click="approvalStore.grant(request.approvalId, remember[request.approvalId] === true)">Grant</button>
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { onMounted, onUnmounted } from 'vue'
+import { onMounted, onUnmounted, ref } from 'vue'
 import { TriangleAlert } from 'lucide-vue-next'
 import { useApprovalStore } from '../stores/approvalStore'
 
 const approvalStore = useApprovalStore()
+const remember = ref<Record<string, boolean>>({})
 
 let expiryTimer: ReturnType<typeof setInterval> | null = null
 
