@@ -88,13 +88,13 @@ the human can unblock it.
   `shared_schemas/knowledge`: models (Person/ProfileFact/ObservedSignal/Relationship/ConsentRecord/RecognitionLink) + KnowledgeStore ABC + InMemory impl. Per-person scoping, erasure, signal reinforcement, minors-explicit-only guard. Suite 88 green (also fixed 2 pre-existing shared-schemas test bugs).
 - [x] **U19b — envelope crypto (OMK/DEK, AES-GCM)** · deps: U19a · ADR-008 · `dce86a6`
   `crypto.py` (AES-256-GCM + scrypt, vetted lib) + `EncryptedKnowledgeStore`: per-person DEK wrapped by OMK, at-rest bytes always ciphertext, delete=cryptographic erasure. Contract parametrized across memory+encrypted stores. Shared-schemas 100 green.
-- [ ] **U19c — owner-unlock tiers (OS-session + step-up)** · deps: U19b · ~~🔒 DECIDE~~ · DONE
+- [x] **U19c — owner-unlock tiers (OS-session + step-up)** · deps: U19b · ~~🔒 DECIDE~~ · DONE
   `StepUpGate` (STEP_UP_WEBHOOK_URL, auto-deny if unset); `UnlockTier` (BENIGN/SENSITIVE); knowledge API gated by tier; `/knowledge/lock`, `/knowledge/tier`, `/knowledge/stepup/callback/{token}/grant|deny`; `set_omk_loaded()` wired in main. Brain 23 green.
 - [x] **U19d — knowledge transparency (API + console view)** · deps: U19a · `1fe53d0` + `11c2d3a`
   Brain `/knowledge/*` API: list/inspect (facts+signals)/add+delete fact/erase person/consent; encrypted store when KNOWLEDGE_PASSPHRASE set. Brain 15 green. Console: `knowledgeStore` (Pinia, 403→locked banner) + `KnowledgePanel.vue` modal (🧠 header button): people list w/ role badges, person detail (facts editable, signals read-only w/ confidence), add person/fact, forget-person w/ confirm, tier badge + Lock button, minor-policy note. Console 45 green (16 new).
 - [x] **U19e — judgment/anticipation layer (stateless over the store)** · deps: U19a,U19c · `8783ab5`
   `JudgmentLayer` (shared-schemas): builds a minimal `PersonContext` per turn — guest→name only, minor→explicit facts only (ADR-008 §10), family/owner→top-N facts + high-confidence signals. `PersonContext.to_system_note()` injected into pipeline system prompt. Brain subscribes to `PersonRecognized` to track active person. Shared-schemas 117 green, orchestrator 137 green, brain 23 green.
-- [ ] **U20 — outbound dev-agent tool** · deps: U5 · ~~🔒 DECIDE~~ · DONE
+- [x] **U20 — outbound dev-agent tool** · deps: U5 · ~~🔒 DECIDE~~ · DONE
   `DevAgentTool`: classify read/write/commit/push; auto-approve reads; `ApprovalManager` step-up for writes/commit/push; cross-repo always asks; Claude Code escalation via `DEV_AGENT_BACKEND=claude` with separate approval. Gated by `DEV_AGENT_ENABLED=true`. Orchestrator 139 green.
 - [x] **U21 — local-LLM offline tier wiring** · deps: U5 · `f2a4864`
   Pipeline offline path tries a local model (OFFLINE_LLM_PROVIDER, e.g. ollama) before the regex FallbackAgent; `openai_chat` gained per-call provider/model overrides. Orchestrator 113 green.
@@ -152,9 +152,6 @@ the human can unblock it.
 
 - [x] **U37 — body-yaw follow (romp meedraaien)** · deps: U16 · `pending`
   Geen eigen volglus nodig: de SDK heeft `set_automatic_body_yaw(enabled)` — de daemon draait de romp zelf mee met het getrackte gezicht. Adapter `set_body_follow()` (+ herstel bij tracking-hertoggle, reset naar 0.0 bij uit), route `POST /robot/body_follow`, brain-proxy + `RobotClient.set_body_follow`, capability-toggle `body_follow` (BODY_FOLLOW, default uit, live hook). FakeRobotAdapter kreeg set_tracking/set_body_follow → tracking-route nu ook testbaar. Robot 48 (+3), brain 106 groen; live geverifieerd op de Pi (aan/uit → {"body_follow":true/false}).
-
-- [ ] **U39 — Spotify + Sonos muziekbesturing** · deps: U35
-  Spotify-connector (OAuth Authorization Code + PKCE; play/pause/zoek/favorieten/afspeellijsten via Web API) + optionele Sonos-koppeling (lokale UPnP/Sonos API of Spotify Connect naar het Sonos-device). Tools: play_music/pause_music/next_track/list_playlists. Vergt eenmalige Spotify-app-registratie (developer.spotify.com) door de eigenaar. Genoteerd op verzoek — nog niet geïmplementeerd.
 
 - [x] **U40 — capabilities/permissions center + app launcher** · deps: U20,U35 · `d943f88`
   Brain `/capabilities` (GET/POST toggles: dev_agent, app_launch, follow_me, speak_replies, gestures, recognition, maintenance; persist .env + live-apply hooks voor dev_agent/follow_me/speak_replies). `launch_app` orchestrator-tool + ALLOWED_APPS allow-list (name=command, argv-only, approval-gated, per-call env-check). Console CapabilitiesPanel (shield-knop titelbalk) met toggles + uitleg beveiligingsmodel + geregistreerde apps. Nooit een bypass van de approval-gate. Brain 86, orchestrator 143, policies 6, console 56 groen.
