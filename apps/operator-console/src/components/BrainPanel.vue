@@ -106,9 +106,25 @@
           />
           <p v-if="aboutDraft.includes('[[')" class="content-hint"><WikiText :text="aboutDraft" @open="openTarget" /></p>
 
+          <h3 class="content-title content-title--spaced">Sources</h3>
+          <p class="content-hint">Where to find/read this person — socials, blogs, mail. Injected into conversations as context.</p>
+          <div class="fact-chips">
+            <span v-for="f in sourceFacts" :key="f.fact_id" class="fact-chip fact-chip--source">
+              <em>{{ f.key.slice(7) }}</em> {{ f.value }}
+              <button class="chip-x" :aria-label="`Delete ${f.key}`" @click="store.deleteFact(f.fact_id, store.detail!.person.person_id)"><X :size="10" /></button>
+            </span>
+          </div>
+          <div class="inline-add">
+            <select v-model="newSource.kind" class="b-input" aria-label="Source kind">
+              <option v-for="k in SOURCE_KINDS" :key="k" :value="k">{{ k }}</option>
+            </select>
+            <input v-model="newSource.value" class="b-input b-grow" placeholder="handle / url / address" aria-label="Source value" />
+            <button class="b-btn" :disabled="!newSource.value.trim()" @click="addSource()">Add source</button>
+          </div>
+
           <h3 class="content-title content-title--spaced">Facts</h3>
           <div class="fact-chips">
-            <span v-for="f in store.detail.facts" :key="f.fact_id" class="fact-chip">
+            <span v-for="f in plainFacts" :key="f.fact_id" class="fact-chip">
               <em>{{ f.key }}</em> {{ f.value }}
               <button class="chip-x" :aria-label="`Delete ${f.key}`" @click="store.deleteFact(f.fact_id, store.detail!.person.person_id)"><X :size="10" /></button>
             </span>
@@ -180,6 +196,19 @@ const skills = ref<SkillItem[]>([])
 const selected = ref<string>('_skills')
 const aboutDraft = ref('')
 const newFact = ref({ key: '', value: '' })
+// U77: per-person sources — stored as `source:<kind>` facts so they persist in
+// the encrypted store and reach the LLM via the judgment layer automatically.
+const SOURCE_KINDS = ['instagram', 'facebook', 'x-twitter', 'linkedin', 'blog', 'website', 'gmail', 'github'] as const
+const newSource = ref({ kind: 'instagram' as string, value: '' })
+const sourceFacts = computed(() => (store.detail?.facts ?? []).filter(f => f.key.startsWith('source:')))
+const plainFacts = computed(() => (store.detail?.facts ?? []).filter(f => !f.key.startsWith('source:')))
+
+async function addSource(): Promise<void> {
+  if (!store.detail) return
+  const ok = await store.addFact(store.detail.person.person_id,
+    `source:${newSource.value.kind}`, newSource.value.value.trim())
+  if (ok) newSource.value.value = ''
+}
 const newSkill = ref({ name: '', description: '', body: '' })
 const addError = ref('')
 
@@ -409,6 +438,7 @@ onMounted(async () => {
   background: var(--surface-2); border: 1px solid var(--border-strong);
 }
 .fact-chip em { font-style: normal; color: var(--accent); }
+.fact-chip--source em { color: var(--ok-text, #2f9e6e); }
 .chip-x { background: none; border: none; color: var(--text-faint); cursor: pointer; padding: 0; display: inline-flex; }
 .chip-x:hover { color: var(--danger-text, #e5484d); }
 

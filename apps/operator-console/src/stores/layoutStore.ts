@@ -21,12 +21,15 @@ export const useLayoutStore = defineStore('layout', () => {
   const rightTab = ref<RightTab>(saved.rightTab ?? 'events')
   const leftWidth = ref(saved.leftWidth ?? 300)
   const rightWidth = ref(saved.rightWidth ?? 340)
+  const showBottom = ref((saved as any).showBottom ?? true)
+  const bottomHeight = ref((saved as any).bottomHeight ?? 200)
 
-  watch([showLeft, showRight, rightTab, leftWidth, rightWidth], () => {
+  watch([showLeft, showRight, rightTab, leftWidth, rightWidth, showBottom, bottomHeight], () => {
     localStorage.setItem(KEY, JSON.stringify({
       showLeft: showLeft.value, showRight: showRight.value,
       rightTab: rightTab.value, leftWidth: leftWidth.value,
-      rightWidth: rightWidth.value,
+      rightWidth: rightWidth.value, showBottom: showBottom.value,
+      bottomHeight: bottomHeight.value,
     }))
   })
 
@@ -37,5 +40,6 @@ export const useLayoutStore = defineStore('layout', () => {
     if (tab === 'brain' && rightWidth.value < 420) rightWidth.value = 480
   }
 
-  return { showLeft, showRight, rightTab, leftWidth, rightWidth, openRight }
+  return { showLeft, showRight, rightTab, leftWidth, rightWidth,
+           showBottom, bottomHeight, openRight }
 })
