@@ -174,7 +174,7 @@ the human can unblock it.
 - [x] **U46 — mic-versterking + UI ademruimte** · deps: U45 · `deba026`
   Robot-mic: de Reachy-mic-array is weinig gevoelig zelfs op max ALSA-gain (RMS 0.0008 ≈ stilte) → adaptieve peak-normalisatie in capture_audio (target 0.5, gain-cap 40, MIC_TARGET_PEAK/MIC_MAX_GAIN env). Live: opname nu RMS 0.08 / piek 0.5 (bruikbaar voor Whisper, was ~100× te stil). UI: ruimere spacing (panel-padding, status-row-gap, section-labels, mt-3, quick-action-knoppen) — minder gedrongen. Robot 45 groen, console build clean.
 
-- [x] **U47 — hands-free wake-word + doorpraat-conversatie** · deps: U45,U46 · `<hash>`
+- [x] **U47 — hands-free wake-word + doorpraat-conversatie** · deps: U45,U46 · `c1702f1`
   `VoiceLoop` (brain): draait continu op de robotmic, gedrag via env (VOICE_MODE=off|wake_word, WAKE_WORD, live leesbaar). VAD via raw mic-peak (X-Audio-Peak header van /robot/listen) → stilte overslaan zonder STT-kosten. Wake-word start ("Richie, …" → commando = rest); na ÉLK gesproken antwoord (ook een begroeting) opent een follow-up-venster zodat je zonder wake-word kunt doorpraten; echo-guard (wacht tot de robot klaar is met spreken). Instelling in Settings→Appearance (Hands-free: off/wake word + wake-word-veld) via /setup/prefs (voice_mode+wake_word, persist). Live geverifieerd: loop pollt /robot/listen elke ~4s in wake_word-modus. Brain 92, robot 45, console 56 groen.
 
 ## Progress log (append-only; newest last)
