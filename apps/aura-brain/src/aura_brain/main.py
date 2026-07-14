@@ -224,6 +224,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     _apply_computer_use(os.environ.get("COMPUTER_USE_ENABLED", "false").lower() == "true")
     capabilities_api.set_live_hook("computer_use", _apply_computer_use)
 
+    # U59: hand the shared skill store to the agentic loop.
+    from aura_brain import skills_api as _skills_api
+
+    if _skills_api.get_store() is not None:
+        ctx.pipeline.set_skill_store(_skills_api.get_store())
+
     # U19e: judgment/anticipation layer — injects minimal personal context per turn.
     from shared_schemas.knowledge import JudgmentLayer
     from shared_schemas.events.perception import PersonRecognized
@@ -619,6 +625,14 @@ def create_app() -> FastAPI:
     from aura_brain import logs_api
     logs_api.install()  # ring buffer on the root logger — no files, no telemetry
     app.include_router(logs_api.router)  # U56: in-app log viewer
+
+    # U59: owner-taught skills — CRUD API; the store is shared with the
+    # pipeline in the lifespan (pipeline doesn't exist yet at mount time).
+    from aura_brain import skills_api
+    from orchestrator.skills import SkillStore
+
+    skills_api.init(SkillStore())
+    app.include_router(skills_api.router)
 
     return app
 
