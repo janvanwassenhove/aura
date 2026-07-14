@@ -27,6 +27,40 @@ def init(pipeline: Any, bus: Any, session_id: str, robot: Any = None) -> None:
     _pipeline, _bus, _session_id, _robot = pipeline, bus, session_id, robot
 
 
+@router.post("/listen")
+async def listen_turn(body: dict | None = None) -> JSONResponse:
+    """Talk to the robot via ITS OWN microphone: record on the Pi → transcribe
+    → one pipeline turn (reply spoken back on the robot)."""
+    if _pipeline is None or _robot is None:
+        return JSONResponse({"error": "voice not initialised"}, status_code=503)
+    from aura_brain import voice
+
+    duration = float((body or {}).get("duration_s", 5.0))
+    try:
+        wav = await _robot.listen(duration_s=duration)
+    except Exception as exc:  # noqa: BLE001 — robot offline / mic disabled
+        return JSONResponse(
+            {"error": f"could not record from the robot mic: {type(exc).__name__}"},
+            status_code=503,
+        )
+    transcript = await voice.transcribe(wav, filename="robot.wav")
+    if not transcript or not transcript.strip():
+        return JSONResponse(
+            {"error": "I didn't catch that — is the robot's mic enabled and were "
+                      "you speaking? (Needs OPENAI_API_KEY.)"},
+            status_code=422,
+        )
+    transcript = transcript.strip()
+
+    from shared_schemas.events.audio import TranscriptUpdated
+
+    await _bus.publish(TranscriptUpdated(
+        session_id=_session_id, transcript=transcript, is_final=True,
+    ))
+    reply = await _pipeline.orchestrate(transcript, _session_id)
+    return JSONResponse({"transcript": transcript, "reply": reply})
+
+
 @router.post("/turn")
 async def voice_turn(audio: UploadFile) -> JSONResponse:
     if _pipeline is None:

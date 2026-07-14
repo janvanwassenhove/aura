@@ -261,10 +261,17 @@ class ReachyRobotAdapter(RobotAdapter):
             media.stop_recording()
             if not chunks:
                 return b""
-            pcm = np.concatenate(chunks)
-            if pcm.dtype != np.int16:  # float [-1,1] → int16
-                pcm = (np.clip(pcm, -1.0, 1.0) * 32767).astype(np.int16)
-            return pcm.tobytes()
+            pcm = np.concatenate(chunks).astype(np.float32)
+            if pcm.max() > 1.5 or pcm.min() < -1.5:  # already int-scaled
+                pcm = pcm / 32768.0
+            # Resample to 16 kHz mono s16le — the standard STT input rate.
+            if rate and rate > 0 and rate != 16_000:
+                n_out = int(len(pcm) * 16_000 / rate)
+                if n_out > 0:
+                    x_old = np.linspace(0.0, 1.0, num=len(pcm), endpoint=False)
+                    x_new = np.linspace(0.0, 1.0, num=n_out, endpoint=False)
+                    pcm = np.interp(x_new, x_old, pcm).astype(np.float32)
+            return (np.clip(pcm, -1.0, 1.0) * 32767).astype(np.int16).tobytes()
 
         return await asyncio.to_thread(_record)
 
