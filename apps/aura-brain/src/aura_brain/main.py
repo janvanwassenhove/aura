@@ -348,6 +348,19 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     ctx.bus.subscribe(ResponseDrafted, _voice_note_spoken)
 
+    # U69: when AURA starts/controls music, the robot mic will hear lyrics —
+    # tell the voice loop so it requires the wake word instead of treating
+    # transcribed lyrics as conversation (the NOFX incident).
+    from shared_schemas.events.orchestrator import ToolCallSucceeded as _TCS
+
+    _MUSIC_TOOLS = {"play_music", "media_control", "next_track"}
+
+    async def _voice_note_music(event) -> None:
+        if event.tool_name in _MUSIC_TOOLS and ctx._voice_loop is not None:
+            ctx._voice_loop.note_music_started()
+
+    ctx.bus.subscribe(_TCS, _voice_note_music)
+
     _last_greeted: dict[str, float] = {}
     _greet_cooldown = float(os.environ.get("GREET_COOLDOWN_S", "120"))
 
