@@ -37,6 +37,12 @@
     <div class="mt-3">
       <h3 class="section-label">Quick Actions</h3>
       <div class="qa-grid">
+        <button class="qa-btn" :disabled="acting" title="Wake up (enables motors after sleep)" @click="act('wake_up')">
+          <Power :size="13" /> Wake up
+        </button>
+        <button class="qa-btn" :disabled="acting" title="Go to sleep" @click="act('sleep')">
+          <Moon :size="13" /> Sleep
+        </button>
         <button class="qa-btn" :disabled="acting" title="Wave the antennas" @click="act('wave')">
           <Hand :size="13" /> Wave
         </button>
@@ -69,7 +75,7 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
-import { ChevronsDown, Hand, MoveVertical, Sparkles, Volume2, VolumeX } from 'lucide-vue-next'
+import { ChevronsDown, Hand, Moon, MoveVertical, Power, Sparkles, Volume2, VolumeX } from 'lucide-vue-next'
 import { useRobotStore } from '../stores/robotStore'
 
 const BRAIN_URL = import.meta.env.VITE_BRAIN_URL ?? import.meta.env.VITE_ORCHESTRATOR_URL ?? 'http://localhost:8000'
