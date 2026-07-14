@@ -240,6 +240,11 @@ class OrchestratorPipeline:
         self._history: dict[str, list[dict]] = {}
         self._max_history = int(os.environ.get("MAX_CONTEXT_TURNS", "10")) * 2
 
+    @property
+    def persona_config(self):
+        """Active persona's config (U51: embodiment reads the gesture profile)."""
+        return self._persona.config
+
     def _recall(self, session_id: str) -> list[dict]:
         return self._history.get(session_id, [])
 
