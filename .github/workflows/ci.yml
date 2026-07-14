@@ -50,6 +50,23 @@ jobs:
       - name: Run connector-service tests
         run: uv run --package connector-service pytest services/connector-service/tests -v
 
+      - name: Run aura-brain tests
+        run: uv run --package aura-brain --extra dev pytest apps/aura-brain/tests -v
+
+  console:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Console tests + build
+        working-directory: apps/operator-console
+        run: |
+          npm ci
+          npm test
+          npm run build
+
   lint:
     runs-on: ubuntu-latest
     steps:

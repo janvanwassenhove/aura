@@ -616,6 +616,10 @@ def create_app() -> FastAPI:
     from aura_brain import capabilities_api
     app.include_router(capabilities_api.router)  # U40: permissions center
 
+    from aura_brain import logs_api
+    logs_api.install()  # ring buffer on the root logger — no files, no telemetry
+    app.include_router(logs_api.router)  # U56: in-app log viewer
+
     return app
 
 
