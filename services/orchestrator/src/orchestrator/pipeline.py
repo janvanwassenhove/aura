@@ -421,6 +421,47 @@ class OrchestratorPipeline:
         await self._bus.publish(ResponseDrafted(session_id=session_id, response_text=reply))
         return reply
 
+    # U61: subagents — a scoped, read-only sub-loop with its own round budget.
+    _SUBAGENT_TOOLS: frozenset[str] = frozenset({
+        "read_file", "git_prepare", "list_browser_tabs",
+        "list_calendar_events_today", "get_unread_mail", "list_onedrive_files",
+        "list_tasks", "list_todos", "list_reminders",
+        "list_music_playlists", "list_speakers",
+    })
+
+    async def _delegate_subtask(self, arguments: dict, session_id: str, timing: dict) -> str:
+        goal = str(arguments.get("goal", "")).strip()
+        if not goal:
+            return "[delegate_subtask: goal is required]"
+        max_rounds = min(6, max(1, int(arguments.get("max_rounds", 4) or 4)))
+        allowed = self._SUBAGENT_TOOLS & self._router.allowed_tools()
+        specs = build_tool_specs(allowed)
+        sub_id = f"{session_id}::sub"
+        messages: list[dict] = [
+            {"role": "system", "content": (
+                "You are a focused SUBAGENT of the main assistant. Complete "
+                "exactly this subtask and nothing else, using only your "
+                "read-only tools. You cannot write, launch apps, or delegate. "
+                "Return a concise, factual result the main agent can use.")},
+            {"role": "user", "content": goal},
+        ]
+        logger.info("subagent started: %r (max_rounds=%d)", goal[:80], max_rounds)
+        for _round in range(max_rounds):
+            _t = time.perf_counter()
+            resp = await openai_chat(messages, tools=specs or None)
+            timing["llm_ms"] += (time.perf_counter() - _t) * 1000
+            if not resp["tool_calls"]:
+                return resp["content"] or "(subagent returned no result)"
+            atc, tool_msgs, _names = await self._run_tool_round(
+                resp["tool_calls"], sub_id, timing, restrict=allowed)
+            messages.append({"role": "assistant", "content": resp["content"] or None,
+                             "tool_calls": atc})
+            messages.extend(tool_msgs)
+        messages.append({"role": "system", "content":
+                         "Round budget exhausted — give your final concise result now."})
+        final = await openai_chat(messages)
+        return final["content"] or "(subagent: budget exhausted without a result)"
+
     async def _save_skill(self, arguments: dict) -> str:
         """U60 self-training: persist an owner-approved skill (gate fired upstream)."""
         if self._skills is None:
@@ -456,6 +497,7 @@ class OrchestratorPipeline:
 
     async def _run_tool_round(
         self, tool_calls: list, session_id: str, timing: dict,
+        restrict: frozenset[str] | None = None,
     ) -> tuple[list[dict], list[dict], list[str]]:
         """Gate + execute one round of tool calls; returns (assistant_tool_calls,
         tool_messages, executed_tool_names).
@@ -491,6 +533,25 @@ class OrchestratorPipeline:
                 )
                 tool_messages.append({"role": "tool", "tool_call_id": tc_id,
                                       "content": f"[{tool_name}: not available in current mode]"})
+                continue
+
+            # U61: subagents run with a hard tool allowlist — anything outside
+            # it is refused even if the mode would allow it.
+            if restrict is not None and tool_name not in restrict:
+                tool_messages.append({"role": "tool", "tool_call_id": tc_id,
+                                      "content": f"[{tool_name}: not available to this subagent]"})
+                continue
+
+            # U61: deterministic pre-hooks (e.g. "tests before git push") —
+            # a blocking hook replaces execution with its message so the
+            # model reads why and adapts next round.
+            from orchestrator.hooks import pre_hook_block
+
+            blocked = pre_hook_block(tool_name, args_str)
+            if blocked is not None:
+                logger.info("hook blocked %r: %s", tool_name, blocked)
+                tool_messages.append({"role": "tool", "tool_call_id": tc_id,
+                                      "content": blocked})
                 continue
 
             await self._bus.publish(ToolCallRequested(session_id=session_id, tool_name=tool_name))
@@ -537,6 +598,8 @@ class OrchestratorPipeline:
                     )
             elif tool_name == "save_skill":
                 result_text = await self._save_skill(arguments)
+            elif tool_name == "delegate_subtask":
+                result_text = await self._delegate_subtask(arguments, session_id, timing)
             elif tool_name == "run_powershell":
                 result_text = await laptop_tools.run_powershell(
                     arguments.get("command", ""), arguments.get("working_dir"),
@@ -561,6 +624,11 @@ class OrchestratorPipeline:
                 result_text = await _media_control(arguments.get("action", ""))
             else:
                 result_text = await self._call_connector(tool_name, arguments)
+            # U61: post-hooks append deterministic follow-up notes.
+            from orchestrator.hooks import post_hook_notes
+
+            for note in post_hook_notes(tool_name, json.dumps(arguments)):
+                result_text += f"\n[hook] {note}"
             await self._bus.publish(ToolCallSucceeded(
                 session_id=session_id, tool_name=tool_name, result_summary=result_text[:500],
             ))

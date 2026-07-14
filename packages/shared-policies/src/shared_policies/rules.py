@@ -34,6 +34,7 @@ MODE_TOOL_MAP: dict[str, frozenset[str]] = {
             "write_file",
             "git_prepare",
             "save_skill",
+            "delegate_subtask",
             "list_browser_tabs",
             "open_browser_url",
             "launch_app",
@@ -79,6 +80,7 @@ MODE_TOOL_MAP: dict[str, frozenset[str]] = {
             "list_browser_tabs",
             "open_browser_url",
             "save_skill",
+            "delegate_subtask",
         }
     ),
     "presentation": frozenset(
