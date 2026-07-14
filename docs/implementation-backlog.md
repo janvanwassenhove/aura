@@ -106,7 +106,8 @@ the human can unblock it.
 - [x] **U23 — per-turn latency instrumentation** · deps: U5 · `aec8518`
   `TurnLatencyMeasured` event (total/llm/tool ms, first_audio_ms=None until voice) emitted every turn, wired through broadcaster → console. Orchestrator 114 green.
   Emit first-audio + full-turn timings into the event stream; show in console.
-- [ ] **U24 — streaming STT + token-streamed TTS + barge-in** · deps: U22
+- [x] **U24/U54 — gestreamde TTS + barge-in (logica-laag)** · deps: U22 · `pending`
+  `streaming.py`: `split_speech_chunks` (zinsgrenzen, min 60 tekens, staart-cap) + `stream_speech` — chunk N+1 wordt gesynthetiseerd TERWIJL chunk N op de robot speelt → eerste audio na één korte TTS-call i.p.v. één lange. `_embody_reply` gebruikt het gestreamde pad (SPEAK_STREAMING, default aan). Barge-in in de VoiceLoop: tijdens het spreken luistert de lus in korte vensters; een duidelijk luidere stem (BARGE_IN_FACTOR×gate, filtert speaker-echo) kapt de wachttijd en wordt direct als reply behandeld (BARGE_IN, default aan). Brain 125 (+8) groen. Rest van U24 (echte streaming-STT over een live socket) blijft 🔒 SECRET+HW bij U22.
 - [x] **U25 — parallel tool calling** · deps: U5 · `afdb299`
   Tool loop split into a sequential gate pass + a concurrent (asyncio.gather) execution pass for independent tools; approval-gated tools still serialize. A multi-tool turn pays the slowest tool, not the sum. Orchestrator 115, brain 13 green.
 - [ ] **U26 — on-Pi budget guard** · 🔒 HW · deps: U16
