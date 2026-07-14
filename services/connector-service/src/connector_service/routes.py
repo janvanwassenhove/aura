@@ -46,12 +46,37 @@ def _require_connector() -> M365Connector:
 
 @router.get("/health")
 async def health() -> JSONResponse:
-    if _registry is None:
-        return JSONResponse({"status": "ok", "connectors": {}})
+    connectors: dict[str, str] = {} if _registry is None else dict(_registry.health())
+    # U52: honest statuses — music runs on canned data without a Spotify token.
+    connectors["music"] = "mock" if _music.mock else "ok"
     return JSONResponse({
-        "status": _registry.overall_status(),
-        "connectors": _registry.health(),
+        "status": "ok" if _registry is None else _registry.overall_status(),
+        "connectors": connectors,
     })
+
+
+@router.post("/test/{key}")
+async def test_connector(key: str) -> JSONResponse:
+    """U52: per-connector probe — one cheap real call so the owner can verify a
+    connection actually works (instead of trusting a green badge)."""
+    try:
+        if key == "music":
+            return JSONResponse({"key": key, "ok": not _music.mock,
+                                 "detail": await _music.list_devices()})
+        if _registry is None:
+            return JSONResponse({"key": key, "ok": False, "detail": "no registry"}, status_code=503)
+        connector = _registry.get(key)
+        if connector is None:
+            return JSONResponse({"key": key, "ok": False,
+                                 "detail": "not connected — authenticate first"})
+        is_mock = getattr(connector, "is_mock", False) or type(connector).__name__.startswith("Mock")
+        events = await connector.list_calendar_events_today()
+        detail = f"reachable — {len(events)} calendar event(s) today"
+        if is_mock:
+            detail += " (MOCK data, not a real account)"
+        return JSONResponse({"key": key, "ok": not is_mock, "detail": detail})
+    except Exception as exc:  # noqa: BLE001 — a probe must report, not 500
+        return JSONResponse({"key": key, "ok": False, "detail": f"probe failed: {exc}"})
 
 
 # ------------------------------------------------------------------
@@ -171,3 +196,22 @@ async def create_task(body: dict) -> JSONResponse:
     )
     return JSONResponse(task.model_dump(mode="json"))
 
+
+
+# ------------------------------------------------------------------
+# Browser (U52: Chrome via CDP — read free, navigate approval-gated)
+# ------------------------------------------------------------------
+
+from connector_service.browser import ChromeBrowser  # noqa: E402
+
+_browser = ChromeBrowser()
+
+
+@router.get("/browser/tabs")
+async def browser_tabs() -> JSONResponse:
+    return JSONResponse({"result": await _browser.list_tabs()})
+
+
+@router.post("/browser/open")
+async def browser_open(body: dict) -> JSONResponse:
+    return JSONResponse({"result": await _browser.open_url(str(body.get("url", "")))})

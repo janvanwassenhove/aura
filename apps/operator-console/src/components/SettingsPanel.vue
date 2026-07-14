@@ -150,7 +150,11 @@
             <div class="conn-card-header">
               <div class="conn-provider-info"><span class="conn-icon"><Building2 :size="16" /></span><span class="conn-name">Microsoft M365</span></div>
               <ConnStatusBadge :status="msState.status" />
+              <button class="btn-conn btn-ghost btn-small" :disabled="msState.testing" title="Run one real call to verify" @click="connStore.testProvider('microsoft')">
+                <LoaderCircle v-if="msState.testing" :size="12" class="spinner" /> Test
+              </button>
             </div>
+            <p v-if="msState.testResult" class="conn-hint conn-test-result">{{ msState.testResult }}</p>
             <p v-if="msState.error" class="conn-error">{{ msState.error }}</p>
 
             <div v-if="msState.deviceCode" class="device-code-box">
@@ -180,7 +184,11 @@
             <div class="conn-card-header">
               <div class="conn-provider-info"><span class="conn-icon"><Globe :size="16" /></span><span class="conn-name">Google Workspace</span></div>
               <ConnStatusBadge :status="googleState.status" />
+              <button class="btn-conn btn-ghost btn-small" :disabled="googleState.testing" title="Run one real call to verify" @click="connStore.testProvider('google')">
+                <LoaderCircle v-if="googleState.testing" :size="12" class="spinner" /> Test
+              </button>
             </div>
+            <p v-if="googleState.testResult" class="conn-hint conn-test-result">{{ googleState.testResult }}</p>
             <p v-if="googleState.error" class="conn-error">{{ googleState.error }}</p>
 
             <div v-if="googleState.deviceCode" class="device-code-box">
@@ -210,7 +218,11 @@
             <div class="conn-card-header">
               <div class="conn-provider-info"><span class="conn-icon"><Github :size="16" /></span><span class="conn-name">GitHub</span></div>
               <ConnStatusBadge :status="githubState.status" />
+              <button class="btn-conn btn-ghost btn-small" :disabled="githubState.testing" title="Run one real call to verify" @click="connStore.testProvider('github')">
+                <LoaderCircle v-if="githubState.testing" :size="12" class="spinner" /> Test
+              </button>
             </div>
+            <p v-if="githubState.testResult" class="conn-hint conn-test-result">{{ githubState.testResult }}</p>
             <p v-if="githubState.error" class="conn-error">{{ githubState.error }}</p>
 
             <div v-if="githubState.deviceCode" class="device-code-box">
@@ -254,7 +266,11 @@
             <div class="conn-card-header">
               <div class="conn-provider-info"><span class="conn-icon"><MessageSquare :size="16" /></span><span class="conn-name">Slack</span></div>
               <ConnStatusBadge :status="slackState.status" />
+              <button class="btn-conn btn-ghost btn-small" :disabled="slackState.testing" title="Run one real call to verify" @click="connStore.testProvider('slack')">
+                <LoaderCircle v-if="slackState.testing" :size="12" class="spinner" /> Test
+              </button>
             </div>
+            <p v-if="slackState.testResult" class="conn-hint conn-test-result">{{ slackState.testResult }}</p>
             <p v-if="slackState.error" class="conn-error">{{ slackState.error }}</p>
             <template v-if="slackState.status !== 'ok'">
               <div class="settings-field">
@@ -276,6 +292,23 @@
             </div>
           </div>
 
+          <!-- ── Spotify / Sonos (U52) ── -->
+          <div class="conn-card">
+            <div class="conn-card-header">
+              <div class="conn-provider-info"><span class="conn-icon"><Music :size="16" /></span><span class="conn-name">Spotify / Sonos</span></div>
+              <ConnStatusBadge :status="musicState.status" />
+            </div>
+            <p v-if="musicState.status === 'mock'" class="conn-hint">
+              Running on canned data. Set <code>SPOTIFY_ACCESS_TOKEN</code> in the env for real playback &amp; Sonos targeting.
+            </p>
+            <div class="conn-actions">
+              <button class="btn-conn btn-ghost" :disabled="musicState.testing" @click="connStore.testProvider('music')">
+                <LoaderCircle v-if="musicState.testing" :size="13" class="spinner" /> Test
+              </button>
+            </div>
+            <p v-if="musicState.testResult" class="conn-hint conn-test-result">{{ musicState.testResult }}</p>
+          </div>
+
         </div><!-- /conn-list -->
       </template>
     </div>
@@ -286,7 +319,7 @@
 import { ref, computed, onMounted, watch, defineComponent, h } from 'vue'
 import {
   Building2, Circle, CircleCheck, ExternalLink, Github, Globe, LoaderCircle,
-  MessageSquare, Moon, RefreshCw, Settings, Sun, X,
+  MessageSquare, Moon, Music, RefreshCw, Settings, Sun, X,
 } from 'lucide-vue-next'
 import { useSettingsStore, type LLMProvider, type ModelOption } from '../stores/settingsStore'
 import { useConnectionsStore, type ConnectorStatus } from '../stores/connectionsStore'
@@ -356,6 +389,7 @@ const msState     = computed(() => connStore.providers.find(p => p.provider === 
 const googleState = computed(() => connStore.providers.find(p => p.provider === 'google')!)
 const githubState = computed(() => connStore.providers.find(p => p.provider === 'github')!)
 const slackState  = computed(() => connStore.providers.find(p => p.provider === 'slack')!)
+const musicState  = computed(() => connStore.providers.find(p => p.provider === 'music')!)
 
 const githubToken = ref('')
 const slackToken  = ref('')
@@ -381,6 +415,7 @@ const ConnStatusBadge = defineComponent({
   setup(props) {
     const labels: Record<ConnectorStatus, string> = {
       ok:              'Connected',
+      mock:            'Mock data',
       unauthenticated: 'Not connected',
       unavailable:     'Unavailable',
       unknown:         'Unknown',
@@ -501,10 +536,13 @@ const ConnStatusBadge = defineComponent({
 .conn-icon { display: flex; color: var(--text-muted); }
 .conn-name { font-weight: 600; font-size: 0.88rem; }
 
+.conn-test-result { font-style: italic; }
+
 .conn-status-badge {
   font-size: 0.7rem; padding: 0.12rem 0.45rem; border-radius: 9999px; font-weight: 500;
 }
 .conn-status--ok            { background: var(--ok-bg); color: var(--ok-text); }
+.conn-status--mock          { background: var(--warn-bg, rgba(217,164,65,0.15)); color: var(--warn, #d9a441); }
 .conn-status--unauthenticated { background: var(--surface-hover); color: var(--text-faint); }
 .conn-status--unavailable   { background: var(--danger-bg); color: var(--danger-text); }
 .conn-status--unknown       { background: var(--surface-2); color: var(--text-faint); }
