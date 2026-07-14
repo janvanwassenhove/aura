@@ -12,7 +12,7 @@
  * Brain logs: %APPDATA%/aura-desktop/brain.log (also in the terminal).
  */
 
-const { app, BrowserWindow, Menu, Tray, dialog, ipcMain, session, shell, nativeImage } = require('electron')
+const { app, BrowserWindow, Menu, Tray, dialog, globalShortcut, ipcMain, screen, session, shell, nativeImage } = require('electron')
 const { spawn, execSync } = require('child_process')
 const http = require('http')
 const fs = require('fs')
@@ -213,6 +213,78 @@ function serveConsole() {
 }
 
 // ---------------------------------------------------------------------------
+// U75: screen-control overlay — glowing ring that follows the mouse + an
+// abort banner while AURA drives the screen. Click-through, always on top.
+// ---------------------------------------------------------------------------
+
+let overlayWin = null
+let overlayTimer = null
+
+const OVERLAY_HTML = `data:text/html;charset=utf-8,
+<body style="margin:0;background:transparent;overflow:hidden;font-family:sans-serif">
+<div id="banner" style="position:fixed;top:10px;left:50%%;transform:translateX(-50%%);
+background:rgba(15,23,42,.92);color:%23e2e8f0;border:1px solid %2360a5fa;border-radius:999px;
+padding:8px 18px;font-size:13px;display:flex;gap:10px;align-items:center;box-shadow:0 4px 24px rgba(59,130,246,.35)">
+<span style="width:9px;height:9px;border-radius:50%%;background:%2360a5fa;
+box-shadow:0 0 10px %2360a5fa;animation:pulse 1.1s infinite"></span>
+AURA bestuurt het scherm &mdash; druk <b>&nbsp;Esc&nbsp;</b> om af te breken</div>
+<div id="ring" style="position:fixed;width:46px;height:46px;border-radius:50%%;
+border:3px solid %2360a5fa;box-shadow:0 0 18px 4px rgba(96,165,250,.65), inset 0 0 12px rgba(96,165,250,.5);
+transform:translate(-50%%,-50%%);pointer-events:none;animation:pulse 1.1s infinite"></div>
+<style>@keyframes pulse{0%%,100%%{opacity:.95}50%%{opacity:.45}}</style>
+<script>
+require===undefined;
+window.addEventListener('message',()=>{});
+const {ipcRenderer} = window.electron||{};
+</script>
+<script>
+  // cursor positions arrive via executeJavaScript from the main process
+  window.__setCursor = (x, y) => {
+    const r = document.getElementById('ring')
+    r.style.left = x + 'px'; r.style.top = y + 'px'
+  }
+</script></body>`
+
+function showOverlay() {
+  if (overlayWin) return
+  const { width, height } = screen.getPrimaryDisplay().bounds
+  overlayWin = new BrowserWindow({
+    width, height, x: 0, y: 0,
+    frame: false, transparent: true, alwaysOnTop: true, skipTaskbar: true,
+    focusable: false, hasShadow: false, resizable: false,
+    webPreferences: { sandbox: true },
+  })
+  overlayWin.setIgnoreMouseEvents(true)
+  overlayWin.setAlwaysOnTop(true, 'screen-saver')
+  overlayWin.loadURL(OVERLAY_HTML)
+  overlayTimer = setInterval(() => {
+    if (!overlayWin) return
+    const p = screen.getCursorScreenPoint()
+    overlayWin.webContents.executeJavaScript(
+      `window.__setCursor && window.__setCursor(${p.x}, ${p.y})`, true,
+    ).catch(() => {})
+  }, 40)
+  // Esc aborts the run (global — works whatever app has focus).
+  globalShortcut.register('Escape', () => {
+    const req = http.request({ host: 'localhost', port: BRAIN_PORT, method: 'POST',
+      path: '/orchestrator/computeruse/abort' })
+    req.on('error', () => {})
+    req.end()
+  })
+}
+
+function hideOverlay() {
+  if (overlayTimer) { clearInterval(overlayTimer); overlayTimer = null }
+  globalShortcut.unregister('Escape')
+  if (overlayWin) { overlayWin.destroy(); overlayWin = null }
+}
+
+ipcMain.on('aura:screen-control', (_e, active) => {
+  if (active) showOverlay()
+  else hideOverlay()
+})
+
+// ---------------------------------------------------------------------------
 // Window, tray, menu
 // ---------------------------------------------------------------------------
 
@@ -316,6 +388,7 @@ if (!app.requestSingleInstanceLock()) {
   app.on('before-quit', () => { quitting = true })
   app.on('window-all-closed', () => app.quit())
   app.on('quit', () => {
+    hideOverlay()
     stopBrain()
     if (staticServer) staticServer.close()
   })

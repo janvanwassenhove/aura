@@ -84,3 +84,17 @@ class AgentRoundCompleted(BaseEvent):
     round_no: int
     tool_names: list[str] = []
     done: bool = False
+
+
+class ComputerControlStarted(BaseEvent):
+    """U75: AURA is taking control of the screen (mouse glow + abort UI)."""
+
+    event_type: Literal["ComputerControlStarted"] = "ComputerControlStarted"
+    goal: str = ""
+
+
+class ComputerControlEnded(BaseEvent):
+    """U75: the screen-control run finished/aborted."""
+
+    event_type: Literal["ComputerControlEnded"] = "ComputerControlEnded"
+    summary: str = ""

@@ -70,7 +70,34 @@ class InputBackend(Protocol):
     def drag(self, x1: int, y1: int, x2: int, y2: int) -> None: ...
 
 
-class ComputerUseAgent:
+class _Abortable:
+    """U75: owner can abort a running screen-control action; runs also stop
+    at COMPUTER_USE_TIMEOUT_S wall-clock (default 180s)."""
+
+    def _init_abort(self) -> None:
+        self._abort = asyncio.Event()
+        self._timeout_s = float(os.environ.get("COMPUTER_USE_TIMEOUT_S", "180"))
+
+    def request_abort(self) -> None:
+        self._abort.set()
+
+    def _start_run(self) -> float:
+        self._abort.clear()
+        import time as _time
+
+        return _time.monotonic() + self._timeout_s
+
+    def _should_stop(self, deadline: float) -> str | None:
+        import time as _time
+
+        if self._abort.is_set():
+            return "[aborted by the owner]"
+        if _time.monotonic() > deadline:
+            return f"[stopped: exceeded {self._timeout_s:.0f}s time limit]"
+        return None
+
+
+class ComputerUseAgent(_Abortable):
     def __init__(
         self,
         backend: InputBackend,
@@ -86,6 +113,7 @@ class ComputerUseAgent:
         self._client = client or _AsyncAnthropicClient(
             api_key or os.environ.get("ANTHROPIC_API_KEY", "")
         )
+        self._init_abort()
         w, h = backend.size()
         self._size = (int(w), int(h))
 
@@ -102,9 +130,13 @@ class ComputerUseAgent:
         }
         messages: list[dict] = [{"role": "user", "content": goal}]
         texts: list[str] = []
+        deadline = self._start_run()
         logger.info("ComputerUseAgent starting goal=%r (max_steps=%d)", goal, self._max_steps)
 
         for step in range(self._max_steps):
+            stop = self._should_stop(deadline)
+            if stop:
+                return stop
             msg = await self._client.create(
                 model=self._model,
                 max_tokens=1024,
@@ -269,7 +301,7 @@ class PyAutoGuiBackend:
         return {"return": "enter", "super": "win", "cmd": "win", "meta": "win"}.get(k, k)
 
 
-class OpenAIComputerAgent:
+class OpenAIComputerAgent(_Abortable):
     """U64: the same screenshot→act→verify loop driven by the OpenAI API —
     no Anthropic key needed. Uses the vision + function-calling of the model
     already configured for conversations (default gpt-4o)."""
@@ -317,6 +349,7 @@ class OpenAIComputerAgent:
 
             client = AsyncOpenAI()
         self._client = client
+        self._init_abort()
         w, h = backend.size()
         self._size = (int(w), int(h))
 
@@ -338,8 +371,12 @@ class OpenAIComputerAgent:
             {"role": "user", "content": goal},
             await self._screenshot_message(),
         ]
+        deadline = self._start_run()
         logger.info("OpenAIComputerAgent starting goal=%r (model=%s)", goal, self._model)
         for step in range(self._max_steps):
+            stop = self._should_stop(deadline)
+            if stop:
+                return stop
             resp = await self._client.chat.completions.create(
                 model=self._model, messages=messages, tools=self._TOOLS,
                 # gpt-5.x rejects max_tokens; this works on gpt-4o too.

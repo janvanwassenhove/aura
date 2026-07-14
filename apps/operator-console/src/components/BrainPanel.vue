@@ -17,6 +17,10 @@
             <span class="rail-label">Skills library</span>
             <span class="rail-count">{{ skills.length }}</span>
           </button>
+          <button :class="['rail-item', selected === '_graph' && 'rail-item--active']" @click="selectGraph()">
+            <span class="rail-avatar rail-avatar--skills"><Share2 :size="15" /></span>
+            <span class="rail-label">Graph</span>
+          </button>
           <div class="rail-sep">People</div>
           <button
             v-for="p in store.people" :key="p.person_id"
@@ -74,8 +78,18 @@
           <p v-if="addError" class="b-error">{{ addError }}</p>
         </section>
 
+        <!-- ── Right: the graph (U75) ── -->
+        <section v-else-if="selected === '_graph'" class="brain-content brain-content--graph">
+          <BrainGraph
+            :people="store.people"
+            :skills="skills"
+            :facts="graphFacts"
+            @open="onGraphOpen"
+          />
+        </section>
+
         <!-- ── Right: one person's brain ── -->
-        <section v-else-if="store.detail" class="brain-content">
+        <section v-else-if="selected !== '_skills' && store.detail" class="brain-content">
           <div class="person-hero">
             <span class="hero-avatar">{{ initials(store.detail.person.display_name) }}</span>
             <div class="hero-meta">
@@ -134,7 +148,8 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
-import { Brain, Pencil, ShieldCheck, Sparkles, X } from 'lucide-vue-next'
+import { Brain, Pencil, Share2, ShieldCheck, Sparkles, X } from 'lucide-vue-next'
+import BrainGraph from './BrainGraph.vue'
 import WikiText from './WikiText.vue'
 import { useKnowledgeStore } from '../stores/knowledgeStore'
 import { useNavStore } from '../stores/navStore'
@@ -188,6 +203,29 @@ async function fetchSkills(): Promise<void> {
     const resp = await fetch(`${BRAIN_URL}/skills`)
     skills.value = (await resp.json()).skills ?? []
   } catch { skills.value = [] }
+}
+
+interface GraphFact { person_id: string; key: string; value: string }
+const graphFacts = ref<GraphFact[]>([])
+
+async function selectGraph(): Promise<void> {
+  selected.value = '_graph'
+  // Collect facts across people for the constellation (small N — fine).
+  const all: GraphFact[] = []
+  for (const p of store.people) {
+    try {
+      await store.inspectPerson(p.person_id)
+      for (const f of store.detail?.facts ?? []) {
+        all.push({ person_id: p.person_id, key: f.key, value: f.value })
+      }
+    } catch { /* locked or gone */ }
+  }
+  graphFacts.value = all
+}
+
+function onGraphOpen(kind: string, id: string): void {
+  if (kind === 'person') select(id)
+  else nav.openSkills(id)
 }
 
 async function select(id: string): Promise<void> {
@@ -317,6 +355,7 @@ onMounted(async () => {
 
 /* content */
 .brain-content { flex: 1; overflow-y: auto; padding: 1.1rem 1.35rem 1.5rem; }
+.brain-content--graph { display: flex; flex-direction: column; padding: 0.9rem; overflow: hidden; }
 .content-title { font-size: 0.8rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-faint); margin: 0 0 0.5rem; }
 .content-title--spaced { margin-top: 1.4rem; }
 .content-hint { font-size: 0.78rem; color: var(--text-faint); margin: 0 0 0.7rem; }
