@@ -342,7 +342,8 @@ class OpenAIComputerAgent:
         for step in range(self._max_steps):
             resp = await self._client.chat.completions.create(
                 model=self._model, messages=messages, tools=self._TOOLS,
-                max_tokens=600,
+                # gpt-5.x rejects max_tokens; this works on gpt-4o too.
+                max_completion_tokens=600,
             )
             msg = resp.choices[0].message
             if not msg.tool_calls:

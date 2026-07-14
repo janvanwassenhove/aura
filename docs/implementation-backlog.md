@@ -231,6 +231,9 @@ the human can unblock it.
 - [x] **U73 — barge-in vereist wake-word + GUI-dwaling gefixt** · `pending`
   Diagnose van "Er war in den 18.": Richies speaker zit naast zijn eigen mic — luidheid alléén kan self-echo nooit van de gebruiker onderscheiden, dus de barge-in triggerde op zijn eigen TTS (verhaspeld als Duits getranscribeerd). Fix: een barge-in telt nu alleen als het transcript het WAKE-WORD bevat ("Richie, stop") — eigen echo zegt nooit z'n eigen naam; loudness-gate blijft als voorfilter (goedkoop). `use_computer` toegevoegd aan de music-guard-triggerset (een GUI-run kan audio starten). Skill aangescherpt: UITSLUITEND in het Spotify-venster werken, nooit help/Connect-links of een browser (dwaalde naar support.spotify.com), overlays sluiten met esc, en bij "speelt op ander apparaat" het apparaten-icoon → 'Deze computer' kiezen + voortgangsbalk-verificatie. Brain 142 (+1 nieuw, 1 aangepast) groen. NB: de keten-cap (U67) werkte zichtbaar al — 2 spookbeurten i.p.v. 6.
 
+- [x] **U74 — upgrade naar gpt-5.1 (chat + schermbesturing)** · `pending`
+  De key blijkt gpt-5/5.1/5.2 te hebben. Omgezet: `OPENAI_MODEL=gpt-5.1` (conversaties, agentic loop, tool-keuzes — moet de doelloze uitweidingen en inconsistente tool-claims flink verminderen) en `COMPUTER_USE_OPENAI_MODEL=gpt-5.1` (visueel sterker dan gpt-4o voor de Spotify-GUI-runs). Compat-fix: de OpenAI-computer-agent gebruikt nu `max_completion_tokens` (gpt-5.x weigert `max_tokens`; werkt ook op gpt-4o). Alles instelbaar gebleven via Settings → LLM / env. Brain-computer-use-tests 13 groen.
+
 ## Progress log (append-only; newest last)
 
 - 2026-06-21 — ledger created on `aura-autobuild`; Phase 0/0b complete, Phase 1 scaffold (U-pre) done before this loop started.
