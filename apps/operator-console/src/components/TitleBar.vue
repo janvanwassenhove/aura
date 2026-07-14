@@ -17,24 +17,24 @@
     <div class="titlebar-drag" />
 
     <div class="titlebar-right">
-      <button class="titlebar-btn" title="Capabilities & permissions" @click="$emit('open-capabilities')">
+      <button class="titlebar-btn" title="Capabilities & permissions" aria-label="Capabilities and permissions" @click="$emit('open-capabilities')">
         <ShieldCheck :size="16" />
       </button>
-      <button class="titlebar-btn" title="Knowledge" @click="$emit('open-knowledge')">
+      <button class="titlebar-btn" title="Knowledge" aria-label="Knowledge" @click="$emit('open-knowledge')">
         <Brain :size="16" />
       </button>
-      <button class="titlebar-btn" title="Settings" @click="$emit('open-settings')">
+      <button class="titlebar-btn" title="Settings" aria-label="Settings" @click="$emit('open-settings')">
         <Settings :size="16" />
       </button>
       <template v-if="isElectron">
         <span class="titlebar-sep" />
-        <button class="titlebar-btn win-btn" title="Minimize" @click="winControl('minimize')">
+        <button class="titlebar-btn win-btn" title="Minimize" aria-label="Minimize window" @click="winControl('minimize')">
           <Minus :size="15" />
         </button>
-        <button class="titlebar-btn win-btn" title="Maximize" @click="winControl('toggleMaximize')">
+        <button class="titlebar-btn win-btn" title="Maximize" aria-label="Maximize window" @click="winControl('toggleMaximize')">
           <Square :size="12" />
         </button>
-        <button class="titlebar-btn win-btn win-btn--close" title="Close" @click="winControl('close')">
+        <button class="titlebar-btn win-btn win-btn--close" title="Close" aria-label="Close window" @click="winControl('close')">
           <X :size="15" />
         </button>
       </template>

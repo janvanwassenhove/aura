@@ -12,6 +12,7 @@
         <button :class="['tab-btn', activeTab === 'connections' && 'tab-btn--active']" @click="switchToConnections">Connections</button>
         <button :class="['tab-btn', activeTab === 'robot' && 'tab-btn--active']" @click="switchToRobot">Robot</button>
         <button :class="['tab-btn', activeTab === 'appearance' && 'tab-btn--active']" @click="activeTab = 'appearance'">Appearance</button>
+        <button :class="['tab-btn', activeTab === 'logs' && 'tab-btn--active']" @click="switchToLogs">Logs</button>
       </div>
 
       <!-- ── LLM tab ── -->
@@ -67,6 +68,30 @@
         <div class="settings-actions">
           <button class="btn-cancel" @click="$emit('close')">Cancel</button>
           <button class="btn-apply" :disabled="llmStore.loading" @click="applyLLM">Apply</button>
+        </div>
+      </template>
+
+      <!-- ── Logs tab (U56): local ring buffer, nothing leaves this machine ── -->
+      <template v-if="activeTab === 'logs'">
+        <div class="logs-toolbar">
+          <select v-model="logLevel" class="field-input logs-level" aria-label="Filter log level" @change="fetchLogs">
+            <option value="">All levels</option>
+            <option value="INFO">Info</option>
+            <option value="WARNING">Warning</option>
+            <option value="ERROR">Error</option>
+          </select>
+          <button class="btn-conn btn-ghost" :disabled="logsLoading" aria-label="Refresh logs" @click="fetchLogs">
+            <RefreshCw :size="13" :class="logsLoading ? 'spinner' : ''" /> Refresh
+          </button>
+          <span class="logs-note">Local only — nothing is sent anywhere.</span>
+        </div>
+        <div class="logs-list" role="log">
+          <p v-if="!logRecords.length" class="conn-hint">No log records yet.</p>
+          <div v-for="(r, i) in logRecords" :key="i" :class="['log-row', `log-row--${r.level.toLowerCase()}`]">
+            <span class="log-ts">{{ r.ts }}</span>
+            <span class="log-level">{{ r.level }}</span>
+            <span class="log-msg">{{ r.message }}</span>
+          </div>
         </div>
       </template>
 
@@ -391,7 +416,7 @@ async function applyLLM() {
 const connStore = useConnectionsStore()
 const themeStore = useThemeStore()
 const prefsStore = usePrefsStore()
-const activeTab = ref<'llm' | 'connections' | 'robot' | 'appearance'>('llm')
+const activeTab = ref<'llm' | 'connections' | 'robot' | 'appearance' | 'logs'>('llm')
 
 const localName = ref(prefsStore.assistantName)
 const localLang = ref(prefsStore.language)
@@ -470,6 +495,35 @@ async function saveRobotUrl(): Promise<void> {
     robotSaving.value = false
   }
 }
+
+// ── Logs tab (U56) ──
+interface LogRecord { ts: string; level: string; logger: string; message: string }
+const BRAIN_URL_LOGS =
+  import.meta.env.VITE_BRAIN_URL ??
+  import.meta.env.VITE_ORCHESTRATOR_URL ??
+  'http://localhost:8000'
+const logRecords = ref<LogRecord[]>([])
+const logLevel = ref('')
+const logsLoading = ref(false)
+
+async function fetchLogs(): Promise<void> {
+  logsLoading.value = true
+  try {
+    const resp = await fetch(`${BRAIN_URL_LOGS}/logs/recent?limit=200&level=${logLevel.value}`)
+    const data = await resp.json()
+    logRecords.value = (data.records ?? []).reverse() // newest first
+  } catch {
+    logRecords.value = []
+  } finally {
+    logsLoading.value = false
+  }
+}
+
+async function switchToLogs(): Promise<void> {
+  activeTab.value = 'logs'
+  await fetchLogs()
+}
+
 
 async function saveGitHub() {
   await connStore.saveToken('github', githubToken.value)
@@ -608,6 +662,17 @@ const ConnStatusBadge = defineComponent({
 .conn-name { font-weight: 600; font-size: 0.88rem; }
 
 .conn-test-result { font-style: italic; }
+
+.logs-toolbar { display: flex; gap: 0.5rem; align-items: center; margin-bottom: 0.5rem; }
+.logs-level { max-width: 130px; }
+.logs-note { font-size: 0.7rem; color: var(--text-faint); margin-left: auto; }
+.logs-list { max-height: 46vh; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; font-family: ui-monospace, monospace; font-size: 0.72rem; }
+.log-row { display: flex; gap: 0.5rem; padding: 0.15rem 0.3rem; border-radius: var(--radius-sm, 4px); }
+.log-row--warning { background: var(--warn-bg, rgba(217,164,65,0.12)); }
+.log-row--error { background: var(--danger-bg, rgba(229,72,77,0.12)); }
+.log-ts { color: var(--text-faint); flex-shrink: 0; }
+.log-level { width: 62px; flex-shrink: 0; color: var(--text-faint); }
+.log-msg { white-space: pre-wrap; word-break: break-word; }
 
 .robot-row { display: flex; gap: 0.5rem; align-items: center; }
 .robot-row .field-input { flex: 1; }
