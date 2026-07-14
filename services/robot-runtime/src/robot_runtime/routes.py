@@ -76,8 +76,19 @@ async def speak(body: dict) -> JSONResponse:
     text: str = body.get("text", "")
     if not text:
         return JSONResponse({"error": "text is required"}, status_code=422)
-    await engine.speak(text)
-    return JSONResponse({"ok": True})
+    # Optional synthesized speech (U36b): base64 PCM s16le mono @ 24 kHz.
+    # The brain does TTS; the robot only plays — it never holds API keys.
+    audio_bytes: bytes | None = None
+    audio_b64 = body.get("audio_b64")
+    if audio_b64:
+        import base64
+
+        try:
+            audio_bytes = base64.b64decode(audio_b64)
+        except Exception:
+            return JSONResponse({"error": "audio_b64 is not valid base64"}, status_code=422)
+    await engine.speak(text, audio_bytes)
+    return JSONResponse({"ok": True, "audio": audio_bytes is not None})
 
 
 # ------------------------------------------------------------------

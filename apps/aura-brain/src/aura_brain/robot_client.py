@@ -57,8 +57,13 @@ class RobotClient:
     async def disconnect(self) -> bool:
         return (await self._request("POST", "/robot/disconnect")).json().get("connected", True)
 
-    async def speak(self, text: str) -> bool:
-        return (await self._request("POST", "/robot/speak", {"text": text})).json().get("ok", False)
+    async def speak(self, text: str, audio_b64: str | None = None) -> bool:
+        """Speak on the robot. With ``audio_b64`` (PCM s16le mono 24 kHz) the
+        robot plays real synthesized speech; without it, text-only (logged)."""
+        body: dict = {"text": text}
+        if audio_b64:
+            body["audio_b64"] = audio_b64
+        return (await self._request("POST", "/robot/speak", body)).json().get("ok", False)
 
     async def execute_motion(self, command: MotionCommand) -> bool:
         body = command.model_dump(mode="json")

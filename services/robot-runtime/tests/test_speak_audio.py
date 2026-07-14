@@ -1,0 +1,71 @@
+"""U36b: /robot/speak accepts base64 PCM and plays it via the adapter."""
+
+from __future__ import annotations
+
+import base64
+
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
+
+from robot_runtime import routes
+from robot_runtime.adapters.fake import FakeRobotAdapter
+from robot_runtime.engine.behavior import BehaviorEngine
+from shared_events.bus import AsyncEventBus
+
+
+def _client() -> TestClient:
+    app = FastAPI()
+    app.include_router(routes.router)
+    return TestClient(app)
+
+
+async def _setup() -> tuple[FakeRobotAdapter, AsyncEventBus]:
+    adapter = FakeRobotAdapter()
+    await adapter.connect()
+    bus = AsyncEventBus()
+    await bus.start()
+    routes.adapter = adapter
+    routes.engine = BehaviorEngine(adapter, bus, session_id="t")
+    return adapter, bus
+
+
+async def _teardown(bus: AsyncEventBus) -> None:
+    routes.adapter = None
+    routes.engine = None
+    await bus.stop()
+
+
+async def test_speak_with_audio_plays_pcm() -> None:
+    adapter, bus = await _setup()
+    try:
+        pcm = b"\x00\x01" * 240
+        resp = _client().post("/robot/speak", json={
+            "text": "Hello Jan!",
+            "audio_b64": base64.b64encode(pcm).decode(),
+        })
+        assert resp.status_code == 200
+        assert resp.json() == {"ok": True, "audio": True}
+        assert adapter.spoken_texts == ["Hello Jan!"]
+        assert adapter.played_audio == [pcm]
+    finally:
+        await _teardown(bus)
+
+
+async def test_speak_without_audio_is_text_only() -> None:
+    adapter, bus = await _setup()
+    try:
+        resp = _client().post("/robot/speak", json={"text": "silent hello"})
+        assert resp.status_code == 200
+        assert resp.json() == {"ok": True, "audio": False}
+        assert adapter.played_audio == []
+    finally:
+        await _teardown(bus)
+
+
+async def test_speak_rejects_invalid_base64() -> None:
+    adapter, bus = await _setup()
+    try:
+        resp = _client().post("/robot/speak", json={"text": "x", "audio_b64": "%%%not-b64%%%"})
+        assert resp.status_code == 422
+    finally:
+        await _teardown(bus)
