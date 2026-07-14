@@ -152,7 +152,7 @@ the human can unblock it.
 - [ ] **U39 — Spotify + Sonos muziekbesturing** · deps: U35
   Spotify-connector (OAuth Authorization Code + PKCE; play/pause/zoek/favorieten/afspeellijsten via Web API) + optionele Sonos-koppeling (lokale UPnP/Sonos API of Spotify Connect naar het Sonos-device). Tools: play_music/pause_music/next_track/list_playlists. Vergt eenmalige Spotify-app-registratie (developer.spotify.com) door de eigenaar. Genoteerd op verzoek — nog niet geïmplementeerd.
 
-- [x] **U40 — capabilities/permissions center + app launcher** · deps: U20,U35 · `<hash>`
+- [x] **U40 — capabilities/permissions center + app launcher** · deps: U20,U35 · `d943f88`
   Brain `/capabilities` (GET/POST toggles: dev_agent, app_launch, follow_me, speak_replies, gestures, recognition, maintenance; persist .env + live-apply hooks voor dev_agent/follow_me/speak_replies). `launch_app` orchestrator-tool + ALLOWED_APPS allow-list (name=command, argv-only, approval-gated, per-call env-check). Console CapabilitiesPanel (shield-knop titelbalk) met toggles + uitleg beveiligingsmodel + geregistreerde apps. Nooit een bypass van de approval-gate. Brain 86, orchestrator 143, policies 6, console 56 groen.
 
 ## Progress log (append-only; newest last)
