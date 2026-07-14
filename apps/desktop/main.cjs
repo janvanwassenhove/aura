@@ -170,15 +170,17 @@ function serveConsole() {
 // Window, tray, menu
 // ---------------------------------------------------------------------------
 
-// Splash: lined bot icon (lucide "bot" path), draggable since the window is frameless.
-const SPLASH_HTML = `data:text/html,
+// Splash: lined bot icon (lucide "bot" path), draggable since the window is
+// frameless. charset=utf-8 + HTML entities so the ellipsis/middot render
+// correctly (a plain data: URL mis-decodes them as Latin-1).
+const SPLASH_HTML = `data:text/html;charset=utf-8,
 <body style="margin:0;background:%230f172a;color:%23e2e8f0;font-family:sans-serif;-webkit-app-region:drag;
 display:flex;align-items:center;justify-content:center;height:100vh;flex-direction:column">
 <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="%2393c5fd" stroke-width="1.5"
 stroke-linecap="round" stroke-linejoin="round"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/>
 <path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/></svg>
-<h2 style="margin:.8rem 0 0;font-weight:600">AURA is starting…</h2>
-<p style="color:%2394a3b8;font-size:.9rem">brain · connectors · knowledge (encrypted)</p></body>`
+<h2 style="margin:.8rem 0 0;font-weight:600">AURA is starting&hellip;</h2>
+<p style="color:%2394a3b8;font-size:.9rem">brain &middot; connectors &middot; knowledge (encrypted)</p></body>`
 
 function trayIcon() {
   // 16x16 robot-blue dot; a data-URL keeps the app asset-free.

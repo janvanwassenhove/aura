@@ -39,7 +39,13 @@
       + tools {{ conversationStore.lastLatency.tool_ms.toFixed(0) }}ms)
     </div>
 
-    <p v-if="recording" class="mic-status mic-status--rec"><span class="rec-dot" /> Listening… tap the mic to send</p>
+    <div v-if="recording" class="mic-status mic-status--rec">
+      <span class="rec-dot" /> Listening… tap the mic to send
+      <span class="vu-meter" :title="`Mic level ${Math.round(micLevel * 100)}%`">
+        <span v-for="n in 12" :key="n" class="vu-bar" :class="{ 'vu-bar--on': micLevel * 12 >= n }" />
+      </span>
+      <span v-if="micLevel < 0.02" class="vu-hint">(no sound yet — speak up)</span>
+    </div>
     <p v-else-if="transcribing" class="mic-status">Transcribing your voice…</p>
     <p v-if="micError" class="mic-error">{{ micError }}</p>
     <form class="input-row" @submit.prevent="submit">
@@ -117,9 +123,39 @@ function fmtTime(iso: string): string {
 const recording = ref(false)
 const transcribing = ref(false)
 const micError = ref('')
+const micLevel = ref(0) // 0..1 live input level so you can SEE the mic hears you
 let recorder: MediaRecorder | null = null
 let chunks: Blob[] = []
 let mimeType = 'audio/webm'
+let audioCtx: AudioContext | null = null
+let levelRaf = 0
+
+function startLevelMeter(stream: MediaStream) {
+  try {
+    audioCtx = new AudioContext()
+    const src = audioCtx.createMediaStreamSource(stream)
+    const analyser = audioCtx.createAnalyser()
+    analyser.fftSize = 512
+    src.connect(analyser)
+    const data = new Uint8Array(analyser.frequencyBinCount)
+    const tick = () => {
+      analyser.getByteTimeDomainData(data)
+      let sum = 0
+      for (const v of data) { const c = (v - 128) / 128; sum += c * c }
+      const rms = Math.sqrt(sum / data.length)
+      micLevel.value = Math.min(1, rms * 3) // scale for visibility
+      levelRaf = requestAnimationFrame(tick)
+    }
+    tick()
+  } catch { /* meter is best-effort */ }
+}
+
+function stopLevelMeter() {
+  cancelAnimationFrame(levelRaf)
+  micLevel.value = 0
+  audioCtx?.close().catch(() => {})
+  audioCtx = null
+}
 
 function pickMimeType(): string {
   const candidates = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus', 'audio/mp4']
@@ -154,13 +190,16 @@ async function toggleMic() {
     recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream)
     recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data) }
     recorder.onstop = async () => {
+      stopLevelMeter()
       stream.getTracks().forEach(t => t.stop())
       recording.value = false
       await sendVoice(new Blob(chunks, { type: recorder?.mimeType || mimeType || 'audio/webm' }))
     }
     recorder.start()
     recording.value = true
+    startLevelMeter(stream)
   } catch {
+    stopLevelMeter()
     stream.getTracks().forEach(t => t.stop())
     micError.value = 'Recording is not supported in this window.'
   }
@@ -195,7 +234,7 @@ async function sendVoice(blob: Blob) {
   }
 }
 
-onUnmounted(() => { if (recording.value) recorder?.stop() })
+onUnmounted(() => { if (recording.value) recorder?.stop(); stopLevelMeter() })
 </script>
 
 <style scoped>
@@ -225,6 +264,10 @@ onUnmounted(() => { if (recording.value) recorder?.stop() })
 .mic-status { font-size: 0.72rem; color: var(--text-muted); margin: 0 0 0.3rem; display: flex; align-items: center; gap: 0.35rem; }
 .mic-status--rec { color: var(--danger); }
 .rec-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--danger); animation: pulse 1.2s infinite; }
+.vu-meter { display: inline-flex; align-items: flex-end; gap: 2px; height: 14px; margin-left: 0.2rem; }
+.vu-bar { width: 3px; height: 100%; border-radius: 1px; background: var(--border); transition: background 0.06s; }
+.vu-bar--on { background: var(--ok); }
+.vu-hint { color: var(--text-faint); font-size: 0.68rem; }
 .spin { animation: spin 1s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 </style>

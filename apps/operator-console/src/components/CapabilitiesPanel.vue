@@ -20,7 +20,7 @@
           <div class="cap-info">
             <div class="cap-label">
               {{ cap.label }}
-              <span v-if="!cap.applies_live" class="cap-badge" title="Applies after restart">restart</span>
+              <span v-if="store.pending.includes(cap.key)" class="cap-badge" title="Restart to apply this change">restart to apply</span>
             </div>
             <div class="cap-desc">{{ cap.description }}</div>
           </div>
