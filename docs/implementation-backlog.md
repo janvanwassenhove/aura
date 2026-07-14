@@ -180,6 +180,9 @@ the human can unblock it.
 - [x] **U48 — eerlijke Spotify-mock + "altijd toestaan"-geheugen** · deps: U39,U40 · `e25f181`
   (1) Mock `play_music` liegt niet meer over succes → geeft "NOT PLAYED, geen account verbonden" + wijst op media-key-fallback of token; AURA meldt nu eerlijk dat het niet speelt. (2) ApprovalManager auto-approve-set (AUTO_APPROVE_TOOLS env + .env-persist): grant(remember=True) → onthoudt tool → volgende keer geen dialoog; `/orchestrator/approval/auto` GET + `/auto/{tool}` POST. ApprovalPanel: "Always allow"-checkbox bij Grant. CapabilitiesPanel: "Always-allowed actions"-lijst met revoke (terug naar vragen). Live geverifieerd: eerlijk antwoord + auto-approve set/lijst/revoke. Orchestrator 154, connector 32, console 56 groen.
 
+- [x] **U49 — wake-word hallucinaties + begroeting-spam + Spotify-play** · deps: U47,U48 · `<hash>`
+  (1) "Бурын": de wake-word-lus transcribeerde kamerruis → Whisper hallucineerde tekst → als commando ingevoerd. Fix: `is_plausible_command()` filter (verwerpt te kort, bekende hallucinatie-frases, en niet-Latijns schrift bij nl/en/fr) + mic-normalisatie-gate 0.0015→0.008 (echte stilte blijft stil → Whisper geeft leeg i.p.v. hallucinatie). (2) Dubbele begroetingen die het voorlezen van de mop onderbraken → per-persoon greet-cooldown (GREET_COOLDOWN_S=120). (3) Spotify: mock-melding nu directief — instrueert launch_app+media_control(play_pause) om de ECHTE desktop-Spotify te starten (je bent ingelogd); volledige favorieten/Sonos-targeting blijft token-afhankelijk. Brain 92→, robot 45, connector 32 groen.
+
 ## Progress log (append-only; newest last)
 
 - 2026-06-21 — ledger created on `aura-autobuild`; Phase 0/0b complete, Phase 1 scaffold (U-pre) done before this loop started.
