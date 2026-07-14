@@ -16,8 +16,14 @@ export const useConversationStore = defineStore('conversation', () => {
   const sessionId = ref<string | null>(null)
   // U23: last TurnLatencyMeasured event, shown in the conversation panel.
   const lastLatency = ref<{ total_ms: number; llm_ms: number; tool_ms: number } | null>(null)
+  // U62: live agentic-loop state (AgentRoundStarted/Completed, U57).
+  const agentRound = ref<{ round: number; max: number; tools: string[] } | null>(null)
 
   const conversationUrl = import.meta.env.VITE_CONVERSATION_URL ?? 'http://localhost:8002'
+  const orchestratorUrl =
+    import.meta.env.VITE_BRAIN_URL ??
+    import.meta.env.VITE_ORCHESTRATOR_URL ??
+    'http://localhost:8000'
 
   function addTurn(turn: ConversationTurn) {
     turns.value.push(turn)
@@ -68,6 +74,15 @@ export const useConversationStore = defineStore('conversation', () => {
     } else if (type === 'ToolCallFailed') {
       const turn = turns.value.findLast(t => t.toolCall?.name === event.tool_name)
       if (turn?.toolCall) turn.toolCall.status = 'failed'
+    } else if (type === 'AgentRoundStarted') {
+      agentRound.value = {
+        round: (event.round_no as number) ?? 1,
+        max: (event.max_rounds as number) ?? 8,
+        tools: [],
+      }
+    } else if (type === 'AgentRoundCompleted') {
+      if (event.done) agentRound.value = null
+      else if (agentRound.value) agentRound.value.tools = (event.tool_names as string[]) ?? []
     } else if (type === 'TurnLatencyMeasured') {
       // U23: per-turn latency instrumentation.
       lastLatency.value = {
@@ -114,5 +129,41 @@ export const useConversationStore = defineStore('conversation', () => {
     lastLatency.value = null
   }
 
-  return { turns, pendingText, isProcessing, sessionId, lastLatency, addTurn, applyEvent, submitTurn, $reset }
+  // U62: steer / stop the running agentic loop; teach the brain (U60).
+  async function steerAgent(text: string): Promise<void> {
+    if (!text.trim()) return
+    await fetch(`${orchestratorUrl}/orchestrator/agent/steer`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text, session_id: sessionId.value ?? 'console' }),
+    }).catch(() => {})
+  }
+
+  async function stopAgent(): Promise<void> {
+    await fetch(`${orchestratorUrl}/orchestrator/agent/stop`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ session_id: sessionId.value ?? 'console' }),
+    }).catch(() => {})
+  }
+
+  async function teach(text: string): Promise<void> {
+    if (!text.trim() || isProcessing.value) return
+    isProcessing.value = true
+    addTurn({ id: crypto.randomUUID(), role: 'user', text: `🎓 ${text}`,
+              timestamp: new Date().toISOString() })
+    try {
+      // The reply arrives as a ResponseDrafted event over the WebSocket.
+      await fetch(`${orchestratorUrl}/orchestrator/agent/feedback`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, session_id: sessionId.value ?? 'console' }),
+      })
+    } catch { /* brain offline */ } finally {
+      isProcessing.value = false
+    }
+  }
+
+  return { turns, pendingText, isProcessing, sessionId, lastLatency, agentRound,
+           addTurn, applyEvent, submitTurn, steerAgent, stopAgent, teach, $reset }
 })

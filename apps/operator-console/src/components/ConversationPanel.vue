@@ -39,6 +39,26 @@
       + tools {{ conversationStore.lastLatency.tool_ms.toFixed(0) }}ms)
     </div>
 
+    <!-- U62: live agentic-loop strip — rounds, steer input, stop -->
+    <div v-if="conversationStore.agentRound" class="agent-strip" role="status">
+      <LoaderCircle :size="13" class="spin" />
+      <span class="agent-round">
+        Working — round {{ conversationStore.agentRound.round }}/{{ conversationStore.agentRound.max }}
+        <template v-if="conversationStore.agentRound.tools.length">
+          · {{ conversationStore.agentRound.tools.join(', ') }}
+        </template>
+      </span>
+      <input
+        v-model="steerText"
+        class="agent-steer-input"
+        placeholder="Steer it… (e.g. 'only today, skip next week')"
+        aria-label="Steer the agent"
+        @keydown.enter.prevent="sendSteer"
+      />
+      <button type="button" class="btn-agent" :disabled="!steerText.trim()" @click="sendSteer">Steer</button>
+      <button type="button" class="btn-agent btn-agent--stop" title="Wrap up after this round" @click="conversationStore.stopAgent()">Stop</button>
+    </div>
+
     <div v-if="recording" class="mic-status mic-status--rec">
       <span class="rec-dot" /> Listening… tap the mic to send
       <span class="vu-meter" :title="`Mic level ${Math.round(micLevel * 100)}%`">
@@ -79,6 +99,16 @@
         <Bot v-else :size="15" />
       </button>
       <button
+        type="button"
+        class="btn-mic"
+        :disabled="conversationStore.isProcessing || !conversationStore.pendingText.trim()"
+        title="Teach: send this as training feedback — the agent may propose a skill (you approve)"
+        aria-label="Teach the assistant"
+        @click="sendTeach"
+      >
+        <GraduationCap :size="15" />
+      </button>
+      <button
         type="submit"
         :disabled="conversationStore.isProcessing || !conversationStore.pendingText.trim()"
         class="btn-primary"
@@ -91,7 +121,7 @@
 
 <script setup lang="ts">
 import { onUnmounted, ref, watch, nextTick } from 'vue'
-import { Bot, LoaderCircle, Mic, Sparkles, Square, Wrench } from 'lucide-vue-next'
+import { Bot, GraduationCap, LoaderCircle, Mic, Sparkles, Square, Wrench } from 'lucide-vue-next'
 import { useConversationStore } from '../stores/conversationStore'
 
 const BRAIN_URL = import.meta.env.VITE_BRAIN_URL ?? import.meta.env.VITE_ORCHESTRATOR_URL ?? 'http://localhost:8000'
@@ -135,6 +165,23 @@ const recording = ref(false)
 const transcribing = ref(false)
 const micError = ref('')
 const micLevel = ref(0) // 0..1 live input level so you can SEE the mic hears you
+
+// U62: agent steering + teach-mode
+const steerText = ref('')
+
+function sendSteer(): void {
+  const text = steerText.value.trim()
+  if (!text) return
+  conversationStore.steerAgent(text)
+  steerText.value = ''
+}
+
+function sendTeach(): void {
+  const text = conversationStore.pendingText.trim()
+  if (!text) return
+  conversationStore.pendingText = ''
+  conversationStore.teach(text)
+}
 let recorder: MediaRecorder | null = null
 let chunks: Blob[] = []
 let mimeType = 'audio/webm'
@@ -307,4 +354,25 @@ onUnmounted(() => { if (recording.value) recorder?.stop(); stopLevelMeter() })
 .vu-hint { color: var(--text-faint); font-size: 0.68rem; }
 .spin { animation: spin 1s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+/* U62: agent-activity strip */
+.agent-strip {
+  display: flex; align-items: center; gap: 0.5rem;
+  padding: 0.4rem 0.6rem; margin-bottom: 0.5rem;
+  background: var(--surface-2); border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md); font-size: 0.75rem;
+}
+.agent-round { color: var(--text-faint); white-space: nowrap; }
+.agent-steer-input {
+  flex: 1; min-width: 80px; background: var(--surface);
+  border: 1px solid var(--border-strong); border-radius: var(--radius-sm, 4px);
+  color: var(--text); padding: 0.25rem 0.45rem; font-size: 0.75rem;
+}
+.btn-agent {
+  border: 1px solid var(--border-strong); background: transparent; color: var(--text);
+  border-radius: var(--radius-sm, 4px); padding: 0.25rem 0.55rem;
+  font-size: 0.72rem; cursor: pointer;
+}
+.btn-agent:disabled { opacity: 0.5; cursor: default; }
+.btn-agent--stop { color: var(--danger-text, #e5484d); border-color: var(--danger-text, #e5484d); }
 </style>
