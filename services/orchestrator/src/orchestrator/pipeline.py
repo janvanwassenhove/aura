@@ -17,7 +17,8 @@ from orchestrator.fallback_agent import FallbackAgent
 from orchestrator.intent_router import IntentRouter
 from orchestrator.llm import local_chat, openai_chat
 from orchestrator.persona_manager import PersonaManager
-from orchestrator.tool_schemas import build_tool_specs
+from orchestrator import laptop_tools
+from orchestrator.tool_schemas import LADDER_NOTE, build_tool_specs
 from shared_events.bus import AsyncEventBus
 from shared_policies import APPROVAL_REQUIRED
 from shared_schemas.events.conversation import IntentRecognized, ResponseDrafted
@@ -329,6 +330,8 @@ class OrchestratorPipeline:
         tool_list_str = await self._context.build_tool_list(allowed)
         system_prompt = self._persona.render_system_prompt(ctx_str, tool_list_str)
         system_prompt = _identity_prefix() + system_prompt
+        if allowed:  # U58: the automation ladder governs every tool choice
+            system_prompt += "\n\n" + LADDER_NOTE
 
         # U42: include recent turns so the robot holds a coherent dialogue.
         messages: list[dict] = [
@@ -492,6 +495,20 @@ class OrchestratorPipeline:
                     result_text = await self._computer_use.run(
                         arguments.get("goal", ""), session_id,
                     )
+            elif tool_name == "run_powershell":
+                result_text = await laptop_tools.run_powershell(
+                    arguments.get("command", ""), arguments.get("working_dir"),
+                )
+            elif tool_name == "read_file":
+                result_text = await laptop_tools.read_file(arguments.get("path", ""))
+            elif tool_name == "write_file":
+                result_text = await laptop_tools.write_file(
+                    arguments.get("path", ""), arguments.get("content", ""),
+                )
+            elif tool_name == "git_prepare":
+                result_text = await laptop_tools.git_prepare(
+                    arguments.get("action", ""), arguments.get("working_dir"),
+                )
             elif tool_name == "open_in_vscode":
                 result_text = await _open_in_vscode(
                     arguments.get("path", ""), arguments.get("line"),
