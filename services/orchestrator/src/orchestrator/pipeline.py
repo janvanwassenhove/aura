@@ -50,6 +50,49 @@ def _identity_prefix() -> str:
     )
 
 
+# Windows virtual-key codes for the media / volume keys. These control the
+# app that currently owns media playback (Spotify, browser, …) — exactly like
+# pressing the keys on a keyboard.
+_MEDIA_KEYS = {
+    "play_pause": 0xB3,
+    "play": 0xB3,
+    "pause": 0xB3,
+    "next": 0xB0,
+    "previous": 0xB1,
+    "prev": 0xB1,
+    "stop": 0xB2,
+    "volume_up": 0xAF,
+    "volume_down": 0xAE,
+    "mute": 0xAD,
+}
+
+
+def _send_media_key(vk: int) -> None:
+    """Press+release a virtual key in the current Windows session (ctypes)."""
+    import ctypes
+
+    user32 = ctypes.windll.user32  # type: ignore[attr-defined]
+    _KEYUP = 0x0002
+    user32.keybd_event(vk, 0, 0, 0)
+    user32.keybd_event(vk, 0, _KEYUP, 0)
+
+
+async def _media_control(action: str) -> str:
+    """Control the laptop's media playback (real desktop apps like Spotify)."""
+    key = (action or "").strip().lower()
+    vk = _MEDIA_KEYS.get(key)
+    if vk is None:
+        return (f"[media_control: unknown action {action!r}. Use one of: "
+                f"{', '.join(sorted(_MEDIA_KEYS))}.]")
+    if os.name != "nt":
+        return "[media_control: media keys are only supported on Windows here.]"
+    try:
+        await asyncio.to_thread(_send_media_key, vk)
+        return f"Sent {key.replace('_', ' ')} to the desktop media player."
+    except Exception as exc:  # noqa: BLE001
+        return f"[media_control: error — {exc}]"
+
+
 def _allowed_apps() -> dict[str, str]:
     """Parse ALLOWED_APPS='name=command;name2=command2' into a dict.
 
@@ -358,6 +401,8 @@ class OrchestratorPipeline:
                 )
             elif tool_name == "launch_app":
                 result_text = await _launch_app(arguments.get("name", ""))
+            elif tool_name == "media_control":
+                result_text = await _media_control(arguments.get("action", ""))
             else:
                 result_text = await self._call_connector(tool_name, arguments)
             await self._bus.publish(ToolCallSucceeded(

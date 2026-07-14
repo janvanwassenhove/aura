@@ -61,6 +61,18 @@ TOOL_SCHEMAS: dict[str, dict] = {
             "device": {"type": "string", "description": "Speaker name, e.g. 'Sonos'. Defaults to the Sonos."},
         }, "additionalProperties": False},
     ),
+    "media_control": _fn(
+        "media_control",
+        "Control the media player running on the owner's laptop (the real "
+        "Spotify/browser app) via the keyboard media keys. Use this to "
+        "play/pause/skip whatever app is playing — no account needed. "
+        "Pair with launch_app('spotify') to open Spotify first.",
+        {"type": "object", "properties": {
+            "action": {"type": "string",
+                       "enum": ["play_pause", "next", "previous", "stop",
+                                "volume_up", "volume_down", "mute"]},
+        }, "required": ["action"], "additionalProperties": False},
+    ),
     "pause_music": _fn("pause_music", "Pause music playback.", _NO_ARGS),
     "next_track": _fn("next_track", "Skip to the next track.", _NO_ARGS),
     "list_music_playlists": _fn("list_music_playlists", "List the user's Spotify playlists.", _NO_ARGS),
