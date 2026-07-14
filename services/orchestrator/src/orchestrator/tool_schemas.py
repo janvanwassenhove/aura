@@ -44,6 +44,11 @@ TOOL_SCHEMAS: dict[str, dict] = {
     "get_unread_mail": _fn(
         "get_unread_mail", "Get the user's unread mail.", _NO_ARGS,
     ),
+    "list_onedrive_files": _fn(
+        "list_onedrive_files",
+        "List the user's recent OneDrive files (name, folder, size, modified).",
+        _NO_ARGS,
+    ),
     "send_mail": _fn(
         "send_mail", "Send an email. Sensitive — requires user approval.",
         {"type": "object", "properties": {

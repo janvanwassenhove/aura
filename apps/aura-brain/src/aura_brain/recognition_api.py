@@ -63,18 +63,27 @@ async def enroll(body: dict) -> JSONResponse:
             status_code=404,
         )
 
-    frame = await _robot.camera_frame()
-    embedding = await asyncio.to_thread(_embedder.embed, frame)
-    if embedding is None:
+    # Grab a few frames over ~1.5s so we enroll several angles → robust matching.
+    captured = 0
+    last_embedding = None
+    for i in range(4):
+        frame = await _robot.camera_frame()
+        embedding = await asyncio.to_thread(_embedder.embed, frame)
+        if embedding is not None:
+            _matcher.enroll(person_id, embedding)
+            last_embedding = embedding
+            captured += 1
+        if i < 3:
+            await asyncio.sleep(0.4)
+    if captured == 0:
         return JSONResponse(
-            {"error": "no face in frame — look at the robot and try again"},
+            {"error": "no face in frame — look straight at the robot and try again"},
             status_code=422,
         )
-    _matcher.enroll(person_id, embedding)
-    # Immediate self-check: the frame we just enrolled must match its own person.
-    check_id, confidence = _matcher.identify(embedding)
+    check_id, confidence = _matcher.identify(last_embedding)
     return JSONResponse({
         "enrolled": person_id,
+        "samples": _matcher.sample_count(person_id),
         "confidence_check": round(confidence, 3),
         "ok": check_id == person_id,
     })

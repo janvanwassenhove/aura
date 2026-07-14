@@ -36,6 +36,16 @@ class MockM365Connector(M365Connector):
             ),
         ]
 
+    async def list_onedrive_files(self) -> list[dict]:
+        """Mock OneDrive listing (no Microsoft account needed)."""
+        now = datetime.now(UTC)
+        return [
+            {"name": "Q3 Report.docx", "size_kb": 148, "modified": (now - timedelta(days=1)).isoformat(), "folder": "Documents"},
+            {"name": "Roadmap.xlsx", "size_kb": 92, "modified": (now - timedelta(days=3)).isoformat(), "folder": "Documents"},
+            {"name": "Team Photo.jpg", "size_kb": 2048, "modified": (now - timedelta(days=10)).isoformat(), "folder": "Pictures"},
+            {"name": "Budget 2026.xlsx", "size_kb": 64, "modified": (now - timedelta(hours=6)).isoformat(), "folder": "Finance"},
+        ]
+
     async def get_unread_mail(self, limit: int = 10) -> list[MailItem]:
         return [
             MailItem(

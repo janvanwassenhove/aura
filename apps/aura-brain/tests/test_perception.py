@@ -34,15 +34,23 @@ class FakeRobot:
 
 
 class ScriptedEmbedder:
-    """Returns a scripted sequence of embeddings (None = no face)."""
+    """Returns a scripted sequence of embeddings (None = no face). After the
+    sequence is exhausted it repeats the last value (enroll captures several
+    frames per call, U38)."""
 
     name = "scripted"
 
     def __init__(self, sequence: list) -> None:
-        self._seq = iter(sequence)
+        self._seq = list(sequence)
+        self._i = 0
 
     def embed(self, png_bytes: bytes):
-        return next(self._seq)
+        if self._i < len(self._seq):
+            val = self._seq[self._i]
+            self._i += 1
+        else:
+            val = self._seq[-1] if self._seq else None
+        return val
 
 
 class FakeStore:
@@ -248,7 +256,7 @@ def test_enroll_without_face_422s() -> None:
     from aura_brain import recognition_api
 
     recognition_api.init(
-        EmbeddingMatcher(OMK), ScriptedEmbedder([None]), FakeRobot(),
+        EmbeddingMatcher(OMK), ScriptedEmbedder([None, None, None, None]), FakeRobot(),
         FakeStore({"jan": "Jan"}),
     )
     app = FastAPI()

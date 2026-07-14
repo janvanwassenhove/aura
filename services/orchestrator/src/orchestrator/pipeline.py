@@ -81,6 +81,7 @@ _TOOL_ROUTES: dict[str, tuple[str, str]] = {
     "delete_calendar_event":      ("DELETE", "/calendar/events/{id}"),
     "get_unread_mail":            ("GET", "/mail/unread"),
     "send_mail":                  ("POST", "/mail/send"),
+    "list_onedrive_files":        ("GET", "/onedrive/files"),
     "post_teams_message":         ("POST", "/teams/message"),
     "list_tasks":                 ("GET", "/tasks"),
     "create_task":                ("POST", "/tasks"),
