@@ -105,6 +105,7 @@ def loop_env(monkeypatch):
 
 
 async def test_barge_in_interrupts_speaking_window(loop_env, monkeypatch) -> None:
+    monkeypatch.setenv("WAKE_WORD", "richie")
     robot = _ScriptedRobot(peaks=[0.5])  # user talks loudly over the robot
     pipeline = _Pipeline()
     vl = VoiceLoop(robot, pipeline, _Bus(), speech_peak=0.03)
@@ -112,7 +113,7 @@ async def test_barge_in_interrupts_speaking_window(loop_env, monkeypatch) -> Non
     assert time.monotonic() < vl._speaking_until  # robot is 'talking'
 
     async def fake_transcribe(_wav, filename="") -> str:
-        return "stop maar, speel muziek af"
+        return "Richie stop maar, speel muziek af"  # U73: barge needs the wake word
 
     from aura_brain import voice
     monkeypatch.setattr(voice, "transcribe", fake_transcribe)
@@ -128,7 +129,7 @@ async def test_barge_in_interrupts_speaking_window(loop_env, monkeypatch) -> Non
         with pytest.raises(asyncio.CancelledError):
             await task
 
-    assert pipeline.commands == ["stop maar, speel muziek af"]
+    assert pipeline.commands and "speel muziek af" in pipeline.commands[0]
     assert vl._speaking_until == 0.0  # wait was cut by the barge-in
 
 
@@ -247,3 +248,27 @@ async def test_wake_word_still_works_during_music_guard(loop_env, monkeypatch) -
         with pytest.raises(asyncio.CancelledError):
             await task
     assert pipeline.commands == ["zet de muziek zachter"]
+
+
+async def test_barge_without_wake_word_is_ignored_as_echo(loop_env, monkeypatch) -> None:
+    """U73: the robot's own voice is loud at its own mic — a loud transcript
+    WITHOUT the wake word during our own speech is echo, never a command."""
+    monkeypatch.setenv("WAKE_WORD", "richie")
+    robot = _ScriptedRobot(peaks=[0.5])  # loud (own speaker)
+    pipeline = _Pipeline()
+    vl = VoiceLoop(robot, pipeline, _Bus(), speech_peak=0.03)
+    vl.note_spoken("Zin." * 60)  # long speech window
+
+    async def own_echo(_wav, filename="") -> str:
+        return "Er war in den 18."  # garbled self-transcription
+
+    from aura_brain import voice
+    monkeypatch.setattr(voice, "transcribe", own_echo)
+
+    task = asyncio.create_task(vl._run())
+    await asyncio.sleep(0.25)
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+    assert pipeline.commands == []             # echo ignored
+    assert time.monotonic() < vl._speaking_until  # still speaking, not interrupted

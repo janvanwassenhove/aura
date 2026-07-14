@@ -179,15 +179,25 @@ class VoiceLoop:
                     wav, peak = await self._robot.listen(min(2.0, self._window_s))
                     if peak < self._speech_peak * self._barge_factor:
                         continue
+                    # U73: the robot's speaker sits next to its own mic — loudness
+                    # alone can't separate the user from self-echo. A barge-in
+                    # must contain the WAKE WORD ("Richie, stop"); anything else
+                    # during our own speech is treated as echo and ignored.
+                    barge_text = (await voice.transcribe(wav, filename="robot.wav") or "").strip()
+                    if not (self._wake and self._wake in barge_text.lower()):
+                        logger.debug("barge ignored (no wake word): %r", barge_text[:60])
+                        continue
                     self._speaking_until = 0.0  # user interrupted → stop waiting
                     self._followup_until = time.monotonic() + self._followup_s
                     in_barge = True
+                    text = barge_text
                 else:
                     wav, peak = await self._robot.listen(self._window_s)
                     if peak < self._speech_peak:
                         continue  # silence — cheap skip, no STT
 
-                text = (await voice.transcribe(wav, filename="robot.wav") or "").strip()
+                if not in_barge:
+                    text = (await voice.transcribe(wav, filename="robot.wav") or "").strip()
                 if not is_plausible_command(text):
                     if text:
                         logger.debug("voice loop ignored implausible transcript: %r", text)

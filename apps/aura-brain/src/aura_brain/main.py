@@ -353,7 +353,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # transcribed lyrics as conversation (the NOFX incident).
     from shared_schemas.events.orchestrator import ToolCallSucceeded as _TCS
 
-    _MUSIC_TOOLS = {"play_music", "media_control", "next_track"}
+    _MUSIC_TOOLS = {"play_music", "media_control", "next_track", "use_computer"}
 
     async def _voice_note_music(event) -> None:
         if event.tool_name in _MUSIC_TOOLS and ctx._voice_loop is not None:
