@@ -63,10 +63,14 @@ async def _migrate(old: Any, new: Any) -> int:
 
 def _persist_env(passphrase: str, salt: str) -> bool:
     """Update KNOWLEDGE_PASSPHRASE/SALT in the env file (create keys if absent)."""
+    return _write_env({"KNOWLEDGE_PASSPHRASE": passphrase, "KNOWLEDGE_SALT": salt})
+
+
+def _write_env(updates: dict[str, str]) -> bool:
     env_path = Path(os.environ.get("AURA_ENV_FILE", "./infra/dev/.env"))
     try:
         lines = env_path.read_text(encoding="utf-8").splitlines() if env_path.exists() else []
-        updates = {"KNOWLEDGE_PASSPHRASE": passphrase, "KNOWLEDGE_SALT": salt}
+        updates = dict(updates)
         out: list[str] = []
         for line in lines:
             key = line.split("=", 1)[0].strip() if "=" in line else None
@@ -87,6 +91,50 @@ def _persist_env(passphrase: str, salt: str) -> bool:
 async def status() -> JSONResponse:
     return JSONResponse({
         "encrypted": bool(_already_encrypted and _already_encrypted()),
+    })
+
+
+# ── Assistant preferences (U36h): call name + reply language ──────────
+
+_ALLOWED_LANGUAGES = {"auto", "en", "nl", "fr"}
+
+
+@router.get("/prefs")
+async def get_prefs() -> JSONResponse:
+    return JSONResponse({
+        "assistant_name": os.environ.get("ASSISTANT_NAME", "AURA"),
+        "language": os.environ.get("ASSISTANT_LANGUAGE", "auto"),
+    })
+
+
+@router.post("/prefs")
+async def set_prefs(body: dict) -> JSONResponse:
+    updates: dict[str, str] = {}
+    name = (body or {}).get("assistant_name")
+    if name is not None:
+        name = name.strip()
+        if not (1 <= len(name) <= 24) or not name.replace(" ", "").isalnum():
+            return JSONResponse(
+                {"error": "name must be 1-24 letters/digits"}, status_code=422,
+            )
+        updates["ASSISTANT_NAME"] = name
+    language = (body or {}).get("language")
+    if language is not None:
+        language = language.strip().lower()
+        if language not in _ALLOWED_LANGUAGES:
+            return JSONResponse(
+                {"error": f"language must be one of {sorted(_ALLOWED_LANGUAGES)}"},
+                status_code=422,
+            )
+        updates["ASSISTANT_LANGUAGE"] = language
+    if not updates:
+        return JSONResponse({"error": "nothing to update"}, status_code=422)
+    os.environ.update(updates)          # effective immediately (read per turn)
+    persisted = _write_env(updates)     # survives restarts
+    return JSONResponse({
+        "assistant_name": os.environ.get("ASSISTANT_NAME", "AURA"),
+        "language": os.environ.get("ASSISTANT_LANGUAGE", "auto"),
+        "persisted": persisted,
     })
 
 

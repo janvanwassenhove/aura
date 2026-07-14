@@ -73,6 +73,27 @@
       <template v-if="activeTab === 'appearance'">
         <div class="settings-body">
           <div class="settings-field">
+            <label class="field-label" for="assistant-name">Assistant name</label>
+            <input id="assistant-name" v-model="localName" class="field-input" maxlength="24" placeholder="AURA" />
+            <p class="conn-hint">The name you call it — used in greetings and its replies.</p>
+          </div>
+          <div class="settings-field">
+            <label class="field-label" for="assistant-lang">Language</label>
+            <select id="assistant-lang" v-model="localLang" class="field-select">
+              <option v-for="l in LANGUAGES" :key="l.id" :value="l.id">{{ l.label }}</option>
+            </select>
+          </div>
+          <div>
+            <button class="btn-apply" :disabled="prefsStore.saving" @click="savePrefs">
+              {{ prefsStore.saving ? 'Saving…' : 'Save' }}
+            </button>
+            <span v-if="prefsSaved" class="settings-success" style="margin-left:0.6rem">Saved</span>
+            <span v-if="prefsStore.error" class="settings-error">{{ prefsStore.error }}</span>
+          </div>
+
+          <hr class="settings-divider" />
+
+          <div class="settings-field">
             <label class="field-label">Theme</label>
             <div class="theme-row">
               <button :class="['theme-btn', themeStore.theme === 'dark' && 'theme-btn--active']" @click="themeStore.theme = 'dark'">
@@ -258,6 +279,7 @@ import {
 import { useSettingsStore, type LLMProvider, type ModelOption } from '../stores/settingsStore'
 import { useConnectionsStore, type ConnectorStatus } from '../stores/connectionsStore'
 import { ACCENTS, useThemeStore } from '../stores/themeStore'
+import { LANGUAGES, usePrefsStore } from '../stores/prefsStore'
 
 defineEmits<{ (e: 'close'): void }>()
 
@@ -290,7 +312,24 @@ async function applyLLM() {
 // ── Connections store ──
 const connStore = useConnectionsStore()
 const themeStore = useThemeStore()
+const prefsStore = usePrefsStore()
 const activeTab = ref<'llm' | 'connections' | 'appearance'>('llm')
+
+const localName = ref(prefsStore.assistantName)
+const localLang = ref(prefsStore.language)
+const prefsSaved = ref(false)
+
+onMounted(async () => {
+  await prefsStore.fetchPrefs()
+  localName.value = prefsStore.assistantName
+  localLang.value = prefsStore.language
+})
+
+async function savePrefs() {
+  prefsSaved.value = false
+  const ok = await prefsStore.save(localName.value.trim() || 'AURA', localLang.value)
+  if (ok) { prefsSaved.value = true; setTimeout(() => { prefsSaved.value = false }, 2000) }
+}
 
 const msState     = computed(() => connStore.providers.find(p => p.provider === 'microsoft')!)
 const googleState = computed(() => connStore.providers.find(p => p.provider === 'google')!)
@@ -415,6 +454,7 @@ const ConnStatusBadge = defineComponent({
 .accent-swatch--purple { background: #9333ea; }
 .accent-swatch--amber { background: #d97706; }
 .accent-swatch--active { border-color: var(--text); }
+.settings-divider { border: none; border-top: 1px solid var(--border); margin: 0.4rem 0; }
 
 /* Connections tab */
 .conn-user-row {

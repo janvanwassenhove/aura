@@ -2,7 +2,7 @@
   <header class="titlebar">
     <div class="titlebar-left">
       <Bot :size="17" class="titlebar-logo" />
-      <span class="titlebar-name">AURA</span>
+      <span class="titlebar-name">{{ prefsStore.assistantName }}</span>
       <span class="titlebar-sep" />
       <span class="titlebar-status" :title="`Event stream: ${wsStatus}`">
         <span :class="['status-dot', `status-dot--${wsStatus}`]" />
@@ -41,13 +41,18 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { onMounted } from 'vue'
 import { Bot, Brain, Cpu, Minus, Settings, Square, X } from 'lucide-vue-next'
 import { useRobotStore } from '../stores/robotStore'
+import { usePrefsStore } from '../stores/prefsStore'
 
 const props = defineProps<{ wsStatus: 'connecting' | 'open' | 'closed' }>()
 defineEmits<{ 'open-knowledge': []; 'open-settings': [] }>()
 
 const robotStore = useRobotStore()
+const prefsStore = usePrefsStore()
+
+onMounted(prefsStore.fetchPrefs)
 
 const wsLabel = computed(() => {
   if (props.wsStatus === 'open') return 'Connected'

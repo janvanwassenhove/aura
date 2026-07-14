@@ -28,6 +28,24 @@ from shared_schemas.robot.models import RobotMode
 logger = logging.getLogger(__name__)
 
 # Tool name → connector-service path (method, path)
+_LANGUAGE_NAMES = {"en": "English", "nl": "Dutch", "fr": "French"}
+
+
+def _identity_prefix() -> str:
+    """Assistant name + reply language, read per turn so the Settings panel
+    changes take effect immediately (U36h)."""
+    name = os.environ.get("ASSISTANT_NAME", "AURA")
+    lang = os.environ.get("ASSISTANT_LANGUAGE", "auto").lower()
+    if lang in _LANGUAGE_NAMES:
+        lang_line = f"Always reply in {_LANGUAGE_NAMES[lang]}."
+    else:
+        lang_line = "Always reply in the language the user is using."
+    return (
+        f"Your name is {name}. You respond when addressed as {name}. "
+        f"{lang_line}\n\n"
+    )
+
+
 async def _open_in_vscode(path: str, line: int | None = None) -> str:
     """Open a file/folder in VS Code on the owner's machine (U35 slice).
 
@@ -161,6 +179,7 @@ class OrchestratorPipeline:
 
         tool_list_str = await self._context.build_tool_list(allowed)
         system_prompt = self._persona.render_system_prompt(ctx_str, tool_list_str)
+        system_prompt = _identity_prefix() + system_prompt
 
         messages: list[dict] = [
             {"role": "system", "content": system_prompt},

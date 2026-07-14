@@ -48,10 +48,14 @@ async def transcribe(data: bytes, filename: str = "audio.webm") -> str | None:
         from openai import AsyncOpenAI
 
         client = AsyncOpenAI()
-        result = await client.audio.transcriptions.create(
-            model=os.environ.get("STT_MODEL", "gpt-4o-mini-transcribe"),
-            file=(filename, io.BytesIO(data)),
-        )
+        kwargs: dict = {
+            "model": os.environ.get("STT_MODEL", "gpt-4o-mini-transcribe"),
+            "file": (filename, io.BytesIO(data)),
+        }
+        lang = os.environ.get("ASSISTANT_LANGUAGE", "auto").lower()
+        if lang in ("en", "nl", "fr"):  # bias STT toward the configured language
+            kwargs["language"] = lang
+        result = await client.audio.transcriptions.create(**kwargs)
         return result.text
     except Exception as exc:  # noqa: BLE001
         logger.warning("transcription failed: %s", exc)
