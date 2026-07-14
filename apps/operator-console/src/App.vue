@@ -61,10 +61,24 @@ const setupStore = useSetupStore()
 onMounted(async () => {
   themeStore.apply()
   connect()
-  // U34: first-run onboarding — only when the brain is reachable and says
-  // setup was never completed. Brain offline → keep the normal dashboard.
+  // U34: first-run onboarding — only when the brain is reachable, setup was
+  // never completed AND the install genuinely looks fresh. An existing,
+  // clearly-configured install (keys/people/encryption present but no
+  // SETUP_DONE marker, e.g. set up before the wizard existed) must never get
+  // hijacked by a full-screen wizard. Brain offline → normal dashboard.
   await setupStore.fetchStatus()
-  if (setupStore.status && !setupStore.status.setup_done) showWizard.value = true
+  const st = setupStore.status
+  if (st && !st.setup_done) {
+    const looksConfigured =
+      st.openai_key_set || st.openrouter_key_set || st.gemini_key_set ||
+      st.people_count > 0 || st.encrypted
+    if (looksConfigured) {
+      // Backfill the marker so the question never comes up again.
+      setupStore.saveConfig({ setup_done: true })
+    } else {
+      showWizard.value = true
+    }
+  }
 })
 </script>
 
