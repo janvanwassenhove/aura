@@ -46,6 +46,8 @@ class PersonContext(BaseModel):
         name = self.person.display_name
         role = self.person.role.value
         lines: list[str] = [f"Talking to: {name} ({role})."]
+        if self.person.description:
+            lines.append(f"  About them: {self.person.description}")
 
         for fact in self.facts:
             lines.append(f"  {fact.key}: {fact.value}")

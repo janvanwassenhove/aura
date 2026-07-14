@@ -201,6 +201,9 @@ the human can unblock it.
 - [x] **U62 — console agent-UX** · deps: U57 · `pending`
   ConversationPanel kreeg een live **agent-strip** (verschijnt tijdens een loop): "Working — round X/Y · tools", steer-invoerveld (→ /agent/steer, landt volgende ronde) en Stop-knop (→ /agent/stop, afronden na huidige ronde). **🎓 Teach-knop** naast Send: stuurt de invoer als trainingsfeedback (→ /agent/feedback; de agent stelt evt. een skill voor — approval-gated). Settings kreeg een **Skills-tab**: lijst (naam/@persoon/beschrijving/aan-uit-toggle), editor (naam/beschrijving/triggers/persoon/body), delete; nieuwe skills en edits gaan vrij via de owner-API. conversationStore trackt AgentRoundStarted/Completed van de WS-stream. Console 56 groen, build clean. Daarmee is het agentic plan (A–F, U57–U62) volledig af.
 
+- [x] **U63 — persoonsprofiel: beschrijving + skills-referentie; Settings-layout** · `pending`
+  Person kreeg een `description`-veld (vrije-tekst-portret, encrypted at rest, backward compatible) — bewerkbaar in het brein-paneel ("About", auto-save op blur) en geïnjecteerd in de judgment-context ("About them: …") zodat gesprekken erop personaliseren. PUT /knowledge/people kreeg merge-semantiek (alleen-description-update raakt naam/rol niet). Persoonsprofiel toont nu ook de SKILLS met die persoon-scope ("their way of working") met hint naar 🎓/Settings→Skills — profiel = één plek met alles wat AURA over iemand weet. Settings-modal: 36rem breed (tabs kapten af op 26rem met 6 tabs), tab-bar nowrap+scroll, ruimere body-padding. Brain 132 (+2), schemas 123, console 56 groen.
+
 ## Progress log (append-only; newest last)
 
 - 2026-06-21 — ledger created on `aura-autobuild`; Phase 0/0b complete, Phase 1 scaffold (U-pre) done before this loop started.

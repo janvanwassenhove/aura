@@ -657,11 +657,11 @@ const ConnStatusBadge = defineComponent({
 }
 .settings-modal {
   background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg);
-  width: 26rem; max-width: 95vw; max-height: 90vh;
+  width: 36rem; max-width: 95vw; max-height: 90vh;
   display: flex; flex-direction: column;
   box-shadow: var(--shadow-modal);
 }
-.settings-modal--wide { width: 32rem; }
+.settings-modal--wide { width: 40rem; }
 
 .settings-header {
   display: flex; align-items: center; justify-content: space-between;
@@ -676,17 +676,19 @@ const ConnStatusBadge = defineComponent({
 /* Tabs */
 .settings-tabs {
   display: flex; border-bottom: 1px solid var(--border); flex-shrink: 0;
+  overflow-x: auto; scrollbar-width: none; padding: 0 0.5rem;
 }
 .tab-btn {
-  flex: 1; padding: 0.5rem 1rem; background: none; border: none;
+  flex: 0 0 auto; padding: 0.55rem 0.9rem; background: none; border: none;
   color: var(--text-faint); font-size: 0.82rem; cursor: pointer; border-bottom: 2px solid transparent;
+  white-space: nowrap;
 }
 .tab-btn:hover { color: var(--text); }
 .tab-btn--active { color: var(--text); border-bottom-color: var(--accent); }
 
 /* LLM tab */
 .settings-loading { padding: 1.5rem 1rem; color: var(--text-muted); text-align: center; font-size: 0.85rem; }
-.settings-body { padding: 1rem; display: flex; flex-direction: column; gap: 0.875rem; overflow-y: auto; }
+.settings-body { padding: 1.15rem 1.35rem 1.35rem; display: flex; flex-direction: column; gap: 1rem; overflow-y: auto; }
 .settings-field { display: flex; flex-direction: column; gap: 0.25rem; }
 .field-label { font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; display: block; }
 .field-select, .field-input {

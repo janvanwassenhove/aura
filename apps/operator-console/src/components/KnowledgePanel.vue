@@ -130,6 +130,17 @@
               Minor — explicit facts only; no passive learning without consent (ADR-008 §10).
             </p>
 
+            <!-- U63: who is this person? Free-text portrait, part of the twin. -->
+            <div class="col-title">About</div>
+            <textarea
+              v-model="editDescription"
+              class="field-input desc-input"
+              rows="2"
+              placeholder="Describe this person — role in your life, style, preferences… (used to personalize conversations)"
+              aria-label="Person description"
+              @blur="saveDescription"
+            />
+
             <!-- Teach face: look at the robot, click, done -->
             <div v-if="store.recognitionEnabled" class="teach-face-row">
               <button class="btn-teach" :disabled="teaching" @click="doTeachFace">
@@ -185,6 +196,19 @@
               </li>
               <li v-if="store.detail.signals.length === 0" class="empty-hint">No observed signals.</li>
             </ul>
+
+            <div class="col-title">Skills — their way of working</div>
+            <ul class="fact-list">
+              <li v-for="sk in store.detail.skills ?? []" :key="sk.name" class="fact-row skill-ref-row">
+                <span class="skill-ref-name">{{ sk.name }}</span>
+                <span class="skill-ref-desc">{{ sk.description }}</span>
+                <span v-if="!sk.enabled" class="skill-ref-off">off</span>
+              </li>
+              <li v-if="!(store.detail.skills ?? []).length" class="empty-hint">
+                No skills for this person yet — teach one via the 🎓 button in the
+                conversation, or add one in Settings → Skills with this person's id.
+              </li>
+            </ul>
           </template>
           <div v-else class="empty-hint detail-placeholder">
             Select a person to inspect everything AURA knows about them.
@@ -207,10 +231,19 @@ const store = useKnowledgeStore()
 // Editable name/role — synced whenever a different person is inspected (U45).
 const editName = ref('')
 const editRole = ref('guest')
+const editDescription = ref('')
 watch(() => store.detail?.person.person_id, () => {
   editName.value = store.detail?.person.display_name ?? ''
   editRole.value = store.detail?.person.role ?? 'guest'
+  editDescription.value = store.detail?.person.description ?? ''
 })
+
+async function saveDescription() {
+  if (!store.detail) return
+  const desc = editDescription.value.trim()
+  if (desc === (store.detail.person.description ?? '')) return
+  await store.saveDescription(store.detail.person.person_id, desc)
+}
 
 async function saveName() {
   if (!store.detail) return
@@ -461,4 +494,11 @@ function confirmForget() {
 .sighting-select { flex: 1; font-size: 0.72rem; padding: 0.2rem 0.35rem; }
 .sighting-btn { display: inline-flex; padding: 0.3rem 0.45rem; }
 .sighting-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* U63: person description + skill references */
+.desc-input { resize: vertical; font-size: 0.8rem; line-height: 1.4; }
+.skill-ref-row { gap: 0.5rem; align-items: baseline; }
+.skill-ref-name { font-family: ui-monospace, monospace; font-size: 0.78rem; color: var(--accent); }
+.skill-ref-desc { color: var(--text-faint); font-size: 0.75rem; flex: 1; }
+.skill-ref-off { font-size: 0.7rem; color: var(--warn, #d9a441); }
 </style>

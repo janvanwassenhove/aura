@@ -130,10 +130,26 @@ async def inspect_person(person_id: str, _: None = Depends(_require_sensitive)) 
         raise HTTPException(status_code=404, detail=f"Unknown person {person_id!r}")
     facts = await store.get_facts(person_id)
     signals = await store.get_signals(person_id)
+    # U63: this person's SKILLS (their way of working, part of the digital
+    # twin) live in the skill store — referenced here so the profile is the
+    # one place that shows everything AURA knows about someone.
+    skills: list[dict] = []
+    try:
+        from aura_brain import skills_api
+
+        skill_store = skills_api.get_store()
+        if skill_store is not None:
+            skills = [
+                {"name": sk.name, "description": sk.description, "enabled": sk.enabled}
+                for sk in skill_store.all() if sk.person == person_id
+            ]
+    except Exception:  # noqa: BLE001 — skills are optional context
+        skills = []
     return JSONResponse({
         "person": person.model_dump(mode="json"),
         "facts": [f.model_dump(mode="json") for f in facts],
         "signals": [s.model_dump(mode="json") for s in signals],
+        "skills": skills,
     })
 
 
@@ -143,16 +159,26 @@ async def upsert_person(
     body: dict,
     _: None = Depends(_require_sensitive),
 ) -> JSONResponse:
+    store = _require()
+    existing = await store.get_person(person_id)
+    # Merge semantics (U63): omitted fields keep their current value so the
+    # console can update just the description without resetting name/role.
+    defaults = {
+        "display_name": existing.display_name if existing else person_id,
+        "role": existing.role.value if existing else "guest",
+        "description": existing.description if existing else "",
+    }
     try:
-        role = PersonRole(body.get("role", "guest"))
+        role = PersonRole(body.get("role") or defaults["role"])
     except ValueError:
         raise HTTPException(status_code=422, detail="Invalid role")
     person = Person(
         person_id=person_id,
-        display_name=body.get("display_name", person_id),
+        display_name=body.get("display_name") or defaults["display_name"],
         role=role,
+        description=body.get("description", defaults["description"]) or "",
     )
-    await _require().upsert_person(person)
+    await store.upsert_person(person)
     return JSONResponse(person.model_dump(mode="json"))
 
 

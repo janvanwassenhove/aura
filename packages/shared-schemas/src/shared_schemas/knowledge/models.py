@@ -34,6 +34,10 @@ class Person(BaseModel):
     person_id: str                       # stable slug, e.g. "jan"
     display_name: str
     role: PersonRole = PersonRole.GUEST
+    # Owner-written free-text portrait ("my partner; works in healthcare;
+    # prefers short answers"). Part of the digital twin; encrypted at rest
+    # like everything else. Optional -> old persisted data loads unchanged.
+    description: str = ""
     created_at: datetime = Field(default_factory=_now)
 
 

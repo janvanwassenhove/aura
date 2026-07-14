@@ -11,6 +11,7 @@ export interface KnowledgePerson {
   person_id: string
   display_name: string
   role: string
+  description?: string
   created_at?: string
 }
 
@@ -33,10 +34,18 @@ export interface KnowledgeSignal {
   last_seen?: string
 }
 
+export interface PersonSkillRef {
+  name: string
+  description: string
+  enabled: boolean
+}
+
 export interface PersonDetail {
   person: KnowledgePerson
   facts: KnowledgeFact[]
   signals: KnowledgeSignal[]
+  /** U63: skills scoped to this person (their way of working). */
+  skills?: PersonSkillRef[]
 }
 
 export const useKnowledgeStore = defineStore('knowledge', () => {
@@ -106,6 +115,18 @@ export const useKnowledgeStore = defineStore('knowledge', () => {
       body: JSON.stringify({ display_name: displayName, role }),
     })
     if (resp) await fetchPeople()
+    return resp !== null
+  }
+
+  // U63: owner-written portrait of the person (merged server-side — name and
+  // role are untouched).
+  async function saveDescription(personId: string, description: string): Promise<boolean> {
+    const resp = await _request(`/people/${encodeURIComponent(personId)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ description }),
+    })
+    if (resp && detail.value?.person.person_id === personId) await inspectPerson(personId)
     return resp !== null
   }
 
@@ -279,7 +300,7 @@ export const useKnowledgeStore = defineStore('knowledge', () => {
   return {
     people, detail, tier, omkLoaded, locked, loading, error, recognitionEnabled,
     sightings,
-    fetchTier, fetchPeople, inspectPerson, upsertPerson,
+    fetchTier, fetchPeople, inspectPerson, upsertPerson, saveDescription,
     addFact, updateFact, deleteFact, renamePerson, forgetPerson, setConsent, lock,
     fetchRecognition, secure, teachFace,
     fetchSightings, sightingImageUrl, tagSighting, dismissSighting,
