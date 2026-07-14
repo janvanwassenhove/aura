@@ -89,6 +89,22 @@ class ReachyRobotAdapter(RobotAdapter):
     def get_volume(self) -> float:
         return self._volume
 
+    async def set_tracking(self, enabled: bool) -> bool:
+        """Follow-me: daemon-side face tracking (U36g)."""
+        if self._mini is None:
+            raise RuntimeError("not connected")
+
+        def _toggle() -> None:
+            if enabled:
+                self._mini.start_head_tracking()
+            else:
+                self._mini.stop_head_tracking()
+                self._mini.goto_target(head=_NEUTRAL, duration=1.0)
+
+        async with self._motion_lock:
+            await asyncio.to_thread(_toggle)
+        return enabled
+
     # ------------------------------------------------------------------
     # Lifecycle
     # ------------------------------------------------------------------
@@ -116,6 +132,13 @@ class ReachyRobotAdapter(RobotAdapter):
                 mini.goto_target(head=_NEUTRAL, antennas=[0.0, 0.0], duration=0.8)
             except Exception as exc:  # noqa: BLE001 — wake is best-effort
                 logger.warning("wake-up on connect failed: %s", exc)
+            # U36g: follow the person — the daemon tracks the nearest face and
+            # keeps looking at them (looks up when you stand in front of it).
+            if os.environ.get("HEAD_TRACKING", "true").lower() == "true":
+                try:
+                    mini.start_head_tracking()
+                except Exception as exc:  # noqa: BLE001
+                    logger.warning("head tracking not started: %s", exc)
             return mini
 
         self._mini = await asyncio.to_thread(_open)
@@ -187,6 +210,11 @@ class ReachyRobotAdapter(RobotAdapter):
             # s16le → float32 [-1, 1], resampled to the device output rate
             # (push_audio_sample wants float32; channels are adapted by the SDK).
             pcm = np.frombuffer(audio_bytes, dtype=np.int16).astype(np.float32) / 32768.0
+            # U36g loudness: peak-normalize each utterance to 0.95 so quiet TTS
+            # output uses the full speaker range, then apply the app volume.
+            peak = float(np.max(np.abs(pcm))) if len(pcm) else 0.0
+            if peak > 0.01:
+                pcm = pcm * (0.95 / peak)
             pcm = pcm * self._volume  # U36e: app-controlled speaker gain
             out_rate = media.get_output_audio_samplerate()
             if out_rate and out_rate > 0 and out_rate != sample_rate:

@@ -121,6 +121,26 @@ async def execute_motion(command: MotionCommand) -> JSONResponse:
 
 
 # ------------------------------------------------------------------
+# Head tracking (U36g: follow the person)
+# ------------------------------------------------------------------
+
+
+@router.post("/robot/tracking")
+async def set_tracking(body: dict) -> JSONResponse:
+    assert adapter is not None
+    _touch()
+    enabled = bool(body.get("enabled", True))
+    toggler = getattr(adapter, "set_tracking", None)
+    if toggler is None:
+        return JSONResponse({"error": "adapter has no head tracking"}, status_code=501)
+    try:
+        await toggler(enabled)
+    except Exception as exc:  # noqa: BLE001
+        return JSONResponse({"error": f"tracking failed: {exc}"}, status_code=500)
+    return JSONResponse({"tracking": enabled})
+
+
+# ------------------------------------------------------------------
 # Volume (U36e: app-controlled speaker gain)
 # ------------------------------------------------------------------
 

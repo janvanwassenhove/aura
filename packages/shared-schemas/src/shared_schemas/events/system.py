@@ -5,7 +5,18 @@ from __future__ import annotations
 from typing import Literal
 from uuid import UUID
 
+from pydantic import Field
+
 from shared_schemas.events.base import BaseEvent
+
+
+class MaintenanceReport(BaseEvent):
+    """Periodic self-check by the brain's maintenance loop (U36g)."""
+
+    event_type: Literal["MaintenanceReport"] = "MaintenanceReport"
+    healthy: bool = True
+    checks: dict[str, str] = Field(default_factory=dict)
+    actions: list[str] = Field(default_factory=list)
 
 
 class BackendHeartbeatOk(BaseEvent):

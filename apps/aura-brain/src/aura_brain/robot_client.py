@@ -76,6 +76,9 @@ class RobotClient:
         """One PNG frame from the robot's camera (U18 perception loop)."""
         return (await self._request("GET", "/robot/camera/frame")).content
 
+    async def set_tracking(self, enabled: bool) -> dict:
+        return (await self._request("POST", "/robot/tracking", {"enabled": enabled})).json()
+
     async def get_volume(self) -> dict:
         return (await self._request("GET", "/robot/volume")).json()
 

@@ -88,6 +88,14 @@ async def motion(command: MotionCommand) -> JSONResponse:
     return JSONResponse({"ok": ok})
 
 
+@router.post("/tracking")
+async def tracking(body: dict) -> JSONResponse:
+    try:
+        return JSONResponse(await _robot.set_tracking(bool(body.get("enabled", True))))
+    except (httpx.HTTPError, OSError) as exc:
+        return _unavailable(exc)
+
+
 @router.get("/volume")
 async def get_volume() -> JSONResponse:
     try:
@@ -110,7 +118,8 @@ async def set_volume(body: dict) -> JSONResponse:
 async def say(body: dict) -> JSONResponse:
     """Make the robot SAY something out loud: brain-side TTS → robot speaker.
 
-    Degrades to text-only (console/log) when no TTS is configured.
+    Optional ``motion_id`` plays a gesture along with the speech (U36g
+    speak-and-move quick actions). Degrades to text-only without TTS.
     """
     text = (body or {}).get("text", "").strip()
     if not text:
@@ -118,8 +127,20 @@ async def say(body: dict) -> JSONResponse:
     from aura_brain import voice
 
     audio_b64 = await voice.synthesize_b64(text)
+    motion_id = (body or {}).get("motion_id")
     try:
-        ok = await _robot.speak(text, audio_b64=audio_b64)
+        if motion_id:
+            import asyncio
+
+            await asyncio.gather(
+                _robot.execute_motion(MotionCommand(
+                    motion_id=motion_id, speed=1.0, amplitude=0.6, direction=None,
+                )),
+                _robot.speak(text, audio_b64=audio_b64),
+            )
+            ok = True
+        else:
+            ok = await _robot.speak(text, audio_b64=audio_b64)
     except (httpx.HTTPError, OSError) as exc:
         return _unavailable(exc)
     return JSONResponse({"ok": ok, "voiced": audio_b64 is not None})

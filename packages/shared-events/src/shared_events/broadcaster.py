@@ -17,6 +17,7 @@ from shared_schemas.events import (
     BackendHeartbeatOk,
     BaseEvent,
     GestureDetected,
+    MaintenanceReport,
     BehaviorPlanned,
     BehaviorStateChanged,
     IntentRecognized,
@@ -78,6 +79,7 @@ _ALL_EVENT_TYPES: tuple[type[BaseEvent], ...] = (
     TurnLatencyMeasured,
     PersonRecognized,
     GestureDetected,
+    MaintenanceReport,
 )
 
 

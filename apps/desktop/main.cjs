@@ -66,6 +66,9 @@ function brainEnv() {
   // passphrase is set (wizard) and degrades to inert without the model stack.
   env.RECOGNITION_ENABLED = env.RECOGNITION_ENABLED || 'true'
   env.FACE_EMBEDDER = env.FACE_EMBEDDER || 'insightface'
+  // Laptop tools (U36g): the dev agent can read code freely and run tasks;
+  // every write/commit/push still pops the approval dialog in this app.
+  env.DEV_AGENT_ENABLED = env.DEV_AGENT_ENABLED || 'true'
   return env
 }
 

@@ -142,6 +142,10 @@ class HandGestureDetector:
         upright = lm[0].y > lm[9].y
         if extended >= 4 and upright:
             return "open_palm"
+        # Thumbs up: thumb clearly extended upward, all four fingers folded.
+        thumb_up = lm[4].y < lm[3].y < lm[2].y
+        if thumb_up and extended == 0:
+            return "thumbs_up"
         return None
 
 

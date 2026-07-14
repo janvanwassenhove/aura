@@ -94,6 +94,15 @@ TOOL_SCHEMAS: dict[str, dict] = {
             "due_at": {"type": "string", "description": "ISO-8601 due datetime."},
         }, "required": ["text", "due_at"]},
     ),
+    "open_in_vscode": _fn(
+        "open_in_vscode",
+        "Open a file (optionally at a line) or a folder in VS Code on the "
+        "owner's laptop. Use to SHOW code you are discussing.",
+        {"type": "object", "properties": {
+            "path": {"type": "string", "description": "File or folder path."},
+            "line": {"type": "integer", "description": "1-based line number (optional)."},
+        }, "required": ["path"], "additionalProperties": False},
+    ),
     "run_dev_task": _fn(
         "run_dev_task",
         (

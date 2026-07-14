@@ -27,6 +27,7 @@ from shared_schemas.events.orchestrator import (
 )
 from shared_schemas.events.robot import RobotConnected, RobotDisconnected, RobotModeChanged
 from shared_schemas.events.system import (
+    MaintenanceReport,
     BackendHeartbeatFailed,
     BackendHeartbeatOk,
     OfflineQueueSyncCompleted,
@@ -69,7 +70,7 @@ __all__ = [
     "MotionFailed",
     # system
     "BackendHeartbeatOk",
-    "TurnLatencyMeasured",
+    "MaintenanceReport", "TurnLatencyMeasured",
     "GestureDetected", "PersonRecognized",
     "BackendHeartbeatFailed",
     "OfflineRequestQueued",
