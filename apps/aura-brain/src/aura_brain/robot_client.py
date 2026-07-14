@@ -79,10 +79,18 @@ class RobotClient:
     async def set_tracking(self, enabled: bool) -> dict:
         return (await self._request("POST", "/robot/tracking", {"enabled": enabled})).json()
 
-    async def listen(self, duration_s: float = 5.0) -> bytes:
-        """Record from the robot's mic; returns 16 kHz mono WAV bytes."""
+    async def listen(self, duration_s: float = 5.0) -> tuple[bytes, float]:
+        """Record from the robot's mic. Returns (16 kHz mono WAV, raw peak).
+
+        The raw peak (pre-normalization) lets the voice loop skip silence
+        cheaply without transcribing.
+        """
         resp = await self._request("POST", "/robot/listen", {"duration_s": duration_s})
-        return resp.content
+        try:
+            peak = float(resp.headers.get("X-Audio-Peak", "0"))
+        except ValueError:
+            peak = 0.0
+        return resp.content, peak
 
     async def get_volume(self) -> dict:
         return (await self._request("GET", "/robot/volume")).json()

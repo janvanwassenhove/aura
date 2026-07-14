@@ -15,9 +15,13 @@ export const LANGUAGES: { id: Language; label: string }[] = [
   { id: 'fr', label: 'Français' },
 ]
 
+export type VoiceMode = 'off' | 'wake_word'
+
 export const usePrefsStore = defineStore('prefs', () => {
   const assistantName = ref('AURA')
   const language = ref<Language>('auto')
+  const voiceMode = ref<VoiceMode>('off')
+  const wakeWord = ref('AURA')
   const saving = ref(false)
   const error = ref<string | null>(null)
 
@@ -28,18 +32,23 @@ export const usePrefsStore = defineStore('prefs', () => {
         const data = await resp.json()
         assistantName.value = data.assistant_name ?? 'AURA'
         language.value = (data.language ?? 'auto') as Language
+        voiceMode.value = (data.voice_mode ?? 'off') as VoiceMode
+        wakeWord.value = data.wake_word ?? assistantName.value
       }
     } catch { /* keep defaults */ }
   }
 
-  async function save(name: string, lang: Language): Promise<boolean> {
+  async function save(fields: {
+    assistant_name?: string; language?: Language;
+    voice_mode?: VoiceMode; wake_word?: string
+  }): Promise<boolean> {
     saving.value = true
     error.value = null
     try {
       const resp = await fetch(`${BRAIN_URL}/setup/prefs`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ assistant_name: name, language: lang }),
+        body: JSON.stringify(fields),
       })
       const data = await resp.json().catch(() => ({}))
       if (!resp.ok) {
@@ -48,6 +57,8 @@ export const usePrefsStore = defineStore('prefs', () => {
       }
       assistantName.value = data.assistant_name
       language.value = data.language
+      voiceMode.value = data.voice_mode
+      wakeWord.value = data.wake_word
       return true
     } catch {
       error.value = 'Could not reach the brain.'
@@ -57,5 +68,5 @@ export const usePrefsStore = defineStore('prefs', () => {
     }
   }
 
-  return { assistantName, language, saving, error, fetchPrefs, save }
+  return { assistantName, language, voiceMode, wakeWord, saving, error, fetchPrefs, save }
 })

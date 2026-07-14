@@ -22,7 +22,9 @@ def client(tmp_path, monkeypatch):
 def test_defaults(client) -> None:
     c, _ = client
     body = c.get("/setup/prefs").json()
-    assert body == {"assistant_name": "AURA", "language": "auto"}
+    assert body["assistant_name"] == "AURA"
+    assert body["language"] == "auto"
+    assert body["voice_mode"] == "off"
 
 
 def test_set_name_and_language_persists(client) -> None:

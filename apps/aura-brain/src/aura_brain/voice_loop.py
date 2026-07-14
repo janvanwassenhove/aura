@@ -1,0 +1,160 @@
+"""Hands-free voice loop (U47): wake-word start + follow-up conversation.
+
+Runs continuously on the robot's microphone. Behaviour is driven by env so the
+Settings panel can change it live:
+
+  VOICE_MODE = off | wake_word      (off → the loop idles; use the mic button)
+  WAKE_WORD  = the word that starts a conversation (default: the assistant name)
+
+Flow:
+  1. Capture a short window from the robot mic. If it's near-silence (raw peak
+     below a threshold) skip it — no transcription cost.
+  2. Otherwise transcribe. If we're inside a FOLLOW-UP window (just after the
+     robot spoke) the speech is taken as a reply — no wake word needed, so you
+     can just answer. Outside that window the wake word must appear; the command
+     is whatever follows it (or the next utterance if the wake word was alone).
+  3. Run the pipeline turn; the reply is spoken on the robot (embodiment). Each
+     spoken reply — including a recognition greeting — opens a fresh follow-up
+     window, so a greeting naturally turns into a conversation.
+
+Echo guard: while the robot is speaking its own reply, the loop waits (estimated
+from the reply length) so it doesn't transcribe its own voice.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import logging
+import os
+import time
+from typing import Any
+
+logger = logging.getLogger(__name__)
+
+
+class VoiceLoop:
+    def __init__(
+        self,
+        robot: Any,          # RobotClient (needs .listen() -> (wav, peak))
+        pipeline: Any,       # OrchestratorPipeline
+        bus: Any,
+        session_id: str = "default",
+        default_wake_word: str = "aura",
+        window_s: float = 4.0,
+        followup_s: float = 9.0,
+        speech_peak: float = 0.03,
+    ) -> None:
+        self._robot = robot
+        self._pipeline = pipeline
+        self._bus = bus
+        self._session_id = session_id
+        self._default_wake = default_wake_word
+        self._window_s = window_s
+        self._followup_s = followup_s
+        self._speech_peak = float(os.environ.get("VOICE_SPEECH_PEAK", speech_peak))
+        self._task: asyncio.Task | None = None
+        self._followup_until = 0.0
+        self._speaking_until = 0.0
+
+    # -- lifecycle -----------------------------------------------------
+
+    def start(self) -> None:
+        if self._task is None:
+            self._task = asyncio.create_task(self._run())
+            logger.info("VoiceLoop started (wake word default=%r)", self._default_wake)
+
+    async def stop(self) -> None:
+        if self._task is not None:
+            self._task.cancel()
+            try:
+                await self._task
+            except asyncio.CancelledError:
+                pass
+            self._task = None
+
+    def note_spoken(self, text: str) -> None:
+        """Called when the robot speaks: guard against echo + open a follow-up
+        window so the user can reply without the wake word."""
+        now = time.monotonic()
+        speak_s = min(12.0, 1.0 + len(text or "") / 15.0)  # ~15 chars/sec
+        self._speaking_until = now + speak_s
+        self._followup_until = self._speaking_until + self._followup_s
+
+    # -- config (read live so the Settings toggle applies) -------------
+
+    @property
+    def _mode(self) -> str:
+        return os.environ.get("VOICE_MODE", "off").lower()
+
+    @property
+    def _wake(self) -> str:
+        return os.environ.get("WAKE_WORD", self._default_wake).strip().lower()
+
+    # -- main loop -----------------------------------------------------
+
+    async def _run(self) -> None:
+        from aura_brain import voice
+
+        while True:
+            try:
+                if self._mode != "wake_word":
+                    await asyncio.sleep(1.5)
+                    continue
+
+                now = time.monotonic()
+                if now < self._speaking_until:  # robot is talking → don't listen
+                    await asyncio.sleep(self._speaking_until - now)
+                    continue
+
+                wav, peak = await self._robot.listen(self._window_s)
+                if peak < self._speech_peak:
+                    continue  # silence — cheap skip, no STT
+
+                text = (await voice.transcribe(wav, filename="robot.wav") or "").strip()
+                if not text:
+                    continue
+
+                in_followup = time.monotonic() < self._followup_until
+                command = self._extract_command(text, in_followup)
+                if command is None:
+                    continue
+                if not command:  # wake word heard but nothing after it
+                    command = await self._capture_command()
+                    if not command:
+                        continue
+
+                await self._handle(command)
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:  # the loop must never die
+                logger.debug("voice loop tick failed: %s", exc)
+                await asyncio.sleep(1.0)
+
+    def _extract_command(self, text: str, in_followup: bool) -> str | None:
+        """Return the command text, '' if only the wake word was said, or None
+        if this utterance should be ignored."""
+        if in_followup:
+            return text
+        lower = text.lower()
+        wake = self._wake
+        if wake and wake in lower:
+            return text[lower.index(wake) + len(wake):].lstrip(" ,.!?-").strip()
+        return None  # no wake word, not in follow-up → ignore
+
+    async def _capture_command(self) -> str:
+        from aura_brain import voice
+
+        wav, peak = await self._robot.listen(self._window_s)
+        if peak < self._speech_peak:
+            return ""
+        return (await voice.transcribe(wav, filename="robot.wav") or "").strip()
+
+    async def _handle(self, command: str) -> None:
+        from shared_schemas.events.audio import TranscriptUpdated
+
+        await self._bus.publish(TranscriptUpdated(
+            session_id=self._session_id, transcript=command, is_final=True,
+        ))
+        logger.info("VoiceLoop heard: %r", command)
+        await self._pipeline.orchestrate(command, self._session_id)
+        # The reply's ResponseDrafted → note_spoken opens the follow-up window.

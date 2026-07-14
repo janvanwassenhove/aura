@@ -144,7 +144,11 @@ async def listen(body: dict) -> Response:
         w.setsampwidth(2)
         w.setframerate(16_000)
         w.writeframes(pcm)
-    return Response(content=buf.getvalue(), media_type="audio/wav")
+    peak = getattr(adapter, "last_capture_peak", lambda: 0.0)()
+    return Response(
+        content=buf.getvalue(), media_type="audio/wav",
+        headers={"X-Audio-Peak": f"{peak:.5f}"},
+    )
 
 
 # ------------------------------------------------------------------

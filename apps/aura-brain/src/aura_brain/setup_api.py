@@ -99,12 +99,21 @@ async def status() -> JSONResponse:
 _ALLOWED_LANGUAGES = {"auto", "en", "nl", "fr"}
 
 
-@router.get("/prefs")
-async def get_prefs() -> JSONResponse:
-    return JSONResponse({
+_ALLOWED_VOICE_MODES = {"off", "wake_word"}
+
+
+def _prefs_snapshot() -> dict:
+    return {
         "assistant_name": os.environ.get("ASSISTANT_NAME", "AURA"),
         "language": os.environ.get("ASSISTANT_LANGUAGE", "auto"),
-    })
+        "voice_mode": os.environ.get("VOICE_MODE", "off"),
+        "wake_word": os.environ.get("WAKE_WORD", os.environ.get("ASSISTANT_NAME", "AURA")),
+    }
+
+
+@router.get("/prefs")
+async def get_prefs() -> JSONResponse:
+    return JSONResponse(_prefs_snapshot())
 
 
 @router.post("/prefs")
@@ -127,15 +136,26 @@ async def set_prefs(body: dict) -> JSONResponse:
                 status_code=422,
             )
         updates["ASSISTANT_LANGUAGE"] = language
+    voice_mode = (body or {}).get("voice_mode")
+    if voice_mode is not None:
+        voice_mode = voice_mode.strip().lower()
+        if voice_mode not in _ALLOWED_VOICE_MODES:
+            return JSONResponse(
+                {"error": f"voice_mode must be one of {sorted(_ALLOWED_VOICE_MODES)}"},
+                status_code=422,
+            )
+        updates["VOICE_MODE"] = voice_mode
+    wake_word = (body or {}).get("wake_word")
+    if wake_word is not None:
+        wake_word = wake_word.strip()
+        if not (1 <= len(wake_word) <= 24):
+            return JSONResponse({"error": "wake word must be 1-24 characters"}, status_code=422)
+        updates["WAKE_WORD"] = wake_word
     if not updates:
         return JSONResponse({"error": "nothing to update"}, status_code=422)
-    os.environ.update(updates)          # effective immediately (read per turn)
+    os.environ.update(updates)          # effective immediately (read live)
     persisted = _write_env(updates)     # survives restarts
-    return JSONResponse({
-        "assistant_name": os.environ.get("ASSISTANT_NAME", "AURA"),
-        "language": os.environ.get("ASSISTANT_LANGUAGE", "auto"),
-        "persisted": persisted,
-    })
+    return JSONResponse({**_prefs_snapshot(), "persisted": persisted})
 
 
 @router.post("/secure")
