@@ -58,15 +58,26 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     )
     offline_loop.start()
 
+    # U26: on-Pi budget guard — sheds non-essential work when hot/saturated.
+    from robot_runtime.budget_guard import BudgetGuard
+
+    budget_guard = BudgetGuard(
+        interval_s=float(os.environ.get("BUDGET_INTERVAL_S", "5")),
+    )
+    budget_guard.start()
+    offline_loop.budget_guard = budget_guard  # idle motion respects the budget
+
     # Inject into routes module
     routes.adapter = adapter
     routes.engine = engine
     routes.broadcaster = broadcaster
     routes.bus = bus  # U36d: direct-motion events
     routes.offline_loop = offline_loop
+    routes.budget_guard = budget_guard
 
     yield
 
+    await budget_guard.stop()
     await offline_loop.stop()
     await engine.stop()
     await adapter.disconnect()
