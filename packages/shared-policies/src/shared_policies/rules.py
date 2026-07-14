@@ -13,6 +13,7 @@ APPROVAL_REQUIRED: frozenset[str] = frozenset(
         "create_task",
         "delete_task",
         "launch_app",  # starting an app on the laptop always asks the owner
+        "use_computer",  # screenshot + mouse/keyboard control always asks the owner
     }
 )
 
@@ -22,6 +23,7 @@ MODE_TOOL_MAP: dict[str, frozenset[str]] = {
     "work": frozenset(
         {
             "run_dev_task",
+            "use_computer",
             "open_in_vscode",
             "launch_app",
             "list_calendar_events_today",
@@ -62,6 +64,7 @@ MODE_TOOL_MAP: dict[str, frozenset[str]] = {
             "list_speakers",
             "media_control",
             "launch_app",
+            "use_computer",
         }
     ),
     "presentation": frozenset(

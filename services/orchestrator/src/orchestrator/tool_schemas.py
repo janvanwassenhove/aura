@@ -145,6 +145,22 @@ TOOL_SCHEMAS: dict[str, dict] = {
             "line": {"type": "integer", "description": "1-based line number (optional)."},
         }, "required": ["path"], "additionalProperties": False},
     ),
+    "use_computer": _fn(
+        "use_computer",
+        (
+            "Take screenshot + mouse/keyboard control of the owner's laptop to "
+            "operate ANY desktop app when launch_app/media_control aren't enough "
+            "(e.g. clicking around inside an app's UI). Sensitive and slow — "
+            "requires owner approval and must be OFF by default. Describe the "
+            "concrete goal to accomplish on screen as 'goal'. Never used to enter "
+            "passwords, payment details, or accept terms."
+        ),
+        {"type": "object", "properties": {
+            "goal": {"type": "string",
+                     "description": "Concrete on-screen goal, e.g. 'in Spotify, "
+                                    "click Play on the Discover Weekly playlist'."},
+        }, "required": ["goal"], "additionalProperties": False},
+    ),
     "run_dev_task": _fn(
         "run_dev_task",
         (
