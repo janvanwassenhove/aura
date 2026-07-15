@@ -99,16 +99,20 @@
 
       <!-- ── Skills tab (U62): what the owner taught the agent ── -->
       <template v-if="activeTab === 'skills'">
-        <p class="conn-hint">Skills are procedures you taught the assistant. It proposes new ones from your feedback (🎓) — every write needs your approval. You edit freely here.</p>
+        <p class="conn-hint">Skills are procedures you taught the assistant. It proposes new ones from your feedback (🎓) — every write needs your approval. You edit freely here. <strong>Optimize</strong> rewrites a skill for reliable execution from how it's actually been used — you approve the diff.</p>
         <div v-if="!skills.length && !editingSkill" class="conn-hint">No skills yet. Teach one via the 🎓 button in the conversation, or add one below.</div>
         <div v-for="sk in skills" :key="sk.name" :class="['skill-card', !sk.enabled && 'skill-card--off']">
           <div class="skill-card-head">
             <span class="skill-card-name">{{ sk.name }}</span>
             <button v-if="sk.person" class="skill-scope skill-scope--link" :title="`Open ${sk.person} in Knowledge`" @click="navStore.openPerson(sk.person)">@{{ sk.person }}</button>
+            <span v-if="metrics[sk.name]?.uses" class="skill-uses" :title="`Used ${metrics[sk.name].uses}× · ${metrics[sk.name].new_since_optimized} new signal(s) since last optimize`">
+              {{ metrics[sk.name].uses }}× used<span v-if="metrics[sk.name].new_since_optimized" class="skill-uses-new">+{{ metrics[sk.name].new_since_optimized }}</span>
+            </span>
             <span class="skill-card-spacer" />
             <label class="skill-toggle" :title="sk.enabled ? 'Active' : 'Disabled'">
               <input type="checkbox" :checked="sk.enabled" @change="toggleSkill(sk)" />
             </label>
+            <button class="btn-conn btn-ghost btn-small" :disabled="optimizing === sk.name" @click="optimizeSkill(sk)">{{ optimizing === sk.name ? 'Optimizing…' : 'Optimize' }}</button>
             <button class="btn-conn btn-ghost btn-small" @click="editSkill(sk)">Edit</button>
             <button class="btn-conn btn-ghost btn-small" @click="removeSkill(sk.name)">Delete</button>
           </div>
@@ -118,6 +122,27 @@
             <span v-for="t in sk.triggers" :key="'t' + t" class="skill-tag">“{{ t }}”</span>
             <span v-for="m in sk.personas" :key="'m' + m" class="skill-tag skill-tag--mode">{{ m }}</span>
           </div>
+
+          <!-- U107: optimization proposal — owner approves the rewrite -->
+          <div v-if="proposal && proposal.name === sk.name" class="skill-opt">
+            <p class="skill-opt-rationale"><strong>Proposed rewrite</strong> — based on {{ proposal.based_on }} use(s). {{ proposal.rationale }}</p>
+            <div v-if="!proposal.changed" class="conn-hint">The optimizer judged the current skill already optimal — nothing to change.</div>
+            <div v-else class="skill-opt-diff">
+              <div class="skill-opt-col">
+                <span class="skill-opt-label">Current</span>
+                <pre class="skill-opt-pre">{{ proposal.current_body }}</pre>
+              </div>
+              <div class="skill-opt-col">
+                <span class="skill-opt-label">Proposed</span>
+                <pre class="skill-opt-pre skill-opt-pre--new">{{ proposal.proposed_body }}</pre>
+              </div>
+            </div>
+            <div class="conn-actions">
+              <button v-if="proposal.changed" class="btn-conn btn-primary btn-small" @click="applyProposal(sk)">Apply rewrite</button>
+              <button class="btn-conn btn-ghost btn-small" @click="proposal = null">Dismiss</button>
+            </div>
+          </div>
+          <p v-if="optimizeError === sk.name" class="conn-error">{{ optimizeErrorMsg }}</p>
         </div>
         <div v-if="editingSkill" class="skill-editor">
           <input v-model="editingSkill.name" class="field-input" placeholder="name (kebab-case)" :disabled="!skillIsNew" aria-label="Skill name" />
@@ -649,11 +674,63 @@ const skillIsNew = ref(false)
 const editingTriggers = ref('')
 const skillError = ref('')
 
+// U107: usage metrics + self-optimization proposal.
+interface SkillMetric { uses: number; new_since_optimized: number; last_used: number | null }
+const metrics = ref<Record<string, SkillMetric>>({})
+const optimizing = ref('')
+const optimizeError = ref('')
+const optimizeErrorMsg = ref('')
+interface Proposal { name: string; changed: boolean; rationale: string; current_body: string; proposed_body: string; based_on: number }
+const proposal = ref<Proposal | null>(null)
+
 async function fetchSkills(): Promise<void> {
   try {
     const resp = await fetch(`${BRAIN_URL_LOGS}/skills`)
     skills.value = (await resp.json()).skills ?? []
+    // Pull usage counts in parallel — cheap, drives the "N new signals" badge.
+    const entries = await Promise.all(skills.value.map(async (sk) => {
+      try {
+        const m = await fetch(`${BRAIN_URL_LOGS}/skills/${encodeURIComponent(sk.name)}/metrics`)
+        return m.ok ? [sk.name, await m.json()] as const : null
+      } catch { return null }
+    }))
+    metrics.value = Object.fromEntries(entries.filter(Boolean) as [string, SkillMetric][])
   } catch { skills.value = [] }
+}
+
+async function optimizeSkill(sk: SkillItem): Promise<void> {
+  optimizing.value = sk.name
+  optimizeError.value = ''
+  proposal.value = null
+  try {
+    const resp = await fetch(`${BRAIN_URL_LOGS}/skills/${encodeURIComponent(sk.name)}/optimize`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}),
+    }).catch(() => null)
+    if (!resp || !resp.ok) {
+      optimizeError.value = sk.name
+      optimizeErrorMsg.value = resp ? String((await resp.json().catch(() => ({}))).error ?? `HTTP ${resp.status}`) : 'brain unreachable'
+      return
+    }
+    proposal.value = await resp.json()
+  } finally {
+    optimizing.value = ''
+  }
+}
+
+async function applyProposal(sk: SkillItem): Promise<void> {
+  if (!proposal.value) return
+  const resp = await fetch(`${BRAIN_URL_LOGS}/skills`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    // Save the rewritten body and reset the "new signals" counter.
+    body: JSON.stringify({ ...sk, body: proposal.value.proposed_body, mark_optimized: true }),
+  }).catch(() => null)
+  if (resp && resp.ok) {
+    proposal.value = null
+    await fetchSkills()
+  } else {
+    optimizeError.value = sk.name
+    optimizeErrorMsg.value = 'Could not save the rewrite.'
+  }
 }
 
 const navStore = useNavStore()
@@ -908,6 +985,30 @@ const ConnStatusBadge = defineComponent({
 .skill-toggle { font-size: 0.72rem; color: var(--text-faint); display: flex; gap: 0.25rem; align-items: center; }
 .skill-editor { display: flex; flex-direction: column; gap: 0.45rem; margin-top: 0.6rem; }
 .skill-body { font-family: ui-monospace, monospace; }
+
+/* U107: usage badge + optimization proposal */
+.skill-uses { font-size: 0.68rem; color: var(--text-faint); display: inline-flex; gap: 0.2rem; align-items: baseline; }
+.skill-uses-new {
+  color: var(--accent); font-weight: 700; font-size: 0.64rem;
+  padding: 0.02rem 0.3rem; border: 1px solid var(--accent); border-radius: 999px;
+}
+.skill-opt {
+  margin-top: 0.5rem; padding: 0.6rem; border: 1px dashed var(--accent);
+  border-radius: var(--radius-md); background: var(--surface); display: flex;
+  flex-direction: column; gap: 0.5rem;
+}
+.skill-opt-rationale { margin: 0; font-size: 0.76rem; color: var(--text); }
+.skill-opt-diff { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
+@media (max-width: 640px) { .skill-opt-diff { grid-template-columns: 1fr; } }
+.skill-opt-col { display: flex; flex-direction: column; gap: 0.25rem; min-width: 0; }
+.skill-opt-label { font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-faint); }
+.skill-opt-pre {
+  margin: 0; padding: 0.45rem; font-size: 0.72rem; line-height: 1.35;
+  font-family: ui-monospace, monospace; white-space: pre-wrap; word-break: break-word;
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-sm);
+  max-height: 16rem; overflow-y: auto;
+}
+.skill-opt-pre--new { border-color: var(--accent); }
 
 .robot-row { display: flex; gap: 0.5rem; align-items: center; }
 .robot-row .field-input { flex: 1; }

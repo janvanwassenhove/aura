@@ -24,6 +24,7 @@ self-training flow, U60) are picked up without restarts.
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 import re
@@ -36,6 +37,7 @@ logger = logging.getLogger(__name__)
 _MAX_INJECTED = 3          # full skill bodies per turn
 _MAX_BODY = 2000           # chars per injected body
 _NAME_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,63}$")
+_MAX_OBS = 200             # U107: usage observations kept per skill
 
 
 @dataclass
@@ -191,5 +193,78 @@ class SkillStore:
             return False
         path.unlink()
         self._loaded_at = 0.0
+        for side in (self._obs_path(name), self._opt_path(name)):
+            side.unlink(missing_ok=True)
         logger.info("skill deleted: %s", name)
         return True
+
+    # -- U107: usage observations → self-optimizing loop -----------------
+    #
+    # Every time a skill is injected into a turn we append one observation
+    # (the request + context). Accumulated evidence drives skill_optimizer,
+    # which rewrites the body for optimal execution — the owner approves the
+    # rewrite (a normal save), keeping the "no unattended writes" invariant.
+
+    @property
+    def _metrics_dir(self) -> Path:
+        return self._dir / ".metrics"
+
+    def _obs_path(self, name: str) -> Path:
+        return self._metrics_dir / f"{name}.jsonl"
+
+    def _opt_path(self, name: str) -> Path:
+        # Records the observation count at the last optimization, so the UI
+        # can surface "N new signals since you last optimized this skill".
+        return self._metrics_dir / f"{name}.optimized"
+
+    def record_observation(self, name: str, obs: dict) -> None:
+        """Append one usage observation. Best-effort — never raises into a turn."""
+        try:
+            self._metrics_dir.mkdir(parents=True, exist_ok=True)
+            path = self._obs_path(name)
+            entry = {"ts": round(time.time()), **obs}
+            with path.open("a", encoding="utf-8") as fh:
+                fh.write(json.dumps(entry, ensure_ascii=False) + "\n")
+            # Cap: keep only the most recent _MAX_OBS lines.
+            lines = path.read_text(encoding="utf-8").splitlines()
+            if len(lines) > _MAX_OBS:
+                path.write_text("\n".join(lines[-_MAX_OBS:]) + "\n", encoding="utf-8")
+        except OSError as exc:
+            logger.debug("skill observation not recorded for %s: %s", name, exc)
+
+    def observations(self, name: str) -> list[dict]:
+        path = self._obs_path(name)
+        if not path.exists():
+            return []
+        out: list[dict] = []
+        for line in path.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                out.append(json.loads(line))
+            except json.JSONDecodeError:
+                continue
+        return out
+
+    def mark_optimized(self, name: str) -> None:
+        try:
+            self._metrics_dir.mkdir(parents=True, exist_ok=True)
+            self._opt_path(name).write_text(str(len(self.observations(name))), encoding="utf-8")
+        except OSError as exc:
+            logger.debug("skill optimize-marker not written for %s: %s", name, exc)
+
+    def metrics(self, name: str) -> dict:
+        """Lightweight counts for the UI: total uses and new since last optimize."""
+        obs = self.observations(name)
+        prev = 0
+        try:
+            prev = int(self._opt_path(name).read_text(encoding="utf-8").strip() or "0")
+        except (OSError, ValueError):
+            prev = 0
+        last_ts = obs[-1]["ts"] if obs else None
+        return {
+            "uses": len(obs),
+            "new_since_optimized": max(0, len(obs) - prev),
+            "last_used": last_ts,
+        }

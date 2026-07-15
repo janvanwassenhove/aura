@@ -70,9 +70,41 @@ async def save_skill(body: dict) -> JSONResponse:
             body=str(body.get("body", "")),
         )
         _store.save(skill)
+        # U107: applying an optimization resets the "new signals" counter.
+        if body.get("mark_optimized"):
+            _store.mark_optimized(skill.name)
     except ValueError as exc:
         return JSONResponse({"error": str(exc)}, status_code=422)
     return JSONResponse(_dump(skill))
+
+
+@router.get("/{name}/metrics")
+async def skill_metrics(name: str) -> JSONResponse:
+    """U107: usage counts for a skill (uses, new signals since last optimize)."""
+    if _store is None or _store.get(name) is None:
+        return JSONResponse({"error": f"unknown skill {name!r}"}, status_code=404)
+    return JSONResponse(_store.metrics(name))
+
+
+@router.post("/{name}/optimize")
+async def optimize_skill(name: str, body: dict | None = None) -> JSONResponse:
+    """U107: propose (never save) a rewrite of the skill body for optimal
+    execution, based on accumulated usage evidence + an optional owner hint.
+    The owner reviews the diff and applies it via POST /skills."""
+    if _store is None or _store.get(name) is None:
+        return JSONResponse({"error": f"unknown skill {name!r}"}, status_code=404)
+    from orchestrator.config import model_for_role
+    from orchestrator.llm import openai_chat
+    from orchestrator.skill_optimizer import propose_optimization
+
+    result = await propose_optimization(
+        _store, name, openai_chat,
+        hint=str((body or {}).get("hint", "")),
+        model=model_for_role("agent"),
+    )
+    if "error" in result:
+        return JSONResponse(result, status_code=422)
+    return JSONResponse(result)
 
 
 @router.delete("/{name}")
