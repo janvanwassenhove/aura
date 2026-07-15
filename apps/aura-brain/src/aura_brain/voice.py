@@ -80,6 +80,12 @@ async def transcribe(data: bytes, filename: str = "audio.webm") -> str | None:
         lang = os.environ.get("ASSISTANT_LANGUAGE", "auto").lower()
         if lang in ("en", "nl", "fr"):  # bias STT toward the configured language
             kwargs["language"] = lang
+        # U87: prime STT with the assistant's NAME so it transcribes the wake
+        # word correctly instead of dropping it or hearing "Hej"/"hey". The
+        # prompt biases the vocabulary toward these tokens.
+        name = os.environ.get("ASSISTANT_NAME", "AURA")
+        wake = os.environ.get("WAKE_WORD", name)
+        kwargs["prompt"] = f"Gesprek met de robot {name}. Aanspreken met '{wake}, ...'."
         result = await client.audio.transcriptions.create(**kwargs)
         return result.text
     except Exception as exc:  # noqa: BLE001
