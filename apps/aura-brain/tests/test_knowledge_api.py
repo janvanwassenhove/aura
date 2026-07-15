@@ -113,3 +113,25 @@ def test_wikilink_mentions_appear_as_backlinks() -> None:
         assert body["skills"] == [{"name": "weekly-report",
                                    "description": "how the weekly report goes",
                                    "enabled": True, "via": "mention"}]
+
+
+def test_lock_then_unlock_with_passphrase(monkeypatch) -> None:
+    """U94: /knowledge/unlock re-elevates to SENSITIVE with the right passphrase."""
+    import os, tempfile
+    monkeypatch.setenv("KNOWLEDGE_PASSPHRASE", "super-secret-pass")
+    monkeypatch.setenv("KNOWLEDGE_SALT", "testsalt")
+    monkeypatch.setenv("DATABASE_URL", "sqlite+aiosqlite:///:memory:")
+    tmp = tempfile.mkdtemp()
+    monkeypatch.setenv("KNOWLEDGE_DB_PATH", os.path.join(tmp, "k.enc.json"))
+    app = create_app()
+    with TestClient(app) as client:
+        assert client.put("/knowledge/people/x", json={"display_name": "X", "role": "guest"}).status_code == 200
+        # lock → benign → people 403
+        assert client.post("/knowledge/lock").json()["locked"] is True
+        assert client.get("/knowledge/people").status_code == 403
+        # wrong passphrase stays locked
+        assert client.post("/knowledge/unlock", json={"passphrase": "nope"}).status_code == 403
+        assert client.get("/knowledge/people").status_code == 403
+        # right passphrase unlocks
+        assert client.post("/knowledge/unlock", json={"passphrase": "super-secret-pass"}).json()["unlocked"] is True
+        assert client.get("/knowledge/people").status_code == 200
