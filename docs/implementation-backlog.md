@@ -318,6 +318,9 @@ the human can unblock it.
 - [x] **U102 — slaap-pose terug naar SDK-emote `goto_sleep()`, maar robuust** · `pending`
   Op verzoek terug naar de standaard SDK sleep-emote i.p.v. de U101 custom pose. De emote "nam" soms niet omdat head-tracking / automatic body-yaw de kop tijdens de beweging terugtrok naar het gezicht. Fix: vóór `goto_sleep()` worden `stop_head_tracking()` én `set_automatic_body_yaw(False)` hard aangeroepen (en `_tracking_on=False` gezet), plus één retry als de SDK-call gooit. Tests verifiëren de volgorde (tracking uit vóór goto_sleep). Live op de Pi geverifieerd (sleep/wake 200, geen retry-warning). Gedeployed + herstart.
 
+- [x] **U103 — persona-graph groeit uit bronnen (blog/website/github inlezen)** · `pending`
+  De U77 `source:<kind>`-facts worden nu echt GELEZEN: `POST /knowledge/people/{id}/ingest` haalt fetchbare bronnen op (blog/website/github; github-handle → profiel-URL), stript HTML, laat het chat-model max 8 facts per bron destilleren met `[[wiki-links]]` in de waarde — die verschijnen als nodes/edges in de brain graph. Dedupe op (key,value) zodat herhaald ingesten de graph niet verdubbelt; auth-walled bronnen (instagram/facebook/x/linkedin/gmail) worden eerlijk als "needs login" geskipt. Console: "Grow brain from sources"-knop in het persoonsprofiel met resultaatregel. Nieuwe module `source_ingest.py` + tests. Brain 163, console 56 groen.
+
 ## Progress log (append-only; newest last)
 
 - 2026-06-21 — ledger created on `aura-autobuild`; Phase 0/0b complete, Phase 1 scaffold (U-pre) done before this loop started.

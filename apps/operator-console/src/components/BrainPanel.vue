@@ -158,6 +158,12 @@
             <input v-model="newSource.value" class="b-input b-grow" placeholder="handle / url / address" aria-label="Source value" />
             <button class="b-btn" :disabled="!newSource.value.trim()" @click="addSource()">Add source</button>
           </div>
+          <div v-if="sourceFacts.length" class="inline-add">
+            <button class="b-btn" :disabled="ingesting" @click="growBrain()">
+              {{ ingesting ? 'Reading sources…' : 'Grow brain from sources' }}
+            </button>
+            <span v-if="ingestNote" class="content-hint">{{ ingestNote }}</span>
+          </div>
 
           <h3 class="content-title content-title--spaced">Facts</h3>
           <div class="fact-chips">
@@ -322,6 +328,24 @@ async function addSource(): Promise<void> {
   const ok = await store.addFact(store.detail.person.person_id,
     `source:${newSource.value.kind}`, newSource.value.value.trim())
   if (ok) newSource.value.value = ''
+}
+
+// U103: read fetchable sources (blog/website/github) → LLM distills [[linked]]
+// facts → the brain graph grows. Auth-walled sources are honestly skipped.
+const ingesting = ref(false)
+const ingestNote = ref('')
+async function growBrain(): Promise<void> {
+  if (!store.detail || ingesting.value) return
+  ingesting.value = true
+  ingestNote.value = ''
+  try {
+    const r = await store.ingestSources(store.detail.person.person_id)
+    if (!r) { ingestNote.value = 'Ingest failed — is the brain running?'; return }
+    const skips = r.skipped.length ? ` · skipped ${r.skipped.length} (${r.skipped.map(s => `${s.kind}: ${s.reason}`).join('; ')})` : ''
+    ingestNote.value = `${r.added_count} new fact${r.added_count === 1 ? '' : 's'} from ${r.read.length} source${r.read.length === 1 ? '' : 's'}${skips}`
+  } finally {
+    ingesting.value = false
+  }
 }
 const newSkill = ref({ name: '', description: '', body: '' })
 const addError = ref('')
