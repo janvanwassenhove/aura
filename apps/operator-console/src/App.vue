@@ -2,7 +2,6 @@
   <div class="app-layout">
     <TitleBar
       :ws-status="wsStatus"
-      @open-knowledge="layoutStore.openRight('brain')"
       @open-settings="showSettings = true"
       @open-capabilities="showCapabilities = true"
       @toggle-left="layoutStore.showLeft = !layoutStore.showLeft"
@@ -18,9 +17,6 @@
 
     <!-- Settings modal (LLM + Connections + Appearance tabs) -->
     <SettingsPanel v-if="showSettings" @close="showSettings = false" />
-
-    <!-- Knowledge transparency modal (ADR-008 §8: inspect/edit/erase profiles) -->
-    <KnowledgePanel v-if="showKnowledge" @close="showKnowledge = false" />
 
     <!-- Capabilities / permissions center (U40) -->
     <CapabilitiesPanel v-if="showCapabilities" @close="showCapabilities = false" />
@@ -46,7 +42,7 @@
            @pointerdown="startDrag('right', $event)" />
       <aside v-if="layoutStore.showRight" class="ws-right" :style="{ width: layoutStore.rightWidth + 'px' }">
         <div class="ws-right-body">
-          <BrainPanel docked @open-knowledge="showKnowledge = true" />
+          <BrainPanel docked />
         </div>
       </aside>
     </main>
@@ -63,7 +59,6 @@ import EventLogPanel from './components/EventLogPanel.vue'
 import ApprovalPanel from './components/ApprovalPanel.vue'
 import SettingsPanel from './components/SettingsPanel.vue'
 import BrainPanel from './components/BrainPanel.vue'
-import KnowledgePanel from './components/KnowledgePanel.vue'
 import CapabilitiesPanel from './components/CapabilitiesPanel.vue'
 import SetupWizard from './components/SetupWizard.vue'
 import { useEventBusWs } from './composables/useEventBusWs'
@@ -74,7 +69,6 @@ import { useThemeStore } from './stores/themeStore'
 
 const { wsStatus, connect } = useEventBusWs()
 const showSettings = ref(false)
-const showKnowledge = ref(false)
 const layoutStore = useLayoutStore()
 
 // U76: draggable splitters (VS Code-style resize).
