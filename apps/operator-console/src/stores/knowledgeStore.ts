@@ -54,6 +54,7 @@ export const useKnowledgeStore = defineStore('knowledge', () => {
   const tier = ref<string>('benign')
   const omkLoaded = ref(false)
   const locked = ref(false)
+  const brainError = ref(false)  // U98: /people 5xx → brain needs a restart
   const loading = ref(false)
   const error = ref<string | null>(null)
 
@@ -70,6 +71,7 @@ export const useKnowledgeStore = defineStore('knowledge', () => {
       if (!resp.ok) {
         const body = await resp.json().catch(() => ({}))
         error.value = body.detail ?? `Request failed (${resp.status})`
+        if (resp.status >= 500) brainError.value = true
         return null
       }
       locked.value = false
@@ -90,12 +92,12 @@ export const useKnowledgeStore = defineStore('knowledge', () => {
 
   async function fetchPeople(): Promise<void> {
     loading.value = true
+    brainError.value = false
     try {
       const resp = await _request('/people')
-      if (resp) people.value = await resp.json()
-    } finally {
-      loading.value = false
-    }
+      if (resp) { people.value = await resp.json(); return }
+    } catch { brainError.value = true }
+    finally { loading.value = false }
   }
 
   async function inspectPerson(personId: string): Promise<void> {
@@ -298,7 +300,7 @@ export const useKnowledgeStore = defineStore('knowledge', () => {
   }
 
   return {
-    people, detail, tier, omkLoaded, locked, loading, error, recognitionEnabled,
+    people, detail, tier, omkLoaded, locked, brainError, loading, error, recognitionEnabled,
     sightings,
     fetchTier, fetchPeople, inspectPerson, upsertPerson, saveDescription,
     addFact, updateFact, deleteFact, renamePerson, forgetPerson, setConsent, lock,
