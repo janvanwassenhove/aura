@@ -252,6 +252,9 @@ the human can unblock it.
 - [x] **U80 — spraak afgekapt na één woord ("Zeker…") gefixt** · `pending`
   Root cause: `play_audio` deed één grote `media.push_audio_sample(hele-zin)` en keerde direct terug — de SDK draint een klein buffertje en stopt als er niets bijgevoed wordt, dus lange antwoorden werden tot ~0.5s afgekapt (de 1s-testtoon paste nog net, vandaar dat die wél klonk). Fix: audio in ~200ms-blokken pushen op afspeeltempo (sleep per blok) en **blokkeren tot de hele utterance gespeeld is** + korte staart; motion_lock vastgehouden zodat niets de spraak onderbreekt. Bijkomend voordeel: gestreamde TTS (U54) wacht nu netjes per chunk. Live op de Pi geverifieerd (4s-toon: call blokkeert ~volledige duur i.p.v. <0.5s). Gedeployed + herstart.
 
+- [x] **U81 — spraak nog afgekapt (underrun) + volgen tijdens spreken** · `pending`
+  (1) Afkap-vervolg op U80: het exacte realtime-pacen liet de device-buffer tussen blokjes leeglopen (underrun → SDK stopt) — nu wordt ~80% van de blokduur geslapen zodat de buffer altijd vooruit-gevoed is, plus een langere staart (0.4s). 6s-toon getest: call blokkeert de volledige duur, geen afkap. (2) **Volgen tijdens spreken**: reply-gebaren (nod/tilt/shake/gesture/wave) pauzeren de head-tracking niet meer (FOLLOW_WHILE_SPEAKING, default aan) — Richie houdt zijn ogen op je terwijl hij gebaart én praat; grote emotes (wake_up/sleep/look_around/point) beheren de kop nog zelf. Robot 54 groen, live geverifieerd, tracking heraan op de Pi. Gedeployed + herstart.
+
 ## Progress log (append-only; newest last)
 
 - 2026-06-21 — ledger created on `aura-autobuild`; Phase 0/0b complete, Phase 1 scaffold (U-pre) done before this loop started.
