@@ -294,6 +294,9 @@ the human can unblock it.
 - [x] **U94 — unlock-endpoint + Add person terug in het Brain-paneel** · `pending`
   Regressie uit U93: de nieuwe Lock-knop zette de tier op BENIGN maar er was **geen unlock** (alleen herstart herstelde SENSITIVE) — dead-end. Fix: `POST /knowledge/unlock {passphrase}` verifieert de passphrase door dezelfde OMK af te leiden (zelfde salt) en te vergelijken met de geladen sleutel — foute passphrase elevate't nooit, passphrase wordt nooit gelogd/opgeslagen. Console: unlock-strook (passphrase-veld + Unlock) verschijnt wanneer locked; en de bij de consolidatie vergeten **Add person** (id/naam/rol) staat nu onder de mensenlijst in het Brain-paneel. Teach face zit al in het persoonsscherm (U93). Brain 158 (+1), console build clean. Live vastzittende BENIGN → app-herstart herstelt SENSITIVE (of unlock na herstart met de nieuwe code).
 
+- [x] **U95 — "Restart brain"-knop: einde aan het herstart-misverstand** · `pending`
+  Kern van álle "het werkt nog niet"-meldingen: Ctrl+R herlaadt alleen het console-venster (Vue), NIET het brain-proces (Python child) — dus code-fixes (STT-prompt, bare-wake, followup) én de tier bleven op de oude staat. Geen dataverlies: jan/Elke stonden gewoon in data/knowledge.enc.json; ze waren "weg" omdat de tier op BENIGN stond (locked → /people 403). Fix: Electron-IPC `aura:restart-brain` (stopBrain → wait → startBrain → waitForBrain) + preload-bridge + **Restart-knop in de titelbalk** (alleen in de app; herlaadt de console na een verse brain). Eén klik laadt nu alle nieuwe code/config én herstelt SENSITIVE. Console 56 groen, Electron syntax-checked.
+
 ## Progress log (append-only; newest last)
 
 - 2026-06-21 — ledger created on `aura-autobuild`; Phase 0/0b complete, Phase 1 scaffold (U-pre) done before this loop started.
