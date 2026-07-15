@@ -55,6 +55,8 @@ def test_ingest_grows_facts_and_dedupes(fake_fetch_and_llm) -> None:
 
         facts = client.get("/knowledge/people/jan").json()["facts"]
         assert any("[[home automation]]" in f["value"] for f in facts)
+        # U105 provenance: mined facts link back to their source host.
+        assert any("via [[blog.example]]" in f["value"] for f in facts)
 
         # Re-running must not duplicate the graph.
         again = client.post("/knowledge/people/jan/ingest").json()
@@ -71,3 +73,38 @@ def test_github_handle_resolves_to_url() -> None:
     assert source_ingest._fetch_url("github", "janv") == "https://github.com/janv"
     assert source_ingest._fetch_url("website", "example.com") == "https://example.com"
     assert source_ingest._fetch_url("instagram", "@jan") is None
+
+
+def test_only_restricts_to_one_source(fake_fetch_and_llm) -> None:
+    """U105: auto-ingest on add reads ONLY the just-added source."""
+    app = create_app()
+    with TestClient(app) as client:
+        client.put("/knowledge/people/jan", json={"display_name": "Jan", "role": "owner"})
+        client.post("/knowledge/people/jan/facts", json={"key": "source:blog", "value": "https://blog.example"})
+        client.post("/knowledge/people/jan/facts", json={"key": "source:website", "value": "https://site.example"})
+
+        r = client.post("/knowledge/people/jan/ingest",
+                        json={"kind": "website", "value": "https://site.example"}).json()
+        assert len(r["read"]) == 1 and r["read"][0]["kind"] == "website"
+
+
+def test_refresh_all_respects_per_person_optout(fake_fetch_and_llm) -> None:
+    """U105: the weekly refresh skips people whose last source-refresh is 'off'."""
+    app = create_app()
+    with TestClient(app) as client:
+        client.put("/knowledge/people/jan", json={"display_name": "Jan", "role": "owner"})
+        client.post("/knowledge/people/jan/facts", json={"key": "source:blog", "value": "https://blog.example"})
+        client.put("/knowledge/people/elke", json={"display_name": "Elke", "role": "family"})
+        client.post("/knowledge/people/elke/facts", json={"key": "source:blog", "value": "https://elke.example"})
+        client.post("/knowledge/people/elke/facts", json={"key": "source-refresh", "value": "off"})
+
+        r = client.post("/knowledge/refresh-sources").json()
+        by_person = {x["person_id"]: x for x in r["refreshed"]}
+        assert by_person["jan"]["added_count"] == 2
+        assert by_person["elke"].get("skipped") == "auto-refresh off"
+
+        # Toggling back on (a newer fact wins) re-includes them.
+        client.post("/knowledge/people/elke/facts", json={"key": "source-refresh", "value": "on"})
+        r2 = client.post("/knowledge/refresh-sources").json()
+        by_person2 = {x["person_id"]: x for x in r2["refreshed"]}
+        assert by_person2["elke"]["added_count"] == 2

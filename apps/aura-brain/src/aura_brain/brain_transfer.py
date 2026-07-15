@@ -58,6 +58,24 @@ Their messages:
 # Parsing (pure — unit-testable without LLM or store)
 # ------------------------------------------------------------------
 
+def detect_export_format(data: Any) -> str | None:
+    """'claude' | 'chatgpt' | None — U105 provenance for imported facts."""
+    if isinstance(data, (str, bytes)):
+        try:
+            data = json.loads(data)
+        except json.JSONDecodeError:
+            return None
+    if not isinstance(data, list):
+        return None
+    for conv in data:
+        if isinstance(conv, dict):
+            if "chat_messages" in conv:
+                return "claude"
+            if "mapping" in conv:
+                return "chatgpt"
+    return None
+
+
 def parse_chat_export(data: Any) -> list[dict[str, str]]:
     """Normalise a ChatGPT or Claude export to [{title, text}] per conversation.
 
@@ -166,6 +184,7 @@ async def import_chat_export(store: Any, person_id: str, payload: Any) -> dict:
     convs = parse_chat_export(payload)
     if not convs:
         return {"error": "unrecognised export — expected a ChatGPT or Claude conversations.json"}
+    origin = detect_export_format(payload) or "chat-import"
     chunks = chunk_conversations(convs)
     cap = int(os.environ.get("IMPORT_MAX_CHUNKS", "15"))
     truncated = max(0, len(chunks) - cap)
@@ -183,11 +202,14 @@ async def import_chat_export(store: Any, person_id: str, payload: Any) -> dict:
             return {"error": f"distillation failed ({type(exc).__name__})",
                     "conversations": len(convs), "added": added, "added_count": len(added)}
         for f in facts:
-            if (f["key"].lower(), f["value"].strip().lower()) in have:
+            # U105 provenance: imported facts link back to their origin, so
+            # person → fact → [[chatgpt]]/[[claude]] builds up in the graph.
+            value = f["value"] if f"[[{origin}]]" in f["value"] else f"{f['value']} — via [[{origin}]]"
+            if (f["key"].lower(), value.strip().lower()) in have:
                 continue
-            await store.add_fact(ProfileFact(person_id=person_id, key=f["key"], value=f["value"]))
-            have.add((f["key"].lower(), f["value"].strip().lower()))
-            added.append(f)
+            await store.add_fact(ProfileFact(person_id=person_id, key=f["key"], value=value))
+            have.add((f["key"].lower(), value.strip().lower()))
+            added.append({"key": f["key"], "value": value})
 
     return {"person_id": person_id, "conversations": len(convs),
             "chunks_processed": len(chunks), "chunks_skipped": truncated,

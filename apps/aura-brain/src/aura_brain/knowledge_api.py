@@ -217,16 +217,28 @@ async def add_fact(
 @router.post("/people/{person_id}/ingest")
 async def ingest_sources(
     person_id: str,
+    body: dict | None = None,
     _: None = Depends(_require_sensitive),
 ) -> JSONResponse:
     """U103: grow the persona graph — read this person's fetchable sources
-    (blog/website/github) and distill them into [[linked]] profile facts."""
+    (blog/website/github) and distill them into [[linked]] profile facts.
+    U105: body {"kind","value"} restricts to one source (auto-ingest on add)."""
     from aura_brain.source_ingest import ingest_person_sources
 
-    result = await ingest_person_sources(_require(), person_id)
+    only = body if body and body.get("kind") else None
+    result = await ingest_person_sources(_require(), person_id, only=only)
     if "error" in result:
         raise HTTPException(status_code=404, detail=result["error"])
     return JSONResponse(result)
+
+
+@router.post("/refresh-sources")
+async def refresh_sources(_: None = Depends(_require_sensitive)) -> JSONResponse:
+    """U105: re-read every person's fetchable sources now (same loop the
+    weekly SOURCE_REFRESH_HOURS timer runs; dedupe keeps it idempotent)."""
+    from aura_brain.source_ingest import refresh_all_sources
+
+    return JSONResponse(await refresh_all_sources(_require()))
 
 
 @router.post("/people/{person_id}/import-chats")

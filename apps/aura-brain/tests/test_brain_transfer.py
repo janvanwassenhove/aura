@@ -89,9 +89,11 @@ def test_import_chats_grows_facts_and_dedupes(fake_distill) -> None:
 
         facts = client.get("/knowledge/people/jan").json()["facts"]
         assert any("[[Reachy Mini]]" in f["value"] for f in facts)
+        # U105 provenance: imported facts link back to their origin.
+        assert any("via [[chatgpt]]" in f["value"] for f in facts)
 
-        # Re-import: same distilled fact → nothing added twice.
-        again = client.post("/knowledge/people/jan/import-chats", json={"export": _CLAUDE_EXPORT}).json()
+        # Re-import of the same export: same distilled fact → nothing added twice.
+        again = client.post("/knowledge/people/jan/import-chats", json={"export": _CHATGPT_EXPORT}).json()
         assert again["added_count"] == 0
 
 

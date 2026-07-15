@@ -142,10 +142,15 @@ export const useKnowledgeStore = defineStore('knowledge', () => {
     return resp !== null
   }
 
-  async function ingestSources(personId: string): Promise<{ added_count: number; read: unknown[]; skipped: { kind: string; reason: string }[] } | null> {
+  async function ingestSources(personId: string, only?: { kind: string; value: string }): Promise<{ added_count: number; read: unknown[]; skipped: { kind: string; reason: string }[] } | null> {
     // U103: read the person's fetchable sources (blog/website/github) and
     // grow their facts — the brain graph grows with them.
-    const resp = await _request(`/people/${encodeURIComponent(personId)}/ingest`, { method: 'POST' })
+    // U105: pass `only` to ingest a single just-added source.
+    const resp = await _request(`/people/${encodeURIComponent(personId)}/ingest`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(only ?? {}),
+    })
     if (!resp) return null
     const result = await resp.json()
     await inspectPerson(personId)

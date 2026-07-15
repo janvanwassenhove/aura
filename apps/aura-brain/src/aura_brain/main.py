@@ -659,8 +659,24 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         ctx._heartbeat.start()
         ctx.pipeline.set_heartbeat_monitor(ctx._heartbeat)
 
+    # --- U105: periodic source refresh — the persona graph keeps growing with
+    # new blog posts. SOURCE_REFRESH_HOURS (default 168 = weekly, 0 = off);
+    # gated like the heartbeat so it never runs during tests.
+    _refresh_task = None
+    if os.environ.get("SOURCE_REFRESH_ENABLED", "false").lower() == "true":
+        from aura_brain.source_ingest import refresh_loop
+
+        # Read the store via ctx so a wizard store-swap is picked up live.
+        class _StoreProxy:
+            def __getattr__(self, name):  # noqa: ANN001, ANN204
+                return getattr(ctx.knowledge_store, name)
+
+        _refresh_task = asyncio.ensure_future(refresh_loop(_StoreProxy()))
+
     yield
 
+    if _refresh_task is not None:
+        _refresh_task.cancel()
     if ctx._voice_loop is not None:
         await ctx._voice_loop.stop()
     if ctx._maintenance is not None:
