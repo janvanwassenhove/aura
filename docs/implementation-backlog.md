@@ -306,6 +306,9 @@ the human can unblock it.
 - [x] **U98 — onmisbare "Restart brain"-banner (het draaiende proces was nooit herstart)** · `pending`
   Live bevestigd: bestand schoon (jan+Elke), maar `/knowledge/people` gaf nog steeds 500 → het draaiende aura-brain.exe had het OUDE bestand (met x) én de oude code in het geheugen; console-reload (Ctrl+R) herstart de brain NIET. Álle fixes van de laatste beurten (U89/U92/U93/U96/U97) wachten op een echte proces-herstart. Fix: `knowledgeStore.brainError` (true bij /people 5xx) + prominente **oranje "Restart brain"-banner** in het Brain-paneel met knop (window.aura.restartBrain van U95, met duidelijke fallback "sluit de app volledig af — de X, niet Ctrl+R" als de oude preload de bridge nog niet heeft). Console 56 groen. NB: één volledige app-herstart is nog nodig om U95's preload+banner te laden; daarna werkt de knop.
 
+- [x] **U99 — microfoon aan/uit-toggle in Robot State** · `pending`
+  Schakelaar "Microphone" bovenaan het Robot State-paneel (naast Follow me): aan → VOICE_MODE=wake_word (Richie luistert naar "Richie …"), uit → VOICE_MODE=off (de spraaklus idlet, geen mic-luisteren). Zet de pref live via /setup/prefs (leest de huidige stand bij mount); mic-icoon Mic/MicOff. Handig om het luisteren snel stil te leggen zonder naar Settings. Console 56 groen.
+
 ## Progress log (append-only; newest last)
 
 - 2026-06-21 — ledger created on `aura-autobuild`; Phase 0/0b complete, Phase 1 scaffold (U-pre) done before this loop started.

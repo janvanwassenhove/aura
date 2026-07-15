@@ -35,6 +35,17 @@
     </div>
 
     <div class="status-row mt-3">
+      <span class="label volume-label">
+        <Mic v-if="micOn" :size="14" /><MicOff v-else :size="14" /> Microphone
+      </span>
+      <button
+        :class="['toggle', micOn && 'toggle--on']"
+        :title="micOn ? 'Stop listening (Richie won’t hear the wake word)' : 'Listen for “Richie …”'"
+        @click="toggleMicListening"
+      ><span class="toggle-knob" /></button>
+    </div>
+
+    <div class="status-row">
       <span class="label volume-label"><Eye :size="14" /> Follow me</span>
       <button
         :class="['toggle', tracking && 'toggle--on']"
@@ -174,7 +185,7 @@
 import { onMounted, ref } from 'vue'
 import {
   Bot, ChevronsDown, Eye, Hand, Laugh, Moon, MoveHorizontal, MoveVertical,
-  Pencil, Power, Sparkles, ThumbsUp, Volume1, Volume2, VolumeX,
+  Mic, MicOff, Pencil, Power, Sparkles, ThumbsUp, Volume1, Volume2, VolumeX,
 } from 'lucide-vue-next'
 import { useRobotStore } from '../stores/robotStore'
 
@@ -186,6 +197,24 @@ const actError = ref('')
 const volume = ref(0.8)
 
 const tracking = ref(true) // adapter enables head tracking on connect
+
+// U99: microphone (wake-word listening) on/off — sets VOICE_MODE via prefs.
+const micOn = ref(true)
+async function fetchMic() {
+  try {
+    const r = await fetch(`${BRAIN_URL}/setup/prefs`)
+    micOn.value = ((await r.json()).voice_mode ?? 'off') === 'wake_word'
+  } catch { /* keep */ }
+}
+async function toggleMicListening() {
+  micOn.value = !micOn.value
+  try {
+    await fetch(`${BRAIN_URL}/setup/prefs`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ voice_mode: micOn.value ? 'wake_word' : 'off' }),
+    })
+  } catch { micOn.value = !micOn.value } // revert on failure
+}
 
 // U85: character persona selection + editing + growth
 interface Character { id: string; display_name: string; character_prompt: string
@@ -301,7 +330,7 @@ async function applyVolume() {
   } catch { /* robot offline — slider stays local */ }
 }
 
-onMounted(() => { fetchCharacters() })
+onMounted(() => { fetchCharacters(); fetchMic() })
 onMounted(async () => {
   try {
     const resp = await fetch(`${BRAIN_URL}/robot/volume`)
