@@ -276,6 +276,9 @@ the human can unblock it.
 - [x] **U88 — "Richie:" wordt hardop meegezegd (sprekerlabel)** · `pending`
   Het LLM zette soms zijn eigen naam als sprekerlabel vóór het antwoord ("Richie: …"), dat vervolgens ook uitgesproken werd. Fix: `_strip_speaker_label` verwijdert een leidend "<naam>:" / "<naam> -" éénmalig (fuzzy op spellingsdrift, zodat ook "Ritchie:" pakt), toegepast op het finale antwoord vóór weergave én TTS; een naam midden in de zin of "Jan:" blijft staan. Plus een expliciete instructie in de identity-prompt om het niet te doen. Orchestrator 188 (+1) groen. Vereist app-herstart.
 
+- [x] **U89 — STT-prompt-echo + latency (reasoning-model + venster)** · `pending`
+  (1) De generieke "je praat met Richie…"-reply was Whisper die de STT-prompt-HINT letterlijk terugkaatste bij onduidelijke audio; het model antwoordde daarop. Fix: prompt terug naar kale woord-priming (`"{wake} {name}"`, geen zin) + guard die een transcript dat enkel uit de priming-woorden bestaat weggooit → behandeld als kaal wake-word (lus herluistert naar het commando). (2) **Vertraging**: OPENAI_MODEL stond op gpt-5.1 (reasoning-model, "denkt na" → 3–8s/beurt, dodelijk voor spraak) → **gpt-4o** (snel, live toegepast op de draaiende brain). Opnamevenster live-instelbaar via VOICE_WINDOW_S (default 3s i.p.v. 4). Brain-voice-tests groen. Model terug te zetten via Settings → LLM.
+
 ## Progress log (append-only; newest last)
 
 - 2026-06-21 — ledger created on `aura-autobuild`; Phase 0/0b complete, Phase 1 scaffold (U-pre) done before this loop started.

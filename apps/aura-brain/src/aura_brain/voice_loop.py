@@ -133,7 +133,7 @@ class VoiceLoop:
         self._bus = bus
         self._session_id = session_id
         self._default_wake = default_wake_word
-        self._window_s = window_s
+        self._window_s_default = window_s
         self._followup_s = followup_s
         self._speech_peak_default = float(speech_peak)
         self._task: asyncio.Task | None = None
@@ -209,6 +209,14 @@ class VoiceLoop:
     @property
     def _wake(self) -> str:
         return os.environ.get("WAKE_WORD", self._default_wake).strip().lower()
+
+    @property
+    def _window_s(self) -> float:
+        # U89: read live so mic window (latency vs cut-off) is tunable.
+        try:
+            return float(os.environ.get("VOICE_WINDOW_S", self._window_s_default))
+        except ValueError:
+            return self._window_s_default
 
     @property
     def _speech_peak(self) -> float:
