@@ -35,9 +35,26 @@
             <span class="rail-label">{{ p.display_name }}</span>
             <span :class="['rail-role', `rail-role--${p.role}`]">{{ p.role }}</span>
           </button>
-          <p v-if="store.locked" class="rail-locked">
-            Profiles are locked — unlock via Security &amp; faces.
-          </p>
+          <div v-if="store.locked" class="rail-unlock">
+            <p class="rail-locked">Profiles are locked.</p>
+            <input v-model="unlockPass" type="password" class="rail-input" placeholder="Knowledge passphrase" @keydown.enter="doUnlock" />
+            <button class="rail-btn" :disabled="!unlockPass || unlocking" @click="doUnlock">
+              {{ unlocking ? 'Unlocking…' : 'Unlock' }}
+            </button>
+            <p v-if="unlockErr" class="rail-err">{{ unlockErr }}</p>
+          </div>
+          <div v-else class="rail-add">
+            <div class="rail-sep">Add person</div>
+            <input v-model="newP.id" class="rail-input" placeholder="id (e.g. jan)" />
+            <input v-model="newP.name" class="rail-input" placeholder="Display name" />
+            <select v-model="newP.role" class="rail-input">
+              <option value="owner">owner</option><option value="family">family</option>
+              <option value="guest">guest</option><option value="minor">minor</option>
+            </select>
+            <button class="rail-btn" :disabled="!newP.id.trim() || !newP.name.trim() || addingP" @click="addPerson">
+              {{ addingP ? 'Adding…' : '+ Add person' }}
+            </button>
+          </div>
         </nav>
 
         <!-- ── Right: skills library ── -->
@@ -198,6 +215,33 @@ const store = useKnowledgeStore()
 const prefs = usePrefsStore()
 const nav = useNavStore()
 const teaching = ref(false)
+const unlockPass = ref('')
+const unlocking = ref(false)
+const unlockErr = ref('')
+const newP = ref({ id: '', name: '', role: 'guest' })
+const addingP = ref(false)
+
+async function doUnlock() {
+  if (!unlockPass.value) return
+  unlocking.value = true
+  unlockErr.value = ''
+  try {
+    const r = await fetch(`${BRAIN_URL}/knowledge/unlock`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ passphrase: unlockPass.value }),
+    })
+    if (!r.ok) { unlockErr.value = (await r.json().catch(() => ({}))).error ?? 'unlock failed'; return }
+    unlockPass.value = ''
+    await Promise.all([store.fetchTier(), store.fetchPeople()])
+  } catch { unlockErr.value = 'brain unreachable' } finally { unlocking.value = false }
+}
+async function addPerson() {
+  addingP.value = true
+  try {
+    const ok = await store.upsertPerson(newP.value.id.trim().toLowerCase(), newP.value.name.trim(), newP.value.role)
+    if (ok) { const id = newP.value.id.trim().toLowerCase(); newP.value = { id: '', name: '', role: 'guest' }; await select(id) }
+  } finally { addingP.value = false }
+}
 const teachMsg = ref('')
 
 async function doTeachFace() {
@@ -454,7 +498,12 @@ onMounted(async () => {
 .rail-role--family { color: var(--accent); border-color: currentColor; }
 .rail-role--minor { color: var(--warn, #d9a441); border-color: currentColor; }
 .rail-sep { font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-faint); margin: 0.6rem 0.4rem 0.15rem; }
-.rail-locked { font-size: 0.72rem; color: var(--warn, #d9a441); padding: 0.4rem; }
+.rail-locked { font-size: 0.72rem; color: var(--warn, #d9a441); padding: 0.3rem 0.4rem; }
+.rail-unlock, .rail-add { display: flex; flex-direction: column; gap: 0.35rem; padding: 0.3rem 0.4rem; }
+.rail-input { background: var(--surface); border: 1px solid var(--border-strong); border-radius: var(--radius-md); color: var(--text); padding: 0.35rem 0.45rem; font-size: 0.78rem; }
+.rail-btn { background: var(--accent); color: var(--accent-contrast, #fff); border: none; border-radius: var(--radius-md); padding: 0.4rem; font-size: 0.78rem; cursor: pointer; }
+.rail-btn:disabled { opacity: 0.5; }
+.rail-err { color: var(--danger-text, #e5484d); font-size: 0.72rem; margin: 0; }
 
 /* content */
 .brain-content { flex: 1; overflow-y: auto; padding: 1.1rem 1.35rem 1.5rem; }

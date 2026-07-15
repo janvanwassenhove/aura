@@ -241,10 +241,39 @@ async def set_consent(
 
 @router.post("/lock")
 async def lock_knowledge() -> JSONResponse:
-    """Drop to BENIGN tier (logical lock). Restart brain with KNOWLEDGE_PASSPHRASE to restore."""
+    """Drop to BENIGN tier (logical lock). Unlock via POST /knowledge/unlock."""
     global _tier
     _tier = UnlockTier.BENIGN
     return JSONResponse({"tier": UnlockTier.BENIGN, "locked": True})
+
+
+@router.post("/unlock")
+async def unlock_knowledge(body: dict) -> JSONResponse:
+    """U94: re-elevate to SENSITIVE by re-entering the knowledge passphrase.
+
+    Verifies the passphrase by deriving the OMK (same salt) and comparing it to
+    the store's loaded key — wrong passphrase never elevates, and the passphrase
+    is never logged or stored."""
+    global _tier
+    import os
+
+    if not _omk_loaded:
+        # Dev mode (no encryption) — nothing to unlock.
+        _tier = UnlockTier.SENSITIVE
+        return JSONResponse({"tier": _tier, "unlocked": True})
+    passphrase = str((body or {}).get("passphrase", ""))
+    if len(passphrase) < 1:
+        return JSONResponse({"error": "passphrase required"}, status_code=422)
+    store_omk = getattr(_store, "_omk", None)
+    if store_omk is None:
+        return JSONResponse({"error": "store has no key"}, status_code=500)
+    from shared_schemas.knowledge import crypto
+
+    salt = os.environ.get("KNOWLEDGE_SALT", "aura-knowledge").encode().ljust(16, b"0")[:16]
+    if crypto.derive_omk(passphrase, salt) != store_omk:
+        return JSONResponse({"error": "wrong passphrase"}, status_code=403)
+    _tier = UnlockTier.SENSITIVE
+    return JSONResponse({"tier": _tier, "unlocked": True})
 
 
 @router.get("/tier")
