@@ -246,6 +246,8 @@ class ReachyRobotAdapter(RobotAdapter):
             return
 
         def _play() -> None:
+            import time
+
             # s16le → float32 [-1, 1], resampled to the device output rate
             # (push_audio_sample wants float32; channels are adapted by the SDK).
             pcm = np.frombuffer(audio_bytes, dtype=np.int16).astype(np.float32) / 32768.0
@@ -255,16 +257,28 @@ class ReachyRobotAdapter(RobotAdapter):
             if peak > 0.01:
                 pcm = pcm * (0.95 / peak)
             pcm = pcm * self._volume  # U36e: app-controlled speaker gain
-            out_rate = media.get_output_audio_samplerate()
+            out_rate = media.get_output_audio_samplerate() or sample_rate
             if out_rate and out_rate > 0 and out_rate != sample_rate:
                 n_out = int(len(pcm) * out_rate / sample_rate)
                 x_old = np.linspace(0.0, 1.0, num=len(pcm), endpoint=False)
                 x_new = np.linspace(0.0, 1.0, num=n_out, endpoint=False)
                 pcm = np.interp(x_new, x_old, pcm).astype(np.float32)
+            # U80: push in real-time-paced blocks and BLOCK until the whole
+            # utterance has played. A single big push_audio_sample() only played
+            # the first fraction of a second (the SDK drains a small buffer and
+            # stops when nothing keeps feeding it) — long replies were cut to
+            # one word ("Zeker…"). Feed ~200 ms blocks, sleeping each block's
+            # duration so the queue stays fed but never overflows.
             media.start_playing()
-            media.push_audio_sample(pcm)
+            block = max(1, int(out_rate * 0.2))
+            for start in range(0, len(pcm), block):
+                chunk = pcm[start:start + block]
+                media.push_audio_sample(chunk)
+                time.sleep(len(chunk) / out_rate)
+            # small tail so the device drains the last block before we release
+            time.sleep(0.15)
 
-        async with self._motion_lock:  # don't fight a wake_up emote's sound
+        async with self._motion_lock:  # hold the lock so nothing cuts the speech
             await asyncio.to_thread(_play)
 
     async def capture_audio(self, duration_s: float = 3.0) -> bytes:
