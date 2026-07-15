@@ -36,6 +36,17 @@
 
     <div class="status-row mt-3">
       <span class="label volume-label">
+        <Moon v-if="asleep" :size="14" /><Power v-else :size="14" /> {{ asleep ? 'Asleep' : 'Awake' }}
+      </span>
+      <button
+        :class="['toggle', !asleep && 'toggle--on']"
+        :title="asleep ? 'Wake up' : 'Sleep — take no action'"
+        @click="toggleSleep"
+      ><span class="toggle-knob" /></button>
+    </div>
+
+    <div class="status-row">
+      <span class="label volume-label">
         <Mic v-if="micOn" :size="14" /><MicOff v-else :size="14" /> Microphone
       </span>
       <button
@@ -200,6 +211,18 @@ const tracking = ref(true) // adapter enables head tracking on connect
 
 // U99: microphone (wake-word listening) on/off — sets VOICE_MODE via prefs.
 const micOn = ref(true)
+const asleep = ref(false)
+async function fetchSleep() {
+  try { const r = await fetch(`${BRAIN_URL}/robot/sleep`); asleep.value = (await r.json()).asleep === true } catch {}
+}
+async function toggleSleep() {
+  const to = !asleep.value
+  asleep.value = to
+  try {
+    await fetch(`${BRAIN_URL}/robot/${to ? 'sleep' : 'wake'}`, { method: 'POST' })
+    micOn.value = !to  // sleep turns the mic off; wake turns it on
+  } catch { asleep.value = !to }
+}
 async function fetchMic() {
   try {
     const r = await fetch(`${BRAIN_URL}/setup/prefs`)
@@ -330,7 +353,7 @@ async function applyVolume() {
   } catch { /* robot offline — slider stays local */ }
 }
 
-onMounted(() => { fetchCharacters(); fetchMic() })
+onMounted(() => { fetchCharacters(); fetchMic(); fetchSleep() })
 onMounted(async () => {
   try {
     const resp = await fetch(`${BRAIN_URL}/robot/volume`)

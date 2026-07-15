@@ -88,6 +88,50 @@ async def motion(command: MotionCommand) -> JSONResponse:
     return JSONResponse({"ok": ok})
 
 
+@router.post("/sleep")
+async def sleep() -> JSONResponse:
+    """U100: sleep MODE — take no action. Suppresses greetings + spoken replies
+    (ROBOT_ASLEEP), stops mic listening (VOICE_MODE=off), stops idle head
+    tracking, and puts the robot in a sleep pose."""
+    import os as _os
+
+    _os.environ["ROBOT_ASLEEP"] = "true"
+    _os.environ["VOICE_MODE"] = "off"
+    from aura_brain.setup_api import _write_env
+    _write_env({"ROBOT_ASLEEP": "true", "VOICE_MODE": "off"})
+    try:
+        await _robot.set_tracking(False)
+        from shared_schemas.robot.models import MotionCommand
+        await _robot.execute_motion(MotionCommand(motion_id="sleep", speed=1.0, amplitude=0.6, direction=None))
+    except (httpx.HTTPError, OSError):
+        pass
+    return JSONResponse({"asleep": True})
+
+
+@router.post("/wake")
+async def wake() -> JSONResponse:
+    """U100: wake up — resume normal behavior (greetings, replies, listening)."""
+    import os as _os
+
+    _os.environ["ROBOT_ASLEEP"] = "false"
+    _os.environ["VOICE_MODE"] = "wake_word"
+    from aura_brain.setup_api import _write_env
+    _write_env({"ROBOT_ASLEEP": "false", "VOICE_MODE": "wake_word"})
+    try:
+        from shared_schemas.robot.models import MotionCommand
+        await _robot.execute_motion(MotionCommand(motion_id="wake_up", speed=1.0, amplitude=0.7, direction=None))
+        await _robot.set_tracking(True)
+    except (httpx.HTTPError, OSError):
+        pass
+    return JSONResponse({"asleep": False})
+
+
+@router.get("/sleep")
+async def sleep_status() -> JSONResponse:
+    import os as _os
+    return JSONResponse({"asleep": _os.environ.get("ROBOT_ASLEEP", "false").lower() == "true"})
+
+
 @router.post("/tracking")
 async def tracking(body: dict) -> JSONResponse:
     try:
