@@ -327,6 +327,9 @@ the human can unblock it.
 - [x] **U105 — bronnen automatisch minen + provenance in de graph** · `pending`
   (1) Auto-ingest bij toevoegen: een fetchbare source (blog/website/github) wordt direct na "Add source" gelezen — het ingest-endpoint accepteert nu `{"kind","value"}` om één bron te lezen. (2) Periodieke refresh: `refresh_loop` in de brain herleest wekelijks alle bronnen (SOURCE_REFRESH_ENABLED + SOURCE_REFRESH_HOURS=168, 0=uit; live aangezet in infra/dev/.env); per persoon uit te schakelen met de "auto-refresh"-checkbox (laatste `source-refresh`-fact wint, geen step-up nodig); `POST /knowledge/refresh-sources` doet hetzelfde on-demand. (3) Provenance: elke gemineerde fact eindigt op `— via [[host]]` (of `[[chatgpt]]`/`[[claude]]` bij chat-imports). (4) Graph: `[[topics]]` in fact-values worden nu GEDEELDE topic-nodes (paars) — persoon → fact → topic/bron bouwt zichtbaar op; matcht een topic een bestaande persoon/skill dan linkt hij daarnaartoe. Brain 173, console 56 groen.
 
+- [x] **U106 — graph: pan & zoom** · `pending`
+  De brain graph is nu navigeerbaar: slepen op de achtergrond pant, scrollen zoomt in/uit rond de cursor (0.2×–4×), en er zijn +/−/reset-knoppen rechtsboven. Eén viewport-transform (`scale`,`ox`,`oy`) wordt in `draw()` toegepast; hit-testing rekent scherm→wereld terug zodat klikken/hover de zoom volgen. Een druk-zonder-bewegen telt nog steeds als klik (opent de node), slepen niet. Cursor: grab/grabbing/pointer. Console 56 groen.
+
 ## Progress log (append-only; newest last)
 
 - 2026-06-21 — ledger created on `aura-autobuild`; Phase 0/0b complete, Phase 1 scaffold (U-pre) done before this loop started.

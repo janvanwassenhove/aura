@@ -1,12 +1,21 @@
 <template>
   <div class="graph-wrap">
-    <canvas ref="canvas" class="graph-canvas" @mousemove="onMove" @click="onClick" />
+    <canvas
+      ref="canvas" class="graph-canvas"
+      @mousemove="onMove" @mousedown="onDown" @mouseup="onUp" @mouseleave="onLeave"
+      @wheel.prevent="onWheel"
+    />
     <div v-if="hover" class="graph-tip" :style="{ left: hover.x + 14 + 'px', top: hover.y + 8 + 'px' }">
       <strong>{{ hover.label }}</strong><span class="tip-kind">{{ hover.kind }}</span>
     </div>
+    <div class="graph-zoom">
+      <button class="gz-btn" title="Zoom in" @click="zoomBy(1.2)">+</button>
+      <button class="gz-btn" title="Zoom out" @click="zoomBy(1 / 1.2)">−</button>
+      <button class="gz-btn" title="Reset zoom &amp; position" @click="resetView">⤢</button>
+    </div>
     <p class="graph-legend">
       <span class="lg lg-person" /> person · <span class="lg lg-skill" /> skill ·
-      <span class="lg lg-fact" /> fact · <span class="lg lg-topic" /> topic/source — click a node to open it
+      <span class="lg lg-fact" /> fact · <span class="lg lg-topic" /> topic/source — drag to pan, scroll to zoom, click a node to open
     </p>
   </div>
 </template>
@@ -36,6 +45,11 @@ let nodes: GNode[] = []
 let edges: GEdge[] = []
 let raf = 0
 let ticks = 0
+
+// U106: pan/zoom viewport. World→screen: sx = wx * scale + ox. Plain object
+// (mutated each frame by the render loop — no reactivity needed).
+const view = { scale: 1, ox: 0, oy: 0 }
+let drag: { sx: number; sy: number; ox: number; oy: number; moved: boolean } | null = null
 
 function seededRand(i: number): number {
   const x = Math.sin(i * 999 + 7) * 10000
@@ -134,7 +148,10 @@ function draw(): void {
   if (!c) return
   const ctx = c.getContext('2d')!
   const { width: w, height: h } = c
+  ctx.setTransform(1, 0, 0, 1, 0, 0)
   ctx.clearRect(0, 0, w, h)
+  // U106: everything below is drawn in world coords; the viewport scales/pans it.
+  ctx.setTransform(view.scale, 0, 0, view.scale, view.ox, view.oy)
   ctx.strokeStyle = 'rgba(120, 150, 180, 0.25)'
   ctx.lineWidth = 1
   for (const e of edges) {
@@ -168,24 +185,75 @@ function loop(): void {
   raf = requestAnimationFrame(loop)
 }
 
-function nodeAt(mx: number, my: number): GNode | null {
+function nodeAt(sx: number, sy: number): GNode | null {
+  // Screen → world before hit-testing, so picking follows pan/zoom.
+  const wx = (sx - view.ox) / view.scale
+  const wy = (sy - view.oy) / view.scale
   for (const n of nodes) {
-    if (Math.hypot(n.x - mx, n.y - my) <= n.r + 4) return n
+    if (Math.hypot(n.x - wx, n.y - wy) <= n.r + 4) return n
   }
   return null
 }
 
-function onMove(ev: MouseEvent): void {
+function onDown(ev: MouseEvent): void {
   const rect = canvas.value!.getBoundingClientRect()
-  const n = nodeAt(ev.clientX - rect.left, ev.clientY - rect.top)
-  hover.value = n ? { x: ev.clientX - rect.left, y: ev.clientY - rect.top, label: n.label, kind: n.kind } : null
-  canvas.value!.style.cursor = n ? 'pointer' : 'default'
+  drag = { sx: ev.clientX - rect.left, sy: ev.clientY - rect.top, ox: view.ox, oy: view.oy, moved: false }
 }
 
-function onClick(ev: MouseEvent): void {
+function onMove(ev: MouseEvent): void {
   const rect = canvas.value!.getBoundingClientRect()
-  const n = nodeAt(ev.clientX - rect.left, ev.clientY - rect.top)
-  if (n && n.kind !== 'fact') emit('open', n.kind, n.kind === 'person' ? n.id : n.id)
+  const mx = ev.clientX - rect.left, my = ev.clientY - rect.top
+  if (drag) {  // panning
+    const dx = mx - drag.sx, dy = my - drag.sy
+    if (Math.abs(dx) + Math.abs(dy) > 3) drag.moved = true
+    view.ox = drag.ox + dx
+    view.oy = drag.oy + dy
+    hover.value = null
+    canvas.value!.style.cursor = 'grabbing'
+    return
+  }
+  const n = nodeAt(mx, my)
+  hover.value = n ? { x: mx, y: my, label: n.label, kind: n.kind } : null
+  canvas.value!.style.cursor = n ? 'pointer' : 'grab'
+}
+
+function onUp(ev: MouseEvent): void {
+  // A press that didn't move is a click — open the node under it.
+  if (drag && !drag.moved) {
+    const rect = canvas.value!.getBoundingClientRect()
+    const n = nodeAt(ev.clientX - rect.left, ev.clientY - rect.top)
+    if (n && n.kind !== 'fact' && n.kind !== 'topic') emit('open', n.kind, n.id)
+  }
+  drag = null
+}
+
+function onLeave(): void {
+  drag = null
+  hover.value = null
+}
+
+function zoomAt(sx: number, sy: number, factor: number): void {
+  const newScale = Math.max(0.2, Math.min(4, view.scale * factor))
+  // Keep the world point under (sx,sy) fixed while scaling.
+  view.ox = sx - (sx - view.ox) * (newScale / view.scale)
+  view.oy = sy - (sy - view.oy) * (newScale / view.scale)
+  view.scale = newScale
+}
+
+function onWheel(ev: WheelEvent): void {
+  const rect = canvas.value!.getBoundingClientRect()
+  zoomAt(ev.clientX - rect.left, ev.clientY - rect.top, ev.deltaY < 0 ? 1.1 : 1 / 1.1)
+}
+
+function zoomBy(factor: number): void {
+  const c = canvas.value
+  if (c) zoomAt(c.width / 2, c.height / 2, factor)  // zoom toward the centre
+}
+
+function resetView(): void {
+  view.scale = 1
+  view.ox = 0
+  view.oy = 0
 }
 
 function resize(): void {
@@ -207,7 +275,19 @@ onBeforeUnmount(() => { cancelAnimationFrame(raf); window.removeEventListener('r
   width: 100%; height: calc(100% - 26px); display: block;
   background: radial-gradient(ellipse at center, #23272e 0%, #1a1d22 100%);
   border-radius: var(--radius-lg);
+  cursor: grab;
 }
+.graph-zoom {
+  position: absolute; top: 0.5rem; right: 0.5rem; z-index: 6;
+  display: flex; flex-direction: column; gap: 0.25rem;
+}
+.gz-btn {
+  width: 26px; height: 26px; display: grid; place-items: center;
+  background: var(--surface); border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md); color: var(--text); cursor: pointer;
+  font-size: 0.95rem; line-height: 1; padding: 0;
+}
+.gz-btn:hover { background: var(--surface-2); }
 .graph-tip {
   position: absolute; pointer-events: none; z-index: 5;
   background: var(--surface); border: 1px solid var(--border-strong);
