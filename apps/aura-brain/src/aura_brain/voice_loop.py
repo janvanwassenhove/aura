@@ -131,7 +131,7 @@ class VoiceLoop:
         self._default_wake = default_wake_word
         self._window_s = window_s
         self._followup_s = followup_s
-        self._speech_peak = float(os.environ.get("VOICE_SPEECH_PEAK", speech_peak))
+        self._speech_peak_default = float(speech_peak)
         self._task: asyncio.Task | None = None
         self._followup_until = 0.0
         self._speaking_until = 0.0
@@ -205,6 +205,14 @@ class VoiceLoop:
     @property
     def _wake(self) -> str:
         return os.environ.get("WAKE_WORD", self._default_wake).strip().lower()
+
+    @property
+    def _speech_peak(self) -> float:
+        # U86: read live so Settings can tune mic sensitivity without a restart.
+        try:
+            return float(os.environ.get("VOICE_SPEECH_PEAK", self._speech_peak_default))
+        except ValueError:
+            return self._speech_peak_default
 
     # -- main loop -----------------------------------------------------
 
