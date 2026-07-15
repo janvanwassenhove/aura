@@ -46,6 +46,10 @@ class UnlockTier(StrEnum):
 
 _omk_loaded: bool = False
 _tier: UnlockTier = UnlockTier.BENIGN
+# U96: the store is only GATED after an explicit POST /knowledge/lock. On a
+# fresh start the owner's own profiles are always readable (no confusing
+# "everything vanished" benign wall). Unlock / restart clears this.
+_explicitly_locked: bool = False
 
 
 # ------------------------------------------------------------------
@@ -64,10 +68,11 @@ def set_stepup_gate(gate: StepUpGate) -> None:
 
 def set_omk_loaded(loaded: bool) -> None:
     """Signal whether the EncryptedKnowledgeStore is active (KNOWLEDGE_PASSPHRASE set)."""
-    global _omk_loaded, _tier
+    global _omk_loaded, _tier, _explicitly_locked
     _omk_loaded = loaded
     if loaded:
         _tier = UnlockTier.SENSITIVE
+        _explicitly_locked = False
 
 
 def is_omk_loaded() -> bool:
@@ -86,10 +91,10 @@ def _require() -> KnowledgeStore:
 
 def _require_sensitive() -> None:
     """FastAPI dependency: 403 when the store is encrypted but the tier is BENIGN (locked)."""
-    if _omk_loaded and _tier == UnlockTier.BENIGN:
+    if _omk_loaded and _explicitly_locked:
         raise HTTPException(
             status_code=403,
-            detail="Knowledge locked. POST /knowledge/lock to unlock (restart with KNOWLEDGE_PASSPHRASE).",
+            detail="Knowledge locked. POST /knowledge/unlock with the passphrase.",
         )
 
 
@@ -242,8 +247,9 @@ async def set_consent(
 @router.post("/lock")
 async def lock_knowledge() -> JSONResponse:
     """Drop to BENIGN tier (logical lock). Unlock via POST /knowledge/unlock."""
-    global _tier
+    global _tier, _explicitly_locked
     _tier = UnlockTier.BENIGN
+    _explicitly_locked = True
     return JSONResponse({"tier": UnlockTier.BENIGN, "locked": True})
 
 
@@ -254,12 +260,13 @@ async def unlock_knowledge(body: dict) -> JSONResponse:
     Verifies the passphrase by deriving the OMK (same salt) and comparing it to
     the store's loaded key — wrong passphrase never elevates, and the passphrase
     is never logged or stored."""
-    global _tier
+    global _tier, _explicitly_locked
     import os
 
     if not _omk_loaded:
         # Dev mode (no encryption) — nothing to unlock.
         _tier = UnlockTier.SENSITIVE
+        _explicitly_locked = False
         return JSONResponse({"tier": _tier, "unlocked": True})
     passphrase = str((body or {}).get("passphrase", ""))
     if len(passphrase) < 1:
@@ -273,6 +280,7 @@ async def unlock_knowledge(body: dict) -> JSONResponse:
     if crypto.derive_omk(passphrase, salt) != store_omk:
         return JSONResponse({"error": "wrong passphrase"}, status_code=403)
     _tier = UnlockTier.SENSITIVE
+    _explicitly_locked = False
     return JSONResponse({"tier": _tier, "unlocked": True})
 
 

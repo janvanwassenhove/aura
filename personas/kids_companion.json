@@ -7,7 +7,7 @@
   "speaking_style": "playful, simple, enthusiastic",
   "humor_level": "high",
   "verbosity": "brief",
-  "interruptibility": "vad",
+  "interruptibility": "wake_word",
   "emotional_style": "cheerful",
   "voice_provider": "openai",
   "voice_id": "sage",

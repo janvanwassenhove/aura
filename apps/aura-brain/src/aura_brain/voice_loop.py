@@ -206,6 +206,16 @@ class VoiceLoop:
         except ValueError:
             return 1.6
 
+    def _strip_wake_word(self, command: str) -> str:
+        """U96: remove a leading/whole wake word from the command so a bare or
+        echoed 'Richie' collapses to empty (→ ignored, not a turn)."""
+        idx = wake_word_index(command, self._wake)
+        if idx < 0:
+            return command
+        rest = command[idx:]
+        parts = rest.split(None, 1)
+        return (parts[1] if len(parts) > 1 else "").strip(" ,.!?-").strip()
+
     def _is_echo_of_last_reply(self, text: str) -> bool:
         """True when the transcript is largely the robot's own last reply
         bouncing back through the mic (word-overlap heuristic)."""
@@ -361,6 +371,16 @@ class VoiceLoop:
                     command = await self._capture_command()
                     if not is_plausible_command(command):
                         continue
+
+                # U96: a command that is ONLY the wake word (Whisper echoes the
+                # STT name-prompt as "Richie" on noise/robot-echo) must NEVER be
+                # sent to the LLM — that produced the endless "You: Richie" →
+                # generic-reply loop. Strip the wake word; if nothing real
+                # remains, stay silent.
+                command = self._strip_wake_word(command)
+                if len(command.strip()) < 2:
+                    logger.debug("voice loop ignored bare/echoed wake word")
+                    continue
 
                 # NOW this is a real user turn: re-arm cancel tokens and inject
                 # the interruption note as OWNER GUIDANCE (a system message,

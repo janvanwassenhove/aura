@@ -361,3 +361,38 @@ async def test_interruption_note_not_prepended_to_command(monkeypatch) -> None:
     handled.append(command)     # command stays clean
     assert "interrupted" not in command
     assert any("interrupted" in s for s in steered)
+
+
+async def test_bare_or_echoed_wake_word_never_becomes_a_turn(loop_env, monkeypatch) -> None:
+    """U96: a command that is only the wake word (Whisper echoes the STT
+    name-prompt on noise/robot-echo) is dropped — no "You: Richie" phantom
+    turn, no generic reply loop."""
+    monkeypatch.delenv("FOLLOWUP_S", raising=False)
+    monkeypatch.setenv("BARGE_IN", "false")
+    monkeypatch.setenv("WAKE_WORD", "richie")
+    robot = _ScriptedRobot(peaks=[0.5, 0.04])  # loud wake window, then silence
+    pipeline = _Pipeline()
+    vl = VoiceLoop(robot, pipeline, _Bus(), speech_peak=0.03, followup_s=0.0)
+
+    async def only_wake(_wav, filename="") -> str:
+        return "Richie"  # bare wake word / echoed prompt
+
+    from aura_brain import voice
+    monkeypatch.setattr(voice, "transcribe", only_wake)
+
+    task = asyncio.create_task(vl._run())
+    await asyncio.sleep(0.2)
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+    assert pipeline.commands == []  # bare wake word → no turn
+
+
+def test_strip_wake_word() -> None:
+    import os
+    os.environ["WAKE_WORD"] = "richie"
+    vl = VoiceLoop(_ScriptedRobot([0.5]), _Pipeline(), _Bus())
+    assert vl._strip_wake_word("Richie") == ""
+    assert vl._strip_wake_word("Ritchie.") == ""
+    assert vl._strip_wake_word("Richie, zet muziek op") == "zet muziek op"
+    assert vl._strip_wake_word("zet muziek op") == "zet muziek op"
