@@ -71,6 +71,14 @@ def _fetch_url(kind: str, value: str) -> str | None:
     return v
 
 
+def _source_label(url: str) -> str:
+    """Human node-name for a source — the bare host (U105 provenance)."""
+    from urllib.parse import urlparse
+
+    host = urlparse(url).netloc or url
+    return host.removeprefix("www.")
+
+
 async def _fetch_page(url: str) -> str:
     """GET a page and return its stripped text. Seam for tests."""
     async with httpx.AsyncClient(
@@ -109,17 +117,22 @@ async def _extract_facts(name: str, url: str, text: str) -> list[dict[str, str]]
     ][:_MAX_FACTS_PER_SOURCE]
 
 
-async def ingest_person_sources(store: Any, person_id: str) -> dict:
+async def ingest_person_sources(store: Any, person_id: str, only: dict | None = None) -> dict:
     """Fetch every fetchable source of ``person_id`` and grow their facts.
 
-    Returns an honest summary: which sources were read, which were skipped
-    (auth-walled or unreachable), and which facts were added (deduped).
+    ``only={"kind","value"}`` restricts to a single source (U105 auto-ingest
+    right after adding one). Returns an honest summary: which sources were
+    read, which were skipped (auth-walled or unreachable), and which facts
+    were added (deduped).
     """
     person = await store.get_person(person_id)
     if person is None:
         return {"error": f"unknown person {person_id!r}"}
     existing = await store.get_facts(person_id)
     sources = [f for f in existing if f.key.startswith("source:")]
+    if only is not None:
+        sources = [f for f in sources
+                   if f.key == f"source:{only.get('kind')}" and f.value.strip() == str(only.get('value', '')).strip()]
     have = {(f.key.lower(), f.value.strip().lower()) for f in existing}
 
     read: list[dict] = []
@@ -150,12 +163,64 @@ async def ingest_person_sources(store: Any, person_id: str) -> dict:
         read.append({"kind": kind, "url": url, "facts_found": len(facts)})
         from shared_schemas.knowledge import ProfileFact
 
+        label = _source_label(url)
         for f in facts:
-            if (f["key"].lower(), f["value"].strip().lower()) in have:
+            # U105 provenance: every mined fact says WHERE it came from, as a
+            # [[link]] — the source host becomes a shared node in the graph,
+            # so person → fact → source builds up visibly.
+            value = f["value"] if f"[[{label}]]" in f["value"] else f"{f['value']} — via [[{label}]]"
+            if (f["key"].lower(), value.strip().lower()) in have:
                 continue  # dedupe — re-running ingest must not double the graph
-            await store.add_fact(ProfileFact(person_id=person_id, key=f["key"], value=f["value"]))
-            have.add((f["key"].lower(), f["value"].strip().lower()))
-            added.append(f)
+            await store.add_fact(ProfileFact(person_id=person_id, key=f["key"], value=value))
+            have.add((f["key"].lower(), value.strip().lower()))
+            added.append({"key": f["key"], "value": value})
 
     return {"person_id": person_id, "read": read, "skipped": skipped,
             "added": added, "added_count": len(added)}
+
+
+# ------------------------------------------------------------------
+# U105: periodic refresh — the graph keeps growing with new blog posts
+# ------------------------------------------------------------------
+
+def _refresh_enabled(facts: list) -> bool:
+    """Per-person opt-out: the LAST `source-refresh` fact wins ('off' skips)."""
+    state = "on"
+    for f in facts:
+        if f.key == "source-refresh":
+            state = f.value.strip().lower()
+    return state != "off"
+
+
+async def refresh_all_sources(store: Any) -> dict:
+    """Re-ingest every person's fetchable sources (dedupe keeps it idempotent)."""
+    results: list[dict] = []
+    for person in await store.list_people():
+        facts = await store.get_facts(person.person_id)
+        if not any(f.key.startswith("source:") for f in facts):
+            continue
+        if not _refresh_enabled(facts):
+            results.append({"person_id": person.person_id, "skipped": "auto-refresh off"})
+            continue
+        results.append(await ingest_person_sources(store, person.person_id))
+    return {"refreshed": results}
+
+
+async def refresh_loop(store: Any) -> None:
+    """Background loop: every SOURCE_REFRESH_HOURS (default 168 = weekly,
+    0 = off) re-read all sources so the persona graph grows over time."""
+    import asyncio
+
+    while True:
+        hours = float(os.environ.get("SOURCE_REFRESH_HOURS", "168"))
+        if hours <= 0:
+            await asyncio.sleep(3600)  # disabled — re-check hourly for live re-enable
+            continue
+        await asyncio.sleep(hours * 3600)
+        try:
+            summary = await refresh_all_sources(store)
+            added = sum(r.get("added_count", 0) for r in summary["refreshed"])
+            logger.info("Source refresh: %d people, %d new facts",
+                        len(summary["refreshed"]), added)
+        except Exception:  # noqa: BLE001 — refresh must never kill the brain
+            logger.exception("Source refresh failed")

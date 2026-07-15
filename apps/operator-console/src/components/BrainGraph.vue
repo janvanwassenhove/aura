@@ -6,7 +6,7 @@
     </div>
     <p class="graph-legend">
       <span class="lg lg-person" /> person · <span class="lg lg-skill" /> skill ·
-      <span class="lg lg-fact" /> fact — click a node to open it
+      <span class="lg lg-fact" /> fact · <span class="lg lg-topic" /> topic/source — click a node to open it
     </p>
   </div>
 </template>
@@ -17,7 +17,7 @@
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 
 interface GNode {
-  id: string; label: string; kind: 'person' | 'skill' | 'fact'
+  id: string; label: string; kind: 'person' | 'skill' | 'fact' | 'topic'
   x: number; y: number; vx: number; vy: number; r: number
 }
 interface GEdge { a: number; b: number }
@@ -75,6 +75,21 @@ function buildGraph(w: number, h: number): void {
     }
   }
   for (const f of props.facts) link(`fact:${f.person_id}:${f.key}`.toLowerCase(), `person:${f.person_id.toLowerCase()}`)
+
+  // U105: [[topics]] inside fact values become SHARED nodes — the same topic
+  // (or source host, via provenance) across people/facts is one node, so the
+  // mined information builds up visibly around each persona.
+  for (const f of props.facts) {
+    for (const m of f.value.matchAll(/\[\[([^\]]+)\]\]/g)) {
+      const t = m[1].trim()
+      const key = t.toLowerCase()
+      // An existing person/skill with that name IS the node — link to it.
+      if (idx.has(`person:${key}`)) { link(`fact:${f.person_id}:${f.key}`.toLowerCase(), `person:${key}`); continue }
+      if (idx.has(`skill:${key}`)) { link(`fact:${f.person_id}:${f.key}`.toLowerCase(), `skill:${key}`); continue }
+      if (!idx.has(`topic:${key}`)) add(t, t, 'topic', 7)
+      link(`fact:${f.person_id}:${f.key}`.toLowerCase(), `topic:${key}`)
+    }
+  }
   ticks = 0
 }
 
@@ -112,7 +127,7 @@ function step(w: number, h: number): void {
   }
 }
 
-const COLORS = { person: '#f0b429', skill: '#5cb8e4', fact: '#7ba7c9' }
+const COLORS = { person: '#f0b429', skill: '#5cb8e4', fact: '#7ba7c9', topic: '#9d7be0' }
 
 function draw(): void {
   const c = canvas.value
@@ -206,4 +221,5 @@ onBeforeUnmount(() => { cancelAnimationFrame(raf); window.removeEventListener('r
 .lg-person { background: #f0b429; }
 .lg-skill { background: #5cb8e4; }
 .lg-fact { background: #7ba7c9; width: 6px; height: 6px; }
+.lg-topic { background: #9d7be0; }
 </style>

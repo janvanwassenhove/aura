@@ -165,6 +165,9 @@
             <button class="b-btn" :disabled="ingesting" @click="growBrain()">
               {{ ingesting ? 'Reading sources…' : 'Grow brain from sources' }}
             </button>
+            <label class="refresh-toggle" title="Re-read this person's sources on the weekly refresh (SOURCE_REFRESH_HOURS)">
+              <input type="checkbox" :checked="refreshOn" @change="toggleRefresh()" /> auto-refresh
+            </label>
             <span v-if="ingestNote" class="content-hint">{{ ingestNote }}</span>
           </div>
 
@@ -334,13 +337,39 @@ const newFact = ref({ key: '', value: '' })
 const SOURCE_KINDS = ['instagram', 'facebook', 'x-twitter', 'linkedin', 'blog', 'website', 'gmail', 'github'] as const
 const newSource = ref({ kind: 'instagram' as string, value: '' })
 const sourceFacts = computed(() => (store.detail?.facts ?? []).filter(f => f.key.startsWith('source:')))
-const plainFacts = computed(() => (store.detail?.facts ?? []).filter(f => !f.key.startsWith('source:')))
+const plainFacts = computed(() => (store.detail?.facts ?? []).filter(f => !f.key.startsWith('source:') && f.key !== 'source-refresh'))
+// U105: which source kinds the brain can actually read without a login.
+const FETCHABLE = ['blog', 'website', 'github']
+// Per-person weekly auto-refresh: the LAST `source-refresh` fact wins.
+const refreshOn = computed(() => {
+  const rf = (store.detail?.facts ?? []).filter(f => f.key === 'source-refresh')
+  return rf.length === 0 || rf[rf.length - 1].value.trim().toLowerCase() !== 'off'
+})
+async function toggleRefresh(): Promise<void> {
+  if (!store.detail) return
+  await store.addFact(store.detail.person.person_id, 'source-refresh', refreshOn.value ? 'off' : 'on')
+}
 
 async function addSource(): Promise<void> {
   if (!store.detail) return
-  const ok = await store.addFact(store.detail.person.person_id,
-    `source:${newSource.value.kind}`, newSource.value.value.trim())
-  if (ok) newSource.value.value = ''
+  const kind = newSource.value.kind
+  const value = newSource.value.value.trim()
+  const ok = await store.addFact(store.detail.person.person_id, `source:${kind}`, value)
+  if (!ok) return
+  newSource.value.value = ''
+  // U105: fetchable source → read it right away, so the graph grows on add.
+  if (FETCHABLE.includes(kind)) {
+    ingesting.value = true
+    ingestNote.value = 'Reading new source…'
+    try {
+      const r = await store.ingestSources(store.detail.person.person_id, { kind, value })
+      ingestNote.value = r
+        ? (r.added_count ? `${r.added_count} new fact${r.added_count === 1 ? '' : 's'} from ${kind}` : (r.skipped[0]?.reason ?? 'nothing new found'))
+        : 'Read failed — is the brain running?'
+    } finally {
+      ingesting.value = false
+    }
+  }
 }
 
 // U103: read fetchable sources (blog/website/github) → LLM distills [[linked]]
@@ -450,7 +479,8 @@ async function selectGraph(): Promise<void> {
 
 function onGraphOpen(kind: string, id: string): void {
   if (kind === 'person') select(id)
-  else nav.openSkills(id)
+  else if (kind === 'skill') nav.openSkills(id)
+  // topic nodes are anchors, not documents — nothing to open (yet).
 }
 
 async function select(id: string): Promise<void> {
@@ -647,6 +677,10 @@ onMounted(async () => {
 .fact-chip em { font-style: normal; color: var(--accent); }
 .fact-chip--source em { color: var(--ok-text, #2f9e6e); }
 .file-hidden { display: none; }
+.refresh-toggle {
+  display: inline-flex; align-items: center; gap: 0.3rem;
+  font-size: 0.72rem; color: var(--text-faint); cursor: pointer; user-select: none;
+}
 .chip-x { background: none; border: none; color: var(--text-faint); cursor: pointer; padding: 0; display: inline-flex; }
 .chip-x:hover { color: var(--danger-text, #e5484d); }
 
