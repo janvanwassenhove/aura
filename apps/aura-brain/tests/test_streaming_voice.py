@@ -272,3 +272,39 @@ async def test_barge_without_wake_word_is_ignored_as_echo(loop_env, monkeypatch)
         await task
     assert pipeline.commands == []             # echo ignored
     assert time.monotonic() < vl._speaking_until  # still speaking, not interrupted
+
+
+async def test_followup_rejects_quiet_ambient_and_self_echo(loop_env, monkeypatch) -> None:
+    """U91: in a follow-up window, ambient noise (quiet) and the robot's own
+    reply echoing back must NOT become commands."""
+    monkeypatch.setenv("FOLLOWUP_PEAK_FACTOR", "1.6")
+    monkeypatch.setenv("BARGE_IN", "false")
+    # peaks: quiet (below 1.6× gate) then a clear echo of the last reply
+    robot = _ScriptedRobot(peaks=[0.04, 0.5])
+    pipeline = _Pipeline()
+    vl = VoiceLoop(robot, pipeline, _Bus(), speech_peak=0.03, followup_s=30.0)
+    vl.note_spoken("Ik weet dat je favoriete koffie zwart is en je van skatepunk houdt.")
+    vl._speaking_until = 0.0  # skip echo-guard wait
+    assert vl._followup_until > 0
+
+    async def echo_transcript(_wav, filename="") -> str:
+        # the robot's own reply bounced back through the mic
+        return "je favoriete koffie zwart is en je van skatepunk houdt"
+
+    from aura_brain import voice
+    monkeypatch.setattr(voice, "transcribe", echo_transcript)
+
+    task = asyncio.create_task(vl._run())
+    await asyncio.sleep(0.2)
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+    assert pipeline.commands == []  # quiet ambient + self-echo both rejected
+
+
+def test_echo_detection_heuristic() -> None:
+    vl = VoiceLoop(_ScriptedRobot([0.5]), _Pipeline(), _Bus())
+    vl.note_spoken("Ik weet dat je favoriete koffie zwart is, dat je van skatepunk houdt.")
+    assert vl._is_echo_of_last_reply("je favoriete koffie zwart en skatepunk houdt") is True
+    assert vl._is_echo_of_last_reply("zet de champions op in de living") is False
+    assert vl._is_echo_of_last_reply("ja") is False  # too short

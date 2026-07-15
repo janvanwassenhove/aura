@@ -282,6 +282,9 @@ the human can unblock it.
 - [x] **U90 — modelrollen: model per taaktype (snel gesprek vs krachtig voor taken)** · `pending`
   `openai_chat(model=…)`-override + `config.model_for_role("chat"/"agent")` (leest CHAT_MODEL/AGENT_MODEL live, alleen OpenAI, anders fallback naar het actieve model). Pipeline: ronde 1 gebruikt het **chat**-model (snel, lage latency voor spraak); zodra een beurt meerstaps wordt (tools in het spel), gebruiken ronde 2+ het **agent**-model (krachtig — bv. gpt-5.1 om Computer Use aan te sturen: Spotify openen, nummer zoeken, afspelen). Computer Use zelf houdt zijn eigen COMPUTER_USE_OPENAI_MODEL. Settings → LLM: drie rol-velden (Conversation / Tasks & tools / Screen control) met model-suggesties + Save. Gezet: chat=gpt-4o, agent=gpt-5.1, computer=gpt-5.1 (live + .env). Orchestrator 190 (+2), console 56 groen. `model=` alleen doorgegeven als gezet (test-fakes blijven werken).
 
+- [x] **U91 — spooktranscripten: STT-echo (U89 nog niet geladen) + follow-up-hardening** · `pending`
+  Twee bronnen van "ik heb dat nooit gezegd": (a) "Aanspreken met 'Richie, ...'." = de oude STT-prompt-zin die Whisper terugkaatst — al gefixt in U89 (kale prompt + guard), maar de draaiende brain draaide nog de U87-code → **app-herstart nodig**. (b) "Wat weet ik?" = Whisper-hallucinatie die in een follow-up-venster (zonder wake-word) als commando werd opgevat. Hardening: follow-up-uitingen moeten nu duidelijk luider zijn dan de stilte-gate (FOLLOWUP_PEAK_FACTOR=1.6 → bewuste spraak, geen kamergeluid), én een transcript dat grotendeels de eigen laatste reply is (word-overlap ≥60%) wordt als self-echo geweigerd. Brain 155 (+2) groen. Muziek-/keten-guards (U67/U69) blijven.
+
 ## Progress log (append-only; newest last)
 
 - 2026-06-21 — ledger created on `aura-autobuild`; Phase 0/0b complete, Phase 1 scaffold (U-pre) done before this loop started.
