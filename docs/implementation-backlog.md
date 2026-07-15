@@ -258,6 +258,9 @@ the human can unblock it.
 - [x] **U82 — spraak enorm stil: hardware-volume (ALSA) op max bij connect** · `pending`
   Root cause: de SDK/daemon zet de speaker-ALSA-control `PCM` bij init terug op ~62% = **-23dB** (fors gedempt) — vandaar "enorm stil" ondanks digitale normalisatie. De adapter zette wél een digitale gain (self._volume) maar raakte de hardware-mixer nooit aan. Fix: `_set_hardware_volume_max()` zet `PCM` op 100%/0dB bij élke connect (amixer; overridebaar via SPEAKER_ALSA_CARD/CONTROL, uit te zetten met SPEAKER_ALSA_MAX=false); fijnregeling blijft digitaal via de app-slider. Live geverifieerd (55% → 100% na herstart) + ALSA-state opgeslagen. Robot 54 groen. Gedeployed + herstart.
 
+- [x] **U83 — spraak in stukjes: via GStreamer playbin i.p.v. appsrc-push + streaming uit** · `pending`
+  De echte oorzaak: het appsrc/`push_audio_sample`-pad draint een klein buffertje en stopt — vandaar het hakken, hoeveel pacing ik er ook op zette. De SDK heeft `media.play_sound(bestand)` (GStreamer playbin naar dezelfde sink). `play_audio` schrijft de (genormaliseerde) PCM nu naar een tijdelijke WAV in /dev/shm en speelt die end-to-end af, blokkerend tot klaar; aplay kon niet (device door daemon bezet). Bijkomend: gestreamde TTS standaard UIT (SPEAK_STREAMING=false) — per-chunk waren dat losse playbin-bestandjes met gaatjes; één synthese + één bestand speelt de hele zin vloeiend. Live geverifieerd (7s-toon end-to-end, geen fouten). Robot 54 groen. Robot-fix gedeployed+herstart; brain-fix (streaming-default) vereist app-herstart.
+
 ## Progress log (append-only; newest last)
 
 - 2026-06-21 — ledger created on `aura-autobuild`; Phase 0/0b complete, Phase 1 scaffold (U-pre) done before this loop started.

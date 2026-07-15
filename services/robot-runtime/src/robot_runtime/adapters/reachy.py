@@ -272,40 +272,46 @@ class ReachyRobotAdapter(RobotAdapter):
             return
 
         def _play() -> None:
+            import struct
+            import tempfile
             import time
+            import wave
 
-            # s16le → float32 [-1, 1], resampled to the device output rate
-            # (push_audio_sample wants float32; channels are adapted by the SDK).
+            # s16le mono → peak-normalize to 0.95 (quiet TTS uses full range),
+            # then apply the app volume (U36e/U36g).
             pcm = np.frombuffer(audio_bytes, dtype=np.int16).astype(np.float32) / 32768.0
-            # U36g loudness: peak-normalize each utterance to 0.95 so quiet TTS
-            # output uses the full speaker range, then apply the app volume.
             peak = float(np.max(np.abs(pcm))) if len(pcm) else 0.0
             if peak > 0.01:
                 pcm = pcm * (0.95 / peak)
-            pcm = pcm * self._volume  # U36e: app-controlled speaker gain
-            out_rate = media.get_output_audio_samplerate() or sample_rate
-            if out_rate and out_rate > 0 and out_rate != sample_rate:
-                n_out = int(len(pcm) * out_rate / sample_rate)
-                x_old = np.linspace(0.0, 1.0, num=len(pcm), endpoint=False)
-                x_new = np.linspace(0.0, 1.0, num=n_out, endpoint=False)
-                pcm = np.interp(x_new, x_old, pcm).astype(np.float32)
-            # U80: push in real-time-paced blocks and BLOCK until the whole
-            # utterance has played. A single big push_audio_sample() only played
-            # the first fraction of a second (the SDK drains a small buffer and
-            # stops when nothing keeps feeding it) — long replies were cut to
-            # one word ("Zeker…"). Feed ~200 ms blocks, sleeping each block's
-            # duration so the queue stays fed but never overflows.
-            media.start_playing()
-            block = max(1, int(out_rate * 0.2))
-            for start in range(0, len(pcm), block):
-                chunk = pcm[start:start + block]
-                media.push_audio_sample(chunk)
-                # Feed slightly AHEAD of real time (sleep 80% of the block) so
-                # the device buffer never underruns between pushes — an exact
-                # real-time sleep let it drain and stop mid-sentence (U80→U81).
-                time.sleep(len(chunk) / out_rate * 0.8)
-            # tail: let the buffered audio drain before releasing the lock
-            time.sleep(0.4)
+            pcm = np.clip(pcm * self._volume, -1.0, 1.0)
+            samples = (pcm * 32767.0).astype(np.int16)
+            duration = len(samples) / sample_rate if sample_rate else 0.0
+
+            # U83: play the WHOLE utterance as one WAV via GStreamer playbin
+            # (media.play_sound). The push_audio_sample/appsrc path drained its
+            # small buffer and stopped, chopping long replies into fragments;
+            # playbin plays a complete file end-to-end on the same audio sink.
+            path = None
+            try:
+                with tempfile.NamedTemporaryFile(
+                    suffix=".wav", delete=False, dir="/dev/shm"
+                ) as fh:
+                    path = fh.name
+                with wave.open(path, "wb") as w:
+                    w.setnchannels(1)
+                    w.setsampwidth(2)
+                    w.setframerate(sample_rate)
+                    w.writeframes(struct.pack(f"<{len(samples)}h", *samples.tolist()))
+                media.play_sound(path)
+                # playbin is async; block for the audio duration (+margin) so
+                # nothing else grabs the sink and the lock stays held.
+                time.sleep(duration + 0.4)
+            finally:
+                if path:
+                    try:
+                        os.remove(path)
+                    except OSError:
+                        pass
 
         async with self._motion_lock:  # hold the lock so nothing cuts the speech
             await asyncio.to_thread(_play)
