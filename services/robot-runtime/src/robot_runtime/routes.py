@@ -49,6 +49,12 @@ async def health() -> JSONResponse:
 @router.get("/robot/status")
 async def get_status() -> JSONResponse:
     assert adapter is not None
+    # U79: a status poll is proof the brain link is alive. The brain's
+    # RobotEventBridge polls this regularly, so without touching liveness here
+    # a brain that is up but just not commanding (ordinary conversation) wrongly
+    # trips the offline loop after BRAIN_LINK_TIMEOUT — its idle-nod loop then
+    # holds the head and kills follow-me + recognition greetings.
+    _touch()
     status = await adapter.get_status()
     return JSONResponse(status.model_dump())
 
