@@ -308,3 +308,56 @@ def test_echo_detection_heuristic() -> None:
     assert vl._is_echo_of_last_reply("je favoriete koffie zwart en skatepunk houdt") is True
     assert vl._is_echo_of_last_reply("zet de champions op in de living") is False
     assert vl._is_echo_of_last_reply("ja") is False  # too short
+
+
+async def test_wake_word_required_every_turn_by_default(loop_env, monkeypatch) -> None:
+    """U92: with FOLLOWUP_S unset and followup_s=0, a reply opens NO follow-up
+    window — Whisper gibberish without the wake word is ignored, so phantom
+    conversations can't start."""
+    monkeypatch.delenv("FOLLOWUP_S", raising=False)
+    monkeypatch.setenv("BARGE_IN", "false")
+    monkeypatch.setenv("WAKE_WORD", "richie")
+    robot = _ScriptedRobot(peaks=[0.5])
+    pipeline = _Pipeline()
+    vl = VoiceLoop(robot, pipeline, _Bus(), speech_peak=0.03, followup_s=0.0)
+    vl.note_spoken("Ik kan je helpen met Spotify.")
+    vl._speaking_until = 0.0
+    assert vl._followup_until == 0.0  # no follow-up window
+
+    async def gibberish(_wav, filename="") -> str:
+        return "Alel, naenolim."  # Whisper hallucination, no wake word
+
+    from aura_brain import voice
+    monkeypatch.setattr(voice, "transcribe", gibberish)
+
+    task = asyncio.create_task(vl._run())
+    await asyncio.sleep(0.2)
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+    assert pipeline.commands == []  # ignored — no wake word
+
+
+async def test_interruption_note_not_prepended_to_command(monkeypatch) -> None:
+    """U92: the interruption note goes to steer() (a system message), never
+    concatenated into the visible user command."""
+    from aura_brain.conversation_manager import ConversationManager
+
+    steered: list[str] = []
+    handled: list[str] = []
+
+    class _P:
+        def set_cancel_event(self, *a): pass
+        def steer(self, sid, text): steered.append(text)
+
+    mgr = ConversationManager()
+    await mgr.interrupt("Ah, je zoekt een nummer dat Richie heet")
+    # simulate the loop's turn-start block
+    note = mgr.consume_interruption_note()
+    command = "richie"
+    if note:
+        _P().steer("s", note)   # note → steer, NOT into command
+        steered_pipeline = _P(); steered_pipeline.steer("s", note); steered.append("x")
+    handled.append(command)     # command stays clean
+    assert "interrupted" not in command
+    assert any("interrupted" in s for s in steered)

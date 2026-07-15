@@ -383,6 +383,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         _robot, ctx.pipeline, ctx.bus, session_id=session_id,
         default_wake_word=os.environ.get("ASSISTANT_NAME", "AURA").lower(),
         manager=ctx.conversation,
+        followup_s=0.0,  # U92: wake word required every turn by default
     )
     ctx.pipeline.set_cancel_event(session_id, ctx.conversation.llm_cancel)
     ctx._voice_loop.start()

@@ -134,7 +134,7 @@ class VoiceLoop:
         self._session_id = session_id
         self._default_wake = default_wake_word
         self._window_s_default = window_s
-        self._followup_s = followup_s
+        self._followup_s_default = followup_s
         self._speech_peak_default = float(speech_peak)
         self._task: asyncio.Task | None = None
         self._followup_until = 0.0
@@ -185,6 +185,19 @@ class VoiceLoop:
     _last_reply: str = ""
 
     @property
+    def _followup_s(self) -> float:
+        # U92: env override if set (live-tunable), else the constructor value.
+        # Production creates the loop with followup_s=0 → wake word required
+        # every turn (reliable); tests pass an explicit value.
+        raw = os.environ.get("FOLLOWUP_S")
+        if raw is None:
+            return self._followup_s_default
+        try:
+            return float(raw)
+        except ValueError:
+            return self._followup_s_default
+
+    @property
     def _followup_peak_factor(self) -> float:
         # U91: follow-up utterances must be this much louder than the silence
         # gate (deliberate speech), so ambient noise can't become a command.
@@ -213,10 +226,15 @@ class VoiceLoop:
         now = time.monotonic()
         speak_s = min(12.0, 1.0 + len(text or "") / 15.0)  # ~15 chars/sec
         self._speaking_until = now + speak_s
-        if now < self._music_until:
-            self._followup_until = 0.0  # music playing → wake word required (U69)
+        # U92: FOLLOWUP_S=0 (default) → the wake word is required EVERY turn.
+        # That stops room noise / Whisper gibberish from being taken as replies
+        # in a no-wake-word window (the "phantom conversations"). Set FOLLOWUP_S
+        # to e.g. 8 to re-enable natural "just answer" follow-ups.
+        followup_s = self._followup_s
+        if followup_s <= 0 or now < self._music_until:
+            self._followup_until = 0.0  # wake word required
         elif self._followup_chain < self._max_followup_chain:
-            self._followup_until = self._speaking_until + self._followup_s
+            self._followup_until = self._speaking_until + followup_s
         else:
             self._followup_until = 0.0  # chain exhausted → wake word required
 
@@ -334,9 +352,12 @@ class VoiceLoop:
                     self._manager.begin_turn("voice")
                     self._pipeline.set_cancel_event(self._session_id,
                                                     self._manager.llm_cancel)
+                    # U92: inject the interruption note as OWNER GUIDANCE (a
+                    # system message), NOT prepended to the visible command —
+                    # otherwise it showed up verbatim as the user's turn.
                     note = self._manager.consume_interruption_note()
-                    if note:
-                        command = f"{note} {command}"
+                    if note and hasattr(self._pipeline, "steer"):
+                        self._pipeline.steer(self._session_id, note)
                     self._manager.thinking()
                 # U67: track the wake-word-less chain. Hearing the wake word
                 # resets it — a real user re-engaging restores full flow.
