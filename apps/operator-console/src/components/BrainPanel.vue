@@ -6,10 +6,7 @@
         <span v-if="store.tier" class="brain-tier" :title="`Unlock tier: ${store.tier}`">
           <ShieldCheck :size="12" /> {{ store.tier }}
         </span>
-        <button v-if="!store.locked" class="brain-sec-btn" title="Lock the knowledge store" @click="lockKnowledge">
-          <Lock :size="13" /> Lock
-        </button>
-        <span v-else class="brain-locked-badge" title="Encrypted &amp; locked"><Lock :size="12" /> locked</span>
+        <span v-if="store.locked" class="brain-locked-badge" title="Encrypted &amp; locked"><Lock :size="12" /> locked</span>
         <button v-if="!docked" class="brain-close" aria-label="Close" @click="$emit('close')"><X :size="15" /></button>
       </header>
 
