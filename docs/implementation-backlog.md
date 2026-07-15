@@ -273,6 +273,9 @@ the human can unblock it.
 - [x] **U87 — Whisper laat de naam vallen: STT-prompt-hint + ruimere wake-match** · `pending`
   `voice-check` bewees: mic + drempel + transcriptie werken (peak 0.67, passed_gate), maar het transcript was "Hej." — Whisper dropte "Richie" (en gokte de verkeerde taal). Fix: STT krijgt nu een **prompt-hint** met de assistentnaam+wake-word ("Gesprek met de robot Richie. Aanspreken met 'Richie, …'.") → biast de transcriptie naar de juiste tokens i.p.v. de naam weg te laten. Fuzzy wake-match verruimd met een prefix-guard (eerste 4 tekens): "Rich/Riche/Richy/Ritchie" pakken nu allemaal, terwijl "rietje/prima" terecht falen. Brain suite groen. Vereist app-herstart om de STT-prompt te laden.
 
+- [x] **U88 — "Richie:" wordt hardop meegezegd (sprekerlabel)** · `pending`
+  Het LLM zette soms zijn eigen naam als sprekerlabel vóór het antwoord ("Richie: …"), dat vervolgens ook uitgesproken werd. Fix: `_strip_speaker_label` verwijdert een leidend "<naam>:" / "<naam> -" éénmalig (fuzzy op spellingsdrift, zodat ook "Ritchie:" pakt), toegepast op het finale antwoord vóór weergave én TTS; een naam midden in de zin of "Jan:" blijft staan. Plus een expliciete instructie in de identity-prompt om het niet te doen. Orchestrator 188 (+1) groen. Vereist app-herstart.
+
 ## Progress log (append-only; newest last)
 
 - 2026-06-21 — ledger created on `aura-autobuild`; Phase 0/0b complete, Phase 1 scaffold (U-pre) done before this loop started.
