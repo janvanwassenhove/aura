@@ -184,6 +184,26 @@ class VoiceLoop:
 
     _last_reply: str = ""
 
+    @property
+    def _followup_peak_factor(self) -> float:
+        # U91: follow-up utterances must be this much louder than the silence
+        # gate (deliberate speech), so ambient noise can't become a command.
+        try:
+            return float(os.environ.get("FOLLOWUP_PEAK_FACTOR", "1.6"))
+        except ValueError:
+            return 1.6
+
+    def _is_echo_of_last_reply(self, text: str) -> bool:
+        """True when the transcript is largely the robot's own last reply
+        bouncing back through the mic (word-overlap heuristic)."""
+        if not self._last_reply or len(text) < 8:
+            return False
+        a = {w for w in text.lower().split() if len(w) > 3}
+        b = {w for w in self._last_reply.lower().split() if len(w) > 3}
+        if not a:
+            return False
+        return len(a & b) / len(a) >= 0.6
+
     def note_spoken(self, text: str) -> None:
         self._last_reply = (text or "")[:200]
         """Called when the robot speaks: guard against echo + open a follow-up
@@ -283,14 +303,27 @@ class VoiceLoop:
                     if peak < self._speech_peak:
                         continue  # silence — cheap skip, no STT
 
+                in_followup = in_barge or time.monotonic() < self._followup_until
+                # U91: a follow-up window accepts speech WITHOUT the wake word,
+                # so ambient noise/TV/echo can hallucinate a "command". Require
+                # a deliberately-louder utterance there (the user actually
+                # replying), so room noise near the gate doesn't slip through.
+                if in_followup and not in_barge:
+                    if peak < self._speech_peak * self._followup_peak_factor:
+                        continue
+
                 if not in_barge:
                     text = (await voice.transcribe(wav, filename="robot.wav") or "").strip()
                 if not is_plausible_command(text):
                     if text:
                         logger.debug("voice loop ignored implausible transcript: %r", text)
                     continue
+                # U91: reject a transcript that is (fuzzily) the robot's OWN
+                # last reply echoing back through the mic in a follow-up window.
+                if in_followup and not in_barge and self._is_echo_of_last_reply(text):
+                    logger.debug("voice loop ignored self-echo in follow-up: %r", text[:60])
+                    continue
 
-                in_followup = in_barge or time.monotonic() < self._followup_until
                 command = self._extract_command(text, in_followup)
                 if command is None:
                     continue
