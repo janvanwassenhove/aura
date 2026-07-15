@@ -421,6 +421,14 @@ class OrchestratorPipeline:
                 )
                 if block:
                     system_prompt += "\n\n" + block
+                # U107: record a usage observation per relevant skill so the
+                # self-optimizing loop has real evidence to rewrite from.
+                for sk in self._skills.relevant(text, str(persona), self._active_person_id):
+                    self._skills.record_observation(sk.name, {
+                        "request": text[:200],
+                        "persona": str(persona),
+                        "person": self._active_person_id or "",
+                    })
             except Exception as exc:  # noqa: BLE001 — skills must never break a turn
                 logger.debug("skill injection failed: %s", exc)
 
