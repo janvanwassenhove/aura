@@ -331,6 +331,20 @@ function createWindow() {
   })
   ipcMain.on('win:close', () => mainWindow?.close())
 
+  // U95: restart the brain child process (loads new code / config) without
+  // quitting the whole app. The console calls this via the preload bridge.
+  ipcMain.handle('aura:restart-brain', async () => {
+    try {
+      stopBrain()
+      await new Promise((r) => setTimeout(r, 1200))  // let the tree die
+      startBrain()
+      await waitForBrain()
+      return { ok: true }
+    } catch (err) {
+      return { ok: false, error: String(err && err.message || err) }
+    }
+  })
+
   const menu = Menu.buildFromTemplate([
     {
       label: 'AURA',

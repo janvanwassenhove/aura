@@ -26,6 +26,9 @@
       <button class="titlebar-btn" title="Brain panel (people, skills, graph)" aria-label="Toggle right panel" @click="$emit('toggle-right')">
         <PanelRight :size="15" />
       </button>
+      <button v-if="isElectron" class="titlebar-btn" :title="restarting ? 'Restarting brain…' : 'Restart brain (load new code/settings)'" aria-label="Restart brain" :disabled="restarting" @click="restartBrain">
+        <RotateCw :size="15" :class="restarting ? 'spin' : ''" />
+      </button>
       <button class="titlebar-btn" title="Capabilities & permissions" aria-label="Capabilities and permissions" @click="$emit('open-capabilities')">
         <ShieldCheck :size="16" />
       </button>
@@ -49,9 +52,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { onMounted } from 'vue'
-import { Bot, Cpu, Minus, Settings, ShieldCheck, Square, X, PanelBottom, PanelLeft, PanelRight } from 'lucide-vue-next'
+import { Bot, Cpu, Minus, RotateCw, Settings, ShieldCheck, Square, X, PanelBottom, PanelLeft, PanelRight } from 'lucide-vue-next'
 import { useRobotStore } from '../stores/robotStore'
 import { usePrefsStore } from '../stores/prefsStore'
 
@@ -60,6 +63,17 @@ defineEmits<{
   'open-settings': []; 'open-capabilities': []
   'toggle-left': []; 'toggle-right': []; 'toggle-bottom': []
 }>()
+
+const restarting = ref(false)
+async function restartBrain() {
+  if (restarting.value || !auraWindow?.restartBrain) return
+  restarting.value = true
+  try {
+    const r = await auraWindow.restartBrain()
+    if (r?.ok) location.reload()  // reconnect the console to the fresh brain
+    else alert('Brain restart failed: ' + (r?.error ?? 'unknown'))
+  } finally { restarting.value = false }
+}
 
 const robotStore = useRobotStore()
 const prefsStore = usePrefsStore()
@@ -123,4 +137,7 @@ function winControl(action: 'minimize' | 'toggleMaximize' | 'close') {
 .titlebar-btn:hover { color: var(--text); background: var(--surface-hover); }
 .win-btn:hover { background: var(--surface-hover); }
 .win-btn--close:hover { background: var(--danger); color: #fff; }
+
+.spin { animation: tb-spin 0.9s linear infinite; }
+@keyframes tb-spin { to { transform: rotate(360deg); } }
 </style>
