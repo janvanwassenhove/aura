@@ -43,6 +43,15 @@ class FakeMini:
     def goto_sleep(self) -> None:
         self.calls.append(("goto_sleep", {}))
 
+    def stop_head_tracking(self) -> None:
+        self.calls.append(("stop_head_tracking", {}))
+
+    def start_head_tracking(self) -> None:
+        self.calls.append(("start_head_tracking", {}))
+
+    def set_automatic_body_yaw(self, enabled: bool) -> None:
+        self.calls.append(("set_automatic_body_yaw", {"enabled": enabled}))
+
     def release_media(self) -> None:
         self.media_released = True
 
@@ -132,9 +141,12 @@ async def test_wake_up_and_sleep_map_to_sdk_emotes(adapter) -> None:
     await adapter.execute_motion(MotionCommand(motion_id="wake_up", direction=None))
     await adapter.execute_motion(MotionCommand(motion_id="sleep", direction=None))
     moves = _moves(adapter._created[0])
-    # U101: wake_up still uses the SDK emote; sleep is now a custom "tucked"
-    # pose (goto_target with head down + antennas back), not goto_sleep().
-    assert "wake_up" in moves and "goto_target" in moves
+    # U102: back to the SDK emotes — wake_up() and goto_sleep().
+    assert "wake_up" in moves and "goto_sleep" in moves
+    # sleep must hard-stop head-tracking + body-yaw BEFORE goto_sleep, so the
+    # tracking loop can't pull the head back out of the pose.
+    assert moves.index("stop_head_tracking") < moves.index("goto_sleep")
+    assert moves.index("set_automatic_body_yaw") < moves.index("goto_sleep")
 
 
 async def test_unknown_motion_falls_back_to_gentle_nod(adapter) -> None:
@@ -152,8 +164,7 @@ async def test_timeline_executes_cues_in_order(adapter) -> None:
     ])
     await adapter.execute_timeline(timeline)
     moves = _moves(adapter._created[0])
-    # U101: sleep cue is a custom goto_target pose; it runs after wake_up.
-    assert moves.index("wake_up") < moves.index("goto_target")
+    assert moves.index("wake_up") < moves.index("goto_sleep")
 
 
 async def test_motion_before_connect_raises(adapter) -> None:

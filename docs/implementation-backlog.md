@@ -315,6 +315,9 @@ the human can unblock it.
 - [x] **U101 — slaap-pose: wegduiken + antennes naar achteren** · `pending`
   De `sleep`-beweging riep de SDK-emote `goto_sleep()` aan; nu een eigen "tucked" pose: kop naar beneden wegduiken (`_rot(x, SLEEP_HEAD_PITCH=0.6)`) + beide antennes naar achteren (`SLEEP_ANTENNA=1.4`), duration 1.4s. `wake_up` herstelt rechtop. Beide instelbaar via env. Live op de Pi geverifieerd (sleep/wake 200). Robot 54 groen. Gedeployed + herstart.
 
+- [x] **U102 — slaap-pose terug naar SDK-emote `goto_sleep()`, maar robuust** · `pending`
+  Op verzoek terug naar de standaard SDK sleep-emote i.p.v. de U101 custom pose. De emote "nam" soms niet omdat head-tracking / automatic body-yaw de kop tijdens de beweging terugtrok naar het gezicht. Fix: vóór `goto_sleep()` worden `stop_head_tracking()` én `set_automatic_body_yaw(False)` hard aangeroepen (en `_tracking_on=False` gezet), plus één retry als de SDK-call gooit. Tests verifiëren de volgorde (tracking uit vóór goto_sleep). Live op de Pi geverifieerd (sleep/wake 200, geen retry-warning). Gedeployed + herstart.
+
 ## Progress log (append-only; newest last)
 
 - 2026-06-21 — ledger created on `aura-autobuild`; Phase 0/0b complete, Phase 1 scaffold (U-pre) done before this loop started.
