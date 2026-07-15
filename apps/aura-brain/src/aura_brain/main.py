@@ -275,6 +275,20 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     capabilities_api.set_live_hook("body_follow", _apply_body_follow)
 
+    # U84: conversation state machine + character personas.
+    from aura_brain.characters import CharacterStore
+    from aura_brain.conversation_manager import ConversationManager
+
+    ctx.characters = CharacterStore()
+    ctx.conversation = ConversationManager(stop_robot_audio=_robot.stop_audio)
+
+    def _active_character_note() -> str:
+        c = ctx.characters.active()
+        ctx.conversation.character = c
+        return c.system_note() if c else ""
+
+    ctx.pipeline.set_character_provider(_active_character_note)
+
     # U36: EMBODIMENT — every assistant reply is spoken out loud on the robot
     # with a gesture matched to the content (greeting→wave, question→tilt,
     # excitement→gesture, default→nod). Toggle with SPEAK_REPLIES=false.
@@ -297,6 +311,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         speak, gesture, amplitude = embodiment_plan(text, persona_cfg)
         if not speak:
             return
+        # U84: the active character shapes voice, speed and motion energy.
+        character = ctx.characters.active() if hasattr(ctx, "characters") else None
+        if character is not None:
+            amplitude = min(1.0, amplitude * character.motion_scale())
+            if character.robot_motion_style == "still":
+                gesture = None
         try:
             if gesture is not None:
                 await _robot.execute_motion(MotionCommand(
@@ -305,28 +325,45 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             # U54: streamed speech — first sentence starts playing while the
             # rest is still being synthesized (SPEAK_STREAMING=false → old path).
             # U65: the voice follows the global pref, with per-persona override.
+            # U84: character voice/speed override; the speak runs as a
+            # CANCELLABLE task registered with the conversation manager so a
+            # barge-in cuts it (and the robot playback) instantly.
             capped = text[:600]  # cap TTS cost
             reply_voice = voice.resolve_voice(
                 str(persona_cfg.name) if persona_cfg is not None else None)
+            reply_speed = 1.0
+            if character is not None:
+                if character.voice_id:
+                    reply_voice = character.voice_id
+                reply_speed = character.voice_speed or 1.0
 
             async def _synth(chunk: str) -> str:
-                return await voice.synthesize_b64(chunk, reply_voice)
+                return await voice.synthesize_b64(chunk, reply_voice, speed=reply_speed)
 
-            # U83: streaming is default OFF now — on the robot each chunk is a
-            # separate playbin file, and the small gaps between them chopped the
-            # reply. One synth + one continuous file plays the whole answer
-            # smoothly. Set SPEAK_STREAMING=true to trade smoothness for lower
-            # first-audio latency.
-            if os.environ.get("SPEAK_STREAMING", "false").lower() == "true":
-                from aura_brain.streaming import stream_speech
+            # U83: streaming is default OFF — one synth + one continuous file
+            # plays the whole answer smoothly (per-chunk playbin files gapped).
+            async def _do_speak() -> None:
+                if os.environ.get("SPEAK_STREAMING", "false").lower() == "true":
+                    from aura_brain.streaming import stream_speech
 
-                async def _speak_chunk(chunk: str, audio_b64: str) -> None:
-                    await _robot.speak(chunk, audio_b64=audio_b64)
+                    async def _speak_chunk(chunk: str, audio_b64: str) -> None:
+                        if ctx.conversation.tts_cancel.is_set():
+                            raise asyncio.CancelledError
+                        await _robot.speak(chunk, audio_b64=audio_b64)
 
-                await stream_speech(capped, _synth, _speak_chunk)
-            else:
-                audio_b64 = await _synth(capped)
-                await _robot.speak(capped, audio_b64=audio_b64)
+                    await stream_speech(capped, _synth, _speak_chunk)
+                else:
+                    audio_b64 = await _synth(capped)
+                    if ctx.conversation.tts_cancel.is_set():
+                        return  # interrupted during synthesis — stay silent
+                    await _robot.speak(capped, audio_b64=audio_b64)
+
+            speak_task = asyncio.ensure_future(_do_speak())
+            ctx.conversation.register_speak_task(speak_task)
+            try:
+                await speak_task
+            except asyncio.CancelledError:
+                logging.getLogger(__name__).info("speak task cancelled (barge-in)")
         except Exception as exc:  # robot offline → the console turn still shows
             logging.getLogger(__name__).debug("embodied reply failed: %s", exc)
 
@@ -345,7 +382,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     ctx._voice_loop = VoiceLoop(
         _robot, ctx.pipeline, ctx.bus, session_id=session_id,
         default_wake_word=os.environ.get("ASSISTANT_NAME", "AURA").lower(),
+        manager=ctx.conversation,
     )
+    ctx.pipeline.set_cancel_event(session_id, ctx.conversation.llm_cancel)
     ctx._voice_loop.start()
 
     async def _voice_note_spoken(event: ResponseDrafted) -> None:

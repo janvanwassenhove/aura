@@ -35,7 +35,8 @@ def resolve_voice(persona: str | None = None) -> str:
     return voice if voice in TTS_VOICES else "alloy"
 
 
-async def synthesize_b64(text: str, voice: str | None = None) -> str | None:
+async def synthesize_b64(text: str, voice: str | None = None,
+                         speed: float = 1.0) -> str | None:
     """Return base64 PCM (s16le mono 24 kHz) for ``text``, or None if TTS is
     unavailable (no key / provider error). ``voice`` defaults to the global
     preference (read live, so the Settings dropdown applies immediately)."""
@@ -45,15 +46,16 @@ async def synthesize_b64(text: str, voice: str | None = None) -> str | None:
     if voice not in TTS_VOICES:
         voice = "alloy"
     try:
-        provider = _tts_cache.get(voice)
+        cache_key = f"{voice}@{speed:.2f}"
+        provider = _tts_cache.get(cache_key)
         if provider is None:
             from conversation_runtime.providers.openai_provider import OpenAITTSProvider
 
             provider = OpenAITTSProvider(
                 model=os.environ.get("TTS_MODEL", "gpt-4o-mini-tts"),
-                voice=voice,
+                voice=voice, speed=speed,
             )
-            _tts_cache[voice] = provider
+            _tts_cache[cache_key] = provider
         pcm = await provider.synthesize(text)
         return base64.b64encode(pcm).decode()
     except Exception as exc:  # noqa: BLE001 — voice is best-effort, never fatal

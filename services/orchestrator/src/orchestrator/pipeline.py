@@ -253,9 +253,40 @@ class OrchestratorPipeline:
         self._stop_flags: set[str] = set()
         # U59: owner-taught skills, injected into the system prompt when relevant.
         self._skills = None  # SkillStore | None — set via set_skill_store()
+        # U84: character persona note + per-turn LLM cancellation.
+        self._character_note = None  # Callable[[], str] | None
+        self._cancel_events: dict[str, asyncio.Event] = {}
 
     def set_skill_store(self, store) -> None:
         self._skills = store
+
+    def set_character_provider(self, provider) -> None:
+        """U84: callable returning the active character's system note."""
+        self._character_note = provider
+
+    def set_cancel_event(self, session_id: str, event: asyncio.Event) -> None:
+        """U84 barge-in: cancels the running turn's LLM work mid-call."""
+        self._cancel_events[session_id] = event
+
+    async def _llm(self, messages, tools, timing: dict, session_id: str):
+        """openai_chat raced against the turn's cancel event (U84)."""
+        _t = time.perf_counter()
+        cancel = self._cancel_events.get(session_id)
+        llm_task = asyncio.ensure_future(openai_chat(messages, tools=tools))
+        try:
+            if cancel is None:
+                return await llm_task
+            cancel_task = asyncio.ensure_future(cancel.wait())
+            done, _ = await asyncio.wait(
+                {llm_task, cancel_task}, return_when=asyncio.FIRST_COMPLETED)
+            if llm_task in done:
+                cancel_task.cancel()
+                return llm_task.result()
+            llm_task.cancel()
+            logger.info("LLM turn cancelled mid-call (barge-in), session=%s", session_id)
+            return {"content": None, "tool_calls": None, "cancelled": True}
+        finally:
+            timing["llm_ms"] += (time.perf_counter() - _t) * 1000
 
     # -- U57: owner steering of a running loop --------------------------
 
@@ -276,6 +307,8 @@ class OrchestratorPipeline:
         return self._persona.config
 
     def _recall(self, session_id: str) -> list[dict]:
+        if os.environ.get("SESSION_MEMORY", "true").lower() != "true":
+            return []
         return self._history.get(session_id, [])
 
     def _remember(self, session_id: str, role: str, content: str) -> None:
@@ -349,6 +382,15 @@ class OrchestratorPipeline:
             except Exception as exc:  # noqa: BLE001 — skills must never break a turn
                 logger.debug("skill injection failed: %s", exc)
 
+        # U84: active character persona (voice & character layer).
+        if self._character_note is not None:
+            try:
+                note = self._character_note()
+                if note:
+                    system_prompt += "\n\n" + note
+            except Exception:  # noqa: BLE001
+                pass
+
         # U42: include recent turns so the robot holds a coherent dialogue.
         messages: list[dict] = [
             {"role": "system", "content": system_prompt},
@@ -376,9 +418,10 @@ class OrchestratorPipeline:
             await self._bus.publish(AgentRoundStarted(
                 session_id=session_id, round_no=round_no, max_rounds=max_rounds))
 
-            _t = time.perf_counter()
-            llm_response = await openai_chat(messages, tools=tool_specs or None)
-            timing["llm_ms"] += (time.perf_counter() - _t) * 1000
+            llm_response = await self._llm(messages, tool_specs or None, timing, session_id)
+            if llm_response.get("cancelled"):
+                reply = ""  # barge-in: the interrupting turn takes over
+                break
             content: str | None = llm_response["content"]
             tool_calls: list | None = llm_response["tool_calls"]
 
@@ -417,6 +460,8 @@ class OrchestratorPipeline:
                 "including what remains unfinished."})
             reply = await self._final_answer(messages, timing, None)
 
+        if reply == "":  # U84: cancelled by barge-in — stay silent
+            return ""
         self._remember(session_id, "assistant", reply)
         await self._bus.publish(ResponseDrafted(session_id=session_id, response_text=reply))
         return reply

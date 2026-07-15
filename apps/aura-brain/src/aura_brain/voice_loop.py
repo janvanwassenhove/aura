@@ -77,7 +77,9 @@ class VoiceLoop:
         window_s: float = 4.0,
         followup_s: float = 9.0,
         speech_peak: float = 0.03,
+        manager=None,  # ConversationManager | None (U84)
     ) -> None:
+        self._manager = manager
         self._robot = robot
         self._pipeline = pipeline
         self._bus = bus
@@ -132,7 +134,10 @@ class VoiceLoop:
                 pass
             self._task = None
 
+    _last_reply: str = ""
+
     def note_spoken(self, text: str) -> None:
+        self._last_reply = (text or "")[:200]
         """Called when the robot speaks: guard against echo + open a follow-up
         window so the user can reply without the wake word. The follow-up
         chain is capped (U67) — after a few wake-word-less turns the wake word
@@ -183,10 +188,28 @@ class VoiceLoop:
                     # alone can't separate the user from self-echo. A barge-in
                     # must contain the WAKE WORD ("Richie, stop"); anything else
                     # during our own speech is treated as echo and ignored.
+                    # U84: interruptibility per character — wake_word (default:
+                    # transcript must contain the wake word; self-echo never
+                    # says its own name), vad (loudness + plausibility is
+                    # enough), off (never interrupt).
+                    mode = "wake_word"
+                    if self._manager is not None and self._manager.character is not None:
+                        mode = self._manager.character.interruptibility or "wake_word"
+                    if mode == "off":
+                        continue
                     barge_text = (await voice.transcribe(wav, filename="robot.wav") or "").strip()
-                    if not (self._wake and self._wake in barge_text.lower()):
+                    if mode != "vad" and not (self._wake and self._wake in barge_text.lower()):
                         logger.debug("barge ignored (no wake word): %r", barge_text[:60])
                         continue
+                    if mode == "vad" and not is_plausible_command(barge_text):
+                        continue  # debounce: echo/noise without real content
+                    # THE barge-in: cut TTS + LLM through the state machine.
+                    if self._manager is not None:
+                        await self._manager.interrupt(self._last_reply)
+                    try:
+                        await self._robot.stop_audio()
+                    except Exception:  # noqa: BLE001 — robot offline
+                        pass
                     self._speaking_until = 0.0  # user interrupted → stop waiting
                     self._followup_until = time.monotonic() + self._followup_s
                     in_barge = True
@@ -207,6 +230,17 @@ class VoiceLoop:
                 command = self._extract_command(text, in_followup)
                 if command is None:
                     continue
+                # U84: this utterance becomes the ACTIVE turn (re-arms cancel
+                # tokens); after a barge-in the LLM gets one-shot context that
+                # its previous answer was cut off.
+                if self._manager is not None:
+                    self._manager.begin_turn("voice")
+                    self._pipeline.set_cancel_event(self._session_id,
+                                                    self._manager.llm_cancel)
+                    note = self._manager.consume_interruption_note()
+                    if note:
+                        command = f"{note} {command}"
+                    self._manager.thinking()
                 # U67: track the wake-word-less chain. Hearing the wake word
                 # resets it — a real user re-engaging restores full flow.
                 if self._wake and self._wake in text.lower():

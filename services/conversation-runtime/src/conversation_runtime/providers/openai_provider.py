@@ -54,18 +54,23 @@ class OpenAITTSProvider(TTSProvider):
         api_key: str | None = None,
         model: str = _DEFAULT_TTS_MODEL,
         voice: str = _DEFAULT_TTS_VOICE,
+        speed: float = 1.0,
     ) -> None:
         self._client = AsyncOpenAI(api_key=api_key or os.environ.get("OPENAI_API_KEY"))
         self._model = model
         self._voice = voice
+        self._speed = max(0.25, min(4.0, float(speed)))  # U84: character voice_speed
 
     async def synthesize(self, text: str) -> bytes:
-        response = await self._client.audio.speech.create(
+        kwargs: dict = dict(
             model=self._model,
             voice=self._voice,  # type: ignore[arg-type]
             input=text,
             response_format="pcm",
         )
+        if abs(self._speed - 1.0) > 1e-3:
+            kwargs["speed"] = self._speed
+        response = await self._client.audio.speech.create(**kwargs)
         return response.content
 
     async def stream_synthesize(self, text: str) -> AsyncIterator[bytes]:

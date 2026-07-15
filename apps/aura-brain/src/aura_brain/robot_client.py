@@ -79,6 +79,10 @@ class RobotClient:
     async def set_tracking(self, enabled: bool) -> dict:
         return (await self._request("POST", "/robot/tracking", {"enabled": enabled})).json()
 
+    async def stop_audio(self) -> dict:
+        """U84 barge-in: cut the robot's current speech immediately."""
+        return (await self._request("POST", "/robot/audio/stop", {})).json()
+
     async def set_body_follow(self, enabled: bool) -> dict:
         """U37: torso turns with the tracked face (automatic body yaw)."""
         return (await self._request("POST", "/robot/body_follow", {"enabled": enabled})).json()

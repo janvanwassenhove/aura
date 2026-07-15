@@ -248,6 +248,10 @@ def _prefs_snapshot() -> dict:
         "voice_mode": os.environ.get("VOICE_MODE", "off"),
         "wake_word": os.environ.get("WAKE_WORD", os.environ.get("ASSISTANT_NAME", "AURA")),
         "tts_voice": os.environ.get("TTS_VOICE", "alloy"),
+        # U84: conversation-layer settings
+        "character": os.environ.get("ACTIVE_CHARACTER", ""),
+        "interrupt_sensitivity": os.environ.get("BARGE_IN_FACTOR", "3.0"),
+        "session_memory": os.environ.get("SESSION_MEMORY", "true"),
     }
 
 
@@ -296,6 +300,26 @@ async def set_prefs(body: dict) -> JSONResponse:
                 status_code=422,
             )
         updates["TTS_VOICE"] = tts_voice
+    character = (body or {}).get("character")
+    if character is not None:
+        character = str(character).strip()
+        if character:
+            from aura_brain.characters import CharacterStore
+
+            if CharacterStore().get(character) is None:
+                return JSONResponse({"error": f"unknown character {character!r}"},
+                                    status_code=422)
+        updates["ACTIVE_CHARACTER"] = character
+    sensitivity = (body or {}).get("interrupt_sensitivity")
+    if sensitivity is not None:
+        try:
+            updates["BARGE_IN_FACTOR"] = str(max(1.5, min(8.0, float(sensitivity))))
+        except (TypeError, ValueError):
+            return JSONResponse({"error": "interrupt_sensitivity must be a number"},
+                                status_code=422)
+    session_memory = (body or {}).get("session_memory")
+    if session_memory is not None:
+        updates["SESSION_MEMORY"] = "true" if str(session_memory).lower() in ("true", "1", "on") else "false"
     wake_word = (body or {}).get("wake_word")
     if wake_word is not None:
         wake_word = wake_word.strip()
@@ -307,6 +331,19 @@ async def set_prefs(body: dict) -> JSONResponse:
     os.environ.update(updates)          # effective immediately (read live)
     persisted = _write_env(updates)     # survives restarts
     return JSONResponse({**_prefs_snapshot(), "persisted": persisted})
+
+
+@router.get("/characters")
+async def list_characters() -> JSONResponse:
+    """U84: available character personas + which one is active."""
+    from aura_brain.characters import CharacterStore
+    from dataclasses import asdict
+
+    store = CharacterStore()
+    return JSONResponse({
+        "active": os.environ.get("ACTIVE_CHARACTER", ""),
+        "characters": [asdict(c) for c in store.all()],
+    })
 
 
 @router.post("/secure")
