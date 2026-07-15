@@ -10,6 +10,13 @@
         <button v-if="!docked" class="brain-close" aria-label="Close" @click="$emit('close')"><X :size="15" /></button>
       </header>
 
+      <div v-if="store.brainError" class="brain-restart-banner">
+        <span>⚠ The brain needs a restart to load recent fixes and your profiles.</span>
+        <button class="brb-btn" :disabled="restartingBrain" @click="restartBrain">
+          {{ restartingBrain ? 'Restarting…' : 'Restart brain' }}
+        </button>
+      </div>
+
       <div class="brain-body">
         <!-- ── Left rail: skills library + people ── -->
         <nav class="brain-rail">
@@ -240,6 +247,20 @@ async function addPerson() {
   } finally { addingP.value = false }
 }
 const teachMsg = ref('')
+const restartingBrain = ref(false)
+async function restartBrain() {
+  const aura = (window as any).aura
+  if (!aura?.restartBrain) {
+    alert('Please fully CLOSE the AURA app (the X button, not Ctrl+R) and reopen it — that restarts the brain.')
+    return
+  }
+  restartingBrain.value = true
+  try {
+    const r = await aura.restartBrain()
+    if (r?.ok) location.reload()
+    else alert('Restart failed: ' + (r?.error ?? 'unknown') + ' — try fully closing and reopening the app.')
+  } finally { restartingBrain.value = false }
+}
 
 async function doTeachFace() {
   if (!store.detail) return
@@ -466,6 +487,8 @@ onMounted(async () => {
 .brain-close:hover { color: var(--text); }
 
 .brain-body { flex: 1; display: flex; min-height: 0; }
+.brain-restart-banner { display: flex; align-items: center; gap: 0.8rem; padding: 0.6rem 1rem; background: var(--warn-bg, rgba(217,164,65,0.15)); color: var(--warn, #b8860b); font-size: 0.82rem; border-bottom: 1px solid var(--border); }
+.brb-btn { background: var(--accent); color: var(--accent-contrast, #fff); border: none; border-radius: var(--radius-md); padding: 0.35rem 0.8rem; font-size: 0.78rem; cursor: pointer; margin-left: auto; }
 
 /* rail */
 .brain-rail {

@@ -303,6 +303,9 @@ the human can unblock it.
 - [x] **U97 — personen "verdwenen" = 500-crash op één corrupte entry (mijn testvervuiling)** · `pending`
   Diagnose: `/knowledge/people` gaf **500**, niet leeg/403 (tier was sensitive). Oorzaak: een van mijn eerdere tests schreef per ongeluk persoon 'x' in het ÉCHTE data/knowledge.enc.json, versleuteld met een andere testsleutel → `get_person('x')` gaf InvalidTag → `list_people` crashte → hele lijst weg (jan/Elke waren prima). Fix: `EncryptedKnowledgeStore.list_people` skipt nu een niet-ontsleutelbare entry (logt een warning) i.p.v. te crashen — één corrupte bundle verbergt nooit meer iedereen. Plus: 'x' verwijderd uit het bestand na verificatie dat jan/Elke wél ontsleutelen (atomic write). Schemas 123 groen. Excuses voor de testvervuiling.
 
+- [x] **U98 — onmisbare "Restart brain"-banner (het draaiende proces was nooit herstart)** · `pending`
+  Live bevestigd: bestand schoon (jan+Elke), maar `/knowledge/people` gaf nog steeds 500 → het draaiende aura-brain.exe had het OUDE bestand (met x) én de oude code in het geheugen; console-reload (Ctrl+R) herstart de brain NIET. Álle fixes van de laatste beurten (U89/U92/U93/U96/U97) wachten op een echte proces-herstart. Fix: `knowledgeStore.brainError` (true bij /people 5xx) + prominente **oranje "Restart brain"-banner** in het Brain-paneel met knop (window.aura.restartBrain van U95, met duidelijke fallback "sluit de app volledig af — de X, niet Ctrl+R" als de oude preload de bridge nog niet heeft). Console 56 groen. NB: één volledige app-herstart is nog nodig om U95's preload+banner te laden; daarna werkt de knop.
+
 ## Progress log (append-only; newest last)
 
 - 2026-06-21 — ledger created on `aura-autobuild`; Phase 0/0b complete, Phase 1 scaffold (U-pre) done before this loop started.
