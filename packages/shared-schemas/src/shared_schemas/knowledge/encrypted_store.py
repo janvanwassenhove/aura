@@ -116,8 +116,17 @@ class EncryptedKnowledgeStore(KnowledgeStore):
 
     async def list_people(self) -> list[Person]:
         out: list[Person] = []
-        for pid in self._blobs:
-            p = await self.get_person(pid)
+        for pid in list(self._blobs):
+            try:
+                p = await self.get_person(pid)
+            except Exception as exc:  # noqa: BLE001
+                # A bundle that can't be decrypted (e.g. written with a
+                # different key) must never hide everyone else. Skip it.
+                import logging
+
+                logging.getLogger(__name__).warning(
+                    "skipping undecryptable knowledge entry %r: %s", pid, type(exc).__name__)
+                continue
             if p is not None:
                 out.append(p)
         return out
