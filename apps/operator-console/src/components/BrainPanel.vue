@@ -3,9 +3,13 @@
     <div :class="docked ? 'brain-dock-inner' : 'brain-modal'">
       <header class="brain-header">
         <span class="brain-title"><Brain :size="17" /> {{ prefs.assistantName }}'s brain</span>
-        <button class="brain-sec-btn" @click="$emit('open-knowledge')">
-          <ShieldCheck :size="13" /> Security &amp; faces
+        <span v-if="store.tier" class="brain-tier" :title="`Unlock tier: ${store.tier}`">
+          <ShieldCheck :size="12" /> {{ store.tier }}
+        </span>
+        <button v-if="!store.locked" class="brain-sec-btn" title="Lock the knowledge store" @click="lockKnowledge">
+          <Lock :size="13" /> Lock
         </button>
+        <span v-else class="brain-locked-badge" title="Encrypted &amp; locked"><Lock :size="12" /> locked</span>
         <button v-if="!docked" class="brain-close" aria-label="Close" @click="$emit('close')"><X :size="15" /></button>
       </header>
 
@@ -48,7 +52,8 @@
               </header>
               <p class="b-skill-desc"><WikiText :text="sk.description" @open="openTarget" /></p>
               <div class="b-skill-tags">
-                <span v-for="t in sk.triggers.slice(0, 4)" :key="t" class="b-tag">“{{ t }}”</span>
+                <span v-for="t in sk.triggers" :key="t" class="b-tag" title="Trigger word — the assistant uses this skill when your request contains it">“{{ t }}” <button class="b-tag-x" :aria-label="`Remove trigger ${t}`" @click="removeTrigger(sk, t)">×</button></span>
+                <button class="b-tag b-tag--add" title="Add a trigger word" @click="addTrigger(sk)">+ trigger</button>
               </div>
             </article>
             <p v-if="!generalSkills.length" class="content-hint">No general skills yet.</p>
@@ -96,7 +101,18 @@
               <h2 class="hero-name">{{ store.detail.person.display_name }}</h2>
               <span :class="['rail-role', `rail-role--${store.detail.person.role}`]">{{ store.detail.person.role }}</span>
             </div>
+            <span class="hero-spacer" />
+            <button v-if="store.recognitionEnabled" class="hero-btn" :disabled="teaching" title="Teach this person's face" @click="doTeachFace">
+              <ScanFace :size="14" /> {{ teaching ? 'Looking…' : 'Teach face' }}
+            </button>
+            <button class="hero-btn hero-btn--danger" title="Forget this person (erase profile + face)" @click="doForget">
+              <Trash2 :size="14" />
+            </button>
           </div>
+          <p v-if="teachMsg" class="content-hint teach-line">{{ teachMsg }}</p>
+          <p v-if="!store.recognitionEnabled" class="content-hint">
+            Face recognition is off — open Security to unlock it with the knowledge passphrase.
+          </p>
 
           <h3 class="content-title">About</h3>
           <textarea
@@ -164,7 +180,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
-import { Brain, Pencil, Share2, ShieldCheck, Sparkles, X } from 'lucide-vue-next'
+import { Brain, Lock, Pencil, ScanFace, Share2, ShieldCheck, Sparkles, Trash2, X } from 'lucide-vue-next'
 import BrainGraph from './BrainGraph.vue'
 import WikiText from './WikiText.vue'
 import { useKnowledgeStore } from '../stores/knowledgeStore'
@@ -172,7 +188,7 @@ import { useNavStore } from '../stores/navStore'
 import { usePrefsStore } from '../stores/prefsStore'
 
 const props = defineProps<{ docked?: boolean }>()
-const emit = defineEmits<{ (e: 'close'): void; (e: 'open-knowledge'): void }>()
+const emit = defineEmits<{ (e: 'close'): void }>()
 
 function onBackdrop(): void {
   if (!props.docked) emit('close')
@@ -181,6 +197,42 @@ function onBackdrop(): void {
 const store = useKnowledgeStore()
 const prefs = usePrefsStore()
 const nav = useNavStore()
+const teaching = ref(false)
+const teachMsg = ref('')
+
+async function doTeachFace() {
+  if (!store.detail) return
+  teaching.value = true
+  teachMsg.value = ''
+  try { teachMsg.value = await store.teachFace(store.detail.person.person_id) }
+  finally { teaching.value = false }
+}
+async function doForget() {
+  if (!store.detail) return
+  if (!confirm(`Forget ${store.detail.person.display_name}? This erases their profile and face.`)) return
+  await store.forgetPerson(store.detail.person.person_id)
+  selected.value = '_skills'
+}
+async function lockKnowledge() {
+  try { await fetch(`${BRAIN_URL}/knowledge/lock`, { method: 'POST' }) } catch {}
+  await store.fetchTier()
+}
+async function removeTrigger(sk: any, t: string) {
+  const triggers = sk.triggers.filter((x: string) => x !== t)
+  await saveSkillTriggers(sk, triggers)
+}
+async function addTrigger(sk: any) {
+  const t = prompt('New trigger word (the assistant activates this skill when your request contains it):')
+  if (!t || !t.trim()) return
+  await saveSkillTriggers(sk, [...sk.triggers, t.trim().toLowerCase()])
+}
+async function saveSkillTriggers(sk: any, triggers: string[]) {
+  await fetch(`${BRAIN_URL}/skills`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ...sk, triggers }),
+  }).catch(() => {})
+  await fetchSkills()
+}
 
 interface SkillItem {
   name: string; description: string; triggers: string[]
@@ -323,7 +375,7 @@ watch(() => nav.knowledgeRequest, async (r) => {
 })
 
 onMounted(async () => {
-  await Promise.all([store.fetchPeople(), fetchSkills()])
+  await Promise.all([store.fetchPeople(), fetchSkills(), store.fetchTier(), store.fetchRecognition()])
 })
 </script>
 
@@ -353,6 +405,15 @@ onMounted(async () => {
   padding: 0.9rem 1.1rem; border-bottom: 1px solid var(--border);
 }
 .brain-title { font-weight: 600; font-size: 0.95rem; display: inline-flex; align-items: center; gap: 0.45rem; flex: 1; }
+.brain-tier { font-size: 0.68rem; color: var(--text-faint); display: inline-flex; align-items: center; gap: 0.25rem; text-transform: uppercase; }
+.brain-locked-badge { font-size: 0.7rem; color: var(--warn, #d9a441); display: inline-flex; align-items: center; gap: 0.25rem; }
+.hero-spacer { flex: 1; }
+.hero-btn { display: inline-flex; align-items: center; gap: 0.3rem; font-size: 0.75rem; background: var(--surface-2); border: 1px solid var(--border-strong); border-radius: var(--radius-md); color: var(--text); padding: 0.3rem 0.55rem; cursor: pointer; }
+.hero-btn--danger { color: var(--danger-text, #e5484d); }
+.hero-btn:disabled { opacity: 0.5; }
+.teach-line { color: var(--ok-text, #2f9e6e); }
+.b-tag-x { background: none; border: none; color: var(--text-faint); cursor: pointer; padding: 0 0 0 0.15rem; }
+.b-tag--add { cursor: pointer; border-style: dashed; }
 .brain-sec-btn {
   display: inline-flex; align-items: center; gap: 0.3rem;
   font-size: 0.75rem; color: var(--text-faint); background: none;

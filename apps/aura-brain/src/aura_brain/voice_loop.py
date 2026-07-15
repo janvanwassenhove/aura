@@ -345,30 +345,34 @@ class VoiceLoop:
                 command = self._extract_command(text, in_followup)
                 if command is None:
                     continue
-                # U84: this utterance becomes the ACTIVE turn (re-arms cancel
-                # tokens); after a barge-in the LLM gets one-shot context that
-                # its previous answer was cut off.
-                if self._manager is not None:
-                    self._manager.begin_turn("voice")
-                    self._pipeline.set_cancel_event(self._session_id,
-                                                    self._manager.llm_cancel)
-                    # U92: inject the interruption note as OWNER GUIDANCE (a
-                    # system message), NOT prepended to the visible command —
-                    # otherwise it showed up verbatim as the user's turn.
-                    note = self._manager.consume_interruption_note()
-                    if note and hasattr(self._pipeline, "steer"):
-                        self._pipeline.steer(self._session_id, note)
-                    self._manager.thinking()
                 # U67: track the wake-word-less chain. Hearing the wake word
                 # resets it — a real user re-engaging restores full flow.
                 if wake_word_index(text, self._wake) >= 0:
                     self._followup_chain = 0
                 elif in_followup:
                     self._followup_chain += 1
-                if not command:  # wake word heard but nothing after it
+
+                # U93: bare wake word ("Richie" with nothing after it) — listen
+                # ONE more window for the actual command. If it's silent or
+                # gibberish, do NOTHING (no generic "how can I help" reply that
+                # made phantom turns). Only start a turn once we have a real
+                # command.
+                if not command:
                     command = await self._capture_command()
                     if not is_plausible_command(command):
                         continue
+
+                # NOW this is a real user turn: re-arm cancel tokens and inject
+                # the interruption note as OWNER GUIDANCE (a system message,
+                # never prepended to the visible command).
+                if self._manager is not None:
+                    self._manager.begin_turn("voice")
+                    self._pipeline.set_cancel_event(self._session_id,
+                                                    self._manager.llm_cancel)
+                    note = self._manager.consume_interruption_note()
+                    if note and hasattr(self._pipeline, "steer"):
+                        self._pipeline.steer(self._session_id, note)
+                    self._manager.thinking()
 
                 await self._handle(command)
             except asyncio.CancelledError:

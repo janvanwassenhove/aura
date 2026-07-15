@@ -23,14 +23,11 @@
       <button class="titlebar-btn" title="Toggle bottom panel (Events)" aria-label="Toggle bottom panel" @click="$emit('toggle-bottom')">
         <PanelBottom :size="15" />
       </button>
-      <button class="titlebar-btn" title="Toggle right panel (Brain)" aria-label="Toggle right panel" @click="$emit('toggle-right')">
+      <button class="titlebar-btn" title="Brain panel (people, skills, graph)" aria-label="Toggle right panel" @click="$emit('toggle-right')">
         <PanelRight :size="15" />
       </button>
       <button class="titlebar-btn" title="Capabilities & permissions" aria-label="Capabilities and permissions" @click="$emit('open-capabilities')">
         <ShieldCheck :size="16" />
-      </button>
-      <button class="titlebar-btn" title="Knowledge" aria-label="Knowledge" @click="$emit('open-knowledge')">
-        <Brain :size="16" />
       </button>
       <button class="titlebar-btn" title="Settings" aria-label="Settings" @click="$emit('open-settings')">
         <Settings :size="16" />
@@ -54,13 +51,13 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { onMounted } from 'vue'
-import { Bot, Brain, Cpu, Minus, Settings, ShieldCheck, Square, X, PanelBottom, PanelLeft, PanelRight } from 'lucide-vue-next'
+import { Bot, Cpu, Minus, Settings, ShieldCheck, Square, X, PanelBottom, PanelLeft, PanelRight } from 'lucide-vue-next'
 import { useRobotStore } from '../stores/robotStore'
 import { usePrefsStore } from '../stores/prefsStore'
 
 const props = defineProps<{ wsStatus: 'connecting' | 'open' | 'closed' }>()
 defineEmits<{
-  'open-knowledge': []; 'open-settings': []; 'open-capabilities': []
+  'open-settings': []; 'open-capabilities': []
   'toggle-left': []; 'toggle-right': []; 'toggle-bottom': []
 }>()
 
