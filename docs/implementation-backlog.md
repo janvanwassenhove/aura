@@ -321,6 +321,9 @@ the human can unblock it.
 - [x] **U103 — persona-graph groeit uit bronnen (blog/website/github inlezen)** · `pending`
   De U77 `source:<kind>`-facts worden nu echt GELEZEN: `POST /knowledge/people/{id}/ingest` haalt fetchbare bronnen op (blog/website/github; github-handle → profiel-URL), stript HTML, laat het chat-model max 8 facts per bron destilleren met `[[wiki-links]]` in de waarde — die verschijnen als nodes/edges in de brain graph. Dedupe op (key,value) zodat herhaald ingesten de graph niet verdubbelt; auth-walled bronnen (instagram/facebook/x/linkedin/gmail) worden eerlijk als "needs login" geskipt. Console: "Grow brain from sources"-knop in het persoonsprofiel met resultaatregel. Nieuwe module `source_ingest.py` + tests. Brain 163, console 56 groen.
 
+- [x] **U104 — brein import/export: ChatGPT/Claude-exports minen + volledige JSON-dump** · `pending`
+  Import: `POST /knowledge/people/{id}/import-chats` accepteert de inhoud van een ChatGPT- of Claude-data-export (conversations.json, formaat auto-gedetecteerd); alleen wat de PERSOON zelf schreef wordt gelezen, in ~4k-chunks verpakt (cap IMPORT_MAX_CHUNKS=15, eerlijk gerapporteerd als geskipt) en door het chat-model gedestilleerd tot `[[linked]]` facts — zelfde dedupe als U103, dus her-importeren verdubbelt niets. Export: `GET /knowledge/export` dumpt alle personen/facts/signals als één JSON. Console: "Import chat export…"-filepicker in het persoonsprofiel (lokaal gelezen, alleen naar de eigen brain gepost) en "⬇ Export brain"-download in de rail. Nieuwe module `brain_transfer.py` + 8 tests. Brain 171, console 56 groen.
+
 ## Progress log (append-only; newest last)
 
 - 2026-06-21 — ledger created on `aura-autobuild`; Phase 0/0b complete, Phase 1 scaffold (U-pre) done before this loop started.

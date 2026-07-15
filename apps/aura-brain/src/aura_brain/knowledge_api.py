@@ -229,6 +229,37 @@ async def ingest_sources(
     return JSONResponse(result)
 
 
+@router.post("/people/{person_id}/import-chats")
+async def import_chats(
+    person_id: str,
+    body: dict,
+    _: None = Depends(_require_sensitive),
+) -> JSONResponse:
+    """U104: mine a ChatGPT/Claude data-export for facts about this person.
+
+    Body: {"export": <parsed conversations.json>} — the console reads the
+    file locally and posts its content; nothing is sent anywhere else."""
+    from aura_brain.brain_transfer import import_chat_export
+
+    payload = (body or {}).get("export")
+    if payload is None:
+        raise HTTPException(status_code=422, detail="export (conversations.json content) is required")
+    result = await import_chat_export(_require(), person_id, payload)
+    if result.get("error", "").startswith("unknown person"):
+        raise HTTPException(status_code=404, detail=result["error"])
+    if "error" in result and not result.get("added"):
+        raise HTTPException(status_code=422, detail=result["error"])
+    return JSONResponse(result)
+
+
+@router.get("/export")
+async def export_brain(_: None = Depends(_require_sensitive)) -> JSONResponse:
+    """U104: one honest JSON dump of everything AURA knows (people/facts/signals)."""
+    from aura_brain.brain_transfer import export_knowledge
+
+    return JSONResponse(await export_knowledge(_require()))
+
+
 @router.delete("/facts/{fact_id}")
 async def delete_fact(fact_id: str) -> JSONResponse:
     """Delete a fact: step-up required (destructive, ADR-008 §9)."""
