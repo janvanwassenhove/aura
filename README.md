@@ -132,3 +132,27 @@ All software-buildable units are complete and tested (see
 work needs the physical device: the Reachy SDK adapter (U16), on-Pi camera
 recognition (U18), live Realtime voice (U22/U24), and the on-Pi budget guard
 (U26) — the tested seams for each are in place.
+
+## Natural voice conversation (U84)
+
+The conversation layer is a real state machine (`aura_brain/conversation_manager.py`):
+IDLE → LISTENING → TRANSCRIBING → THINKING → SPEAKING, with INTERRUPTED as a
+first-class state. Every transition is logged with turn id, `tts_playing`,
+`llm_active` and `cancel_requested` (never audio or secrets).
+
+**Barge-in** works end-to-end: while the robot speaks, the mic keeps
+listening; an interruption stops the robot's audio instantly
+(`POST /robot/audio/stop` → playbin cut), cancels the in-flight LLM call and
+the speak task, and the interrupting utterance becomes the new active turn —
+with one-shot context telling the LLM its previous answer was cut off.
+
+**Characters** (`personas/*.json`, seeded on first run): friendly_assistant,
+dry_tech_butler, kids_companion, workshop_coach, quiet_mode. A character sets
+the system prompt, verbosity/humor, voice + speed, motion energy and
+interruptibility (`wake_word` | `vad` | `off`). Select via Settings
+(`ACTIVE_CHARACTER`), list via `GET /setup/characters`.
+
+Key settings (Settings panel / env): `VOICE_MODE=wake_word`, `WAKE_WORD`,
+`ACTIVE_CHARACTER`, `BARGE_IN_FACTOR` (interrupt sensitivity),
+`SESSION_MEMORY`, `SPEAK_STREAMING` (off = smoothest playback). See
+`docs/conversation_diagnosis.md` for the architecture map.

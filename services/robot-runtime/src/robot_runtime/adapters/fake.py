@@ -52,6 +52,10 @@ class FakeRobotAdapter(RobotAdapter):
         self._body_follow = enabled
         return enabled
 
+    def stop_audio(self) -> bool:
+        self._audio_stopped = True
+        return True
+
     def set_volume(self, level: float) -> float:
         self._volume = max(0.0, min(1.0, level))
         return self._volume

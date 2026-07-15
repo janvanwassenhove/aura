@@ -85,6 +85,9 @@ class ReachyRobotAdapter(RobotAdapter):
         # play at full amplitude, then resume it (U38-fix).
         self._tracking_on = False
         self._body_follow = False  # U37: torso turns with the tracked face
+        import threading
+
+        self._audio_abort = threading.Event()  # U84: barge-in cuts speech
         # Raw (pre-normalization) peak of the last mic capture — lets the voice
         # loop tell silence from speech cheaply, without transcribing (U47).
         self._last_raw_peak = 0.0
@@ -304,8 +307,22 @@ class ReachyRobotAdapter(RobotAdapter):
                     w.writeframes(struct.pack(f"<{len(samples)}h", *samples.tolist()))
                 media.play_sound(path)
                 # playbin is async; block for the audio duration (+margin) so
-                # nothing else grabs the sink and the lock stays held.
-                time.sleep(duration + 0.4)
+                # nothing else grabs the sink — but wake every 100 ms so a
+                # barge-in can cut the speech instantly (U84).
+                deadline = time.monotonic() + duration + 0.4
+                while time.monotonic() < deadline:
+                    if self._audio_abort.is_set():
+                        try:  # stop the playbin NOW
+                            playbin = getattr(media, "_playbin", None)
+                            if playbin is not None:
+                                from gi.repository import Gst  # type: ignore
+
+                                playbin.set_state(Gst.State.NULL)
+                        except Exception:  # noqa: BLE001 — stop is best-effort
+                            pass
+                        logger.info("audio playback aborted (barge-in)")
+                        break
+                    time.sleep(0.1)
             finally:
                 if path:
                     try:
@@ -313,8 +330,14 @@ class ReachyRobotAdapter(RobotAdapter):
                     except OSError:
                         pass
 
+        self._audio_abort.clear()
         async with self._motion_lock:  # hold the lock so nothing cuts the speech
             await asyncio.to_thread(_play)
+
+    def stop_audio(self) -> bool:
+        """U84 barge-in: abort the current utterance immediately."""
+        self._audio_abort.set()
+        return True
 
     async def capture_audio(self, duration_s: float = 3.0) -> bytes:
         media = self._media()

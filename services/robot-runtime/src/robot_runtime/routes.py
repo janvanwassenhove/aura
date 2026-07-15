@@ -178,6 +178,17 @@ async def set_tracking(body: dict) -> JSONResponse:
     return JSONResponse({"tracking": enabled})
 
 
+@router.post("/robot/audio/stop")
+async def audio_stop() -> JSONResponse:
+    """U84 barge-in: abort the current utterance immediately."""
+    assert adapter is not None
+    _touch()
+    stopper = getattr(adapter, "stop_audio", None)
+    if stopper is None:
+        return JSONResponse({"error": "adapter has no stop_audio"}, status_code=501)
+    return JSONResponse({"stopped": bool(stopper())})
+
+
 @router.get("/robot/budget")
 async def budget() -> JSONResponse:
     """U26: on-Pi resource budget (CPU/mem/temp) and constrained state."""
