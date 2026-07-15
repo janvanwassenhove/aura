@@ -285,6 +285,9 @@ the human can unblock it.
 - [x] **U91 — spooktranscripten: STT-echo (U89 nog niet geladen) + follow-up-hardening** · `pending`
   Twee bronnen van "ik heb dat nooit gezegd": (a) "Aanspreken met 'Richie, ...'." = de oude STT-prompt-zin die Whisper terugkaatst — al gefixt in U89 (kale prompt + guard), maar de draaiende brain draaide nog de U87-code → **app-herstart nodig**. (b) "Wat weet ik?" = Whisper-hallucinatie die in een follow-up-venster (zonder wake-word) als commando werd opgevat. Hardening: follow-up-uitingen moeten nu duidelijk luider zijn dan de stilte-gate (FOLLOWUP_PEAK_FACTOR=1.6 → bewuste spraak, geen kamergeluid), én een transcript dat grotendeels de eigen laatste reply is (word-overlap ≥60%) wordt als self-echo geweigerd. Brain 155 (+2) groen. Muziek-/keten-guards (U67/U69) blijven.
 
+- [x] **U92 — spooktranscripten definitief: interruptie-notitie-lek + wake-word-per-beurt** · `pending`
+  Screenshot toonde twee bugs: (a) de U84-interruptie-notitie ("[The user interrupted…]") werd vóór het commando geplakt → verscheen letterlijk als je "YOU"-bericht én ging naar het LLM. Fix: de notitie gaat nu via `pipeline.steer()` (systeemboodschap, onzichtbaar), nooit meer in het zichtbare commando. (b) Whisper-gebrabbel ("Alel naenolim", "Yakin bolamenitari") werd in follow-up-vensters (zonder wake-word) als commando opgevat → eindeloze uitgevonden gesprekken. Fix: **FOLLOWUP_S=0 als default** → het wake-word "Richie" is nu élke beurt vereist (betrouwbaar); zet FOLLOWUP_S=8 voor natuurlijke "gewoon antwoorden"-follow-ups. Live-instelbaar. Brain 157 (+2), orchestrator 190 groen. Vereist app-herstart.
+
 ## Progress log (append-only; newest last)
 
 - 2026-06-21 — ledger created on `aura-autobuild`; Phase 0/0b complete, Phase 1 scaffold (U-pre) done before this loop started.
