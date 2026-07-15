@@ -346,6 +346,20 @@ async def list_characters() -> JSONResponse:
     })
 
 
+@router.post("/characters/{character_id}")
+async def update_character(character_id: str, body: dict) -> JSONResponse:
+    """U85: owner edits a character (prompt, traits, voice, …) from the app."""
+    from dataclasses import asdict
+
+    from aura_brain.characters import CharacterStore
+
+    updated = CharacterStore().update(character_id, body or {})
+    if updated is None:
+        return JSONResponse({"error": f"unknown character {character_id!r}"},
+                            status_code=404)
+    return JSONResponse(asdict(updated))
+
+
 @router.post("/secure")
 async def secure(body: dict) -> JSONResponse:
     if _get_store is None or _swap_store is None:

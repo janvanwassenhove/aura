@@ -170,3 +170,33 @@ async def test_pipeline_llm_cancelled_mid_call(monkeypatch) -> None:
     reply = await asyncio.wait_for(turn, timeout=2.0)
     await bus.stop()
     assert reply == ""           # cancelled turn stays silent — no stale answer
+
+
+# ── U85: fuzzy wake word + character growth + edit ────────────────────
+
+def test_fuzzy_wake_word_matches_misspellings() -> None:
+    from aura_brain.voice_loop import wake_word_index
+
+    assert wake_word_index("richie wat is het weer", "richie") == 0
+    assert wake_word_index("Ritchie, zet muziek op", "richie") == 0   # edit-1
+    assert wake_word_index("hey Richy kan je helpen", "richie") >= 0  # edit-1
+    assert wake_word_index("oké prima dan", "richie") == -1           # absent
+    assert wake_word_index("het is een rijke buurt", "richie") == -1  # not a match
+
+
+def test_character_edit_and_growth(tmp_path) -> None:
+    from aura_brain.characters import CharacterStore
+
+    store = CharacterStore(str(tmp_path))
+    store.all()  # seed
+    updated = store.update("friendly_assistant", {
+        "learned_traits": "onthoudt dat Jan van skate punk houdt",
+        "verbosity": "normal",
+    })
+    assert updated.learned_traits.startswith("onthoudt")
+    assert updated.verbosity == "normal"
+    # persisted + surfaces in the system note
+    reloaded = CharacterStore(str(tmp_path)).get("friendly_assistant")
+    assert "skate punk" in reloaded.learned_traits
+    assert "developed over time" in reloaded.system_note()
+    assert store.update("nonexistent", {"x": 1}) is None

@@ -44,6 +44,50 @@ _HALLUCINATIONS = {
 _LATIN_EXTRA = set("àâäáãéèêëíìîïóòôöõúùûüçñ’'-")
 
 
+def _within_edits(a: str, b: str, maxd: int) -> bool:
+    """True when levenshtein(a, b) <= maxd. Tiny DP, no dependency."""
+    la, lb = len(a), len(b)
+    if abs(la - lb) > maxd:
+        return False
+    prev = list(range(lb + 1))
+    for i in range(1, la + 1):
+        cur = [i] + [0] * lb
+        best = cur[0]
+        for j in range(1, lb + 1):
+            cost = 0 if a[i - 1] == b[j - 1] else 1
+            cur[j] = min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + cost)
+            best = min(best, cur[j])
+        if best > maxd:
+            return False
+        prev = cur
+    return prev[lb] <= maxd
+
+
+def wake_word_index(text: str, wake: str) -> int:
+    """U85: fuzzy wake-word position in ``text`` (-1 if absent).
+
+    Whisper spells names creatively — "Richie" arrives as "Ritchie", "Richy",
+    "richie," etc. Match per token, punctuation-stripped, allowing edit
+    distance 1 for words of 4+ chars.
+    """
+    if not wake:
+        return -1
+    lower = text.lower()
+    exact = lower.find(wake)
+    if exact >= 0:
+        return exact
+    pos = 0
+    for raw in lower.split():
+        token = raw.strip(".,!?;:'\"()-")
+        # Longer names tolerate 2 edits ("Richy"/"Ritchie" → "richie"); short
+        # ones only 1, so we don't over-match common words.
+        maxd = 2 if len(wake) >= 5 else 1
+        if len(wake) >= 4 and len(token) >= 3 and _within_edits(token, wake, maxd):
+            return lower.find(raw, pos)
+        pos = lower.find(raw, pos) + len(raw)
+    return -1
+
+
 def is_plausible_command(text: str) -> bool:
     """Guard against Whisper hallucinations on ambient noise/silence.
 
@@ -198,7 +242,7 @@ class VoiceLoop:
                     if mode == "off":
                         continue
                     barge_text = (await voice.transcribe(wav, filename="robot.wav") or "").strip()
-                    if mode != "vad" and not (self._wake and self._wake in barge_text.lower()):
+                    if mode != "vad" and wake_word_index(barge_text, self._wake) < 0:
                         logger.debug("barge ignored (no wake word): %r", barge_text[:60])
                         continue
                     if mode == "vad" and not is_plausible_command(barge_text):
@@ -243,7 +287,7 @@ class VoiceLoop:
                     self._manager.thinking()
                 # U67: track the wake-word-less chain. Hearing the wake word
                 # resets it — a real user re-engaging restores full flow.
-                if self._wake and self._wake in text.lower():
+                if wake_word_index(text, self._wake) >= 0:
                     self._followup_chain = 0
                 elif in_followup:
                     self._followup_chain += 1
@@ -264,10 +308,13 @@ class VoiceLoop:
         if this utterance should be ignored."""
         if in_followup:
             return text
-        lower = text.lower()
         wake = self._wake
-        if wake and wake in lower:
-            return text[lower.index(wake) + len(wake):].lstrip(" ,.!?-").strip()
+        idx = wake_word_index(text, wake)
+        if idx >= 0:
+            # cut after the (possibly misspelled) wake token
+            rest = text[idx:]
+            first = rest.split(None, 1)
+            return (first[1] if len(first) > 1 else "").lstrip(" ,.!?-").strip()
         return None  # no wake word, not in follow-up → ignore
 
     async def _capture_command(self) -> str:
