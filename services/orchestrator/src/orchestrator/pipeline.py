@@ -303,11 +303,18 @@ class OrchestratorPipeline:
         """U84 barge-in: cancels the running turn's LLM work mid-call."""
         self._cancel_events[session_id] = event
 
-    async def _llm(self, messages, tools, timing: dict, session_id: str):
-        """openai_chat raced against the turn's cancel event (U84)."""
+    async def _llm(self, messages, tools, timing: dict, session_id: str,
+                   model: str | None = None):
+        """openai_chat raced against the turn's cancel event (U84), with an
+        optional per-role model override (U90)."""
         _t = time.perf_counter()
         cancel = self._cancel_events.get(session_id)
-        llm_task = asyncio.ensure_future(openai_chat(messages, tools=tools))
+        # Only pass model= when set, so test/fake openai_chat stubs without the
+        # kwarg keep working (U90).
+        call_kwargs = {"tools": tools}
+        if model is not None:
+            call_kwargs["model"] = model
+        llm_task = asyncio.ensure_future(openai_chat(messages, **call_kwargs))
         try:
             if cancel is None:
                 return await llm_task
@@ -453,7 +460,16 @@ class OrchestratorPipeline:
             await self._bus.publish(AgentRoundStarted(
                 session_id=session_id, round_no=round_no, max_rounds=max_rounds))
 
-            llm_response = await self._llm(messages, tool_specs or None, timing, session_id)
+            # U90: round 1 uses the fast CHAT model for a snappy reply; once a
+            # turn goes multi-step (tools in play), rounds 2+ use the capable
+            # AGENT model for the reasoning over tool results (e.g. drive
+            # Computer Use to open Spotify and find a track).
+            from orchestrator.config import model_for_role
+
+            role_model = (model_for_role("chat") if round_no == 1
+                          else model_for_role("agent"))
+            llm_response = await self._llm(messages, tool_specs or None, timing,
+                                           session_id, model=role_model)
             if llm_response.get("cancelled"):
                 reply = ""  # barge-in: the interrupting turn takes over
                 break

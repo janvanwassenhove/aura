@@ -191,3 +191,47 @@ def test_strip_speaker_label(monkeypatch) -> None:
     assert strip("Het is laat, Richie.") == "Het is laat, Richie."   # not a leading label
     assert strip("Jan: hoi") == "Jan: hoi"                            # someone else
     assert strip("Gewoon antwoord") == "Gewoon antwoord"
+
+
+async def test_model_roles_chat_round1_agent_rounds2plus(bus, monkeypatch) -> None:
+    """U90: round 1 uses CHAT_MODEL (fast); once tools are in play, rounds 2+
+    use AGENT_MODEL (capable) — e.g. gpt-4o for chat, gpt-5.1 for the task."""
+    monkeypatch.setenv("LLM_PROVIDER", "openai")
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+    monkeypatch.setenv("CHAT_MODEL", "gpt-4o")
+    monkeypatch.setenv("AGENT_MODEL", "gpt-5.1")
+    from orchestrator.config import update_config
+    update_config("openai", "gpt-4o-mini")  # active model = fallback
+
+    seen_models: list[str | None] = []
+
+    async def fake_llm(messages, tools=None, model=None, **kw):
+        seen_models.append(model)
+        n = len([m for m in messages if m["role"] == "tool"])
+        if n == 0:
+            return {"content": None, "tool_calls": [_tc("a", "list_tasks")]}
+        return {"content": "done", "tool_calls": None}
+
+    async def connector(self, tool_name, arguments):
+        return "[ok]"
+
+    monkeypatch.setattr(pipeline_mod, "openai_chat", fake_llm)
+    monkeypatch.setattr(OrchestratorPipeline, "_call_connector", connector)
+
+    reply = await _pipeline(bus).orchestrate("plan iets", "s1")
+    assert reply == "done"
+    assert seen_models[0] == "gpt-4o"    # round 1 → chat model
+    assert seen_models[1] == "gpt-5.1"   # round 2 → agent model
+
+
+def test_model_for_role_falls_back_and_respects_provider(monkeypatch) -> None:
+    from orchestrator.config import model_for_role, update_config
+
+    monkeypatch.setenv("CHAT_MODEL", "gpt-4o")
+    monkeypatch.delenv("AGENT_MODEL", raising=False)
+    update_config("openai", "gpt-4o-mini")
+    assert model_for_role("chat") == "gpt-4o"
+    assert model_for_role("agent") is None   # unset → fallback
+    update_config("gemini", "gemini-2.5-flash")
+    assert model_for_role("chat") is None     # only applies to OpenAI
+    update_config("openai", "gpt-4o-mini")    # restore

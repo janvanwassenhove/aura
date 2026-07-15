@@ -279,6 +279,9 @@ the human can unblock it.
 - [x] **U89 — STT-prompt-echo + latency (reasoning-model + venster)** · `pending`
   (1) De generieke "je praat met Richie…"-reply was Whisper die de STT-prompt-HINT letterlijk terugkaatste bij onduidelijke audio; het model antwoordde daarop. Fix: prompt terug naar kale woord-priming (`"{wake} {name}"`, geen zin) + guard die een transcript dat enkel uit de priming-woorden bestaat weggooit → behandeld als kaal wake-word (lus herluistert naar het commando). (2) **Vertraging**: OPENAI_MODEL stond op gpt-5.1 (reasoning-model, "denkt na" → 3–8s/beurt, dodelijk voor spraak) → **gpt-4o** (snel, live toegepast op de draaiende brain). Opnamevenster live-instelbaar via VOICE_WINDOW_S (default 3s i.p.v. 4). Brain-voice-tests groen. Model terug te zetten via Settings → LLM.
 
+- [x] **U90 — modelrollen: model per taaktype (snel gesprek vs krachtig voor taken)** · `pending`
+  `openai_chat(model=…)`-override + `config.model_for_role("chat"/"agent")` (leest CHAT_MODEL/AGENT_MODEL live, alleen OpenAI, anders fallback naar het actieve model). Pipeline: ronde 1 gebruikt het **chat**-model (snel, lage latency voor spraak); zodra een beurt meerstaps wordt (tools in het spel), gebruiken ronde 2+ het **agent**-model (krachtig — bv. gpt-5.1 om Computer Use aan te sturen: Spotify openen, nummer zoeken, afspelen). Computer Use zelf houdt zijn eigen COMPUTER_USE_OPENAI_MODEL. Settings → LLM: drie rol-velden (Conversation / Tasks & tools / Screen control) met model-suggesties + Save. Gezet: chat=gpt-4o, agent=gpt-5.1, computer=gpt-5.1 (live + .env). Orchestrator 190 (+2), console 56 groen. `model=` alleen doorgegeven als gezet (test-fakes blijven werken).
+
 ## Progress log (append-only; newest last)
 
 - 2026-06-21 — ledger created on `aura-autobuild`; Phase 0/0b complete, Phase 1 scaffold (U-pre) done before this loop started.

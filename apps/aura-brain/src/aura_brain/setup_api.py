@@ -253,6 +253,10 @@ def _prefs_snapshot() -> dict:
         "interrupt_sensitivity": os.environ.get("BARGE_IN_FACTOR", "3.0"),
         "session_memory": os.environ.get("SESSION_MEMORY", "true"),
         "mic_sensitivity": os.environ.get("VOICE_SPEECH_PEAK", "0.012"),
+        # U90: per-task-type model roles (empty → use the active LLM model).
+        "chat_model": os.environ.get("CHAT_MODEL", ""),
+        "agent_model": os.environ.get("AGENT_MODEL", ""),
+        "computer_use_model": os.environ.get("COMPUTER_USE_OPENAI_MODEL", "gpt-4o"),
     }
 
 
@@ -318,6 +322,12 @@ async def set_prefs(body: dict) -> JSONResponse:
         except (TypeError, ValueError):
             return JSONResponse({"error": "interrupt_sensitivity must be a number"},
                                 status_code=422)
+    for role_key, env_key in (("chat_model", "CHAT_MODEL"),
+                              ("agent_model", "AGENT_MODEL"),
+                              ("computer_use_model", "COMPUTER_USE_OPENAI_MODEL")):
+        val = (body or {}).get(role_key)
+        if val is not None:
+            updates[env_key] = str(val).strip()
     mic_sensitivity = (body or {}).get("mic_sensitivity")
     if mic_sensitivity is not None:
         try:

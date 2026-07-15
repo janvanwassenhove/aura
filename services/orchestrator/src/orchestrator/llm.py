@@ -26,6 +26,7 @@ _OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 async def openai_chat(
     messages: list[dict[str, Any]],
     tools: list[dict[str, Any]] | None = None,
+    model: str | None = None,
 ) -> dict[str, Any]:
     """Call the LLM and return the raw choice dict.
 
@@ -53,7 +54,7 @@ async def openai_chat(
         from google.genai import types as genai_types
 
         gclient = google_genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
-        model = cfg.model
+        model = model or cfg.model
 
         # Convert OpenAI messages format → Gemini contents format
         contents = []
@@ -120,14 +121,14 @@ async def openai_chat(
             api_key=os.environ.get("OPENROUTER_API_KEY"),
             base_url=_OPENROUTER_BASE_URL,
         )
-        model = cfg.model
+        model = model or cfg.model
 
     # --- OpenAI ---
     else:
         from openai import AsyncOpenAI
 
         client = AsyncOpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
-        model = cfg.model
+        model = model or cfg.model
 
     kwargs: dict[str, Any] = {
         "model": model,

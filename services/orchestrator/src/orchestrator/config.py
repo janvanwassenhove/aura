@@ -46,6 +46,23 @@ def get_config() -> LLMConfig:
     return _config
 
 
+def model_for_role(role: str) -> str | None:
+    """U90: per-task-type model override, read live from env.
+
+    role='chat'  → CHAT_MODEL  (fast, low-latency voice replies)
+    role='agent' → AGENT_MODEL (capable, multi-step tool use / reasoning)
+    Returns None to fall back to the active runtime model (Settings → LLM).
+    Only applies to the OpenAI provider; ignored otherwise.
+    """
+    if _config.provider != "openai":
+        return None
+    env_key = {"chat": "CHAT_MODEL", "agent": "AGENT_MODEL"}.get(role)
+    if not env_key:
+        return None
+    value = os.environ.get(env_key, "").strip()
+    return value or None
+
+
 def update_config(provider: str, model: str) -> LLMConfig:
     """Update the runtime LLM config in-place. Returns the updated config."""
     if provider not in _VALID_PROVIDERS:

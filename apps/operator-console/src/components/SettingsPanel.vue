@@ -62,6 +62,31 @@
             <input v-else id="llm-model" v-model="localModel" type="text" class="field-input" :placeholder="modelPlaceholder" />
           </div>
 
+          <div v-if="localProvider === 'openai'" class="settings-field">
+            <label class="field-label">Model per task type <span class="mr-hint">(optional — empty = use the model above)</span></label>
+            <div class="model-role">
+              <span class="mr-name">💬 Conversation <em>fast, low-latency voice</em></span>
+              <input v-model="roleChat" list="mr-models" class="field-input mr-input" placeholder="e.g. gpt-4o" />
+            </div>
+            <div class="model-role">
+              <span class="mr-name">🛠️ Tasks &amp; tools <em>multi-step, Spotify/computer use</em></span>
+              <input v-model="roleAgent" list="mr-models" class="field-input mr-input" placeholder="e.g. gpt-5.1" />
+            </div>
+            <div class="model-role">
+              <span class="mr-name">🖥️ Screen control <em>drives the mouse/keyboard</em></span>
+              <input v-model="roleComputer" list="mr-models" class="field-input mr-input" placeholder="gpt-4o" />
+            </div>
+            <datalist id="mr-models">
+              <option v-for="m in llmStore.models" :key="m.id" :value="m.id" />
+              <option value="gpt-4o" /><option value="gpt-4o-mini" />
+              <option value="gpt-5.1" /><option value="gpt-5" /><option value="gpt-5-mini" />
+            </datalist>
+            <button class="btn-apply mr-save" :disabled="rolesSaving" @click="saveModelRoles">
+              {{ rolesSaving ? 'Saving…' : 'Save model roles' }}
+            </button>
+            <span v-if="rolesSaved" class="settings-success" style="margin-left:0.5rem">Saved</span>
+          </div>
+
           <p v-if="llmStore.error" class="settings-error">{{ llmStore.error }}</p>
           <p v-if="llmStore.successMessage" class="settings-success">{{ llmStore.successMessage }}</p>
         </div>
@@ -437,6 +462,34 @@ defineEmits<{ (e: 'close'): void }>()
 const llmStore = useSettingsStore()
 const localProvider = ref<LLMProvider>('openai')
 const localModel = ref<string>('')
+// U90: per-task-type model roles
+const roleChat = ref('')
+const roleAgent = ref('')
+const roleComputer = ref('')
+const rolesSaving = ref(false)
+const rolesSaved = ref(false)
+
+async function fetchModelRoles() {
+  try {
+    const r = await fetch(`${BRAIN_URL_LOGS}/setup/prefs`)
+    const d = await r.json()
+    roleChat.value = d.chat_model ?? ''
+    roleAgent.value = d.agent_model ?? ''
+    roleComputer.value = d.computer_use_model ?? ''
+  } catch { /* keep */ }
+}
+async function saveModelRoles() {
+  rolesSaving.value = true
+  rolesSaved.value = false
+  try {
+    const r = await fetch(`${BRAIN_URL_LOGS}/setup/prefs`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_model: roleChat.value.trim(),
+        agent_model: roleAgent.value.trim(), computer_use_model: roleComputer.value.trim() }),
+    })
+    rolesSaved.value = r.ok
+  } finally { rolesSaving.value = false }
+}
 
 const modelPlaceholder = computed(() => {
   if (localProvider.value === 'openrouter') return 'e.g. openai/gpt-oss-120b:free'
@@ -447,6 +500,7 @@ const freeModels = computed<ModelOption[]>(() => llmStore.models.filter(m => m.f
 const paidModels = computed<ModelOption[]>(() => llmStore.models.filter(m => !m.free))
 
 onMounted(async () => {
+  fetchModelRoles()
   await llmStore.fetchConfig()
   localProvider.value = llmStore.provider
   localModel.value = llmStore.model
@@ -902,4 +956,12 @@ const ConnStatusBadge = defineComponent({
 @keyframes spin { to { transform: rotate(360deg); } }
 
 .btn-small { font-size: 0.72rem; padding: 0.2rem 0.5rem; }
+
+/* U90: model roles */
+.mr-hint { color: var(--text-faint); font-weight: 400; font-size: 0.7rem; }
+.model-role { display: flex; align-items: center; gap: 0.5rem; margin: 0.3rem 0; }
+.mr-name { flex: 1; font-size: 0.78rem; display: flex; flex-direction: column; }
+.mr-name em { font-style: normal; color: var(--text-faint); font-size: 0.68rem; }
+.mr-input { max-width: 11rem; }
+.mr-save { margin-top: 0.4rem; }
 </style>
