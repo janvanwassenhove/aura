@@ -80,14 +80,20 @@ async def transcribe(data: bytes, filename: str = "audio.webm") -> str | None:
         lang = os.environ.get("ASSISTANT_LANGUAGE", "auto").lower()
         if lang in ("en", "nl", "fr"):  # bias STT toward the configured language
             kwargs["language"] = lang
-        # U87: prime STT with the assistant's NAME so it transcribes the wake
-        # word correctly instead of dropping it or hearing "Hej"/"hey". The
-        # prompt biases the vocabulary toward these tokens.
+        # U87/U89: prime STT with the wake word/name as bare VOCABULARY tokens
+        # (not a sentence — a sentence gets echoed back verbatim on unclear
+        # audio, which the LLM then answers, U89). A short word list only
+        # biases spelling of the name.
         name = os.environ.get("ASSISTANT_NAME", "AURA")
         wake = os.environ.get("WAKE_WORD", name)
-        kwargs["prompt"] = f"Gesprek met de robot {name}. Aanspreken met '{wake}, ...'."
+        kwargs["prompt"] = f"{wake} {name}"
         result = await client.audio.transcriptions.create(**kwargs)
-        return result.text
+        text = (result.text or "").strip()
+        # Guard: if STT just echoed our priming words (unclear audio), discard.
+        stripped = text.lower().strip(" .,!?").replace(wake.lower(), "").replace(name.lower(), "").strip()
+        if not stripped:
+            return wake  # treat as bare wake word → the loop re-listens for the command
+        return text
     except Exception as exc:  # noqa: BLE001
         logger.warning("transcription failed: %s", exc)
         return None
