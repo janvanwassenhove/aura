@@ -546,7 +546,12 @@ class ReachyRobotAdapter(RobotAdapter):
             mini.wake_up()
             go(head=_NEUTRAL, antennas=[0.0, 0.0], duration=0.8)  # settle upright
         elif motion == "sleep":
-            mini.goto_sleep()
+            # U101: "tucked" sleep pose — duck the head down/away and sweep the
+            # antennas back, instead of the SDK's default sleep emote. Tunable
+            # via SLEEP_HEAD_PITCH (down, rad) and SLEEP_ANTENNA (back, rad).
+            down = float(os.environ.get("SLEEP_HEAD_PITCH", "0.6"))
+            ant = float(os.environ.get("SLEEP_ANTENNA", "1.4"))
+            go(head=_rot("x", down), antennas=[ant, ant], duration=1.4)
         elif motion == "look_around":  # idle curiosity: glance at 2 spots, settle
             import random
 
