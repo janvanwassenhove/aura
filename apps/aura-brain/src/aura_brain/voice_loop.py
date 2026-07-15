@@ -82,7 +82,11 @@ def wake_word_index(text: str, wake: str) -> int:
         # Longer names tolerate 2 edits ("Richy"/"Ritchie" → "richie"); short
         # ones only 1, so we don't over-match common words.
         maxd = 2 if len(wake) >= 5 else 1
-        if len(wake) >= 4 and len(token) >= 3 and _within_edits(token, wake, maxd):
+        prefix = wake[:4]
+        shared_prefix = len(wake) >= 4 and token.startswith(prefix)
+        if len(wake) >= 4 and len(token) >= 3 and (
+            _within_edits(token, wake, maxd) or shared_prefix
+        ):
             return lower.find(raw, pos)
         pos = lower.find(raw, pos) + len(raw)
     return -1

@@ -270,6 +270,9 @@ the human can unblock it.
 - [x] **U86 — Richie hoort je niet: VAD-drempel te hoog voor stille mic + live-tuning** · `pending`
   Diagnose: begroeting werkt via de camera, maar de spraaklus gebruikt de mic — en de rauwe piek bij praten (~0.023) lag ONDER de VAD-drempel 0.03, dus elke opname werd als "stilte" overgeslagen. Fix: VOICE_SPEECH_PEAK=0.012 in .env; de drempel wordt nu **live** gelezen (property i.p.v. bij startup) → instelbaar zonder herstart via prefs `mic_sensitivity`. Diagnose-endpoint `POST /setup/voice-check`: neemt op en rapporteert raw_peak/gate/passed_gate/transcript/wake_matched — zo verifieer je voice-input zonder gokken. NB: de fuzzy wake-word-code (U85) + de lagere drempel laden pas bij een **app-herstart** — de draaiende brain draaide nog de oude code (exact-match + gate 0.03). Brain 153 groen.
 
+- [x] **U87 — Whisper laat de naam vallen: STT-prompt-hint + ruimere wake-match** · `pending`
+  `voice-check` bewees: mic + drempel + transcriptie werken (peak 0.67, passed_gate), maar het transcript was "Hej." — Whisper dropte "Richie" (en gokte de verkeerde taal). Fix: STT krijgt nu een **prompt-hint** met de assistentnaam+wake-word ("Gesprek met de robot Richie. Aanspreken met 'Richie, …'.") → biast de transcriptie naar de juiste tokens i.p.v. de naam weg te laten. Fuzzy wake-match verruimd met een prefix-guard (eerste 4 tekens): "Rich/Riche/Richy/Ritchie" pakken nu allemaal, terwijl "rietje/prima" terecht falen. Brain suite groen. Vereist app-herstart om de STT-prompt te laden.
+
 ## Progress log (append-only; newest last)
 
 - 2026-06-21 — ledger created on `aura-autobuild`; Phase 0/0b complete, Phase 1 scaffold (U-pre) done before this loop started.
