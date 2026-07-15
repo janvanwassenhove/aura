@@ -249,6 +249,9 @@ the human can unblock it.
 - [x] **U79 — robot vast/geen tracking: brain-link-diagnose + status-touch** · `pending`
   Symptoom (robot stond stil, volgde/herkende niet): de brain kon de robot niet bereiken — de mDNS-naam `reachy-mini.local` resolvete niet meer vanaf de laptop (proxy gaf `robot unreachable: ConnectError`), waardoor de robot naar de offline-idle-lus viel (idle_fidget-nods die de kop vasthouden) en herkenning stopte (draait op de brain, die camerabeelden ophaalt). Live opgelost: robotadres op het vaste IP gezet via `/setup/config` (Settings → Robot; persistent) + head-tracking heraangezet op de Pi. Robuustheidsfix: `GET /robot/status` roept nu `_touch()` aan — een brain die leeft en pollt maar even niet commandeert (gewoon gesprek) tript niet langer onterecht naar offline na BRAIN_LINK_TIMEOUT. Op de Pi gedeployed + herstart. Aanbeveling in setup: gebruik het IP i.p.v. .local als mDNS wisselvallig is.
 
+- [x] **U80 — spraak afgekapt na één woord ("Zeker…") gefixt** · `pending`
+  Root cause: `play_audio` deed één grote `media.push_audio_sample(hele-zin)` en keerde direct terug — de SDK draint een klein buffertje en stopt als er niets bijgevoed wordt, dus lange antwoorden werden tot ~0.5s afgekapt (de 1s-testtoon paste nog net, vandaar dat die wél klonk). Fix: audio in ~200ms-blokken pushen op afspeeltempo (sleep per blok) en **blokkeren tot de hele utterance gespeeld is** + korte staart; motion_lock vastgehouden zodat niets de spraak onderbreekt. Bijkomend voordeel: gestreamde TTS (U54) wacht nu netjes per chunk. Live op de Pi geverifieerd (4s-toon: call blokkeert ~volledige duur i.p.v. <0.5s). Gedeployed + herstart.
+
 ## Progress log (append-only; newest last)
 
 - 2026-06-21 — ledger created on `aura-autobuild`; Phase 0/0b complete, Phase 1 scaffold (U-pre) done before this loop started.
