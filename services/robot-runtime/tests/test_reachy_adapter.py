@@ -132,7 +132,9 @@ async def test_wake_up_and_sleep_map_to_sdk_emotes(adapter) -> None:
     await adapter.execute_motion(MotionCommand(motion_id="wake_up", direction=None))
     await adapter.execute_motion(MotionCommand(motion_id="sleep", direction=None))
     moves = _moves(adapter._created[0])
-    assert "wake_up" in moves and "goto_sleep" in moves
+    # U101: wake_up still uses the SDK emote; sleep is now a custom "tucked"
+    # pose (goto_target with head down + antennas back), not goto_sleep().
+    assert "wake_up" in moves and "goto_target" in moves
 
 
 async def test_unknown_motion_falls_back_to_gentle_nod(adapter) -> None:
@@ -150,7 +152,8 @@ async def test_timeline_executes_cues_in_order(adapter) -> None:
     ])
     await adapter.execute_timeline(timeline)
     moves = _moves(adapter._created[0])
-    assert moves.index("wake_up") < moves.index("goto_sleep")
+    # U101: sleep cue is a custom goto_target pose; it runs after wake_up.
+    assert moves.index("wake_up") < moves.index("goto_target")
 
 
 async def test_motion_before_connect_raises(adapter) -> None:
