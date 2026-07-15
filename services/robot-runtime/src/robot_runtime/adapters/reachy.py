@@ -546,12 +546,22 @@ class ReachyRobotAdapter(RobotAdapter):
             mini.wake_up()
             go(head=_NEUTRAL, antennas=[0.0, 0.0], duration=0.8)  # settle upright
         elif motion == "sleep":
-            # U101: "tucked" sleep pose — duck the head down/away and sweep the
-            # antennas back, instead of the SDK's default sleep emote. Tunable
-            # via SLEEP_HEAD_PITCH (down, rad) and SLEEP_ANTENNA (back, rad).
-            down = float(os.environ.get("SLEEP_HEAD_PITCH", "0.6"))
-            ant = float(os.environ.get("SLEEP_ANTENNA", "1.4"))
-            go(head=_rot("x", down), antennas=[ant, ant], duration=1.4)
+            # U102: use the SDK's default goto_sleep() emote. It sometimes
+            # didn't "take" because head-tracking / automatic body-yaw kept
+            # pulling the head back toward the face while the emote played —
+            # so hard-stop both first, then call goto_sleep with one retry.
+            for _fn in (mini.stop_head_tracking, lambda: mini.set_automatic_body_yaw(False)):
+                try:
+                    _fn()
+                except Exception:  # noqa: BLE001
+                    pass
+            self._tracking_on = False
+            for _attempt in range(2):
+                try:
+                    mini.goto_sleep()
+                    break
+                except Exception as exc:  # noqa: BLE001
+                    logger.warning("goto_sleep() failed (attempt %d): %s", _attempt + 1, exc)
         elif motion == "look_around":  # idle curiosity: glance at 2 spots, settle
             import random
 
