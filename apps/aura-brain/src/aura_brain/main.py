@@ -312,7 +312,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             async def _synth(chunk: str) -> str:
                 return await voice.synthesize_b64(chunk, reply_voice)
 
-            if os.environ.get("SPEAK_STREAMING", "true").lower() == "true":
+            # U83: streaming is default OFF now — on the robot each chunk is a
+            # separate playbin file, and the small gaps between them chopped the
+            # reply. One synth + one continuous file plays the whole answer
+            # smoothly. Set SPEAK_STREAMING=true to trade smoothness for lower
+            # first-audio latency.
+            if os.environ.get("SPEAK_STREAMING", "false").lower() == "true":
                 from aura_brain.streaming import stream_speech
 
                 async def _speak_chunk(chunk: str, audio_b64: str) -> None:
