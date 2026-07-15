@@ -267,6 +267,9 @@ the human can unblock it.
 - [x] **U85 — fuzzy wake-word, gevarieerde begroeting, persona-keuze+groei in de app** · `cfb1515`
   (1) Wake-word werkte niet: ASSISTANT_NAME stond nog op "AURA" én Whisper spelt "Richie" wisselend. `wake_word_index()` matcht nu fuzzy (begrensde Levenshtein ≤2 voor namen ≥5 tekens, per token) in start- én barge-in-check; naam op Richie. (2) Begroetingsvariatie: willekeurige invalshoek + "nooit dezelfde woorden"; character.greeting_message wint. (3) Persona in Robot State: dropdown + inline editor (prompt/verbosity/humor/voice/interrupt/learned traits) → POST /setup/characters/{id}; groeit via learned_traits. Brain 153, console 56 groen. Live gezet op de brain.
 
+- [x] **U86 — Richie hoort je niet: VAD-drempel te hoog voor stille mic + live-tuning** · `pending`
+  Diagnose: begroeting werkt via de camera, maar de spraaklus gebruikt de mic — en de rauwe piek bij praten (~0.023) lag ONDER de VAD-drempel 0.03, dus elke opname werd als "stilte" overgeslagen. Fix: VOICE_SPEECH_PEAK=0.012 in .env; de drempel wordt nu **live** gelezen (property i.p.v. bij startup) → instelbaar zonder herstart via prefs `mic_sensitivity`. Diagnose-endpoint `POST /setup/voice-check`: neemt op en rapporteert raw_peak/gate/passed_gate/transcript/wake_matched — zo verifieer je voice-input zonder gokken. NB: de fuzzy wake-word-code (U85) + de lagere drempel laden pas bij een **app-herstart** — de draaiende brain draaide nog de oude code (exact-match + gate 0.03). Brain 153 groen.
+
 ## Progress log (append-only; newest last)
 
 - 2026-06-21 — ledger created on `aura-autobuild`; Phase 0/0b complete, Phase 1 scaffold (U-pre) done before this loop started.

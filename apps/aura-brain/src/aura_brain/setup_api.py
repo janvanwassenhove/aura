@@ -252,6 +252,7 @@ def _prefs_snapshot() -> dict:
         "character": os.environ.get("ACTIVE_CHARACTER", ""),
         "interrupt_sensitivity": os.environ.get("BARGE_IN_FACTOR", "3.0"),
         "session_memory": os.environ.get("SESSION_MEMORY", "true"),
+        "mic_sensitivity": os.environ.get("VOICE_SPEECH_PEAK", "0.012"),
     }
 
 
@@ -317,6 +318,12 @@ async def set_prefs(body: dict) -> JSONResponse:
         except (TypeError, ValueError):
             return JSONResponse({"error": "interrupt_sensitivity must be a number"},
                                 status_code=422)
+    mic_sensitivity = (body or {}).get("mic_sensitivity")
+    if mic_sensitivity is not None:
+        try:
+            updates["VOICE_SPEECH_PEAK"] = str(max(0.004, min(0.1, float(mic_sensitivity))))
+        except (TypeError, ValueError):
+            return JSONResponse({"error": "mic_sensitivity must be a number"}, status_code=422)
     session_memory = (body or {}).get("session_memory")
     if session_memory is not None:
         updates["SESSION_MEMORY"] = "true" if str(session_memory).lower() in ("true", "1", "on") else "false"
@@ -331,6 +338,37 @@ async def set_prefs(body: dict) -> JSONResponse:
     os.environ.update(updates)          # effective immediately (read live)
     persisted = _write_env(updates)     # survives restarts
     return JSONResponse({**_prefs_snapshot(), "persisted": persisted})
+
+
+@router.post("/voice-check")
+async def voice_check(body: dict) -> JSONResponse:
+    """U86: one-shot mic diagnostic — record from the robot, report the raw
+    peak, the transcript and whether the wake word matched. Lets the owner
+    verify voice input without guessing."""
+    import os as _os
+
+    from aura_brain import voice as _voice
+    from aura_brain.robot_client import RobotClient
+    from aura_brain.voice_loop import wake_word_index
+
+    robot = RobotClient()
+    try:
+        wav, peak = await robot.listen(float((body or {}).get("duration_s", 4)))
+    except Exception as exc:  # noqa: BLE001
+        return JSONResponse({"error": f"robot mic unreachable: {exc}"}, status_code=503)
+    gate = float(_os.environ.get("VOICE_SPEECH_PEAK", "0.012"))
+    transcript = ""
+    if peak >= gate:
+        transcript = (await _voice.transcribe(wav, filename="check.wav") or "").strip()
+    wake = _os.environ.get("WAKE_WORD", _os.environ.get("ASSISTANT_NAME", "AURA")).lower()
+    return JSONResponse({
+        "raw_peak": round(peak, 4),
+        "gate": gate,
+        "passed_gate": peak >= gate,
+        "transcript": transcript,
+        "wake_word": wake,
+        "wake_matched": wake_word_index(transcript, wake) >= 0 if transcript else False,
+    })
 
 
 @router.get("/characters")
