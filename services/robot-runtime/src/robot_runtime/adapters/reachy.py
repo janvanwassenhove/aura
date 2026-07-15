@@ -274,9 +274,12 @@ class ReachyRobotAdapter(RobotAdapter):
             for start in range(0, len(pcm), block):
                 chunk = pcm[start:start + block]
                 media.push_audio_sample(chunk)
-                time.sleep(len(chunk) / out_rate)
-            # small tail so the device drains the last block before we release
-            time.sleep(0.15)
+                # Feed slightly AHEAD of real time (sleep 80% of the block) so
+                # the device buffer never underruns between pushes — an exact
+                # real-time sleep let it drain and stop mid-sentence (U80→U81).
+                time.sleep(len(chunk) / out_rate * 0.8)
+            # tail: let the buffered audio drain before releasing the lock
+            time.sleep(0.4)
 
         async with self._motion_lock:  # hold the lock so nothing cuts the speech
             await asyncio.to_thread(_play)
@@ -393,13 +396,26 @@ class ReachyRobotAdapter(RobotAdapter):
         async with self._motion_lock:
             await asyncio.to_thread(self._run_motion_tracked, command)
 
+    # Reply-time gestures (embodiment): keep looking at the person while doing
+    # them so follow-me is not interrupted every time the robot speaks (U81).
+    _FOLLOW_GESTURES = frozenset({"nod", "tilt", "shake", "gesture", "wave"})
+
     def _run_motion_tracked(self, command: MotionCommand) -> None:
         """Run a motion at FULL amplitude: pause follow-me tracking (which
         would otherwise pull the head straight back to the face and dampen the
-        move), play it, then resume tracking. Sync; runs inside the lock."""
+        move), play it, then resume tracking. Sync; runs inside the lock.
+
+        U81: with FOLLOW_WHILE_SPEAKING (default on) the small reply gestures
+        DON'T pause tracking — the robot keeps its eyes on you while gesturing
+        and speaking. Big emotes still manage the head themselves."""
+        motion = command.motion_id.lower()
+        follow_while_speaking = (
+            os.environ.get("FOLLOW_WHILE_SPEAKING", "true").lower() == "true"
+        )
+        keep_tracking = follow_while_speaking and motion in self._FOLLOW_GESTURES
         paused = False
         # wake_up/sleep/look_around manage the head themselves; don't touch them.
-        if self._tracking_on and command.motion_id.lower() not in (
+        if self._tracking_on and not keep_tracking and motion not in (
             "wake_up", "sleep", "look_around", "point"
         ):
             try:
