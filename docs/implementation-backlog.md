@@ -255,6 +255,9 @@ the human can unblock it.
 - [x] **U81 — spraak nog afgekapt (underrun) + volgen tijdens spreken** · `pending`
   (1) Afkap-vervolg op U80: het exacte realtime-pacen liet de device-buffer tussen blokjes leeglopen (underrun → SDK stopt) — nu wordt ~80% van de blokduur geslapen zodat de buffer altijd vooruit-gevoed is, plus een langere staart (0.4s). 6s-toon getest: call blokkeert de volledige duur, geen afkap. (2) **Volgen tijdens spreken**: reply-gebaren (nod/tilt/shake/gesture/wave) pauzeren de head-tracking niet meer (FOLLOW_WHILE_SPEAKING, default aan) — Richie houdt zijn ogen op je terwijl hij gebaart én praat; grote emotes (wake_up/sleep/look_around/point) beheren de kop nog zelf. Robot 54 groen, live geverifieerd, tracking heraan op de Pi. Gedeployed + herstart.
 
+- [x] **U82 — spraak enorm stil: hardware-volume (ALSA) op max bij connect** · `pending`
+  Root cause: de SDK/daemon zet de speaker-ALSA-control `PCM` bij init terug op ~62% = **-23dB** (fors gedempt) — vandaar "enorm stil" ondanks digitale normalisatie. De adapter zette wél een digitale gain (self._volume) maar raakte de hardware-mixer nooit aan. Fix: `_set_hardware_volume_max()` zet `PCM` op 100%/0dB bij élke connect (amixer; overridebaar via SPEAKER_ALSA_CARD/CONTROL, uit te zetten met SPEAKER_ALSA_MAX=false); fijnregeling blijft digitaal via de app-slider. Live geverifieerd (55% → 100% na herstart) + ALSA-state opgeslagen. Robot 54 groen. Gedeployed + herstart.
+
 ## Progress log (append-only; newest last)
 
 - 2026-06-21 — ledger created on `aura-autobuild`; Phase 0/0b complete, Phase 1 scaffold (U-pre) done before this loop started.

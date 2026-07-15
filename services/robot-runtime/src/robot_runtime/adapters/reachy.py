@@ -99,6 +99,27 @@ class ReachyRobotAdapter(RobotAdapter):
     def get_volume(self) -> float:
         return self._volume
 
+    @staticmethod
+    def _set_hardware_volume_max() -> None:
+        """Force the speaker's ALSA PCM control to 0 dB (U82). Best-effort:
+        overridable via SPEAKER_ALSA_CONTROL / SPEAKER_ALSA_CARD; skipped when
+        SPEAKER_ALSA_MAX=false."""
+        if os.environ.get("SPEAKER_ALSA_MAX", "true").lower() != "true":
+            return
+        import subprocess
+
+        card = os.environ.get("SPEAKER_ALSA_CARD", "0")
+        control = os.environ.get("SPEAKER_ALSA_CONTROL", "PCM")
+        try:
+            subprocess.run(
+                ["amixer", "-c", card, "sset", control, "100%"],
+                check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                timeout=5,
+            )
+            logger.info("speaker ALSA %s set to 100%% (card %s)", control, card)
+        except Exception as exc:  # noqa: BLE001 — audio is best-effort
+            logger.warning("could not set speaker ALSA volume: %s", exc)
+
     async def set_tracking(self, enabled: bool) -> bool:
         """Follow-me: daemon-side face tracking (U36g)."""
         if self._mini is None:
@@ -162,6 +183,11 @@ class ReachyRobotAdapter(RobotAdapter):
                 mini.goto_target(head=_NEUTRAL, antennas=[0.0, 0.0], duration=0.8)
             except Exception as exc:  # noqa: BLE001 — wake is best-effort
                 logger.warning("wake-up on connect failed: %s", exc)
+            # U82: the SDK/daemon resets the speaker's ALSA PCM volume to ~62%
+            # (-23 dB) on init, which made TTS "enorm stil". Force the hardware
+            # mixer to max on every connect so speech is audible; fine loudness
+            # control stays digital via the app volume slider (self._volume).
+            self._set_hardware_volume_max()
             # U36g: follow the person — the daemon tracks the nearest face and
             # keeps looking at them (looks up when you stand in front of it).
             if os.environ.get("HEAD_TRACKING", "true").lower() == "true":
