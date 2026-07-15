@@ -309,6 +309,9 @@ the human can unblock it.
 - [x] **U99 — microfoon aan/uit-toggle in Robot State** · `pending`
   Schakelaar "Microphone" bovenaan het Robot State-paneel (naast Follow me): aan → VOICE_MODE=wake_word (Richie luistert naar "Richie …"), uit → VOICE_MODE=off (de spraaklus idlet, geen mic-luisteren). Zet de pref live via /setup/prefs (leest de huidige stand bij mount); mic-icoon Mic/MicOff. Handig om het luisteren snel stil te leggen zonder naar Settings. Console 56 groen.
 
+- [x] **U100 — slaap-/waakstand in Robot State (echt "doe niets")** · `pending`
+  Sleep/Wake-toggle bovenaan Robot State. Slaap = echte modus, geen enkele actie: `ROBOT_ASLEEP=true` gate't `_embody_reply` (geen gesproken antwoorden) én `_on_person_recognized` (herkent stil, geen begroeting), VOICE_MODE=off (mic-lus idlet), head-tracking uit, sleep-pose. Wake herstelt alles (wake_up-emote, VOICE_MODE=wake_word, tracking aan). Endpoints `POST /robot/sleep|wake` + `GET /robot/sleep`; persistent in .env. Console leest de stand bij mount en synct de mic-toggle mee. Brain 160, console 56 groen.
+
 ## Progress log (append-only; newest last)
 
 - 2026-06-21 — ledger created on `aura-autobuild`; Phase 0/0b complete, Phase 1 scaffold (U-pre) done before this loop started.

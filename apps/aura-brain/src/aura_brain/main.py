@@ -297,6 +297,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     async def _embody_reply(event: ResponseDrafted) -> None:
         text = (event.response_text or "").strip()
+        # U100: sleep mode → stay completely quiet.
+        if os.environ.get("ROBOT_ASLEEP", "false").lower() == "true":
+            return
         # Read the flag per reply so the Capabilities toggle applies live.
         if os.environ.get("SPEAK_REPLIES", "true").lower() != "true":
             return
@@ -437,6 +440,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     async def _on_person_recognized(event: PersonRecognized) -> None:
         ctx.pipeline.set_active_person(event.person_id if event.known else None)
+        # U100: sleep mode → recognize silently, no greeting.
+        if os.environ.get("ROBOT_ASLEEP", "false").lower() == "true":
+            return
         # Greet a KNOWN person: personalized text (the pipeline injects their
         # profile facts via the judgment layer, U19e). The pipeline publishes
         # ResponseDrafted → the embodiment handler above speaks it + waves.
