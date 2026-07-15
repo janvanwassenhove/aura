@@ -179,3 +179,15 @@ async def test_approval_gate_fires_every_round(bus, monkeypatch) -> None:
     reply = await _pipeline(bus).orchestrate("mail Alice and then Bob", "s1")
     assert reply == "both sent"
     assert approvals == ["send_mail", "send_mail"]
+
+
+def test_strip_speaker_label(monkeypatch) -> None:
+    """U88: a leading 'Richie:' label is dropped from replies (spoken aloud)."""
+    monkeypatch.setenv("ASSISTANT_NAME", "Richie")
+    from orchestrator.pipeline import _strip_speaker_label as strip
+
+    assert strip("Richie: het is 3 uur") == "het is 3 uur"
+    assert strip("Ritchie - kijk op de klok") == "kijk op de klok"   # spelling drift
+    assert strip("Het is laat, Richie.") == "Het is laat, Richie."   # not a leading label
+    assert strip("Jan: hoi") == "Jan: hoi"                            # someone else
+    assert strip("Gewoon antwoord") == "Gewoon antwoord"

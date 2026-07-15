@@ -38,6 +38,39 @@ logger = logging.getLogger(__name__)
 _LANGUAGE_NAMES = {"en": "English", "nl": "Dutch", "fr": "French"}
 
 
+def _label_distance(a: str, b: str, maxd: int = 2) -> bool:
+    """Bounded Levenshtein <= maxd (tiny DP)."""
+    la, lb = len(a), len(b)
+    if abs(la - lb) > maxd:
+        return False
+    prev = list(range(lb + 1))
+    for i in range(1, la + 1):
+        cur = [i] + [0] * lb
+        for j in range(1, lb + 1):
+            cost = 0 if a[i - 1] == b[j - 1] else 1
+            cur[j] = min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + cost)
+        if min(cur) > maxd:
+            return False
+        prev = cur
+    return prev[lb] <= maxd
+
+
+def _strip_speaker_label(reply: str) -> str:
+    """U88: LLMs sometimes prefix their own name as a speaker label
+    ("Richie: ..." / "Ritchie - ..."), which then gets spoken aloud. Strip a
+    leading "<name>:" once, fuzzy on spelling drift."""
+    import re as _re
+
+    text = (reply or "").lstrip()
+    name = os.environ.get("ASSISTANT_NAME", "AURA").strip().lower()
+    if not name:
+        return text
+    m = _re.match(r"^([A-Za-zÀ-ÿ]{2,14})\s*[:\-—]\s+", text)
+    if m and _label_distance(m.group(1).lower(), name, 2 if len(name) >= 5 else 1):
+        return text[m.end():].lstrip()
+    return text
+
+
 def _identity_prefix() -> str:
     """Assistant name + reply language, read per turn so the Settings panel
     changes take effect immediately (U36h)."""
@@ -53,7 +86,9 @@ def _identity_prefix() -> str:
         f"topic — chat, banter, opinions, and open questions are welcome, not just "
         f"tasks. Keep replies concise and spoken-friendly (1-3 sentences unless "
         f"asked for detail); no markdown or lists when simply chatting. Use the "
-        f"conversation so far to stay coherent and personal. {lang_line}\n\n"
+        f"conversation so far to stay coherent and personal. NEVER prefix your "
+        f"reply with your own name or a speaker label like '{name}:' — just say "
+        f"the answer. {lang_line}\n\n"
     )
 
 
@@ -462,6 +497,7 @@ class OrchestratorPipeline:
 
         if reply == "":  # U84: cancelled by barge-in — stay silent
             return ""
+        reply = _strip_speaker_label(reply)  # U88: drop a leading "Richie:" label
         self._remember(session_id, "assistant", reply)
         await self._bus.publish(ResponseDrafted(session_id=session_id, response_text=reply))
         return reply
