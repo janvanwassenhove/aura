@@ -180,8 +180,10 @@ async def agent_feedback(body: dict) -> JSONResponse:
         "[TEACHING MOMENT — the owner is training you] The owner says: "
         f"\"{text}\". Reflect on your recent work in this conversation. If this "
         "is a reusable way of working, save it with save_skill (scoped to the "
-        "right person/personas, with good triggers). Then confirm in one or two "
-        "sentences what you learned and when you'll apply it."
+        "right person/personas, with good triggers). If instead it is about "
+        "your PERSONALITY or style, answer with a one-line trait the owner can "
+        "add to your character's 'learned traits' in the Robot panel. Then "
+        "confirm in one or two sentences what you learned."
     )
     reply = await _pipeline.orchestrate(framed, session_id)
     return JSONResponse({"reply": reply, "session_id": session_id})

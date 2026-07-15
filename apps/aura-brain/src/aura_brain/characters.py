@@ -47,6 +47,9 @@ class CharacterPersona:
     robot_motion_style: str = "normal"   # calm | normal | lively | still
     greeting_message: str = ""
     fallback_message: str = "Sorry, that didn't work — want me to try again?"
+    # U85: the character GROWS — owner-approved trait notes accumulate here
+    # (edited in the Robot panel; the agent suggests additions in teach-mode).
+    learned_traits: str = ""
 
     def motion_scale(self) -> float:
         return _MOTION_SCALE.get(self.robot_motion_style, 1.0)
@@ -68,6 +71,8 @@ class CharacterPersona:
         parts.append(f"{verbosity_rule} {humor_rule}")
         if self.emotional_style:
             parts.append(f"Emotional tone: {self.emotional_style}.")
+        if self.learned_traits:
+            parts.append(f"Traits you have developed over time: {self.learned_traits}")
         return " ".join(p for p in parts if p.strip())
 
 
@@ -141,6 +146,25 @@ class CharacterStore:
             if c.id == character_id:
                 return c
         return None
+
+    _EDITABLE = {"display_name", "description", "character_prompt",
+                 "speaking_style", "humor_level", "verbosity",
+                 "interruptibility", "emotional_style", "voice_id",
+                 "voice_speed", "robot_motion_style", "greeting_message",
+                 "fallback_message", "learned_traits", "language"}
+
+    def update(self, character_id: str, fields: dict) -> CharacterPersona | None:
+        """U85: owner edits a character (Robot panel). Unknown fields ignored."""
+        current = self.get(character_id)
+        if current is None:
+            return None
+        for k, v in fields.items():
+            if k in self._EDITABLE and v is not None:
+                setattr(current, k, type(getattr(current, k))(v))
+        (self._dir / f"{character_id}.json").write_text(
+            json.dumps(asdict(current), indent=2, ensure_ascii=False),
+            encoding="utf-8")
+        return current
 
     def active(self) -> CharacterPersona | None:
         """The selected character (ACTIVE_CHARACTER env, read live)."""

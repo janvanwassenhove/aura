@@ -59,6 +59,56 @@
       <span class="volume-pct">{{ Math.round(volume * 100) }}%</span>
     </div>
 
+    <!-- U85: character persona — select + edit + grow -->
+    <div class="status-row mt-3">
+      <span class="label volume-label"><Bot :size="14" /> Persona</span>
+      <select v-model="activeCharacter" class="persona-select" @change="applyCharacter">
+        <option value="">Default (no character)</option>
+        <option v-for="c in characters" :key="c.id" :value="c.id">{{ c.display_name }}</option>
+      </select>
+      <button class="persona-edit" :disabled="!activeCharacter" title="Edit this persona" @click="editingPersona = !editingPersona">
+        <Pencil :size="13" />
+      </button>
+    </div>
+    <div v-if="editingPersona && currentCharacter" class="persona-editor">
+      <label class="pe-label">Character</label>
+      <textarea v-model="currentCharacter.character_prompt" rows="2" class="pe-input" />
+      <div class="pe-row">
+        <label class="pe-label">Verbosity
+          <select v-model="currentCharacter.verbosity" class="pe-mini">
+            <option>brief</option><option>normal</option><option>detailed</option>
+          </select>
+        </label>
+        <label class="pe-label">Humor
+          <select v-model="currentCharacter.humor_level" class="pe-mini">
+            <option>none</option><option>low</option><option>medium</option><option>high</option>
+          </select>
+        </label>
+      </div>
+      <div class="pe-row">
+        <label class="pe-label">Voice
+          <select v-model="currentCharacter.voice_id" class="pe-mini">
+            <option v-for="v in VOICES" :key="v" :value="v">{{ v }}</option>
+          </select>
+        </label>
+        <label class="pe-label">Interrupt
+          <select v-model="currentCharacter.interruptibility" class="pe-mini">
+            <option value="wake_word">wake word</option><option value="vad">any voice</option><option value="off">off</option>
+          </select>
+        </label>
+      </div>
+      <label class="pe-label">Learned traits (how it has grown)</label>
+      <textarea v-model="currentCharacter.learned_traits" rows="2" class="pe-input"
+                placeholder="e.g. remembers Jan likes skate punk; keeps mornings extra upbeat" />
+      <div class="pe-actions">
+        <button class="pe-save" :disabled="savingPersona" @click="savePersona">
+          {{ savingPersona ? 'Saving…' : 'Save persona' }}
+        </button>
+        <span v-if="personaSaved" class="pe-ok">Saved</span>
+      </div>
+      <p class="pe-hint">Tip: while talking, use the 🎓 button — the assistant proposes new traits you can add here.</p>
+    </div>
+
     <div class="mt-3">
       <h3 class="section-label">Quick Actions</h3>
       <div class="qa-grid">
@@ -124,7 +174,7 @@
 import { onMounted, ref } from 'vue'
 import {
   Bot, ChevronsDown, Eye, Hand, Laugh, Moon, MoveHorizontal, MoveVertical,
-  Power, Sparkles, ThumbsUp, Volume1, Volume2, VolumeX,
+  Pencil, Power, Sparkles, ThumbsUp, Volume1, Volume2, VolumeX,
 } from 'lucide-vue-next'
 import { useRobotStore } from '../stores/robotStore'
 
@@ -136,6 +186,57 @@ const actError = ref('')
 const volume = ref(0.8)
 
 const tracking = ref(true) // adapter enables head tracking on connect
+
+// U85: character persona selection + editing + growth
+interface Character { id: string; display_name: string; character_prompt: string
+  verbosity: string; humor_level: string; voice_id: string
+  interruptibility: string; learned_traits: string }
+const VOICES = ['', 'alloy', 'ash', 'ballad', 'coral', 'echo', 'fable', 'onyx', 'nova', 'sage', 'shimmer', 'verse']
+const characters = ref<Character[]>([])
+const activeCharacter = ref('')
+const editingPersona = ref(false)
+const savingPersona = ref(false)
+const personaSaved = ref(false)
+const currentCharacter = ref<Character | null>(null)
+
+async function fetchCharacters() {
+  try {
+    const r = await fetch(`${BRAIN_URL}/setup/characters`)
+    const data = await r.json()
+    characters.value = data.characters ?? []
+    activeCharacter.value = data.active ?? ''
+    syncCurrent()
+  } catch { characters.value = [] }
+}
+function syncCurrent() {
+  currentCharacter.value = characters.value.find(c => c.id === activeCharacter.value) ?? null
+}
+async function applyCharacter() {
+  editingPersona.value = false
+  syncCurrent()
+  await fetch(`${BRAIN_URL}/setup/prefs`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ character: activeCharacter.value }),
+  }).catch(() => {})
+}
+async function savePersona() {
+  if (!currentCharacter.value) return
+  savingPersona.value = true
+  personaSaved.value = false
+  try {
+    const c = currentCharacter.value
+    const r = await fetch(`${BRAIN_URL}/setup/characters/${c.id}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        character_prompt: c.character_prompt, verbosity: c.verbosity,
+        humor_level: c.humor_level, voice_id: c.voice_id,
+        interruptibility: c.interruptibility, learned_traits: c.learned_traits,
+      }),
+    })
+    personaSaved.value = r.ok
+    await fetchCharacters()
+  } finally { savingPersona.value = false }
+}
 
 async function toggleTracking() {
   tracking.value = !tracking.value
@@ -200,6 +301,7 @@ async function applyVolume() {
   } catch { /* robot offline — slider stays local */ }
 }
 
+onMounted(() => { fetchCharacters() })
 onMounted(async () => {
   try {
     const resp = await fetch(`${BRAIN_URL}/robot/volume`)
@@ -271,4 +373,19 @@ function fmtTime(iso: string): string {
 .motion-empty { color: var(--text-faint); font-size: 0.8rem; padding: 0.2rem 0; }
 .volume-slider { flex: 1; margin: 0 0.5rem; accent-color: var(--accent); }
 .volume-pct { font-size: 0.72rem; color: var(--text-faint); min-width: 2.2rem; text-align: right; }
+
+/* U85: persona selector + editor */
+.persona-select { flex: 1; background: var(--surface-2); border: 1px solid var(--border-strong); border-radius: var(--radius-md); color: var(--text); padding: 0.3rem 0.4rem; font-size: 0.8rem; }
+.persona-edit { background: none; border: 1px solid var(--border-strong); border-radius: var(--radius-md); color: var(--text-faint); cursor: pointer; padding: 0.3rem 0.4rem; }
+.persona-edit:disabled { opacity: 0.4; cursor: default; }
+.persona-editor { margin-top: 0.5rem; padding: 0.6rem; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface-2); display: flex; flex-direction: column; gap: 0.4rem; }
+.pe-label { font-size: 0.72rem; color: var(--text-faint); display: flex; flex-direction: column; gap: 0.2rem; flex: 1; }
+.pe-input { background: var(--surface); border: 1px solid var(--border-strong); border-radius: var(--radius-sm, 4px); color: var(--text); padding: 0.35rem; font-size: 0.78rem; resize: vertical; width: 100%; }
+.pe-mini { background: var(--surface); border: 1px solid var(--border-strong); border-radius: var(--radius-sm, 4px); color: var(--text); padding: 0.25rem; font-size: 0.75rem; }
+.pe-row { display: flex; gap: 0.5rem; }
+.pe-actions { display: flex; align-items: center; gap: 0.5rem; }
+.pe-save { background: var(--accent); color: var(--accent-contrast, #fff); border: none; border-radius: var(--radius-md); padding: 0.35rem 0.7rem; font-size: 0.78rem; cursor: pointer; }
+.pe-save:disabled { opacity: 0.5; }
+.pe-ok { color: var(--ok-text, #2f9e6e); font-size: 0.75rem; }
+.pe-hint { font-size: 0.68rem; color: var(--text-faint); margin: 0; }
 </style>

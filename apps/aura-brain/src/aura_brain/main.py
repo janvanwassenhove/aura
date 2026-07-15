@@ -449,11 +449,32 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
                 return
             _last_greeted[event.person_id] = now
             name = event.display_name
+            # U85: varied greetings — never the same "Dag Jan" twice in a row.
+            # A character's greeting_message wins when set; otherwise the LLM
+            # gets a random angle to riff on (time of day, plans, callback to
+            # a fact, playful, curious, …).
+            character = ctx.characters.active() if hasattr(ctx, "characters") else None
+            if character is not None and character.greeting_message:
+                await ctx.bus.publish(ResponseDrafted(
+                    session_id=session_id, response_text=character.greeting_message))
+                return
+            import random
+
+            angle = random.choice([
+                "reference the time of day",
+                "ask what they're up to right now",
+                "make a playful observation",
+                "callback to one of their profile facts or interests",
+                "sound genuinely curious about their day",
+                "keep it ultra-short and warm",
+                "offer to help with something concrete",
+            ])
             try:
                 await ctx.pipeline.orchestrate(
-                    f"(system note: {name} just walked up to you and you "
-                    f"recognized their face.) Greet {name} warmly by name in "
-                    f"one short spoken sentence — personal, no lists, no markdown.",
+                    f"(system note: {name} just walked up and you recognized "
+                    f"their face.) Greet {name} by name in ONE short spoken "
+                    f"sentence. Vary it: this time, {angle}. Never start with "
+                    f"the same words as your previous greeting. No lists.",
                     session_id,
                 )
             except Exception as exc:
