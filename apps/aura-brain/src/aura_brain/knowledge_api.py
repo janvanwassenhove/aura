@@ -214,6 +214,21 @@ async def add_fact(
     return JSONResponse(fact.model_dump(mode="json"))
 
 
+@router.post("/people/{person_id}/ingest")
+async def ingest_sources(
+    person_id: str,
+    _: None = Depends(_require_sensitive),
+) -> JSONResponse:
+    """U103: grow the persona graph — read this person's fetchable sources
+    (blog/website/github) and distill them into [[linked]] profile facts."""
+    from aura_brain.source_ingest import ingest_person_sources
+
+    result = await ingest_person_sources(_require(), person_id)
+    if "error" in result:
+        raise HTTPException(status_code=404, detail=result["error"])
+    return JSONResponse(result)
+
+
 @router.delete("/facts/{fact_id}")
 async def delete_fact(fact_id: str) -> JSONResponse:
     """Delete a fact: step-up required (destructive, ADR-008 §9)."""

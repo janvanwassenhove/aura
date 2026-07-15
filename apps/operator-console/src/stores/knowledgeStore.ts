@@ -142,6 +142,16 @@ export const useKnowledgeStore = defineStore('knowledge', () => {
     return resp !== null
   }
 
+  async function ingestSources(personId: string): Promise<{ added_count: number; read: unknown[]; skipped: { kind: string; reason: string }[] } | null> {
+    // U103: read the person's fetchable sources (blog/website/github) and
+    // grow their facts — the brain graph grows with them.
+    const resp = await _request(`/people/${encodeURIComponent(personId)}/ingest`, { method: 'POST' })
+    if (!resp) return null
+    const result = await resp.json()
+    await inspectPerson(personId)
+    return result
+  }
+
   async function updateFact(personId: string, factId: string, key: string, value: string): Promise<boolean> {
     // No update endpoint — replace: add the new fact, then delete the old one.
     const added = await addFact(personId, key, value)
@@ -303,7 +313,7 @@ export const useKnowledgeStore = defineStore('knowledge', () => {
     people, detail, tier, omkLoaded, locked, brainError, loading, error, recognitionEnabled,
     sightings,
     fetchTier, fetchPeople, inspectPerson, upsertPerson, saveDescription,
-    addFact, updateFact, deleteFact, renamePerson, forgetPerson, setConsent, lock,
+    addFact, updateFact, deleteFact, ingestSources, renamePerson, forgetPerson, setConsent, lock,
     fetchRecognition, secure, teachFace,
     fetchSightings, sightingImageUrl, tagSighting, dismissSighting,
     clearDetail, $reset,
