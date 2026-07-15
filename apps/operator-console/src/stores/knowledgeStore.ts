@@ -152,6 +152,26 @@ export const useKnowledgeStore = defineStore('knowledge', () => {
     return result
   }
 
+  async function importChats(personId: string, exportJson: unknown): Promise<{ added_count: number; conversations: number; chunks_processed: number; chunks_skipped: number; error?: string } | null> {
+    // U104: mine a ChatGPT/Claude data-export (read locally, posted to the
+    // local brain only) for facts about this person.
+    const resp = await _request(`/people/${encodeURIComponent(personId)}/import-chats`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ export: exportJson }),
+    })
+    if (!resp) return null
+    const result = await resp.json()
+    await inspectPerson(personId)
+    return result
+  }
+
+  async function exportBrain(): Promise<unknown | null> {
+    // U104: full dump of everything AURA knows — people, facts, signals.
+    const resp = await _request('/export')
+    return resp ? await resp.json() : null
+  }
+
   async function updateFact(personId: string, factId: string, key: string, value: string): Promise<boolean> {
     // No update endpoint — replace: add the new fact, then delete the old one.
     const added = await addFact(personId, key, value)
@@ -313,7 +333,7 @@ export const useKnowledgeStore = defineStore('knowledge', () => {
     people, detail, tier, omkLoaded, locked, brainError, loading, error, recognitionEnabled,
     sightings,
     fetchTier, fetchPeople, inspectPerson, upsertPerson, saveDescription,
-    addFact, updateFact, deleteFact, ingestSources, renamePerson, forgetPerson, setConsent, lock,
+    addFact, updateFact, deleteFact, ingestSources, importChats, exportBrain, renamePerson, forgetPerson, setConsent, lock,
     fetchRecognition, secure, teachFace,
     fetchSightings, sightingImageUrl, tagSighting, dismissSighting,
     clearDetail, $reset,

@@ -58,6 +58,9 @@
             <button class="rail-btn" :disabled="!newP.id.trim() || !newP.name.trim() || addingP" @click="addPerson">
               {{ addingP ? 'Adding…' : '+ Add person' }}
             </button>
+            <button class="rail-btn" title="Download everything the brain knows as JSON" @click="doExportBrain">
+              ⬇ Export brain
+            </button>
           </div>
         </nav>
 
@@ -163,6 +166,16 @@
               {{ ingesting ? 'Reading sources…' : 'Grow brain from sources' }}
             </button>
             <span v-if="ingestNote" class="content-hint">{{ ingestNote }}</span>
+          </div>
+
+          <h3 class="content-title content-title--spaced">Import chats</h3>
+          <p class="content-hint">Drop a ChatGPT or Claude data-export (conversations.json) — {{ prefs.assistantName }} mines what this person wrote for facts. Read locally, sent only to your own brain.</p>
+          <div class="inline-add">
+            <input ref="chatFileInput" type="file" accept=".json,application/json" class="file-hidden" aria-label="Chat export file" @change="importChatsFile" />
+            <button class="b-btn" :disabled="importing" @click="chatFileInput?.click()">
+              {{ importing ? 'Mining chats…' : 'Import chat export…' }}
+            </button>
+            <span v-if="importNote" class="content-hint">{{ importNote }}</span>
           </div>
 
           <h3 class="content-title content-title--spaced">Facts</h3>
@@ -347,6 +360,46 @@ async function growBrain(): Promise<void> {
     ingesting.value = false
   }
 }
+// U104: import a ChatGPT/Claude export → mined facts; export the whole brain.
+const chatFileInput = ref<HTMLInputElement | null>(null)
+const importing = ref(false)
+const importNote = ref('')
+async function importChatsFile(ev: Event): Promise<void> {
+  const file = (ev.target as HTMLInputElement).files?.[0]
+  if (!file || !store.detail || importing.value) return
+  importing.value = true
+  importNote.value = ''
+  try {
+    let parsed: unknown
+    try {
+      parsed = JSON.parse(await file.text())
+    } catch {
+      importNote.value = 'That file is not valid JSON — expected conversations.json from a ChatGPT or Claude export.'
+      return
+    }
+    const r = await store.importChats(store.detail.person.person_id, parsed)
+    if (!r) { importNote.value = store.error ?? 'Import failed.'; return }
+    const skipped = r.chunks_skipped ? ` · ${r.chunks_skipped} chunks skipped (IMPORT_MAX_CHUNKS)` : ''
+    importNote.value = r.error
+      ? `Stopped early (${r.error}) — ${r.added_count} facts kept`
+      : `${r.added_count} new fact${r.added_count === 1 ? '' : 's'} from ${r.conversations} conversation${r.conversations === 1 ? '' : 's'}${skipped}`
+  } finally {
+    importing.value = false
+    if (chatFileInput.value) chatFileInput.value.value = ''
+  }
+}
+
+async function doExportBrain(): Promise<void> {
+  const data = await store.exportBrain()
+  if (!data) return
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+  const a = document.createElement('a')
+  a.href = URL.createObjectURL(blob)
+  a.download = `aura-brain-export-${new Date().toISOString().slice(0, 10)}.json`
+  a.click()
+  URL.revokeObjectURL(a.href)
+}
+
 const newSkill = ref({ name: '', description: '', body: '' })
 const addError = ref('')
 
@@ -593,6 +646,7 @@ onMounted(async () => {
 }
 .fact-chip em { font-style: normal; color: var(--accent); }
 .fact-chip--source em { color: var(--ok-text, #2f9e6e); }
+.file-hidden { display: none; }
 .chip-x { background: none; border: none; color: var(--text-faint); cursor: pointer; padding: 0; display: inline-flex; }
 .chip-x:hover { color: var(--danger-text, #e5484d); }
 
