@@ -43,8 +43,8 @@ class ReminderScheduler:
                     await self._bus.publish(
                         ReminderTriggered(
                             session_id=self._session_id,
-                            reminder_id=str(reminder.reminder_id),
-                            text=reminder.text,
+                            reminder_id=reminder.reminder_id,
+                            message=reminder.text,
                         )
                     )
                     logger.info("Reminder fired: %s", reminder.text[:60])
