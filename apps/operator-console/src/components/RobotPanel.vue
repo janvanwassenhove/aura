@@ -2,81 +2,45 @@
   <section class="panel">
     <h2 class="panel-title">Robot State</h2>
 
-    <div class="status-row">
-      <span class="label">Mode</span>
-      <span :class="['badge', robotStore.statusBadgeClass]">{{ robotStore.mode }}</span>
-    </div>
-
-    <div class="status-row">
-      <span class="label">Behavior</span>
-      <span class="value">{{ robotStore.behaviorState }}</span>
-    </div>
-
-    <div class="status-row">
-      <span class="label">Speaking</span>
+    <!-- U114: one compact status strip — badge only when something is wrong -->
+    <div class="status-strip">
+      <span :class="['strip-dot', robotStore.statusBadgeClass]" :title="`Mode: ${robotStore.mode}`" />
+      <span class="strip-text">{{ robotStore.behaviorState }}</span>
       <span :class="['indicator', robotStore.isSpeaking ? 'indicator-active' : 'indicator-idle']">
-        <Volume2 v-if="robotStore.isSpeaking" :size="14" />
-        <VolumeX v-else :size="14" />
-        {{ robotStore.isSpeaking ? 'Speaking' : 'Silent' }}
+        <Volume2 v-if="robotStore.isSpeaking" :size="13" />
+        <VolumeX v-else :size="13" />
+      </span>
+      <span v-if="robotStore.lastRecognized" class="strip-text strip-text--faint" :title="robotStore.lastRecognized.known ? `${Math.round(robotStore.lastRecognized.confidence * 100)}% confident` : 'Unknown face'">
+        <Eye :size="12" /> {{ robotStore.lastRecognized.known ? robotStore.lastRecognized.display_name : 'unknown' }}
       </span>
     </div>
-
     <div v-if="robotStore.isSpeaking && robotStore.currentTranscript" class="transcript-box">
       {{ robotStore.currentTranscript }}
     </div>
 
-    <div v-if="robotStore.lastRecognized" class="status-row">
-      <span class="label">Recognized</span>
-      <span v-if="robotStore.lastRecognized.known" class="value">
-        {{ robotStore.lastRecognized.display_name }}
-        <span class="text-gray-400 text-xs">({{ Math.round(robotStore.lastRecognized.confidence * 100) }}%)</span>
-      </span>
-      <span v-else class="value text-gray-400">Unknown face</span>
-    </div>
-
-    <div class="status-row mt-3">
-      <span class="label volume-label">
-        <Moon v-if="asleep" :size="14" /><Power v-else :size="14" /> {{ asleep ? 'Asleep' : 'Awake' }}
-      </span>
-      <button
-        :class="['toggle', !asleep && 'toggle--on']"
-        :title="asleep ? 'Wake up' : 'Sleep — take no action'"
-        @click="toggleSleep"
-      ><span class="toggle-knob" /></button>
-    </div>
-
-    <div class="status-row">
-      <span class="label volume-label">
-        <Mic v-if="micOn" :size="14" /><MicOff v-else :size="14" /> Microphone
-      </span>
-      <button
-        :class="['toggle', micOn && 'toggle--on']"
-        :title="micOn ? 'Stop listening (Richie won’t hear the wake word)' : 'Listen for “Richie …”'"
-        @click="toggleMicListening"
-      ><span class="toggle-knob" /></button>
-    </div>
-
-    <div class="status-row">
-      <span class="label volume-label"><Eye :size="14" /> Follow me</span>
-      <button
-        :class="['toggle', tracking && 'toggle--on']"
-        :title="tracking ? 'Stop following faces' : 'Follow the nearest face'"
-        @click="toggleTracking"
-      ><span class="toggle-knob" /></button>
-    </div>
-
-    <!-- U110: proactive speech — reminders + daily briefing on Richie's own initiative -->
-    <div class="status-row">
-      <span class="label volume-label"><Bell :size="14" /> Proactive</span>
-      <button
-        :class="['toggle', proactiveOn && 'toggle--on']"
-        :title="proactiveOn ? 'Richie speaks up for reminders & a daily briefing' : 'Richie only speaks when addressed'"
-        @click="toggleProactive"
-      ><span class="toggle-knob" /></button>
-    </div>
-    <div v-if="proactiveOn" class="status-row status-row--sub">
-      <span class="label volume-label">Daily briefing at</span>
-      <input v-model="briefingTime" type="time" class="briefing-input" aria-label="Daily briefing time" @change="saveBriefingTime" />
+    <!-- U114: the power switches — one icon-toggle row -->
+    <div class="switch-row">
+      <button :class="['switch-btn', !asleep && 'switch-btn--on']"
+              :title="asleep ? 'Asleep — click to wake up' : 'Awake — click for sleep mode (take no action)'"
+              @click="toggleSleep">
+        <Moon v-if="asleep" :size="15" /><Power v-else :size="15" />
+      </button>
+      <button :class="['switch-btn', micOn && 'switch-btn--on']"
+              :title="micOn ? 'Listening for “Richie …” — click to stop' : 'Microphone off — click to listen'"
+              @click="toggleMicListening">
+        <Mic v-if="micOn" :size="15" /><MicOff v-else :size="15" />
+      </button>
+      <button :class="['switch-btn', tracking && 'switch-btn--on']"
+              :title="tracking ? 'Following faces — click to stop' : 'Click to follow the nearest face'"
+              @click="toggleTracking">
+        <Eye :size="15" />
+      </button>
+      <button :class="['switch-btn', proactiveOn && 'switch-btn--on']"
+              :title="proactiveOn ? 'Proactive: speaks up for reminders & daily briefing' : 'Proactive off — only speaks when addressed'"
+              @click="toggleProactive">
+        <Bell :size="15" />
+      </button>
+      <input v-if="proactiveOn" v-model="briefingTime" type="time" class="briefing-input" title="Daily briefing time" aria-label="Daily briefing time" @change="saveBriefingTime" />
     </div>
 
     <div class="status-row">
@@ -145,8 +109,13 @@
       <p class="pe-hint">Tip: while talking, use the 🎓 button — the assistant proposes new traits you can add here.</p>
     </div>
 
+    <!-- U114: all 12 action buttons live in ONE collapsible section so the
+         camera below stays above the fold. -->
     <div class="mt-3">
-      <h3 class="section-label">Quick Actions</h3>
+      <button class="section-toggle" :aria-expanded="actionsOpen" @click="actionsOpen = !actionsOpen">
+        <ChevronRight :size="13" :class="['chev', actionsOpen && 'chev--open']" /> Actions
+      </button>
+      <template v-if="actionsOpen">
       <div class="qa-grid">
         <button class="qa-btn" :disabled="acting" title="Wake up (enables motors after sleep)" @click="act('wake_up')">
           <Power :size="13" /> Wake up
@@ -189,12 +158,17 @@
           <ThumbsUp :size="13" /> Compliment
         </button>
       </div>
+      </template>
       <p v-if="actError" class="qa-error">{{ actError }}</p>
     </div>
 
+    <!-- U114: motion log collapsed by default — a debug surface, not a headline -->
     <div class="mt-3 motion-section">
-      <h3 class="section-label">Motion Log</h3>
-      <ul class="motion-log-scroll">
+      <button class="section-toggle" :aria-expanded="motionOpen" @click="motionOpen = !motionOpen">
+        <ChevronRight :size="13" :class="['chev', motionOpen && 'chev--open']" />
+        Motion log<span v-if="robotStore.motionLog.length" class="section-count">{{ robotStore.motionLog.length }}</span>
+      </button>
+      <ul v-if="motionOpen" class="motion-log-scroll">
         <li v-for="entry in robotStore.motionLog" :key="entry.id" class="motion-row">
           <span :class="['motion-dot', `mdot-${entry.status}`]" />
           <span class="motion-row-name">{{ entry.name }}</span>
@@ -209,7 +183,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import {
-  Bell, Bot, ChevronsDown, Eye, Hand, Laugh, Moon, MoveHorizontal, MoveVertical,
+  Bell, Bot, ChevronRight, ChevronsDown, Eye, Hand, Laugh, Moon, MoveHorizontal, MoveVertical,
   Mic, MicOff, Pencil, Power, Sparkles, ThumbsUp, Volume1, Volume2, VolumeX,
 } from 'lucide-vue-next'
 import { useRobotStore } from '../stores/robotStore'
@@ -220,6 +194,9 @@ const robotStore = useRobotStore()
 const acting = ref(false)
 const actError = ref('')
 const volume = ref(0.8)
+// U114: collapse the button farm + motion log so the camera stays in view.
+const actionsOpen = ref(false)
+const motionOpen = ref(false)
 
 const tracking = ref(true) // adapter enables head tracking on connect
 
@@ -438,11 +415,47 @@ function fmtTime(iso: string): string {
 .qa-error { font-size: 0.72rem; color: var(--danger-text); margin-top: 0.3rem; }
 
 .volume-label { display: inline-flex; align-items: center; gap: 0.3rem; }
-.status-row--sub { padding-left: 1.4rem; opacity: 0.9; }
 .briefing-input {
   background: var(--surface-2); border: 1px solid var(--border-strong);
   border-radius: var(--radius-sm); color: var(--text); padding: 0.15rem 0.4rem;
   font-size: 0.78rem; font-family: inherit;
+}
+
+/* U114: compact status strip */
+.status-strip {
+  display: flex; align-items: center; gap: 0.5rem;
+  padding: 0.3rem 0; font-size: 0.8rem;
+}
+.strip-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--text-faint); flex-shrink: 0; }
+.strip-dot.badge-green { background: var(--ok-text, #2f9e6e); }
+.strip-dot.badge-blue { background: #5cb8e4; }
+.strip-dot.badge-purple { background: #9d7be0; }
+.strip-dot.badge-red { background: var(--danger-text, #e5484d); }
+/* badge-gray (unknown/disconnected) keeps the faint default — no alarm for "unknown" */
+.strip-text { color: var(--text); }
+.strip-text--faint { color: var(--text-faint); display: inline-flex; align-items: center; gap: 0.25rem; margin-left: auto; }
+
+/* U114: icon-toggle switch row */
+.switch-row { display: flex; align-items: center; gap: 0.4rem; padding: 0.35rem 0 0.45rem; }
+.switch-btn {
+  width: 34px; height: 30px; display: grid; place-items: center;
+  background: var(--surface-2); border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md); color: var(--text-faint); cursor: pointer;
+}
+.switch-btn--on { color: var(--accent); border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); }
+
+/* U114: collapsible sections */
+.section-toggle {
+  display: inline-flex; align-items: center; gap: 0.3rem; background: none;
+  border: none; padding: 0.2rem 0; cursor: pointer; color: var(--text-faint);
+  font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;
+}
+.section-toggle:hover { color: var(--text); }
+.chev { transition: transform 0.15s; }
+.chev--open { transform: rotate(90deg); }
+.section-count {
+  font-size: 0.62rem; padding: 0 0.35rem; border-radius: 999px; margin-left: 0.25rem;
+  background: var(--surface-2); border: 1px solid var(--border); text-transform: none;
 }
 
 .toggle {
