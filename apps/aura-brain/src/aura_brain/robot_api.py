@@ -132,6 +132,39 @@ async def sleep_status() -> JSONResponse:
     return JSONResponse({"asleep": _os.environ.get("ROBOT_ASLEEP", "false").lower() == "true"})
 
 
+@router.get("/proactive")
+async def get_proactive() -> JSONResponse:
+    """U110: is proactive speech (reminders + daily briefing) on?"""
+    import os as _os
+    return JSONResponse({
+        "enabled": _os.environ.get("PROACTIVE_ENABLED", "true").lower() == "true",
+        "briefing_time": _os.environ.get("PROACTIVE_BRIEFING_TIME", ""),
+    })
+
+
+@router.post("/proactive")
+async def set_proactive(body: dict) -> JSONResponse:
+    """U110: toggle proactive speech + set the daily-briefing time (HH:MM)."""
+    import os as _os
+    from aura_brain.setup_api import _write_env
+
+    changes: dict = {}
+    if "enabled" in (body or {}):
+        val = "true" if body["enabled"] else "false"
+        _os.environ["PROACTIVE_ENABLED"] = val
+        changes["PROACTIVE_ENABLED"] = val
+    if "briefing_time" in (body or {}):
+        t = str(body["briefing_time"]).strip()
+        _os.environ["PROACTIVE_BRIEFING_TIME"] = t
+        changes["PROACTIVE_BRIEFING_TIME"] = t
+    if changes:
+        _write_env(changes)
+    return JSONResponse({
+        "enabled": _os.environ.get("PROACTIVE_ENABLED", "true").lower() == "true",
+        "briefing_time": _os.environ.get("PROACTIVE_BRIEFING_TIME", ""),
+    })
+
+
 @router.post("/tracking")
 async def tracking(body: dict) -> JSONResponse:
     try:

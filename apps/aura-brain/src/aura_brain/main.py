@@ -55,6 +55,7 @@ class BrainContext:
         self.connector_registry = None
         self.knowledge_store = None
         self.person_memory = None  # U109: PersonMemory | None
+        self.proactive = None      # U110: ProactiveEngine | None
         self.pipeline = None
         self._perception = None
         self._robot_bridge = None
@@ -127,6 +128,14 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     session_id = os.environ.get("DEFAULT_SESSION_ID", "default")
     ctx._reminder_scheduler = ReminderScheduler(ctx.memory_store, ctx.bus, session_id=session_id)
     await ctx._reminder_scheduler.start()
+
+    # U110: proactive Richie — voice fired reminders and a daily briefing out of
+    # his own initiative (reusing the embodiment pipeline via ResponseDrafted).
+    from aura_brain.proactive import ProactiveEngine
+    from shared_schemas.events.system import ReminderTriggered
+
+    ctx.proactive = ProactiveEngine(ctx.bus, session_id=session_id)
+    ctx.bus.subscribe(ReminderTriggered, ctx.proactive.on_reminder)
 
     # --- U3: connector module ---
     from connector_service import routes as connector_routes
@@ -689,8 +698,37 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
         _refresh_task = asyncio.ensure_future(refresh_loop(_StoreProxy()))
 
+    # U110: daily-briefing loop — once a day at PROACTIVE_BRIEFING_TIME Richie
+    # gives a short spoken brief (reminders for today). Empty time = off.
+    _briefing_task = None
+
+    async def _build_brief() -> str:
+        name = os.environ.get("ASSISTANT_NAME", "AURA")
+        try:
+            reminders = await ctx.memory_store.get_reminders()
+        except Exception:  # noqa: BLE001
+            reminders = []
+        if reminders:
+            items = "; ".join(r.text for r in reminders[:5])
+            return f"Goedemorgen! Je hebt {len(reminders)} herinnering{'en' if len(reminders) != 1 else ''} openstaan: {items}."
+        return f"Goedemorgen! Er staan geen herinneringen open — een rustige start. Ik ben er als je iets nodig hebt."
+
+    async def _briefing_loop() -> None:
+        while True:
+            await asyncio.sleep(30)
+            try:
+                if ctx.proactive is not None:
+                    await ctx.proactive.maybe_briefing(_build_brief)
+            except Exception:  # noqa: BLE001 — never kill the loop
+                logging.getLogger(__name__).exception("briefing loop error")
+
+    if os.environ.get("PROACTIVE_BRIEFING_TIME", "").strip():
+        _briefing_task = asyncio.ensure_future(_briefing_loop())
+
     yield
 
+    if _briefing_task is not None:
+        _briefing_task.cancel()
     if _refresh_task is not None:
         _refresh_task.cancel()
     if ctx._voice_loop is not None:

@@ -65,6 +65,20 @@
       ><span class="toggle-knob" /></button>
     </div>
 
+    <!-- U110: proactive speech — reminders + daily briefing on Richie's own initiative -->
+    <div class="status-row">
+      <span class="label volume-label"><Bell :size="14" /> Proactive</span>
+      <button
+        :class="['toggle', proactiveOn && 'toggle--on']"
+        :title="proactiveOn ? 'Richie speaks up for reminders & a daily briefing' : 'Richie only speaks when addressed'"
+        @click="toggleProactive"
+      ><span class="toggle-knob" /></button>
+    </div>
+    <div v-if="proactiveOn" class="status-row status-row--sub">
+      <span class="label volume-label">Daily briefing at</span>
+      <input v-model="briefingTime" type="time" class="briefing-input" aria-label="Daily briefing time" @change="saveBriefingTime" />
+    </div>
+
     <div class="status-row">
       <span class="label volume-label">
         <VolumeX v-if="volume === 0" :size="14" />
@@ -195,7 +209,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import {
-  Bot, ChevronsDown, Eye, Hand, Laugh, Moon, MoveHorizontal, MoveVertical,
+  Bell, Bot, ChevronsDown, Eye, Hand, Laugh, Moon, MoveHorizontal, MoveVertical,
   Mic, MicOff, Pencil, Power, Sparkles, ThumbsUp, Volume1, Volume2, VolumeX,
 } from 'lucide-vue-next'
 import { useRobotStore } from '../stores/robotStore'
@@ -212,6 +226,35 @@ const tracking = ref(true) // adapter enables head tracking on connect
 // U99: microphone (wake-word listening) on/off — sets VOICE_MODE via prefs.
 const micOn = ref(true)
 const asleep = ref(false)
+
+// U110: proactive speech (reminders + daily briefing).
+const proactiveOn = ref(true)
+const briefingTime = ref('')
+async function fetchProactive() {
+  try {
+    const r = await fetch(`${BRAIN_URL}/robot/proactive`)
+    const j = await r.json()
+    proactiveOn.value = j.enabled === true
+    briefingTime.value = j.briefing_time ?? ''
+  } catch {}
+}
+async function toggleProactive() {
+  proactiveOn.value = !proactiveOn.value
+  try {
+    await fetch(`${BRAIN_URL}/robot/proactive`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enabled: proactiveOn.value }),
+    })
+  } catch { proactiveOn.value = !proactiveOn.value }
+}
+async function saveBriefingTime() {
+  try {
+    await fetch(`${BRAIN_URL}/robot/proactive`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ briefing_time: briefingTime.value }),
+    })
+  } catch {}
+}
 async function fetchSleep() {
   try { const r = await fetch(`${BRAIN_URL}/robot/sleep`); asleep.value = (await r.json()).asleep === true } catch {}
 }
@@ -353,7 +396,7 @@ async function applyVolume() {
   } catch { /* robot offline — slider stays local */ }
 }
 
-onMounted(() => { fetchCharacters(); fetchMic(); fetchSleep() })
+onMounted(() => { fetchCharacters(); fetchMic(); fetchSleep(); fetchProactive() })
 onMounted(async () => {
   try {
     const resp = await fetch(`${BRAIN_URL}/robot/volume`)
@@ -395,6 +438,12 @@ function fmtTime(iso: string): string {
 .qa-error { font-size: 0.72rem; color: var(--danger-text); margin-top: 0.3rem; }
 
 .volume-label { display: inline-flex; align-items: center; gap: 0.3rem; }
+.status-row--sub { padding-left: 1.4rem; opacity: 0.9; }
+.briefing-input {
+  background: var(--surface-2); border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm); color: var(--text); padding: 0.15rem 0.4rem;
+  font-size: 0.78rem; font-family: inherit;
+}
 
 .toggle {
   width: 34px; height: 18px; border-radius: 999px; border: 1px solid var(--border);
