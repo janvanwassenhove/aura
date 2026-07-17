@@ -177,6 +177,31 @@
         <li v-if="robotStore.motionLog.length === 0" class="motion-empty">No motions yet</li>
       </ul>
     </div>
+
+    <!-- U117: app logs moved here from Settings — same collapsed treatment -->
+    <div class="mt-3 motion-section">
+      <button class="section-toggle" :aria-expanded="logsOpen" @click="toggleLogs">
+        <ChevronRight :size="13" :class="['chev', logsOpen && 'chev--open']" /> App logs
+      </button>
+      <template v-if="logsOpen">
+        <div class="logs-bar">
+          <select v-model="logLevel" class="briefing-input" aria-label="Filter log level" @change="fetchAppLogs">
+            <option value="">All</option><option value="INFO">Info</option>
+            <option value="WARNING">Warning</option><option value="ERROR">Error</option>
+          </select>
+          <button class="qa-btn qa-btn--slim" :disabled="logsLoading" @click="fetchAppLogs">
+            <RefreshCw :size="12" :class="logsLoading ? 'spin' : ''" /> Refresh
+          </button>
+        </div>
+        <ul class="motion-log-scroll app-log-scroll" role="log">
+          <li v-for="(r, i) in logRecords" :key="i" :class="['app-log-row', `app-log--${r.level.toLowerCase()}`]" :title="r.message">
+            <span class="app-log-level">{{ r.level[0] }}</span>
+            <span class="app-log-msg">{{ r.message }}</span>
+          </li>
+          <li v-if="!logRecords.length" class="motion-empty">No log records</li>
+        </ul>
+      </template>
+    </div>
   </section>
 </template>
 
@@ -184,7 +209,7 @@
 import { onMounted, ref } from 'vue'
 import {
   Bell, Bot, ChevronRight, ChevronsDown, Eye, Hand, Laugh, Moon, MoveHorizontal, MoveVertical,
-  Mic, MicOff, Pencil, Power, Sparkles, ThumbsUp, Volume1, Volume2, VolumeX,
+  Mic, MicOff, Pencil, Power, RefreshCw, Sparkles, ThumbsUp, Volume1, Volume2, VolumeX,
 } from 'lucide-vue-next'
 import { useRobotStore } from '../stores/robotStore'
 
@@ -197,6 +222,23 @@ const volume = ref(0.8)
 // U114: collapse the button farm + motion log so the camera stays in view.
 const actionsOpen = ref(false)
 const motionOpen = ref(false)
+
+// U117: app logs (moved here from Settings) — local ring buffer.
+const logsOpen = ref(false)
+const logsLoading = ref(false)
+const logLevel = ref('')
+const logRecords = ref<{ ts: string; level: string; message: string }[]>([])
+async function fetchAppLogs(): Promise<void> {
+  logsLoading.value = true
+  try {
+    const resp = await fetch(`${BRAIN_URL}/logs/recent?limit=100&level=${logLevel.value}`)
+    logRecords.value = ((await resp.json()).records ?? []).reverse() // newest first
+  } catch { logRecords.value = [] } finally { logsLoading.value = false }
+}
+async function toggleLogs(): Promise<void> {
+  logsOpen.value = !logsOpen.value
+  if (logsOpen.value) await fetchAppLogs()
+}
 
 const tracking = ref(true) // adapter enables head tracking on connect
 
@@ -457,6 +499,22 @@ function fmtTime(iso: string): string {
   font-size: 0.62rem; padding: 0 0.35rem; border-radius: 999px; margin-left: 0.25rem;
   background: var(--surface-2); border: 1px solid var(--border); text-transform: none;
 }
+
+/* U117: app logs */
+.logs-bar { display: flex; gap: 0.4rem; align-items: center; margin: 0.3rem 0; }
+.qa-btn--slim { padding: 0.2rem 0.5rem; font-size: 0.7rem; }
+.spin { animation: spin 0.9s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.app-log-scroll { max-height: 180px; }
+.app-log-row {
+  display: flex; gap: 0.4rem; align-items: baseline; font-size: 0.68rem;
+  font-family: ui-monospace, monospace; padding: 0.1rem 0;
+  border-bottom: 1px solid var(--border); overflow: hidden;
+}
+.app-log-msg { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.app-log-level { flex-shrink: 0; font-weight: 700; color: var(--text-faint); }
+.app-log--warning .app-log-level { color: #e6a23c; }
+.app-log--error .app-log-level { color: var(--danger-text, #e5484d); }
 
 .toggle {
   width: 34px; height: 18px; border-radius: 999px; border: 1px solid var(--border);
