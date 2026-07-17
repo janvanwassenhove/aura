@@ -46,6 +46,27 @@ async def list_skills() -> JSONResponse:
     return JSONResponse({"skills": [_dump(s) for s in _store.all()]})
 
 
+@router.get("/suggestions")
+async def optimization_suggestions() -> JSONResponse:
+    """U108: skills that have accumulated enough new usage signals to be worth
+    re-optimizing. Threshold via SKILL_OPTIMIZE_THRESHOLD (default 8). This is
+    the proactive trigger — the console surfaces it so the owner doesn't have
+    to remember to click Optimize. (Declared before /{name} so it isn't
+    swallowed by that path parameter.)"""
+    import os
+
+    if _store is None:
+        return JSONResponse({"suggestions": [], "threshold": 0})
+    threshold = max(1, int(os.environ.get("SKILL_OPTIMIZE_THRESHOLD", "8")))
+    out = []
+    for skill in _store.all():
+        m = _store.metrics(skill.name)
+        if m["new_since_optimized"] >= threshold:
+            out.append({"name": skill.name, "description": skill.description, **m})
+    out.sort(key=lambda s: s["new_since_optimized"], reverse=True)
+    return JSONResponse({"suggestions": out, "threshold": threshold})
+
+
 @router.get("/{name}")
 async def get_skill(name: str) -> JSONResponse:
     skill = _store.get(name) if _store else None
