@@ -66,6 +66,23 @@ async def test_guest_system_note_contains_name(
     assert "guest" in note
 
 
+async def test_memory_fact_is_labelled_and_leads(
+    store: InMemoryKnowledgeStore, judgment: JudgmentLayer
+) -> None:
+    """U109: the long-term `memory` fact renders distinctly, before plain facts."""
+    from shared_schemas.knowledge import ProfileFact
+
+    await store.upsert_person(Person(person_id="jan", display_name="Jan", role=PersonRole.OWNER))
+    await store.add_fact(ProfileFact(person_id="jan", key="tone", value="concise"))
+    await store.add_fact(ProfileFact(person_id="jan", key="memory", value="- Builds a robot"))
+    ctx = await judgment.build_context("jan")
+    note = ctx.to_system_note()
+    assert "Memory from past conversations:" in note
+    assert "- Builds a robot" in note
+    # Memory label appears before the plain `tone` fact.
+    assert note.index("Memory from past conversations") < note.index("tone: concise")
+
+
 # ---------------------------------------------------------------------------
 # Minor — explicit facts only, NO signals
 # ---------------------------------------------------------------------------

@@ -291,6 +291,7 @@ class OrchestratorPipeline:
         # U84: character persona note + per-turn LLM cancellation.
         self._character_note = None  # Callable[[], str] | None
         self._cancel_events: dict[str, asyncio.Event] = {}
+        self._memory_hook = None  # U109: long-term memory hook (set by the brain)
 
     def set_skill_store(self, store) -> None:
         self._skills = store
@@ -372,6 +373,12 @@ class OrchestratorPipeline:
         """Update the currently-recognized person (called on PersonRecognized events)."""
         self._active_person_id = person_id
 
+    def set_memory_hook(self, hook) -> None:
+        """U109: async (person_id, user_text, reply_text) -> None, called after
+        each turn with a recognized person so the brain can grow long-term
+        memory. Best-effort; never blocks or breaks a turn."""
+        self._memory_hook = hook
+
     async def orchestrate(self, text: str, session_id: str) -> str:
         """Process one user turn; times it and emits TurnLatencyMeasured (U23)."""
         timing = {"llm_ms": 0.0, "tool_ms": 0.0}
@@ -384,6 +391,13 @@ class OrchestratorPipeline:
             llm_ms=round(timing["llm_ms"], 1),
             tool_ms=round(timing["tool_ms"], 1),
         ))
+        # U109: feed the exchange into long-term memory (recognized people only).
+        hook = getattr(self, "_memory_hook", None)
+        if hook is not None and self._active_person_id:
+            try:
+                await hook(self._active_person_id, text, reply)
+            except Exception as exc:  # noqa: BLE001 — memory must never break a turn
+                logger.debug("memory hook failed: %s", exc)
         return reply
 
     async def _orchestrate_impl(self, text: str, session_id: str, timing: dict) -> str:

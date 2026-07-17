@@ -264,6 +264,22 @@ async def import_chats(
     return JSONResponse(result)
 
 
+@router.post("/people/{person_id}/memory/flush")
+async def flush_memory(
+    person_id: str,
+    _: None = Depends(_require_sensitive),
+) -> JSONResponse:
+    """U109: distil any buffered exchanges into this person's long-term memory
+    now (rather than waiting for the buffer to fill). Returns the memory."""
+    from aura_brain import main as _main
+
+    pm = getattr(getattr(_main, "ctx", None), "person_memory", None)
+    if pm is None:
+        return JSONResponse({"memory": "", "note": "long-term memory is disabled"})
+    await pm.flush(person_id)
+    return JSONResponse({"person_id": person_id, "memory": await pm.get_memory(person_id)})
+
+
 @router.get("/export")
 async def export_brain(_: None = Depends(_require_sensitive)) -> JSONResponse:
     """U104: one honest JSON dump of everything AURA knows (people/facts/signals)."""

@@ -146,6 +146,14 @@
           />
           <p v-if="aboutDraft.includes('[[')" class="content-hint"><WikiText :text="aboutDraft" @open="openTarget" /></p>
 
+          <h3 class="content-title content-title--spaced">Memory</h3>
+          <p class="content-hint">What {{ prefs.assistantName }} remembers from past conversations — grown automatically, injected into future turns. Edit freely.</p>
+          <textarea
+            v-model="memoryDraft" class="b-input b-memory" rows="4"
+            placeholder="Nothing remembered yet. This fills in as you talk."
+            aria-label="Long-term memory" @blur="saveMemory"
+          />
+
           <h3 class="content-title content-title--spaced">Sources</h3>
           <p class="content-hint">Where to find/read this person — socials, blogs, mail. Injected into conversations as context.</p>
           <div class="fact-chips">
@@ -337,7 +345,21 @@ const newFact = ref({ key: '', value: '' })
 const SOURCE_KINDS = ['instagram', 'facebook', 'x-twitter', 'linkedin', 'blog', 'website', 'gmail', 'github'] as const
 const newSource = ref({ kind: 'instagram' as string, value: '' })
 const sourceFacts = computed(() => (store.detail?.facts ?? []).filter(f => f.key.startsWith('source:')))
-const plainFacts = computed(() => (store.detail?.facts ?? []).filter(f => !f.key.startsWith('source:') && f.key !== 'source-refresh'))
+const plainFacts = computed(() => (store.detail?.facts ?? []).filter(f => !f.key.startsWith('source:') && f.key !== 'source-refresh' && f.key !== 'memory'))
+// U109: the person's long-term memory (grown from past conversations).
+const memoryFact = computed(() => (store.detail?.facts ?? []).find(f => f.key === 'memory') ?? null)
+const memoryDraft = ref('')
+watch(memoryFact, (f) => { memoryDraft.value = f?.value ?? '' }, { immediate: true })
+async function saveMemory(): Promise<void> {
+  if (!store.detail) return
+  const pid = store.detail.person.person_id
+  const text = memoryDraft.value.trim()
+  const existing = memoryFact.value
+  if (existing && existing.value === text) return
+  if (existing) await store.deleteFact(existing.fact_id, pid)
+  if (text) await store.addFact(pid, 'memory', text)
+  else await store.inspectPerson(pid)
+}
 // U105: which source kinds the brain can actually read without a login.
 const FETCHABLE = ['blog', 'website', 'github']
 // Per-person weekly auto-refresh: the LAST `source-refresh` fact wins.
@@ -692,6 +714,7 @@ onMounted(async () => {
 }
 .b-grow { flex: 1; }
 .b-about { width: 100%; resize: vertical; }
+.b-memory { width: 100%; resize: vertical; font-size: 0.78rem; line-height: 1.4; white-space: pre-wrap; }
 .b-btn {
   background: var(--accent); color: var(--accent-contrast, #fff);
   border: none; border-radius: var(--radius-md); padding: 0.4rem 0.8rem;
