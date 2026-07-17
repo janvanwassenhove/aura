@@ -453,7 +453,13 @@ class ReachyRobotAdapter(RobotAdapter):
 
     # Reply-time gestures (embodiment): keep looking at the person while doing
     # them so follow-me is not interrupted every time the robot speaks (U81).
-    _FOLLOW_GESTURES = frozenset({"nod", "tilt", "shake", "gesture", "wave"})
+    # U116: mood poses (U111) belong here too — they're the same class of small
+    # reply gesture; leaving them out made every emotional reply pause tracking
+    # (and a silently-failed resume killed follow-me until a manual toggle).
+    _FOLLOW_GESTURES = frozenset({
+        "nod", "tilt", "shake", "gesture", "wave",
+        "mood_happy", "mood_excited", "mood_apologetic", "mood_curious", "mood_attentive",
+    })
 
     def _run_motion_tracked(self, command: MotionCommand) -> None:
         """Run a motion at FULL amplitude: pause follow-me tracking (which
@@ -484,8 +490,9 @@ class ReachyRobotAdapter(RobotAdapter):
             if paused:
                 try:
                     self._mini.start_head_tracking()
-                except Exception:  # noqa: BLE001
-                    pass
+                except Exception as exc:  # noqa: BLE001
+                    # U116: don't die silently — this was how follow-me "randomly" stopped.
+                    logger.warning("could not resume head tracking after %s: %s", motion, exc)
 
     async def execute_timeline(self, timeline: MotionTimeline) -> None:
         for cue in timeline.cues:
@@ -545,6 +552,15 @@ class ReachyRobotAdapter(RobotAdapter):
         elif motion == "wake_up":
             mini.wake_up()
             go(head=_NEUTRAL, antennas=[0.0, 0.0], duration=0.8)  # settle upright
+            # U116: sleep hard-stops head tracking + body yaw; waking must undo
+            # that, or follow-me stays dead until a manual toggle.
+            try:
+                mini.start_head_tracking()
+                self._tracking_on = True
+                if self._body_follow:
+                    mini.set_automatic_body_yaw(True)
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("could not resume tracking after wake_up: %s", exc)
         elif motion == "sleep":
             # U102: use the SDK's default goto_sleep() emote. It sometimes
             # didn't "take" because head-tracking / automatic body-yaw kept
