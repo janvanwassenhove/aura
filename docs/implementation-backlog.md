@@ -333,6 +333,9 @@ the human can unblock it.
 - [x] **U107 — self-optimizing skills (agentic learning loop)** · `pending`
   Skills verzamelen nu gebruiks-evidence en herschrijven zichzelf voor optimale uitvoering — met approval. (1) `SkillStore` logt per skill een observatie bij elke injectie (request/persona/person) in `.metrics/<name>.jsonl` (cap 200) + `metrics()` (uses, new_since_optimized). (2) Nieuwe `skill_optimizer.propose_optimization()`: voedt huidige body + evidence-digest aan het agent-model en krijgt een JSON-voorstel {changed, rationale, body} terug — schrijft NOOIT zelf. (3) Brain: `GET /skills/{name}/metrics`, `POST /skills/{name}/optimize` (voorstel), en `mark_optimized` bij save met `mark_optimized:true`. (4) Console (Settings → Skills): "×used +N"-badge, "Optimize"-knop → before/after-diff + rationale, "Apply rewrite" slaat op en reset de teller. Owner-in-the-loop: geen onbewaakte zelf-wijziging. Orchestrator +12 tests, brain +1, console 56 groen.
 
+- [x] **U108 — auto-optimize skills: proactieve optimalisatie-suggesties** · `pending`
+  Sluit de learning loop (U107): `GET /skills/suggestions` geeft de skills terug met genoeg nieuwe gebruikssignalen (new_since_optimized ≥ SKILL_OPTIMIZE_THRESHOLD, default 8). Console (Settings → Skills): een proactieve banner bovenaan ("N skills ready to optimize") met per-skill chips ("naam +N") die direct de bestaande Optimize-flow (diff + approval) starten — je hoeft niet meer te onthouden om te klikken. Applying reset de teller → banner verdwijnt. Route vóór /{name} zodat "suggestions" geen skillnaam wordt. Brain +1 test, console 56 groen.
+
 ## Progress log (append-only; newest last)
 
 - 2026-06-21 — ledger created on `aura-autobuild`; Phase 0/0b complete, Phase 1 scaffold (U-pre) done before this loop started.

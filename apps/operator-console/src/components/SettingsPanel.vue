@@ -100,6 +100,18 @@
       <!-- ── Skills tab (U62): what the owner taught the agent ── -->
       <template v-if="activeTab === 'skills'">
         <p class="conn-hint">Skills are procedures you taught the assistant. It proposes new ones from your feedback (🎓) — every write needs your approval. You edit freely here. <strong>Optimize</strong> rewrites a skill for reliable execution from how it's actually been used — you approve the diff.</p>
+        <!-- U108: proactive optimization prompt — Richie asks when a skill has learned enough -->
+        <div v-if="suggestions.length" class="skill-suggest">
+          <span class="skill-suggest-icon">🔧</span>
+          <div class="skill-suggest-body">
+            <strong>{{ suggestions.length }} skill{{ suggestions.length === 1 ? '' : 's' }} ready to optimize</strong>
+            <span class="skill-suggest-list">
+              <button v-for="s in suggestions" :key="s.name" class="skill-suggest-chip" :disabled="optimizing === s.name" @click="optimizeByName(s.name)">
+                {{ s.name }} <em>+{{ s.new_since_optimized }}</em>
+              </button>
+            </span>
+          </div>
+        </div>
         <div v-if="!skills.length && !editingSkill" class="conn-hint">No skills yet. Teach one via the 🎓 button in the conversation, or add one below.</div>
         <div v-for="sk in skills" :key="sk.name" :class="['skill-card', !sk.enabled && 'skill-card--off']">
           <div class="skill-card-head">
@@ -680,6 +692,9 @@ const metrics = ref<Record<string, SkillMetric>>({})
 const optimizing = ref('')
 const optimizeError = ref('')
 const optimizeErrorMsg = ref('')
+// U108: proactive suggestions — skills with enough new signals to re-optimize.
+interface Suggestion { name: string; description: string; uses: number; new_since_optimized: number }
+const suggestions = ref<Suggestion[]>([])
 interface Proposal { name: string; changed: boolean; rationale: string; current_body: string; proposed_body: string; based_on: number }
 const proposal = ref<Proposal | null>(null)
 
@@ -695,7 +710,16 @@ async function fetchSkills(): Promise<void> {
       } catch { return null }
     }))
     metrics.value = Object.fromEntries(entries.filter(Boolean) as [string, SkillMetric][])
+    try {
+      const s = await fetch(`${BRAIN_URL_LOGS}/skills/suggestions`)
+      suggestions.value = s.ok ? (await s.json()).suggestions ?? [] : []
+    } catch { suggestions.value = [] }
   } catch { skills.value = [] }
+}
+
+async function optimizeByName(name: string): Promise<void> {
+  const sk = skills.value.find(s => s.name === name)
+  if (sk) await optimizeSkill(sk)
 }
 
 async function optimizeSkill(sk: SkillItem): Promise<void> {
@@ -985,6 +1009,24 @@ const ConnStatusBadge = defineComponent({
 .skill-toggle { font-size: 0.72rem; color: var(--text-faint); display: flex; gap: 0.25rem; align-items: center; }
 .skill-editor { display: flex; flex-direction: column; gap: 0.45rem; margin-top: 0.6rem; }
 .skill-body { font-family: ui-monospace, monospace; }
+
+/* U108: proactive optimization suggestion banner */
+.skill-suggest {
+  display: flex; gap: 0.6rem; align-items: flex-start;
+  padding: 0.6rem 0.75rem; margin-bottom: 0.5rem;
+  border: 1px solid var(--accent); border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+.skill-suggest-icon { font-size: 1rem; line-height: 1.4; }
+.skill-suggest-body { display: flex; flex-direction: column; gap: 0.35rem; font-size: 0.78rem; }
+.skill-suggest-list { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+.skill-suggest-chip {
+  font-size: 0.72rem; padding: 0.15rem 0.5rem; border-radius: 999px; cursor: pointer;
+  background: var(--surface); border: 1px solid var(--border-strong); color: var(--text);
+  font-family: ui-monospace, monospace;
+}
+.skill-suggest-chip:hover { border-color: var(--accent); }
+.skill-suggest-chip em { font-style: normal; color: var(--accent); font-weight: 700; }
 
 /* U107: usage badge + optimization proposal */
 .skill-uses { font-size: 0.68rem; color: var(--text-faint); display: inline-flex; gap: 0.2rem; align-items: baseline; }

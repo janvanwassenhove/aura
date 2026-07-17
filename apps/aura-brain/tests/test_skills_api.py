@@ -79,3 +79,29 @@ def test_metrics_and_optimize(client, monkeypatch) -> None:
     assert client.get("/skills/start-spotify/metrics").json()["new_since_optimized"] == 0
 
     assert client.post("/skills/nope/optimize", json={}).status_code == 404
+
+
+def test_optimization_suggestions(client, monkeypatch) -> None:
+    """U108: skills with enough new signals surface as proactive suggestions."""
+    monkeypatch.setenv("SKILL_OPTIMIZE_THRESHOLD", "3")
+    client.post("/skills", json={"name": "start-spotify", "body": "1. Open."})
+    client.post("/skills", json={"name": "greet-guest", "body": "1. Wave."})
+    store = skills_api.get_store()
+
+    # Below threshold → not suggested.
+    store.record_observation("start-spotify", {"request": "a"})
+    assert client.get("/skills/suggestions").json()["suggestions"] == []
+
+    # At/above threshold → suggested.
+    for _ in range(3):
+        store.record_observation("greet-guest", {"request": "hi"})
+    sug = client.get("/skills/suggestions").json()
+    assert sug["threshold"] == 3
+    assert [s["name"] for s in sug["suggestions"]] == ["greet-guest"]
+
+    # Applying an optimization clears the suggestion.
+    store.mark_optimized("greet-guest")
+    assert client.get("/skills/suggestions").json()["suggestions"] == []
+
+    # "suggestions" must not be mistaken for a skill name.
+    assert client.get("/skills/suggestions").status_code == 200
