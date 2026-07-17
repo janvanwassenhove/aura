@@ -149,6 +149,17 @@ async def test_wake_up_and_sleep_map_to_sdk_emotes(adapter) -> None:
     assert moves.index("set_automatic_body_yaw") < moves.index("goto_sleep")
 
 
+async def test_mood_motions_move_head_and_antennas(adapter) -> None:
+    """U111: each mood pose is a real goto_target move (not a crash/fallback)."""
+    await adapter.connect()
+    for mood in ("mood_happy", "mood_excited", "mood_apologetic", "mood_curious", "mood_attentive"):
+        mini = adapter._created[0]
+        before = len(mini.calls)
+        await adapter.execute_motion(MotionCommand(motion_id=mood, direction=None))
+        moves = [n for n, _ in mini.calls[before:]]
+        assert "goto_target" in moves, f"{mood} did not move"
+
+
 async def test_unknown_motion_falls_back_to_gentle_nod(adapter) -> None:
     await adapter.connect()
     await adapter.execute_motion(MotionCommand(motion_id="does-not-exist", direction=None))

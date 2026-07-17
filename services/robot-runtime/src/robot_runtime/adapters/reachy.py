@@ -573,6 +573,30 @@ class ReachyRobotAdapter(RobotAdapter):
                     duration=random.uniform(1.2, 1.8),
                 )
             go(head=_NEUTRAL, duration=1.2)
+        # U111: emotion & mimicry — small mood poses played WHILE speaking.
+        # Antenna/head signs are gentle and return to neutral; tune on hardware
+        # via the MOOD_* envs if a pose reads wrong. _rot("x", +) pitches down.
+        elif motion == "mood_happy":  # chin up, antennas perked forward
+            a = float(os.environ.get("MOOD_HAPPY_ANTENNA", "-0.5")) * amp
+            go(head=_rot("x", -0.15 * amp), antennas=[a, a], duration=0.6)
+            go(head=_NEUTRAL, antennas=[0.0, 0.0], duration=0.7)
+        elif motion == "mood_excited":  # antennas wiggle, lively
+            a = float(os.environ.get("MOOD_EXCITED_ANTENNA", "0.9")) * amp
+            go(head=_rot("x", -0.12 * amp), antennas=[a, -a], duration=0.35)
+            go(antennas=[-a, a], duration=0.35)
+            go(head=_NEUTRAL, antennas=[0.0, 0.0], duration=0.5)
+        elif motion == "mood_apologetic":  # head bowed, antennas droop back
+            a = float(os.environ.get("MOOD_SAD_ANTENNA", "1.0")) * amp
+            go(head=_rot("x", 0.3 * amp), antennas=[a, a], duration=1.0)
+            go(head=_NEUTRAL, antennas=[0.0, 0.0], duration=1.0)
+        elif motion == "mood_curious":  # head tilt + asymmetric antennas
+            roll = 0.35 * amp * (1 if cmd.direction != "left" else -1)
+            a = float(os.environ.get("MOOD_CURIOUS_ANTENNA", "0.4")) * amp
+            go(head=_rot("y", roll), antennas=[-a, a], duration=0.7)
+            go(head=_NEUTRAL, antennas=[0.0, 0.0], duration=0.7)
+        elif motion == "mood_attentive":  # a subtle lean-in, antennas still
+            go(head=_rot("x", -0.1 * amp), duration=0.5)
+            go(head=_NEUTRAL, duration=0.6)
         else:  # unknown id → gentle nod so behavior never crashes on vocabulary
             logger.warning("Unknown motion_id %r — defaulting to nod", cmd.motion_id)
             go(head=_rot("x", 0.2 * amp))

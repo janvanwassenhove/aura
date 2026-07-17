@@ -345,6 +345,15 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             amplitude = min(1.0, amplitude * character.motion_scale())
             if character.robot_motion_style == "still":
                 gesture = None
+        # U111: emotion & mimicry — express the reply's tone with head/antennas.
+        # A detected mood REPLACES the generic reply gesture (they'd fight over
+        # the head). Off via EMOTION_ENABLED=false or a "still" character.
+        if gesture is not None and os.environ.get("EMOTION_ENABLED", "true").lower() == "true":
+            from aura_brain.mood import detect_mood, mood_motion
+
+            mood_id = mood_motion(detect_mood(text))
+            if mood_id is not None:
+                gesture = mood_id
         try:
             if gesture is not None:
                 await _robot.execute_motion(MotionCommand(
