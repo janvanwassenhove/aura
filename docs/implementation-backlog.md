@@ -336,6 +336,9 @@ the human can unblock it.
 - [x] **U108 — auto-optimize skills: proactieve optimalisatie-suggesties** · `pending`
   Sluit de learning loop (U107): `GET /skills/suggestions` geeft de skills terug met genoeg nieuwe gebruikssignalen (new_since_optimized ≥ SKILL_OPTIMIZE_THRESHOLD, default 8). Console (Settings → Skills): een proactieve banner bovenaan ("N skills ready to optimize") met per-skill chips ("naam +N") die direct de bestaande Optimize-flow (diff + approval) starten — je hoeft niet meer te onthouden om te klikken. Applying reset de teller → banner verdwijnt. Route vóór /{name} zodat "suggestions" geen skillnaam wordt. Brain +1 test, console 56 groen.
 
+- [x] **U109 — langetermijngeheugen per persoon** · `pending`
+  Gesprekken zijn vluchtig (U42 = alleen sessie-historie); nu distilleert AURA over sessies heen een blijvend MEMORY per herkende persoon. `person_memory.py` (PersonMemory): buffert per persoon de (user, reply)-uitwisselingen; elke PERSON_MEMORY_EVERY (default 4) vouwt het chat-model ze in het bestaande geheugen — behoudt projecten/beloftes/voorkeuren/terugkerende thema's, dropt small talk — en vervangt het `memory`-fact (encrypted at rest, gecapt op 1400 tekens). Pipeline: `set_memory_hook` in `orchestrate()` voedt elke beurt met een herkende persoon in (best-effort, breekt nooit een beurt). Judgment: het `memory`-fact wordt apart gelabeld ("Memory from past conversations:") en vooraan geïnjecteerd. Console (Brain → persoon): "Memory"-sectie, auto-gegroeid en vrij bewerkbaar. `POST /knowledge/people/{id}/memory/flush` distilleert on-demand. Gated via PERSON_MEMORY_ENABLED. Brain 180 (+5), schemas 13 (+1), orchestrator 197, console 56 groen.
+
 ## Progress log (append-only; newest last)
 
 - 2026-06-21 — ledger created on `aura-autobuild`; Phase 0/0b complete, Phase 1 scaffold (U-pre) done before this loop started.

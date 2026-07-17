@@ -49,8 +49,14 @@ class PersonContext(BaseModel):
         if self.person.description:
             lines.append(f"  About them: {self.person.description}")
 
+        # U109: long-term memory (from past conversations) leads — it's the most
+        # useful continuity signal — and is labelled distinctly from plain facts.
         for fact in self.facts:
-            lines.append(f"  {fact.key}: {fact.value}")
+            if fact.key == "memory":
+                lines.append(f"  Memory from past conversations:\n{fact.value}")
+        for fact in self.facts:
+            if fact.key != "memory":
+                lines.append(f"  {fact.key}: {fact.value}")
 
         for signal in self.signals:
             pct = int(signal.confidence * 100)

@@ -54,6 +54,7 @@ class BrainContext:
         self._reminder_scheduler = None
         self.connector_registry = None
         self.knowledge_store = None
+        self.person_memory = None  # U109: PersonMemory | None
         self.pipeline = None
         self._perception = None
         self._robot_bridge = None
@@ -237,6 +238,21 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     _judgment = JudgmentLayer(ctx.knowledge_store)
     ctx.pipeline.set_judgment_layer(_judgment)
+
+    # U109: long-term memory per person — distil each exchange into a durable
+    # `memory` fact (encrypted at rest, injected into future turns). Gated by
+    # PERSON_MEMORY_ENABLED so tests / minimal installs stay quiet.
+    if os.environ.get("PERSON_MEMORY_ENABLED", "true").lower() == "true":
+        from orchestrator.config import model_for_role
+        from orchestrator.llm import openai_chat
+        from aura_brain.person_memory import PersonMemory
+
+        ctx.person_memory = PersonMemory(
+            ctx.knowledge_store, openai_chat,
+            model_getter=lambda: model_for_role("chat"),
+            every=int(os.environ.get("PERSON_MEMORY_EVERY", "4")),
+        )
+        ctx.pipeline.set_memory_hook(ctx.person_memory.record)
 
     # U36: robot proxy for the console (video panel + quick actions) and the
     # greet-on-recognition flow. One RobotClient serves both.
