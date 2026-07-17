@@ -110,9 +110,10 @@ const themeStore = useThemeStore()
 const setupStore = useSetupStore()
 const navStore = useNavStore()
 
-// U68: [[wikilink]] navigation — links open the right dock / settings.
+// U68: [[wikilink]] navigation — links open the right dock.
+// U117: skills live in the Brain panel now (Settings lost its Skills tab).
 watch(() => navStore.knowledgeRequest, (r) => { if (r) layoutStore.openRight('brain') })
-watch(() => navStore.skillsRequest, (r) => { if (r) showSettings.value = true })
+watch(() => navStore.skillsRequest, (r) => { if (r) layoutStore.openRight('brain') })
 
 onMounted(async () => {
   themeStore.apply()

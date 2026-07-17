@@ -10,10 +10,7 @@
       <div class="settings-tabs">
         <button :class="['tab-btn', activeTab === 'llm' && 'tab-btn--active']" @click="activeTab = 'llm'">LLM</button>
         <button :class="['tab-btn', activeTab === 'connections' && 'tab-btn--active']" @click="switchToConnections">Connections</button>
-        <button :class="['tab-btn', activeTab === 'robot' && 'tab-btn--active']" @click="switchToRobot">Robot</button>
         <button :class="['tab-btn', activeTab === 'appearance' && 'tab-btn--active']" @click="activeTab = 'appearance'">Appearance</button>
-        <button :class="['tab-btn', activeTab === 'skills' && 'tab-btn--active']" @click="switchToSkills">Skills</button>
-        <button :class="['tab-btn', activeTab === 'logs' && 'tab-btn--active']" @click="switchToLogs">Logs</button>
       </div>
 
       <!-- ── LLM tab ── -->
@@ -96,136 +93,6 @@
           <button class="btn-apply" :disabled="llmStore.loading" @click="applyLLM">Apply</button>
         </div>
       </template>
-
-      <!-- ── Skills tab (U62): what the owner taught the agent ── -->
-      <template v-if="activeTab === 'skills'">
-        <p class="conn-hint" title="The assistant proposes new skills from 🎓 feedback (every write needs your approval); Optimize rewrites one from real usage — you approve the diff.">Procedures you taught the assistant. Teach via 🎓, refine with <strong>Optimize</strong> — you approve every change.</p>
-        <!-- U108: proactive optimization prompt — Richie asks when a skill has learned enough -->
-        <div v-if="suggestions.length" class="skill-suggest">
-          <span class="skill-suggest-icon">🔧</span>
-          <div class="skill-suggest-body">
-            <strong>{{ suggestions.length }} skill{{ suggestions.length === 1 ? '' : 's' }} ready to optimize</strong>
-            <span class="skill-suggest-list">
-              <button v-for="s in suggestions" :key="s.name" class="skill-suggest-chip" :disabled="optimizing === s.name" @click="optimizeByName(s.name)">
-                {{ s.name }} <em>+{{ s.new_since_optimized }}</em>
-              </button>
-            </span>
-          </div>
-        </div>
-        <div v-if="!skills.length && !editingSkill" class="conn-hint">No skills yet. Teach one via the 🎓 button in the conversation, or add one below.</div>
-        <div v-for="sk in skills" :key="sk.name" :class="['skill-card', !sk.enabled && 'skill-card--off']">
-          <div class="skill-card-head">
-            <span class="skill-card-name">{{ sk.name }}</span>
-            <button v-if="sk.person" class="skill-scope skill-scope--link" :title="`Open ${sk.person} in Knowledge`" @click="navStore.openPerson(sk.person)">@{{ sk.person }}</button>
-            <span v-if="metrics[sk.name]?.uses" class="skill-uses" :title="`Used ${metrics[sk.name].uses}× · ${metrics[sk.name].new_since_optimized} new signal(s) since last optimize`">
-              {{ metrics[sk.name].uses }}× used<span v-if="metrics[sk.name].new_since_optimized" class="skill-uses-new">+{{ metrics[sk.name].new_since_optimized }}</span>
-            </span>
-            <span class="skill-card-spacer" />
-            <label class="skill-toggle" :title="sk.enabled ? 'Active' : 'Disabled'">
-              <input type="checkbox" :checked="sk.enabled" @change="toggleSkill(sk)" />
-            </label>
-            <button class="btn-conn btn-ghost btn-small" :disabled="optimizing === sk.name" @click="optimizeSkill(sk)">{{ optimizing === sk.name ? 'Optimizing…' : 'Optimize' }}</button>
-            <button class="btn-conn btn-ghost btn-small" @click="editSkill(sk)">Edit</button>
-            <button class="btn-conn btn-ghost btn-small" @click="removeSkill(sk.name)">Delete</button>
-          </div>
-          <p class="skill-card-desc"><WikiText :text="sk.description" @open="openWikiTarget" /></p>
-          <p v-if="sk.body" class="skill-card-body"><WikiText :text="sk.body.length > 180 ? sk.body.slice(0, 180) + '…' : sk.body" @open="openWikiTarget" /></p>
-          <div v-if="sk.triggers.length || sk.personas.length" class="skill-card-tags">
-            <span v-for="t in sk.triggers" :key="'t' + t" class="skill-tag">“{{ t }}”</span>
-            <span v-for="m in sk.personas" :key="'m' + m" class="skill-tag skill-tag--mode">{{ m }}</span>
-          </div>
-
-          <!-- U107: optimization proposal — owner approves the rewrite -->
-          <div v-if="proposal && proposal.name === sk.name" class="skill-opt">
-            <p class="skill-opt-rationale"><strong>Proposed rewrite</strong> — based on {{ proposal.based_on }} use(s). {{ proposal.rationale }}</p>
-            <div v-if="!proposal.changed" class="conn-hint">The optimizer judged the current skill already optimal — nothing to change.</div>
-            <div v-else class="skill-opt-diff">
-              <div class="skill-opt-col">
-                <span class="skill-opt-label">Current</span>
-                <pre class="skill-opt-pre">{{ proposal.current_body }}</pre>
-              </div>
-              <div class="skill-opt-col">
-                <span class="skill-opt-label">Proposed</span>
-                <pre class="skill-opt-pre skill-opt-pre--new">{{ proposal.proposed_body }}</pre>
-              </div>
-            </div>
-            <div class="conn-actions">
-              <button v-if="proposal.changed" class="btn-conn btn-primary btn-small" @click="applyProposal(sk)">Apply rewrite</button>
-              <button class="btn-conn btn-ghost btn-small" @click="proposal = null">Dismiss</button>
-            </div>
-          </div>
-          <p v-if="optimizeError === sk.name" class="conn-error">{{ optimizeErrorMsg }}</p>
-        </div>
-        <div v-if="editingSkill" class="skill-editor">
-          <input v-model="editingSkill.name" class="field-input" placeholder="name (kebab-case)" :disabled="!skillIsNew" aria-label="Skill name" />
-          <input v-model="editingSkill.description" class="field-input" placeholder="One-line description" aria-label="Skill description" />
-          <input v-model="editingTriggers" class="field-input" placeholder="Triggers, comma-separated (e.g. deploy, release)" aria-label="Skill triggers" />
-          <input v-model="editingSkill.person" class="field-input" placeholder="Person id (optional — scopes to their digital twin)" aria-label="Skill person" />
-          <textarea v-model="editingSkill.body" class="field-input skill-body" rows="6" placeholder="The procedure, step by step… Link with [[person-id]] or [[other-skill]] — links become clickable and show up as backlinks on the person's profile." aria-label="Skill body" />
-          <div class="conn-actions">
-            <button class="btn-conn btn-primary" :disabled="!editingSkill.name || !editingSkill.body" @click="saveSkill">Save</button>
-            <button class="btn-conn btn-ghost" @click="editingSkill = null">Cancel</button>
-          </div>
-          <p v-if="skillError" class="conn-error">{{ skillError }}</p>
-        </div>
-        <button v-else class="btn-conn btn-ghost" @click="newSkill">+ New skill</button>
-      </template>
-
-      <!-- ── Logs tab (U56): local ring buffer, nothing leaves this machine ── -->
-      <template v-if="activeTab === 'logs'">
-        <div class="logs-toolbar">
-          <select v-model="logLevel" class="field-input logs-level" aria-label="Filter log level" @change="fetchLogs">
-            <option value="">All levels</option>
-            <option value="INFO">Info</option>
-            <option value="WARNING">Warning</option>
-            <option value="ERROR">Error</option>
-          </select>
-          <button class="btn-conn btn-ghost" :disabled="logsLoading" aria-label="Refresh logs" @click="fetchLogs">
-            <RefreshCw :size="13" :class="logsLoading ? 'spinner' : ''" /> Refresh
-          </button>
-          <span class="logs-note">Local only — nothing is sent anywhere.</span>
-        </div>
-        <div class="logs-list" role="log">
-          <p v-if="!logRecords.length" class="conn-hint">No log records yet.</p>
-          <div v-for="(r, i) in logRecords" :key="i" :class="['log-row', `log-row--${r.level.toLowerCase()}`]">
-            <span class="log-ts">{{ r.ts }}</span>
-            <span class="log-level">{{ r.level }}</span>
-            <span class="log-msg">{{ r.message }}</span>
-          </div>
-        </div>
-      </template>
-
-      <!-- ── Robot tab (U34) ── -->
-      <template v-if="activeTab === 'robot'">
-        <div class="settings-field">
-          <label class="field-label" for="robot-url">Robot address</label>
-          <div class="robot-row">
-            <input id="robot-url" v-model="robotUrl" class="field-input" placeholder="http://192.168.0.178:8001" />
-            <button class="btn-conn btn-ghost" :disabled="robotTesting" @click="testRobotUrl">
-              <LoaderCircle v-if="robotTesting" :size="13" class="spinner" /> Test
-            </button>
-          </div>
-          <p v-if="robotTestResult" class="conn-hint">{{ robotTestResult }}</p>
-        </div>
-        <div class="settings-field">
-          <button class="btn-conn btn-ghost" :disabled="setupStore.discovering" @click="setupStore.discover()">
-            <LoaderCircle v-if="setupStore.discovering" :size="13" class="spinner" />
-            {{ setupStore.discovering ? 'Scanning the network…' : 'Scan my network for the robot' }}
-          </button>
-          <ul v-if="setupStore.found.length" class="robot-found">
-            <li v-for="f in setupStore.found" :key="f.url">
-              <button class="btn-conn btn-ghost btn-small" @click="robotUrl = f.url; testRobotUrl()">{{ f.url }}</button>
-            </li>
-          </ul>
-        </div>
-        <div class="settings-field">
-          <button class="btn-conn btn-primary" :disabled="!robotUrl || robotSaving" @click="saveRobotUrl">
-            <LoaderCircle v-if="robotSaving" :size="13" class="spinner" /> Save
-          </button>
-          <p v-if="robotSaved" class="conn-hint">Saved — applies to new robot connections.</p>
-        </div>
-      </template>
-
       <!-- ── Appearance tab ── -->
       <template v-if="activeTab === 'appearance'">
         <div class="settings-body">
@@ -486,10 +353,7 @@ import {
   MessageSquare, Moon, Music, RefreshCw, Settings, Sun, X,
 } from 'lucide-vue-next'
 import { useSettingsStore, type LLMProvider, type ModelOption } from '../stores/settingsStore'
-import WikiText from './WikiText.vue'
 import { useConnectionsStore, type ConnectorStatus } from '../stores/connectionsStore'
-import { useNavStore } from '../stores/navStore'
-import { useSetupStore } from '../stores/setupStore'
 import { ACCENTS, useThemeStore } from '../stores/themeStore'
 import { LANGUAGES, usePrefsStore } from '../stores/prefsStore'
 
@@ -554,7 +418,7 @@ async function applyLLM() {
 const connStore = useConnectionsStore()
 const themeStore = useThemeStore()
 const prefsStore = usePrefsStore()
-const activeTab = ref<'llm' | 'connections' | 'robot' | 'appearance' | 'logs' | 'skills'>('llm')
+const activeTab = ref<'llm' | 'connections' | 'appearance'>('llm')
 
 const localName = ref(prefsStore.assistantName)
 const localLang = ref(prefsStore.language)
@@ -614,226 +478,10 @@ async function switchToConnections() {
   await connStore.refreshAllStatuses()
 }
 
-// ── Robot tab (U34) ──
-const setupStore = useSetupStore()
-const robotUrl = ref('')
-const robotTesting = ref(false)
-const robotSaving = ref(false)
-const robotSaved = ref(false)
-const robotTestResult = ref('')
-
-async function switchToRobot(): Promise<void> {
-  activeTab.value = 'robot'
-  await setupStore.fetchStatus()
-  if (!robotUrl.value) robotUrl.value = setupStore.status?.robot_url ?? ''
-}
-
-async function testRobotUrl(): Promise<void> {
-  robotTesting.value = true
-  robotTestResult.value = ''
-  try {
-    const r = await setupStore.testRobot(robotUrl.value)
-    robotTestResult.value = r.ok
-      ? `Connected — ${r.mode} (battery ${r.battery_pct}%)`
-      : `Not reachable (${r.error})`
-  } finally {
-    robotTesting.value = false
-  }
-}
-
-async function saveRobotUrl(): Promise<void> {
-  robotSaving.value = true
-  robotSaved.value = false
-  try {
-    const err = await setupStore.saveConfig({ robot_url: robotUrl.value.trim() })
-    robotSaved.value = err === null
-  } finally {
-    robotSaving.value = false
-  }
-}
-
-// ── Logs tab (U56) ──
-interface LogRecord { ts: string; level: string; logger: string; message: string }
 const BRAIN_URL_LOGS =
   import.meta.env.VITE_BRAIN_URL ??
   import.meta.env.VITE_ORCHESTRATOR_URL ??
   'http://localhost:8000'
-const logRecords = ref<LogRecord[]>([])
-const logLevel = ref('')
-const logsLoading = ref(false)
-
-async function fetchLogs(): Promise<void> {
-  logsLoading.value = true
-  try {
-    const resp = await fetch(`${BRAIN_URL_LOGS}/logs/recent?limit=200&level=${logLevel.value}`)
-    const data = await resp.json()
-    logRecords.value = (data.records ?? []).reverse() // newest first
-  } catch {
-    logRecords.value = []
-  } finally {
-    logsLoading.value = false
-  }
-}
-
-// ── Skills tab (U62) ──
-interface SkillItem {
-  name: string; description: string; triggers: string[]
-  personas: string[]; person: string; enabled: boolean; body: string
-}
-const skills = ref<SkillItem[]>([])
-const editingSkill = ref<SkillItem | null>(null)
-const skillIsNew = ref(false)
-const editingTriggers = ref('')
-const skillError = ref('')
-
-// U107: usage metrics + self-optimization proposal.
-interface SkillMetric { uses: number; new_since_optimized: number; last_used: number | null }
-const metrics = ref<Record<string, SkillMetric>>({})
-const optimizing = ref('')
-const optimizeError = ref('')
-const optimizeErrorMsg = ref('')
-// U108: proactive suggestions — skills with enough new signals to re-optimize.
-interface Suggestion { name: string; description: string; uses: number; new_since_optimized: number }
-const suggestions = ref<Suggestion[]>([])
-interface Proposal { name: string; changed: boolean; rationale: string; current_body: string; proposed_body: string; based_on: number }
-const proposal = ref<Proposal | null>(null)
-
-async function fetchSkills(): Promise<void> {
-  try {
-    const resp = await fetch(`${BRAIN_URL_LOGS}/skills`)
-    skills.value = (await resp.json()).skills ?? []
-    // Pull usage counts in parallel — cheap, drives the "N new signals" badge.
-    const entries = await Promise.all(skills.value.map(async (sk) => {
-      try {
-        const m = await fetch(`${BRAIN_URL_LOGS}/skills/${encodeURIComponent(sk.name)}/metrics`)
-        return m.ok ? [sk.name, await m.json()] as const : null
-      } catch { return null }
-    }))
-    metrics.value = Object.fromEntries(entries.filter(Boolean) as [string, SkillMetric][])
-    try {
-      const s = await fetch(`${BRAIN_URL_LOGS}/skills/suggestions`)
-      suggestions.value = s.ok ? (await s.json()).suggestions ?? [] : []
-    } catch { suggestions.value = [] }
-  } catch { skills.value = [] }
-}
-
-async function optimizeByName(name: string): Promise<void> {
-  const sk = skills.value.find(s => s.name === name)
-  if (sk) await optimizeSkill(sk)
-}
-
-async function optimizeSkill(sk: SkillItem): Promise<void> {
-  optimizing.value = sk.name
-  optimizeError.value = ''
-  proposal.value = null
-  try {
-    const resp = await fetch(`${BRAIN_URL_LOGS}/skills/${encodeURIComponent(sk.name)}/optimize`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}),
-    }).catch(() => null)
-    if (!resp || !resp.ok) {
-      optimizeError.value = sk.name
-      optimizeErrorMsg.value = resp ? String((await resp.json().catch(() => ({}))).error ?? `HTTP ${resp.status}`) : 'brain unreachable'
-      return
-    }
-    proposal.value = await resp.json()
-  } finally {
-    optimizing.value = ''
-  }
-}
-
-async function applyProposal(sk: SkillItem): Promise<void> {
-  if (!proposal.value) return
-  const resp = await fetch(`${BRAIN_URL_LOGS}/skills`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    // Save the rewritten body and reset the "new signals" counter.
-    body: JSON.stringify({ ...sk, body: proposal.value.proposed_body, mark_optimized: true }),
-  }).catch(() => null)
-  if (resp && resp.ok) {
-    proposal.value = null
-    await fetchSkills()
-  } else {
-    optimizeError.value = sk.name
-    optimizeErrorMsg.value = 'Could not save the rewrite.'
-  }
-}
-
-const navStore = useNavStore()
-
-// U68: [[target]] in a skill → person when known in Knowledge, else a skill here.
-function openWikiTarget(target: string): void {
-  const t = target.trim().toLowerCase()
-  const skill = skills.value.find(sk => sk.name === t)
-  if (skill) { editSkill(skill); return }
-  navStore.openPerson(t)
-}
-
-// Opened via a [[wikilink]] elsewhere → jump to the Skills tab (and editor).
-watch(() => navStore.skillsRequest, async (r) => {
-  if (!r) return
-  await switchToSkills()
-  if (r.skillName) {
-    const skill = skills.value.find(sk => sk.name === r.skillName)
-    if (skill) editSkill(skill)
-  }
-}, { immediate: true })
-
-async function switchToSkills(): Promise<void> {
-  activeTab.value = 'skills'
-  await fetchSkills()
-}
-
-function newSkill(): void {
-  skillIsNew.value = true
-  editingTriggers.value = ''
-  editingSkill.value = { name: '', description: '', triggers: [], personas: [], person: '', enabled: true, body: '' }
-}
-
-function editSkill(sk: SkillItem): void {
-  skillIsNew.value = false
-  editingTriggers.value = sk.triggers.join(', ')
-  editingSkill.value = { ...sk }
-}
-
-async function saveSkill(): Promise<void> {
-  if (!editingSkill.value) return
-  skillError.value = ''
-  const payload = {
-    ...editingSkill.value,
-    triggers: editingTriggers.value.split(',').map(t => t.trim()).filter(Boolean),
-  }
-  const resp = await fetch(`${BRAIN_URL_LOGS}/skills`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  }).catch(() => null)
-  if (!resp || !resp.ok) {
-    skillError.value = resp ? String((await resp.json().catch(() => ({}))).error ?? `HTTP ${resp.status}`) : 'brain unreachable'
-    return
-  }
-  editingSkill.value = null
-  await fetchSkills()
-}
-
-async function toggleSkill(sk: SkillItem): Promise<void> {
-  await fetch(`${BRAIN_URL_LOGS}/skills`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ ...sk, enabled: !sk.enabled }),
-  }).catch(() => {})
-  await fetchSkills()
-}
-
-async function removeSkill(name: string): Promise<void> {
-  await fetch(`${BRAIN_URL_LOGS}/skills/${name}`, { method: 'DELETE' }).catch(() => {})
-  await fetchSkills()
-}
-
-async function switchToLogs(): Promise<void> {
-  activeTab.value = 'logs'
-  await fetchLogs()
-}
-
-
 async function saveGitHub() {
   await connStore.saveToken('github', githubToken.value)
   if (githubState.value.status === 'ok') githubToken.value = ''

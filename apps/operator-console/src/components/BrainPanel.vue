@@ -68,15 +68,25 @@
           </div>
         </nav>
 
-        <!-- ── Right: skills library ── -->
+        <!-- ── Right: skills library (U117: full editing + optimize live here) ── -->
         <section v-if="selected === '_skills'" class="brain-content">
+          <!-- U108: proactive optimization suggestions -->
+          <div v-if="suggestions.length" class="skill-suggest">
+            <span>🔧 <strong>{{ suggestions.length }} skill{{ suggestions.length === 1 ? '' : 's' }} ready to optimize</strong></span>
+            <button v-for="s in suggestions" :key="s.name" class="b-tag" :disabled="optimizing === s.name" @click="optimizeSkillByName(s.name)">
+              {{ s.name }} <em class="suggest-plus">+{{ s.new_since_optimized }}</em>
+            </button>
+          </div>
+
           <h3 class="content-title">General skills</h3>
           <p class="content-hint">Procedures that apply to everyone. Teach new ones with the 🎓 button, or add below.</p>
           <div class="skill-grid">
             <article v-for="sk in generalSkills" :key="sk.name" :class="['b-skill-card', !sk.enabled && 'b-skill-card--off']">
               <header class="b-skill-head">
                 <span class="b-skill-name">{{ sk.name }}</span>
-                <button class="b-icon-btn" title="Edit in Settings" @click="nav.openSkills(sk.name)"><Pencil :size="12" /></button>
+                <span v-if="skillMetrics[sk.name]?.uses" class="b-uses" :title="`Used ${skillMetrics[sk.name].uses}× · ${skillMetrics[sk.name].new_since_optimized} new signal(s)`">{{ skillMetrics[sk.name].uses }}×</span>
+                <button class="b-icon-btn" :disabled="optimizing === sk.name" title="Optimize — rewrite from real usage (you approve the diff)" @click="optimizeSkillCard(sk)"><Sparkles :size="12" /></button>
+                <button class="b-icon-btn" title="Edit" @click="editSkillCard(sk)"><Pencil :size="12" /></button>
               </header>
               <p class="b-skill-desc"><WikiText :text="sk.description" @open="openTarget" /></p>
               <div class="b-skill-tags">
@@ -95,19 +105,51 @@
               <article v-for="sk in grp.skills" :key="sk.name" :class="['b-skill-card', !sk.enabled && 'b-skill-card--off']">
                 <header class="b-skill-head">
                   <span class="b-skill-name">{{ sk.name }}</span>
-                  <button class="b-icon-btn" title="Edit in Settings" @click="nav.openSkills(sk.name)"><Pencil :size="12" /></button>
+                  <button class="b-icon-btn" :disabled="optimizing === sk.name" title="Optimize — rewrite from real usage" @click="optimizeSkillCard(sk)"><Sparkles :size="12" /></button>
+                  <button class="b-icon-btn" title="Edit" @click="editSkillCard(sk)"><Pencil :size="12" /></button>
                 </header>
                 <p class="b-skill-desc"><WikiText :text="sk.description" @open="openTarget" /></p>
               </article>
             </div>
           </template>
 
-          <div class="inline-add">
-            <input v-model="newSkill.name" class="b-input" placeholder="skill-name" aria-label="Skill name" />
-            <input v-model="newSkill.description" class="b-input b-grow" placeholder="What it covers" aria-label="Skill description" />
-            <input v-model="newSkill.body" class="b-input b-grow" placeholder="The procedure…" aria-label="Skill procedure" />
-            <button class="b-btn" :disabled="!newSkill.name.trim() || !newSkill.body.trim()" @click="addSkill()">Add skill</button>
+          <!-- U117: optimize proposal — before/after diff, owner applies -->
+          <div v-if="skillProposal" class="skill-opt">
+            <p class="skill-opt-head"><strong>{{ skillProposal.name }}</strong> — proposed rewrite, based on {{ skillProposal.based_on }} use(s). {{ skillProposal.rationale }}</p>
+            <p v-if="!skillProposal.changed" class="content-hint">Already optimal — nothing to change.</p>
+            <div v-else class="skill-opt-diff">
+              <div class="skill-opt-col"><span class="skill-opt-label">Current</span><pre class="skill-opt-pre">{{ skillProposal.current_body }}</pre></div>
+              <div class="skill-opt-col"><span class="skill-opt-label">Proposed</span><pre class="skill-opt-pre skill-opt-pre--new">{{ skillProposal.proposed_body }}</pre></div>
+            </div>
+            <div class="inline-add">
+              <button v-if="skillProposal.changed" class="b-btn" @click="applySkillProposal()">Apply rewrite</button>
+              <button class="b-btn b-btn--ghost" @click="skillProposal = null">Dismiss</button>
+            </div>
           </div>
+          <p v-if="optimizeNote" class="b-error">{{ optimizeNote }}</p>
+
+          <!-- U117: inline skill editor — no more jump to Settings -->
+          <div v-if="editSkillDraft" class="skill-editor-inline">
+            <h3 class="content-title content-title--spaced">{{ editSkillIsNew ? 'New skill' : `Edit ${editSkillDraft.name}` }}</h3>
+            <div class="inline-add">
+              <input v-model="editSkillDraft.name" class="b-input" placeholder="name (kebab-case)" :disabled="!editSkillIsNew" aria-label="Skill name" />
+              <input v-model="editSkillDraft.description" class="b-input b-grow" placeholder="One-line description" aria-label="Skill description" />
+            </div>
+            <div class="inline-add">
+              <input v-model="editSkillTriggers" class="b-input b-grow" placeholder="Triggers, comma-separated (e.g. deploy, release)" aria-label="Skill triggers" />
+              <input v-model="editSkillDraft.person" class="b-input" placeholder="Person id (optional)" aria-label="Skill person" />
+            </div>
+            <textarea v-model="editSkillDraft.body" class="b-input b-skill-body" rows="6" placeholder="The procedure, step by step… Link with [[person-id]] or [[other-skill]]." aria-label="Skill procedure" />
+            <div class="inline-add">
+              <button class="b-btn" :disabled="!editSkillDraft.name.trim() || !editSkillDraft.body.trim()" @click="saveSkillDraft()">Save</button>
+              <button class="b-btn b-btn--ghost" @click="editSkillDraft = null">Cancel</button>
+              <button v-if="!editSkillIsNew" class="b-btn b-btn--danger" @click="deleteSkillDraft()">Delete</button>
+              <label v-if="!editSkillIsNew" class="refresh-toggle" title="Disabled skills stay saved but are never used">
+                <input type="checkbox" v-model="editSkillDraft.enabled" /> enabled
+              </label>
+            </div>
+          </div>
+          <button v-else class="b-btn" @click="newSkillDraft()">+ New skill</button>
           <p v-if="addError" class="b-error">{{ addError }}</p>
         </section>
 
@@ -179,14 +221,24 @@
             />
             <p v-if="aboutDraft.includes('[[')" class="content-hint"><WikiText :text="aboutDraft" @open="openTarget" /></p>
 
-            <h3 class="content-title content-title--spaced">Facts</h3>
-            <div class="fact-chips">
-              <span v-for="f in plainFacts" :key="f.fact_id" class="fact-chip">
-                <em>{{ f.key }}</em> {{ f.value }}
-                <button class="chip-x" :aria-label="`Delete ${f.key}`" @click="store.deleteFact(f.fact_id, store.detail!.person.person_id)"><X :size="10" /></button>
-              </span>
-              <span v-if="!plainFacts.length" class="content-hint">No facts yet — add one below, or let sources/chats fill them in.</span>
+            <h3 class="content-title content-title--spaced">Facts <span v-if="plainFacts.length" class="person-tab-count">{{ plainFacts.length }}</span></h3>
+            <input v-if="plainFacts.length > 8" v-model="factFilter" class="b-input fact-filter" placeholder="Filter facts…" aria-label="Filter facts" />
+            <!-- U117: facts scale — grouped per category, capped per group -->
+            <div v-for="g in factGroups" :key="g.key" class="fact-group">
+              <h4 class="fact-group-title">{{ g.key }} <span class="fact-group-count">×{{ g.facts.length }}</span></h4>
+              <div class="fact-chips">
+                <span v-for="f in (expandedGroups.has(g.key) ? g.facts : g.facts.slice(0, 5))" :key="f.fact_id" class="fact-chip" :title="f.value">
+                  {{ f.value }}
+                  <button class="chip-x" :aria-label="`Delete ${g.key} fact`" @click="store.deleteFact(f.fact_id, store.detail!.person.person_id)"><X :size="10" /></button>
+                </span>
+                <button v-if="g.facts.length > 5 && !expandedGroups.has(g.key)" class="fact-more" @click="expandedGroups.add(g.key)">
+                  +{{ g.facts.length - 5 }} more
+                </button>
+                <button v-else-if="g.facts.length > 5" class="fact-more" @click="expandedGroups.delete(g.key)">show less</button>
+              </div>
             </div>
+            <p v-if="!plainFacts.length" class="content-hint">No facts yet — add one below, or let sources/chats fill them in.</p>
+            <p v-else-if="!factGroups.length" class="content-hint">Nothing matches “{{ factFilter }}”.</p>
             <div class="inline-add">
               <input v-model="newFact.key" class="b-input" placeholder="what (e.g. hobby)" aria-label="Fact key" />
               <input v-model="newFact.value" class="b-input b-grow" placeholder="answer (e.g. cycling)" aria-label="Fact value" />
@@ -412,6 +464,25 @@ function shortSource(value: string): string {
 }
 const sourceFacts = computed(() => (store.detail?.facts ?? []).filter(f => f.key.startsWith('source:')))
 const plainFacts = computed(() => (store.detail?.facts ?? []).filter(f => !f.key.startsWith('source:') && f.key !== 'source-refresh' && f.key !== 'memory'))
+
+// U117: facts scale — group by category, filterable, capped per group.
+const factFilter = ref('')
+const expandedGroups = ref(new Set<string>())
+const factGroups = computed(() => {
+  const q = factFilter.value.trim().toLowerCase()
+  const groups = new Map<string, typeof plainFacts.value>()
+  for (const f of plainFacts.value) {
+    if (q && !f.key.toLowerCase().includes(q) && !f.value.toLowerCase().includes(q)) continue
+    const list = groups.get(f.key) ?? []
+    list.push(f)
+    groups.set(f.key, list)
+  }
+  // Biggest groups first — that's where the bulk sits.
+  return [...groups.entries()]
+    .map(([key, facts]) => ({ key, facts }))
+    .sort((a, b) => b.facts.length - a.facts.length)
+})
+watch(() => store.detail?.person.person_id, () => { factFilter.value = ''; expandedGroups.value = new Set() })
 // U109: the person's long-term memory (grown from past conversations).
 const memoryFact = computed(() => (store.detail?.facts ?? []).find(f => f.key === 'memory') ?? null)
 const memoryDraft = ref('')
@@ -544,7 +615,109 @@ async function fetchSkills(): Promise<void> {
   try {
     const resp = await fetch(`${BRAIN_URL}/skills`)
     skills.value = (await resp.json()).skills ?? []
+    // U117: usage metrics + proactive optimize suggestions (moved from Settings).
+    const entries = await Promise.all(skills.value.map(async (sk) => {
+      try {
+        const m = await fetch(`${BRAIN_URL}/skills/${encodeURIComponent(sk.name)}/metrics`)
+        return m.ok ? [sk.name, await m.json()] as const : null
+      } catch { return null }
+    }))
+    skillMetrics.value = Object.fromEntries(entries.filter(Boolean) as [string, SkillMetric][])
+    try {
+      const s = await fetch(`${BRAIN_URL}/skills/suggestions`)
+      suggestions.value = s.ok ? (await s.json()).suggestions ?? [] : []
+    } catch { suggestions.value = [] }
   } catch { skills.value = [] }
+}
+
+// ── U117: skills are managed HERE now (editor + optimize, ex-Settings) ──
+interface SkillMetric { uses: number; new_since_optimized: number; last_used: number | null }
+const skillMetrics = ref<Record<string, SkillMetric>>({})
+const suggestions = ref<{ name: string; new_since_optimized: number }[]>([])
+const optimizing = ref('')
+const optimizeNote = ref('')
+interface SkillProposal { name: string; changed: boolean; rationale: string; current_body: string; proposed_body: string; based_on: number }
+const skillProposal = ref<SkillProposal | null>(null)
+const editSkillDraft = ref<SkillItem | null>(null)
+const editSkillIsNew = ref(false)
+const editSkillTriggers = ref('')
+
+function newSkillDraft(): void {
+  editSkillIsNew.value = true
+  editSkillTriggers.value = ''
+  editSkillDraft.value = { name: '', description: '', triggers: [], personas: [], person: '', enabled: true, body: '' }
+}
+
+function editSkillCard(sk: SkillItem): void {
+  editSkillIsNew.value = false
+  editSkillTriggers.value = sk.triggers.join(', ')
+  editSkillDraft.value = { ...sk }
+}
+
+async function saveSkillDraft(): Promise<void> {
+  if (!editSkillDraft.value) return
+  addError.value = ''
+  const payload = {
+    ...editSkillDraft.value,
+    name: editSkillDraft.value.name.trim().toLowerCase(),
+    triggers: editSkillTriggers.value.split(',').map(t => t.trim()).filter(Boolean),
+  }
+  const resp = await fetch(`${BRAIN_URL}/skills`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+  }).catch(() => null)
+  if (!resp || !resp.ok) {
+    addError.value = resp ? String((await resp.json().catch(() => ({}))).error ?? `HTTP ${resp.status}`) : 'brain unreachable'
+    return
+  }
+  editSkillDraft.value = null
+  await fetchSkills()
+}
+
+async function deleteSkillDraft(): Promise<void> {
+  if (!editSkillDraft.value || editSkillIsNew.value) return
+  await fetch(`${BRAIN_URL}/skills/${encodeURIComponent(editSkillDraft.value.name)}`, { method: 'DELETE' }).catch(() => {})
+  editSkillDraft.value = null
+  await fetchSkills()
+}
+
+async function optimizeSkillCard(sk: SkillItem): Promise<void> {
+  optimizing.value = sk.name
+  optimizeNote.value = ''
+  skillProposal.value = null
+  try {
+    const resp = await fetch(`${BRAIN_URL}/skills/${encodeURIComponent(sk.name)}/optimize`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}),
+    }).catch(() => null)
+    if (!resp || !resp.ok) {
+      optimizeNote.value = resp ? String((await resp.json().catch(() => ({}))).error ?? `HTTP ${resp.status}`) : 'brain unreachable'
+      return
+    }
+    skillProposal.value = await resp.json()
+  } finally {
+    optimizing.value = ''
+  }
+}
+
+async function optimizeSkillByName(name: string): Promise<void> {
+  const sk = skills.value.find(s => s.name === name)
+  if (sk) await optimizeSkillCard(sk)
+}
+
+async function applySkillProposal(): Promise<void> {
+  const prop = skillProposal.value
+  if (!prop) return
+  const sk = skills.value.find(s => s.name === prop.name)
+  if (!sk) return
+  const resp = await fetch(`${BRAIN_URL}/skills`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ...sk, body: prop.proposed_body, mark_optimized: true }),
+  }).catch(() => null)
+  if (resp && resp.ok) {
+    skillProposal.value = null
+    await fetchSkills()
+  } else {
+    optimizeNote.value = 'Could not save the rewrite.'
+  }
 }
 
 interface GraphFact { person_id: string; key: string; value: string }
@@ -570,6 +743,17 @@ function onGraphOpen(kind: string, id: string): void {
   else if (kind === 'skill') nav.openSkills(id)
   // topic nodes are anchors, not documents — nothing to open (yet).
 }
+
+// U117: skills open in THIS panel's library now (Settings lost its Skills tab).
+watch(() => nav.skillsRequest, async (r) => {
+  if (!r) return
+  selected.value = '_skills'
+  await fetchSkills()
+  if (r.skillName) {
+    const sk = skills.value.find(s => s.name === r.skillName)
+    if (sk) editSkillCard(sk)
+  }
+}, { immediate: true })
 
 async function select(id: string): Promise<void> {
   selected.value = id
@@ -804,6 +988,52 @@ onMounted(async () => {
 .chip-icon { flex-shrink: 0; opacity: 0.8; }
 .chip-muted { font-size: 0.6rem; opacity: 0.7; }
 .rail-btn--ghost { background: none; border-style: dashed; }
+
+/* U117: grouped facts */
+.fact-filter { width: 100%; margin-bottom: 0.4rem; }
+.fact-group { margin-bottom: 0.45rem; }
+.fact-group-title {
+  margin: 0 0 0.25rem; font-size: 0.68rem; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.04em; color: var(--accent);
+}
+.fact-group-count { color: var(--text-faint); font-weight: 400; }
+.fact-more {
+  font-size: 0.68rem; padding: 0.1rem 0.5rem; border-radius: 999px;
+  background: none; border: 1px dashed var(--border-strong);
+  color: var(--text-faint); cursor: pointer;
+}
+.fact-more:hover { color: var(--text); border-color: var(--accent); }
+
+/* U117: skills managed in the brain panel */
+.skill-suggest {
+  display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center;
+  padding: 0.5rem 0.65rem; margin-bottom: 0.6rem; font-size: 0.76rem;
+  border: 1px solid var(--accent); border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+.suggest-plus { font-style: normal; color: var(--accent); font-weight: 700; }
+.b-uses { font-size: 0.64rem; color: var(--text-faint); }
+.b-skill-body { width: 100%; font-family: ui-monospace, monospace; resize: vertical; }
+.b-btn--ghost { background: none; border: 1px solid var(--border-strong); color: var(--text); }
+.b-btn--danger { background: none; border: 1px solid var(--danger-text, #e5484d); color: var(--danger-text, #e5484d); }
+.skill-editor-inline { display: flex; flex-direction: column; gap: 0.45rem; margin-top: 0.6rem; }
+.skill-opt {
+  margin-top: 0.6rem; padding: 0.6rem; border: 1px dashed var(--accent);
+  border-radius: var(--radius-md); background: var(--surface); display: flex;
+  flex-direction: column; gap: 0.5rem;
+}
+.skill-opt-head { margin: 0; font-size: 0.76rem; }
+.skill-opt-diff { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
+@media (max-width: 700px) { .skill-opt-diff { grid-template-columns: 1fr; } }
+.skill-opt-col { display: flex; flex-direction: column; gap: 0.25rem; min-width: 0; }
+.skill-opt-label { font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-faint); }
+.skill-opt-pre {
+  margin: 0; padding: 0.45rem; font-size: 0.7rem; line-height: 1.35;
+  font-family: ui-monospace, monospace; white-space: pre-wrap; word-break: break-word;
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-sm);
+  max-height: 14rem; overflow-y: auto;
+}
+.skill-opt-pre--new { border-color: var(--accent); }
 .refresh-toggle {
   display: inline-flex; align-items: center; gap: 0.3rem;
   font-size: 0.72rem; color: var(--text-faint); cursor: pointer; user-select: none;
