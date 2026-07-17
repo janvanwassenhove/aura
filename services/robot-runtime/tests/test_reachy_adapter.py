@@ -149,6 +149,33 @@ async def test_wake_up_and_sleep_map_to_sdk_emotes(adapter) -> None:
     assert moves.index("set_automatic_body_yaw") < moves.index("goto_sleep")
 
 
+async def test_wake_up_resumes_tracking_after_sleep(adapter) -> None:
+    """U116: sleep stops head tracking; the wake_up MOTION must restart it —
+    otherwise the Sleep→Wake quick actions leave follow-me dead."""
+    await adapter.connect()
+    await adapter.set_tracking(True)
+    await adapter.execute_motion(MotionCommand(motion_id="sleep", direction=None))
+    assert adapter._tracking_on is False
+    mini = adapter._created[0]
+    before = len(mini.calls)
+    await adapter.execute_motion(MotionCommand(motion_id="wake_up", direction=None))
+    moves = [n for n, _ in mini.calls[before:]]
+    assert "start_head_tracking" in moves
+    assert adapter._tracking_on is True
+
+
+async def test_mood_gestures_do_not_pause_tracking(adapter) -> None:
+    """U116: mood poses are follow-gestures — the robot keeps its eyes on you
+    while expressing, instead of pausing/resuming tracking every reply."""
+    await adapter.connect()
+    await adapter.set_tracking(True)
+    mini = adapter._created[0]
+    before = len(mini.calls)
+    await adapter.execute_motion(MotionCommand(motion_id="mood_happy", direction=None))
+    moves = [n for n, _ in mini.calls[before:]]
+    assert "stop_head_tracking" not in moves
+
+
 async def test_mood_motions_move_head_and_antennas(adapter) -> None:
     """U111: each mood pose is a real goto_target move (not a crash/fallback)."""
     await adapter.connect()
