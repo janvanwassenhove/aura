@@ -5,13 +5,22 @@ import { ref, watch } from 'vue'
  *  persisted across sessions. */
 export type RightTab = 'brain' | 'events'
 
-const KEY = 'aura-layout-v1'
+const KEY = 'aura-layout-v2'
+const OLD_KEY = 'aura-layout-v1'
 
 function load(): Partial<{
   showLeft: boolean; showRight: boolean; rightTab: RightTab
   leftWidth: number; rightWidth: number
 }> {
-  try { return JSON.parse(localStorage.getItem(KEY) ?? '{}') } catch { return {} }
+  try {
+    const v2 = localStorage.getItem(KEY)
+    if (v2) return JSON.parse(v2)
+    // U113 migration: carry widths/visibility over from v1, but DROP the old
+    // showBottom so everyone gets the new closed-by-default Event Log dock.
+    const v1 = JSON.parse(localStorage.getItem(OLD_KEY) ?? '{}')
+    delete v1.showBottom
+    return v1
+  } catch { return {} }
 }
 
 export const useLayoutStore = defineStore('layout', () => {
@@ -21,7 +30,8 @@ export const useLayoutStore = defineStore('layout', () => {
   const rightTab = ref<RightTab>(saved.rightTab ?? 'events')
   const leftWidth = ref(saved.leftWidth ?? 300)
   const rightWidth = ref(saved.rightWidth ?? 340)
-  const showBottom = ref((saved as any).showBottom ?? true)
+  // U113: the Event Log is a debug surface — closed by default, one click away.
+  const showBottom = ref((saved as any).showBottom ?? false)
   const bottomHeight = ref((saved as any).bottomHeight ?? 200)
 
   watch([showLeft, showRight, rightTab, leftWidth, rightWidth, showBottom, bottomHeight], () => {

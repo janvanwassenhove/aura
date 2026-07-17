@@ -48,19 +48,23 @@
             <p v-if="unlockErr" class="rail-err">{{ unlockErr }}</p>
           </div>
           <div v-else class="rail-add">
-            <div class="rail-sep">Add person</div>
-            <input v-model="newP.id" class="rail-input" placeholder="id (e.g. jan)" />
-            <input v-model="newP.name" class="rail-input" placeholder="Display name" />
-            <select v-model="newP.role" class="rail-input">
-              <option value="owner">owner</option><option value="family">family</option>
-              <option value="guest">guest</option><option value="minor">minor</option>
-            </select>
-            <button class="rail-btn" :disabled="!newP.id.trim() || !newP.name.trim() || addingP" @click="addPerson">
-              {{ addingP ? 'Adding…' : '+ Add person' }}
+            <!-- U112: the add-person form only unfolds on demand -->
+            <button v-if="!showAddPerson" class="rail-btn rail-btn--ghost" @click="showAddPerson = true">
+              + Add person
             </button>
-            <button class="rail-btn" title="Download everything the brain knows as JSON" @click="doExportBrain">
-              ⬇ Export brain
-            </button>
+            <template v-else>
+              <div class="rail-sep">Add person</div>
+              <input v-model="newP.id" class="rail-input" placeholder="id (e.g. jan)" />
+              <input v-model="newP.name" class="rail-input" placeholder="Display name" />
+              <select v-model="newP.role" class="rail-input">
+                <option value="owner">owner</option><option value="family">family</option>
+                <option value="guest">guest</option><option value="minor">minor</option>
+              </select>
+              <button class="rail-btn" :disabled="!newP.id.trim() || !newP.name.trim() || addingP" @click="addPerson">
+                {{ addingP ? 'Adding…' : 'Add' }}
+              </button>
+              <button class="rail-btn rail-btn--ghost" @click="showAddPerson = false">Cancel</button>
+            </template>
           </div>
         </nav>
 
@@ -129,96 +133,128 @@
             <button v-if="store.recognitionEnabled" class="hero-btn" :disabled="teaching" title="Teach this person's face" @click="doTeachFace">
               <ScanFace :size="14" /> {{ teaching ? 'Looking…' : 'Teach face' }}
             </button>
-            <button class="hero-btn hero-btn--danger" title="Forget this person (erase profile + face)" @click="doForget">
-              <Trash2 :size="14" />
-            </button>
+            <!-- U112: rare actions live behind ⋯ instead of permanent sections -->
+            <div class="hero-menu-wrap">
+              <button class="hero-btn" title="More actions" @click="heroMenuOpen = !heroMenuOpen">
+                <MoreHorizontal :size="14" />
+              </button>
+              <div v-if="heroMenuOpen" class="hero-menu" @click="heroMenuOpen = false">
+                <button class="hero-menu-item" :disabled="importing"
+                        title="Drop a ChatGPT/Claude data-export (conversations.json) — mined locally for facts about this person"
+                        @click="chatFileInput?.click()">
+                  {{ importing ? 'Mining chats…' : 'Import chat export…' }}
+                </button>
+                <button class="hero-menu-item" title="Download everything the brain knows as JSON" @click="doExportBrain">
+                  Export brain (JSON)
+                </button>
+                <button class="hero-menu-item hero-menu-item--danger" title="Forget this person (erase profile + face)" @click="doForget">
+                  Forget {{ store.detail.person.display_name }}…
+                </button>
+              </div>
+            </div>
           </div>
           <p v-if="teachMsg" class="content-hint teach-line">{{ teachMsg }}</p>
-          <p v-if="!store.recognitionEnabled" class="content-hint">
-            Face recognition is off — open Security to unlock it with the knowledge passphrase.
-          </p>
+          <p v-if="importNote" class="content-hint teach-line">{{ importNote }}</p>
 
-          <h3 class="content-title">About</h3>
-          <textarea
-            v-model="aboutDraft" class="b-input b-about" rows="2"
-            placeholder="Who is this person to you? Style, preferences… Link with [[skill-name]]."
-            aria-label="About this person" @blur="saveAbout"
-          />
-          <p v-if="aboutDraft.includes('[[')" class="content-hint"><WikiText :text="aboutDraft" @open="openTarget" /></p>
-
-          <h3 class="content-title content-title--spaced">Memory</h3>
-          <p class="content-hint">What {{ prefs.assistantName }} remembers from past conversations — grown automatically, injected into future turns. Edit freely.</p>
-          <textarea
-            v-model="memoryDraft" class="b-input b-memory" rows="4"
-            placeholder="Nothing remembered yet. This fills in as you talk."
-            aria-label="Long-term memory" @blur="saveMemory"
-          />
-
-          <h3 class="content-title content-title--spaced">Sources</h3>
-          <p class="content-hint">Where to find/read this person — socials, blogs, mail. Injected into conversations as context.</p>
-          <div class="fact-chips">
-            <span v-for="f in sourceFacts" :key="f.fact_id" class="fact-chip fact-chip--source">
-              <em>{{ f.key.slice(7) }}</em> {{ f.value }}
-              <button class="chip-x" :aria-label="`Delete ${f.key}`" @click="store.deleteFact(f.fact_id, store.detail!.person.person_id)"><X :size="10" /></button>
-            </span>
-          </div>
-          <div class="inline-add">
-            <select v-model="newSource.kind" class="b-input" aria-label="Source kind">
-              <option v-for="k in SOURCE_KINDS" :key="k" :value="k">{{ k }}</option>
-            </select>
-            <input v-model="newSource.value" class="b-input b-grow" placeholder="handle / url / address" aria-label="Source value" />
-            <button class="b-btn" :disabled="!newSource.value.trim()" @click="addSource()">Add source</button>
-          </div>
-          <div v-if="sourceFacts.length" class="inline-add">
-            <button class="b-btn" :disabled="ingesting" @click="growBrain()">
-              {{ ingesting ? 'Reading sources…' : 'Grow brain from sources' }}
+          <!-- U112: profile tabs — no more one long scroll -->
+          <nav class="person-tabs" role="tablist">
+            <button v-for="t in PERSON_TABS" :key="t.id" role="tab"
+                    :class="['person-tab', personTab === t.id && 'person-tab--active']"
+                    :aria-selected="personTab === t.id" @click="personTab = t.id">
+              {{ t.label }}
+              <span v-if="t.id === 'skills' && (store.detail.skills?.length ?? 0)" class="person-tab-count">{{ store.detail.skills!.length }}</span>
             </button>
-            <label class="refresh-toggle" title="Re-read this person's sources on the weekly refresh (SOURCE_REFRESH_HOURS)">
-              <input type="checkbox" :checked="refreshOn" @change="toggleRefresh()" /> auto-refresh
-            </label>
-            <span v-if="ingestNote" class="content-hint">{{ ingestNote }}</span>
-          </div>
+          </nav>
 
-          <h3 class="content-title content-title--spaced">Import chats</h3>
-          <p class="content-hint">Drop a ChatGPT or Claude data-export (conversations.json) — {{ prefs.assistantName }} mines what this person wrote for facts. Read locally, sent only to your own brain.</p>
-          <div class="inline-add">
-            <input ref="chatFileInput" type="file" accept=".json,application/json" class="file-hidden" aria-label="Chat export file" @change="importChatsFile" />
-            <button class="b-btn" :disabled="importing" @click="chatFileInput?.click()">
-              {{ importing ? 'Mining chats…' : 'Import chat export…' }}
-            </button>
-            <span v-if="importNote" class="content-hint">{{ importNote }}</span>
-          </div>
+          <!-- hidden file input for the ⋯ Import action (lives outside the menu) -->
+          <input ref="chatFileInput" type="file" accept=".json,application/json" class="file-hidden" aria-label="Chat export file" @change="importChatsFile" />
 
-          <h3 class="content-title content-title--spaced">Facts</h3>
-          <div class="fact-chips">
-            <span v-for="f in plainFacts" :key="f.fact_id" class="fact-chip">
-              <em>{{ f.key }}</em> {{ f.value }}
-              <button class="chip-x" :aria-label="`Delete ${f.key}`" @click="store.deleteFact(f.fact_id, store.detail!.person.person_id)"><X :size="10" /></button>
-            </span>
-          </div>
-          <div class="inline-add">
-            <input v-model="newFact.key" class="b-input" placeholder="what (e.g. hobby)" aria-label="Fact key" />
-            <input v-model="newFact.value" class="b-input b-grow" placeholder="answer (e.g. cycling)" aria-label="Fact value" />
-            <button class="b-btn" :disabled="!newFact.key.trim() || !newFact.value.trim()" @click="addFact()">Add fact</button>
-          </div>
+          <!-- Profile: About + Facts -->
+          <template v-if="personTab === 'profile'">
+            <h3 class="content-title">About</h3>
+            <textarea
+              v-model="aboutDraft" class="b-input b-about" rows="2"
+              placeholder="Who is this person to you? Style, preferences… Link with [[skill-name]]."
+              aria-label="About this person" @blur="saveAbout"
+            />
+            <p v-if="aboutDraft.includes('[[')" class="content-hint"><WikiText :text="aboutDraft" @open="openTarget" /></p>
 
-          <h3 class="content-title content-title--spaced">Their way of working</h3>
-          <div class="skill-grid">
-            <article v-for="sk in store.detail.skills ?? []" :key="sk.name" :class="['b-skill-card', !sk.enabled && 'b-skill-card--off']">
-              <header class="b-skill-head">
-                <span class="b-skill-name">{{ sk.name }}</span>
-                <span v-if="(sk as any).via === 'mention'" class="b-tag" title="Mentions this person via a [[link]]">backlink</span>
-                <button class="b-icon-btn" title="Edit in Settings" @click="nav.openSkills(sk.name)"><Pencil :size="12" /></button>
-              </header>
-              <p class="b-skill-desc">{{ sk.description }}</p>
-            </article>
-          </div>
-          <div class="inline-add">
-            <input v-model="newSkill.name" class="b-input" placeholder="skill-name" aria-label="Skill name" />
-            <input v-model="newSkill.body" class="b-input b-grow" :placeholder="`How ${store.detail.person.display_name} wants this done…`" aria-label="Skill procedure" />
-            <button class="b-btn" :disabled="!newSkill.name.trim() || !newSkill.body.trim()" @click="addSkill(store.detail.person.person_id)">Add skill</button>
-          </div>
-          <p v-if="addError" class="b-error">{{ addError }}</p>
+            <h3 class="content-title content-title--spaced">Facts</h3>
+            <div class="fact-chips">
+              <span v-for="f in plainFacts" :key="f.fact_id" class="fact-chip">
+                <em>{{ f.key }}</em> {{ f.value }}
+                <button class="chip-x" :aria-label="`Delete ${f.key}`" @click="store.deleteFact(f.fact_id, store.detail!.person.person_id)"><X :size="10" /></button>
+              </span>
+              <span v-if="!plainFacts.length" class="content-hint">No facts yet — add one below, or let sources/chats fill them in.</span>
+            </div>
+            <div class="inline-add">
+              <input v-model="newFact.key" class="b-input" placeholder="what (e.g. hobby)" aria-label="Fact key" />
+              <input v-model="newFact.value" class="b-input b-grow" placeholder="answer (e.g. cycling)" aria-label="Fact value" />
+              <button class="b-btn" :disabled="!newFact.key.trim() || !newFact.value.trim()" @click="addFact()">Add fact</button>
+            </div>
+          </template>
+
+          <!-- Memory: what Richie remembers across conversations -->
+          <template v-else-if="personTab === 'memory'">
+            <h3 class="content-title" :title="`Grown automatically from conversations, injected into future turns. Edit freely.`">Memory</h3>
+            <textarea
+              v-model="memoryDraft" class="b-input b-memory" rows="10"
+              :placeholder="`Nothing remembered yet. This fills in as you talk with ${prefs.assistantName}.`"
+              aria-label="Long-term memory" @blur="saveMemory"
+            />
+          </template>
+
+          <!-- Sources: where to read this person + grow the graph -->
+          <template v-else-if="personTab === 'sources'">
+            <h3 class="content-title" title="Injected into conversations as context; blog/website/github are read to grow the graph.">Sources</h3>
+            <div class="fact-chips">
+              <span v-for="f in sourceFacts" :key="f.fact_id" class="fact-chip fact-chip--source" :title="f.value">
+                <component :is="sourceIcon(f.key.slice(7))" :size="12" class="chip-icon" />
+                {{ shortSource(f.value) }}
+                <span v-if="!FETCHABLE.includes(f.key.slice(7))" class="chip-muted" title="Needs a login — used as context only, not read">🔒</span>
+                <button class="chip-x" :aria-label="`Delete ${f.key}`" @click="store.deleteFact(f.fact_id, store.detail!.person.person_id)"><X :size="10" /></button>
+              </span>
+              <span v-if="!sourceFacts.length" class="content-hint">No sources yet — add a blog, site or handle below.</span>
+            </div>
+            <div class="inline-add">
+              <select v-model="newSource.kind" class="b-input" aria-label="Source kind">
+                <option v-for="k in SOURCE_KINDS" :key="k" :value="k">{{ k }}</option>
+              </select>
+              <input v-model="newSource.value" class="b-input b-grow" placeholder="handle / url / address" aria-label="Source value" />
+              <button class="b-btn" :disabled="!newSource.value.trim()" @click="addSource()">Add</button>
+            </div>
+            <div v-if="sourceFacts.length" class="inline-add">
+              <button class="b-btn" :disabled="ingesting" @click="growBrain()">
+                {{ ingesting ? 'Reading sources…' : 'Grow brain from sources' }}
+              </button>
+              <label class="refresh-toggle" title="Re-read this person's sources on the weekly refresh (SOURCE_REFRESH_HOURS)">
+                <input type="checkbox" :checked="refreshOn" @change="toggleRefresh()" /> auto-refresh
+              </label>
+              <span v-if="ingestNote" class="content-hint">{{ ingestNote }}</span>
+            </div>
+          </template>
+
+          <!-- Skills: their way of working -->
+          <template v-else-if="personTab === 'skills'">
+            <h3 class="content-title">Their way of working</h3>
+            <div class="skill-grid">
+              <article v-for="sk in store.detail.skills ?? []" :key="sk.name" :class="['b-skill-card', !sk.enabled && 'b-skill-card--off']">
+                <header class="b-skill-head">
+                  <span class="b-skill-name">{{ sk.name }}</span>
+                  <span v-if="(sk as any).via === 'mention'" class="b-tag" title="Mentions this person via a [[link]]">backlink</span>
+                  <button class="b-icon-btn" title="Edit in Settings" @click="nav.openSkills(sk.name)"><Pencil :size="12" /></button>
+                </header>
+                <p class="b-skill-desc">{{ sk.description }}</p>
+              </article>
+              <p v-if="!(store.detail.skills?.length)" class="content-hint">No personal skills yet — add one below or teach via 🎓.</p>
+            </div>
+            <div class="inline-add">
+              <input v-model="newSkill.name" class="b-input" placeholder="skill-name" aria-label="Skill name" />
+              <input v-model="newSkill.body" class="b-input b-grow" :placeholder="`How ${store.detail.person.display_name} wants this done…`" aria-label="Skill procedure" />
+              <button class="b-btn" :disabled="!newSkill.name.trim() || !newSkill.body.trim()" @click="addSkill(store.detail.person.person_id)">Add skill</button>
+            </div>
+            <p v-if="addError" class="b-error">{{ addError }}</p>
+          </template>
         </section>
 
         <section v-else class="brain-content">
@@ -231,7 +267,10 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
-import { Brain, Lock, Pencil, ScanFace, Share2, ShieldCheck, Sparkles, Trash2, X } from 'lucide-vue-next'
+import {
+  BookOpen, Brain, Facebook, Github, Globe, Instagram, Linkedin, Lock, Mail,
+  MoreHorizontal, Pencil, ScanFace, Share2, ShieldCheck, Sparkles, Twitter, X,
+} from 'lucide-vue-next'
 import BrainGraph from './BrainGraph.vue'
 import WikiText from './WikiText.vue'
 import { useKnowledgeStore } from '../stores/knowledgeStore'
@@ -344,6 +383,33 @@ const newFact = ref({ key: '', value: '' })
 // the encrypted store and reach the LLM via the judgment layer automatically.
 const SOURCE_KINDS = ['instagram', 'facebook', 'x-twitter', 'linkedin', 'blog', 'website', 'gmail', 'github'] as const
 const newSource = ref({ kind: 'instagram' as string, value: '' })
+
+// U112: profile tabs + tidy chrome.
+const PERSON_TABS = [
+  { id: 'profile', label: 'Profile' },
+  { id: 'memory', label: 'Memory' },
+  { id: 'sources', label: 'Sources' },
+  { id: 'skills', label: 'Skills' },
+] as const
+type PersonTab = typeof PERSON_TABS[number]['id']
+const personTab = ref<PersonTab>('profile')
+const heroMenuOpen = ref(false)
+const showAddPerson = ref(false)
+
+const SOURCE_ICONS: Record<string, unknown> = {
+  instagram: Instagram, facebook: Facebook, 'x-twitter': Twitter, linkedin: Linkedin,
+  blog: BookOpen, website: Globe, gmail: Mail, github: Github,
+}
+function sourceIcon(kind: string) {
+  return SOURCE_ICONS[kind] ?? Globe
+}
+// Chip label: the handle/host, not the raw URL noise.
+function shortSource(value: string): string {
+  let v = value.trim().replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/+$/, '')
+  const parts = v.split('/')
+  if (parts.length > 1 && parts[parts.length - 1]) v = `${parts[0]}/…/${parts[parts.length - 1]}`.replace('/…/', '/')
+  return v.length > 28 ? v.slice(0, 27) + '…' : v
+}
 const sourceFacts = computed(() => (store.detail?.facts ?? []).filter(f => f.key.startsWith('source:')))
 const plainFacts = computed(() => (store.detail?.facts ?? []).filter(f => !f.key.startsWith('source:') && f.key !== 'source-refresh' && f.key !== 'memory'))
 // U109: the person's long-term memory (grown from past conversations).
@@ -508,6 +574,8 @@ function onGraphOpen(kind: string, id: string): void {
 async function select(id: string): Promise<void> {
   selected.value = id
   addError.value = ''
+  personTab.value = 'profile'   // U112: fresh person → first tab
+  heroMenuOpen.value = false
   if (id !== '_skills') await store.inspectPerson(id)
 }
 
@@ -699,6 +767,43 @@ onMounted(async () => {
 .fact-chip em { font-style: normal; color: var(--accent); }
 .fact-chip--source em { color: var(--ok-text, #2f9e6e); }
 .file-hidden { display: none; }
+
+/* U112: person tabs */
+.person-tabs {
+  display: flex; gap: 0.25rem; margin: 0.6rem 0 0.8rem;
+  border-bottom: 1px solid var(--border-strong);
+}
+.person-tab {
+  background: none; border: none; border-bottom: 2px solid transparent;
+  padding: 0.35rem 0.7rem; font-size: 0.8rem; color: var(--text-faint);
+  cursor: pointer; display: inline-flex; align-items: center; gap: 0.3rem;
+}
+.person-tab:hover { color: var(--text); }
+.person-tab--active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+.person-tab-count {
+  font-size: 0.62rem; padding: 0 0.35rem; border-radius: 999px;
+  background: var(--surface-2); border: 1px solid var(--border);
+}
+
+/* U112: hero ⋯ menu */
+.hero-menu-wrap { position: relative; }
+.hero-menu {
+  position: absolute; right: 0; top: calc(100% + 4px); z-index: 20;
+  background: var(--surface); border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md); box-shadow: var(--shadow-modal);
+  display: flex; flex-direction: column; min-width: 13rem; padding: 0.25rem;
+}
+.hero-menu-item {
+  background: none; border: none; text-align: left; padding: 0.45rem 0.6rem;
+  font-size: 0.78rem; color: var(--text); cursor: pointer; border-radius: var(--radius-sm);
+}
+.hero-menu-item:hover { background: var(--surface-2); }
+.hero-menu-item--danger { color: var(--danger-text, #e5484d); }
+
+/* U112: source chips with icons */
+.chip-icon { flex-shrink: 0; opacity: 0.8; }
+.chip-muted { font-size: 0.6rem; opacity: 0.7; }
+.rail-btn--ghost { background: none; border-style: dashed; }
 .refresh-toggle {
   display: inline-flex; align-items: center; gap: 0.3rem;
   font-size: 0.72rem; color: var(--text-faint); cursor: pointer; user-select: none;

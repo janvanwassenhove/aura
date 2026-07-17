@@ -99,7 +99,7 @@
 
       <!-- ── Skills tab (U62): what the owner taught the agent ── -->
       <template v-if="activeTab === 'skills'">
-        <p class="conn-hint">Skills are procedures you taught the assistant. It proposes new ones from your feedback (🎓) — every write needs your approval. You edit freely here. <strong>Optimize</strong> rewrites a skill for reliable execution from how it's actually been used — you approve the diff.</p>
+        <p class="conn-hint" title="The assistant proposes new skills from 🎓 feedback (every write needs your approval); Optimize rewrites one from real usage — you approve the diff.">Procedures you taught the assistant. Teach via 🎓, refine with <strong>Optimize</strong> — you approve every change.</p>
         <!-- U108: proactive optimization prompt — Richie asks when a skill has learned enough -->
         <div v-if="suggestions.length" class="skill-suggest">
           <span class="skill-suggest-icon">🔧</span>
