@@ -108,3 +108,33 @@ def test_refresh_all_respects_per_person_optout(fake_fetch_and_llm) -> None:
         r2 = client.post("/knowledge/refresh-sources").json()
         by_person2 = {x["person_id"]: x for x in r2["refreshed"]}
         assert by_person2["elke"]["added_count"] == 2
+
+
+# ------------------------------------------------------------------
+# SEC (U121): SSRF — sources must not be able to make the brain fetch
+# internal / non-public hosts.
+# ------------------------------------------------------------------
+
+def _stub_dns(monkeypatch, ip: str) -> None:
+    import socket
+    monkeypatch.setattr(socket, "getaddrinfo",
+                        lambda *a, **k: [(2, 1, 6, "", (ip, a[1] if len(a) > 1 else 0))])
+
+
+def test_is_public_http_url_blocks_internal(monkeypatch) -> None:
+    f = source_ingest._is_public_http_url
+    # Literal-IP / scheme checks need no DNS.
+    assert f("http://127.0.0.1/") is False
+    assert f("http://169.254.169.254/latest/meta-data/") is False   # cloud metadata
+    assert f("http://192.168.0.10/") is False
+    assert f("http://10.0.0.5/") is False
+    assert f("file:///etc/passwd") is False
+    assert f("ftp://example.com/") is False
+    # A hostname that resolves to a private IP is also refused.
+    _stub_dns(monkeypatch, "127.0.0.1")
+    assert f("http://localhost:8020/knowledge/export") is False
+
+
+def test_is_public_http_url_allows_public(monkeypatch) -> None:
+    _stub_dns(monkeypatch, "93.184.216.34")  # a public address
+    assert source_ingest._is_public_http_url("https://example.com/") is True

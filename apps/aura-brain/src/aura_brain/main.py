@@ -764,11 +764,20 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 def create_app() -> FastAPI:
     app = FastAPI(title="AURA Brain", version="0.1.0", lifespan=lifespan)
 
-    origins = os.environ.get("CORS_ORIGINS", "http://localhost:5173").split(",")
+    origins = [o.strip() for o in
+               os.environ.get("CORS_ORIGINS", "http://localhost:5173").split(",") if o.strip()]
+    # SEC: "*" with credentials lets any site make authenticated cross-origin
+    # calls (and browsers reject the combo anyway). If someone sets a wildcard,
+    # drop credentials rather than silently running an insecure config.
+    allow_credentials = "*" not in origins
+    if not allow_credentials:
+        logging.getLogger("aura_brain").warning(
+            "CORS_ORIGINS contains '*' — disabling credentialed CORS. "
+            "Set explicit origins to allow credentials.")
     app.add_middleware(
         CORSMiddleware,
         allow_origins=origins,
-        allow_credentials=True,
+        allow_credentials=allow_credentials,
         allow_methods=["*"],
         allow_headers=["*"],
     )

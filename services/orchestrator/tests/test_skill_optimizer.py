@@ -138,3 +138,25 @@ async def test_polish_draft_survives_llm_failure() -> None:
 
     result = await polish_draft("x", "", "do the thing", _boom)
     assert "error" in result
+
+
+# ------------------------------------------------------------------
+# SEC (U121): a malicious skill name must never escape the skills dir.
+# ------------------------------------------------------------------
+
+def test_traversal_name_cannot_delete_outside_dir(tmp_path) -> None:
+    secret = tmp_path.parent / "secret.md"
+    secret.write_text("keep me", encoding="utf-8")
+    s = SkillStore(str(tmp_path))
+    assert s.delete("../secret") is False          # rejected, not deleted
+    assert s.delete("..\\secret") is False
+    assert secret.exists()
+
+
+def test_traversal_name_has_no_metrics_path(store) -> None:
+    assert store._obs_path("../../etc/passwd") is None
+    assert store._opt_path("../evil") is None
+    # And the public methods degrade safely rather than touching disk.
+    store.record_observation("../../evil", {"request": "x"})
+    assert store.observations("../../evil") == []
+    assert store.metrics("../../evil")["uses"] == 0
