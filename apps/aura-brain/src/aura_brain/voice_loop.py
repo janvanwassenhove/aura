@@ -461,7 +461,10 @@ class VoiceLoop:
         'not handled' → the caller falls back to the classic pipeline."""
         from aura_brain import realtime_voice
 
-        if not realtime_voice.realtime_enabled():
+        # U133: circuit breaker — after repeated failures (e.g. no realtime
+        # entitlement, wrong model) stop trying so we don't add the timeout
+        # latency to every turn; the pipeline handles the whole session.
+        if getattr(self, "_realtime_broken", False) or not realtime_voice.realtime_enabled():
             return False
         try:
             pcm = realtime_voice.wav_to_pcm24k(wav)
@@ -483,9 +486,19 @@ class VoiceLoop:
             self.note_spoken(transcript)
             logger.info("realtime turn done (%d chars, ~$%.4f total)",
                         len(transcript), realtime_voice.METER.spent_usd())
+            self._realtime_fails = 0
             return True
         except Exception as exc:  # noqa: BLE001 — realtime is best-effort
-            logger.warning("realtime turn failed, using pipeline: %s", exc)
+            self._realtime_fails = getattr(self, "_realtime_fails", 0) + 1
+            if self._realtime_fails >= 2:
+                self._realtime_broken = True
+                logger.warning(
+                    "realtime failed %d× (%s) — disabling Realtime for this "
+                    "session; using the pipeline. Switch the engine back to "
+                    "Pipeline in Settings, or restart to retry.",
+                    self._realtime_fails, exc)
+            else:
+                logger.warning("realtime turn failed, using pipeline: %s", exc)
             return False
 
     async def _handle(self, command: str) -> None:

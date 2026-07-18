@@ -143,7 +143,27 @@ async def run_realtime_turn(
     meter: CostMeter | None = None,
 ) -> tuple[str, bytes]:
     """One turn: PCM16 audio in → (transcript, PCM16 audio out). Raises on any
-    failure so the caller can fall back to the classic pipeline."""
+    failure (incl. TIMEOUT) so the caller can fall back to the classic
+    pipeline — a stalled Realtime connection must never freeze the voice loop."""
+    import asyncio
+
+    timeout = float(os.environ.get("REALTIME_TURN_TIMEOUT_S", "15"))
+    try:
+        return await asyncio.wait_for(
+            _run_realtime_turn_inner(pcm_in, instructions, voice, conn_factory, meter),
+            timeout=timeout,
+        )
+    except asyncio.TimeoutError as exc:
+        raise RuntimeError(f"realtime turn timed out after {timeout:.0f}s") from exc
+
+
+async def _run_realtime_turn_inner(
+    pcm_in: bytes,
+    instructions: str,
+    voice: str,
+    conn_factory: ConnFactory | None,
+    meter: CostMeter | None,
+) -> tuple[str, bytes]:
     model = os.environ.get("REALTIME_MODEL", "gpt-4o-mini-realtime-preview")
     factory = conn_factory or _default_conn_factory
     meter = meter or METER
