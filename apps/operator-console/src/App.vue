@@ -87,6 +87,20 @@ function startVDrag(ev: PointerEvent): void {
   window.addEventListener('pointerup', up)
 }
 
+// U120: never let the two side docks push the centre (and the window) into a
+// horizontal scrollbar — cap each against the live viewport, leaving room for
+// the other dock + a minimum centre column.
+const CENTER_MIN = 320
+function maxSideWidth(side: 'left' | 'right'): number {
+  const other = side === 'left' ? layoutStore.rightWidth : layoutStore.leftWidth
+  const otherShown = side === 'left' ? layoutStore.showRight : layoutStore.showLeft
+  return Math.max(240, window.innerWidth - (otherShown ? other : 0) - CENTER_MIN - 40)
+}
+function clampDocks(): void {
+  layoutStore.leftWidth = Math.min(layoutStore.leftWidth, maxSideWidth('left'))
+  layoutStore.rightWidth = Math.min(layoutStore.rightWidth, maxSideWidth('right'))
+}
+
 function startDrag(side: 'left' | 'right', ev: PointerEvent): void {
   ev.preventDefault()
   const startX = ev.clientX
@@ -94,8 +108,8 @@ function startDrag(side: 'left' | 'right', ev: PointerEvent): void {
   const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v))
   const move = (e: PointerEvent) => {
     const dx = e.clientX - startX
-    if (side === 'left') layoutStore.leftWidth = clamp(startW + dx, 220, 560)
-    else layoutStore.rightWidth = clamp(startW - dx, 280, 900)
+    if (side === 'left') layoutStore.leftWidth = clamp(startW + dx, 220, maxSideWidth('left'))
+    else layoutStore.rightWidth = clamp(startW - dx, 280, maxSideWidth('right'))
   }
   const up = () => {
     window.removeEventListener('pointermove', move)
@@ -117,6 +131,10 @@ watch(() => navStore.skillsRequest, (r) => { if (r) layoutStore.openRight('brain
 
 onMounted(async () => {
   themeStore.apply()
+  // U120: a persisted-too-wide dock (dragged wide on a bigger monitor) must
+  // never overflow a smaller window on next launch. Clamp now + on resize.
+  clampDocks()
+  window.addEventListener('resize', clampDocks)
   connect()
   // U34: first-run onboarding — only when the brain is reachable, setup was
   // never completed AND the install genuinely looks fresh. An existing,
@@ -160,6 +178,8 @@ body {
   gap: 0;
   flex: 1;
   min-height: 0;
+  min-width: 0;
+  overflow: hidden;   /* U120: safety net — the window never scrolls sideways */
 }
 .ws-left { display: flex; flex-direction: column; min-height: 0; overflow-y: auto; flex-shrink: 0; }
 .ws-center { flex: 1; min-width: 20rem; min-height: 0; display: flex; flex-direction: column; }
