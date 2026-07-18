@@ -18,33 +18,41 @@
       {{ robotStore.currentTranscript }}
     </div>
 
-    <!-- U114: the power switches — one icon-toggle row -->
-    <div class="switch-row">
-      <button :class="['switch-btn', !asleep && 'switch-btn--on']"
+    <!-- U125: labelled toggle tiles — even 4-up grid, self-explanatory -->
+    <div class="toggle-grid">
+      <button :class="['toggle-cell', !asleep && 'toggle-cell--on']"
               :title="asleep ? 'Asleep — click to wake up' : 'Awake — click for sleep mode (take no action)'"
               @click="toggleSleep">
-        <Moon v-if="asleep" :size="15" /><Power v-else :size="15" />
+        <Moon v-if="asleep" :size="16" /><Power v-else :size="16" />
+        <span class="toggle-lbl">{{ asleep ? 'Asleep' : 'Awake' }}</span>
       </button>
-      <button :class="['switch-btn', micOn && 'switch-btn--on']"
+      <button :class="['toggle-cell', micOn && 'toggle-cell--on']"
               :title="micOn ? 'Listening for “Richie …” — click to stop' : 'Microphone off — click to listen'"
               @click="toggleMicListening">
-        <Mic v-if="micOn" :size="15" /><MicOff v-else :size="15" />
+        <Mic v-if="micOn" :size="16" /><MicOff v-else :size="16" />
+        <span class="toggle-lbl">Mic</span>
       </button>
-      <button :class="['switch-btn', tracking && 'switch-btn--on']"
+      <button :class="['toggle-cell', tracking && 'toggle-cell--on']"
               :title="tracking ? 'Following faces — click to stop' : 'Click to follow the nearest face'"
               @click="toggleTracking">
-        <Eye :size="15" />
+        <Eye :size="16" />
+        <span class="toggle-lbl">Follow</span>
       </button>
-      <button :class="['switch-btn', proactiveOn && 'switch-btn--on']"
+      <button :class="['toggle-cell', proactiveOn && 'toggle-cell--on']"
               :title="proactiveOn ? 'Proactive: speaks up for reminders & daily briefing' : 'Proactive off — only speaks when addressed'"
               @click="toggleProactive">
-        <Bell :size="15" />
+        <Bell :size="16" />
+        <span class="toggle-lbl">Notify</span>
       </button>
-      <input v-if="proactiveOn" v-model="briefingTime" type="time" class="briefing-input" title="Daily briefing time" aria-label="Daily briefing time" @change="saveBriefingTime" />
+    </div>
+    <!-- U125: briefing time gets its own labelled row instead of crowding the toggles -->
+    <div v-if="proactiveOn" class="briefing-row">
+      <Bell :size="13" /> <span>Daily briefing at</span>
+      <input v-model="briefingTime" type="time" class="briefing-input" aria-label="Daily briefing time" @change="saveBriefingTime" />
     </div>
 
-    <div class="status-row">
-      <span class="label volume-label">
+    <div class="ctl-row">
+      <span class="ctl-label">
         <VolumeX v-if="volume === 0" :size="14" />
         <Volume1 v-else-if="volume < 0.5" :size="14" />
         <Volume2 v-else :size="14" />
@@ -59,16 +67,18 @@
       <span class="volume-pct">{{ Math.round(volume * 100) }}%</span>
     </div>
 
-    <!-- U85: character persona — select + edit + grow -->
-    <div class="status-row mt-3">
-      <span class="label volume-label"><Bot :size="14" /> Persona</span>
-      <select v-model="activeCharacter" class="persona-select" @change="applyCharacter">
-        <option value="">Default (no character)</option>
-        <option v-for="c in characters" :key="c.id" :value="c.id">{{ c.display_name }}</option>
-      </select>
-      <button class="persona-edit" :disabled="!activeCharacter" title="Edit this persona" @click="editingPersona = !editingPersona">
-        <Pencil :size="13" />
-      </button>
+    <!-- U85/U125: character persona — label on its own line, full-width select -->
+    <div class="persona-block">
+      <span class="ctl-label"><Bot :size="14" /> Persona</span>
+      <div class="persona-row">
+        <select v-model="activeCharacter" class="persona-select" @change="applyCharacter">
+          <option value="">Default (no character)</option>
+          <option v-for="c in characters" :key="c.id" :value="c.id">{{ c.display_name }}</option>
+        </select>
+        <button class="persona-edit" :disabled="!activeCharacter" title="Edit this persona" @click="editingPersona = !editingPersona">
+          <Pencil :size="13" />
+        </button>
+      </div>
     </div>
     <div v-if="editingPersona && currentCharacter" class="persona-editor">
       <label class="pe-label">Character</label>
@@ -477,14 +487,28 @@ function fmtTime(iso: string): string {
 .strip-text { color: var(--text); }
 .strip-text--faint { color: var(--text-faint); display: inline-flex; align-items: center; gap: 0.25rem; margin-left: auto; }
 
-/* U114: icon-toggle switch row */
-.switch-row { display: flex; align-items: center; gap: 0.4rem; padding: 0.35rem 0 0.45rem; }
-.switch-btn {
-  width: 34px; height: 30px; display: grid; place-items: center;
+/* U125: labelled toggle tiles */
+.toggle-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.4rem; margin: 0.5rem 0 0.4rem; }
+.toggle-cell {
+  display: flex; flex-direction: column; align-items: center; gap: 0.25rem;
+  padding: 0.45rem 0.2rem; min-width: 0;
   background: var(--surface-2); border: 1px solid var(--border-strong);
   border-radius: var(--radius-md); color: var(--text-faint); cursor: pointer;
 }
-.switch-btn--on { color: var(--accent); border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.toggle-cell:hover { border-color: var(--accent-border, var(--accent)); }
+.toggle-cell--on { color: var(--accent); border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.toggle-lbl { font-size: 0.62rem; letter-spacing: 0.02em; }
+.briefing-row {
+  display: flex; align-items: center; gap: 0.4rem; margin-bottom: 0.5rem;
+  font-size: 0.75rem; color: var(--text-faint);
+}
+.briefing-row .briefing-input { margin-left: auto; }
+
+/* U125: control rows that never clip the value / edit affordance */
+.ctl-row { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.3rem; }
+.ctl-label { display: inline-flex; align-items: center; gap: 0.3rem; flex-shrink: 0; font-size: 0.82rem; color: var(--text); }
+.persona-block { margin-top: 0.9rem; display: flex; flex-direction: column; gap: 0.35rem; }
+.persona-row { display: flex; align-items: center; gap: 0.4rem; min-width: 0; }
 
 /* U114: collapsible sections */
 .section-toggle {
@@ -543,12 +567,13 @@ function fmtTime(iso: string): string {
 .motion-row-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .motion-row-time { color: var(--text-faint); font-variant-numeric: tabular-nums; }
 .motion-empty { color: var(--text-faint); font-size: 0.8rem; padding: 0.2rem 0; }
-.volume-slider { flex: 1; margin: 0 0.5rem; accent-color: var(--accent); }
-.volume-pct { font-size: 0.72rem; color: var(--text-faint); min-width: 2.2rem; text-align: right; }
+/* U125: slider shrinks, the % never clips */
+.volume-slider { flex: 1 1 0; min-width: 0; accent-color: var(--accent); }
+.volume-pct { font-size: 0.72rem; color: var(--text-faint); min-width: 2.2rem; flex-shrink: 0; text-align: right; }
 
-/* U85: persona selector + editor */
-.persona-select { flex: 1; background: var(--surface-2); border: 1px solid var(--border-strong); border-radius: var(--radius-md); color: var(--text); padding: 0.3rem 0.4rem; font-size: 0.8rem; }
-.persona-edit { background: none; border: 1px solid var(--border-strong); border-radius: var(--radius-md); color: var(--text-faint); cursor: pointer; padding: 0.3rem 0.4rem; }
+/* U85/U125: persona selector + editor */
+.persona-select { flex: 1 1 0; min-width: 0; background: var(--surface-2); border: 1px solid var(--border-strong); border-radius: var(--radius-md); color: var(--text); padding: 0.3rem 0.4rem; font-size: 0.8rem; }
+.persona-edit { flex-shrink: 0; background: none; border: 1px solid var(--border-strong); border-radius: var(--radius-md); color: var(--text-faint); cursor: pointer; padding: 0.3rem 0.4rem; }
 .persona-edit:disabled { opacity: 0.4; cursor: default; }
 .persona-editor { margin-top: 0.5rem; padding: 0.6rem; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface-2); display: flex; flex-direction: column; gap: 0.4rem; }
 .pe-label { font-size: 0.72rem; color: var(--text-faint); display: flex; flex-direction: column; gap: 0.2rem; flex: 1; }
