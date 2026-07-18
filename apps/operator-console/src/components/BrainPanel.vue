@@ -231,11 +231,21 @@
           <template v-if="personTab === 'profile'">
             <!-- U127: recent recognition snapshots — what Richie saw -->
             <div v-if="snapshots.length" class="snap-strip">
-              <img v-for="s in snapshots" :key="s.snapshot_id" :src="s.image" class="snap-img"
-                   :alt="`Seen ${new Date(s.seen_at * 1000).toLocaleString()}`"
-                   :title="`Seen ${new Date(s.seen_at * 1000).toLocaleString()} · ${Math.round(s.confidence * 100)}%`" />
+              <figure v-for="s in snapshots" :key="s.snapshot_id" class="snap-item">
+                <img :src="s.image" class="snap-img"
+                     :alt="`Seen ${new Date(s.seen_at * 1000).toLocaleString()}`"
+                     :title="`Seen ${new Date(s.seen_at * 1000).toLocaleString()} · ${Math.round(s.confidence * 100)}%`" />
+                <!-- U136: flag a misrecognition → re-filed for correct tagging -->
+                <button class="snap-wrong" :disabled="flagging === s.snapshot_id"
+                        :title="`Not ${store.detail.person.display_name}? Flag as wrong — it moves back to unknown visitors so you can tag the right person.`"
+                        :aria-label="`Not ${store.detail.person.display_name}`"
+                        @click="flagSnapshotWrong(s.snapshot_id)">✕</button>
+              </figure>
             </div>
-            <p v-if="snapshots.length" class="content-hint snap-hint">Recent sightings — kept in memory only, wiped on restart.</p>
+            <p v-if="snapshots.length" class="content-hint snap-hint">
+              Recent sightings — kept in memory only, wiped on restart. Hit ✕ on a photo that isn't {{ store.detail.person.display_name }}.
+            </p>
+            <p v-if="snapNote" class="content-hint snap-hint">{{ snapNote }}</p>
 
             <h3 class="content-title">About</h3>
             <textarea
@@ -806,6 +816,25 @@ watch(() => nav.skillsRequest, async (r) => {
 }, { immediate: true })
 
 const snapshots = ref<{ snapshot_id: string; seen_at: number; confidence: number; image: string }[]>([])
+// U136: flag a misrecognized sighting → it returns to unknown visitors.
+const flagging = ref('')
+const snapNote = ref('')
+
+async function flagSnapshotWrong(snapshotId: string): Promise<void> {
+  if (!store.detail || flagging.value) return
+  flagging.value = snapshotId
+  snapNote.value = ''
+  try {
+    const r = await store.flagSnapshotWrong(store.detail.person.person_id, snapshotId)
+    if (!r) { snapNote.value = 'Could not flag that photo.'; return }
+    snapshots.value = snapshots.value.filter(s => s.snapshot_id !== snapshotId)
+    snapNote.value = r.refiled_for_tagging
+      ? 'Thanks — moved to unknown visitors so you can tag the right person (Security & faces).'
+      : 'Removed. (No face data kept, so it could not be re-filed for tagging.)'
+  } finally {
+    flagging.value = ''
+  }
+}
 
 async function select(id: string): Promise<void> {
   selected.value = id
@@ -1064,10 +1093,21 @@ onMounted(async () => {
 
 /* U127: recognition snapshot strip */
 .snap-strip { display: flex; gap: 0.4rem; overflow-x: auto; padding-bottom: 0.3rem; margin-bottom: 0.3rem; }
+.snap-item { position: relative; margin: 0; flex-shrink: 0; }
 .snap-img {
-  height: 68px; width: auto; border-radius: var(--radius-md); flex-shrink: 0;
+  height: 68px; width: auto; border-radius: var(--radius-md); display: block;
   border: 1px solid var(--border-strong); object-fit: cover;
 }
+/* U136: flag-as-wrong badge, revealed on hover/focus */
+.snap-wrong {
+  position: absolute; top: 3px; right: 3px; width: 18px; height: 18px;
+  display: grid; place-items: center; border-radius: 50%; cursor: pointer;
+  background: rgba(0, 0, 0, 0.55); color: #fff; border: none;
+  font-size: 0.65rem; line-height: 1; opacity: 0; transition: opacity 0.12s;
+}
+.snap-item:hover .snap-wrong, .snap-wrong:focus-visible { opacity: 1; }
+.snap-wrong:hover { background: var(--danger-text, #e5484d); }
+.snap-wrong:disabled { opacity: 0.5; cursor: default; }
 .snap-hint { margin-top: 0; }
 
 /* U112: source chips with icons */

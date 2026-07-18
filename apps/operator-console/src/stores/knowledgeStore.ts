@@ -149,6 +149,16 @@ export const useKnowledgeStore = defineStore('knowledge', () => {
     return (await resp.json()).snapshots ?? []
   }
 
+  async function flagSnapshotWrong(personId: string, snapshotId: string): Promise<{ removed: string; refiled_for_tagging: boolean } | null> {
+    // U136: "that isn't them" — drops the snapshot and re-files it as an
+    // unknown sighting so it can be tagged to the right person.
+    const resp = await _request(
+      `/people/${encodeURIComponent(personId)}/snapshots/${encodeURIComponent(snapshotId)}/wrong`,
+      { method: 'POST' },
+    )
+    return resp ? await resp.json() : null
+  }
+
   async function ingestSources(personId: string, only?: { kind: string; value: string }): Promise<{ added_count: number; read: unknown[]; skipped: { kind: string; reason: string }[] } | null> {
     // U103: read the person's fetchable sources (blog/website/github) and
     // grow their facts — the brain graph grows with them.
@@ -345,7 +355,7 @@ export const useKnowledgeStore = defineStore('knowledge', () => {
     people, detail, tier, omkLoaded, locked, brainError, loading, error, recognitionEnabled,
     sightings,
     fetchTier, fetchPeople, inspectPerson, upsertPerson, saveDescription,
-    addFact, updateFact, deleteFact, ingestSources, importChats, exportBrain, fetchSnapshots, renamePerson, forgetPerson, setConsent, lock,
+    addFact, updateFact, deleteFact, ingestSources, importChats, exportBrain, fetchSnapshots, flagSnapshotWrong, renamePerson, forgetPerson, setConsent, lock,
     fetchRecognition, secure, teachFace,
     fetchSightings, sightingImageUrl, tagSighting, dismissSighting,
     clearDetail, $reset,
