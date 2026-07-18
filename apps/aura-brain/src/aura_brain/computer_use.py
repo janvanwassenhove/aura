@@ -501,7 +501,12 @@ def create_default_agent():
     if os.environ.get("ANTHROPIC_API_KEY", "").strip():
         try:
             return ComputerUseAgent(backend)
-        except Exception as exc:  # noqa: BLE001 — anthropic sdk missing
+        except ModuleNotFoundError:
+            # The `anthropic` SDK is an OPTIONAL dependency — its absence is the
+            # normal case when driving the screen via OpenAI (U74/U90). Not a
+            # warning; the OpenAI fallback below is the designed path.
+            logger.info("anthropic SDK not installed — using the OpenAI computer-use agent.")
+        except Exception as exc:  # noqa: BLE001 — key set but something else broke
             logger.warning("Anthropic computer-use unavailable (%s); trying OpenAI.", exc)
     if os.environ.get("OPENAI_API_KEY", "").strip():
         try:

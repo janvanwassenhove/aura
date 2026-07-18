@@ -81,6 +81,7 @@
     <p v-else-if="transcribing" class="mic-status">Transcribing your voice…</p>
     <p v-if="micError" class="mic-error">{{ micError }}</p>
     <p v-if="teachHint" class="mic-status">🎓 {{ teachHint }}</p>
+    <div class="input-area">
     <form class="input-row" @submit.prevent="submit">
       <input
         v-model="conversationStore.pendingText"
@@ -89,6 +90,8 @@
         :disabled="conversationStore.isProcessing"
         class="chat-input"
       />
+      <!-- U123: grouped so a narrow column can stack them above the input -->
+      <div class="input-actions">
       <button
         type="button"
         :class="['btn-mic', recording && 'btn-mic--recording']"
@@ -127,7 +130,9 @@
       >
         {{ conversationStore.isProcessing ? '…' : 'Send' }}
       </button>
+      </div>
     </form>
+    </div>
   </section>
 </template>
 
