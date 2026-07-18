@@ -162,7 +162,10 @@
             </div>
             <p v-if="polishNote" class="content-hint">{{ polishNote }}</p>
           </div>
-          <button v-else class="b-btn" @click="newSkillDraft()">+ New skill</button>
+          <!-- U122: a standalone action, separated from the skill cards above -->
+          <div v-else class="new-skill-bar">
+            <button class="b-btn b-btn--ghost" @click="newSkillDraft()">+ New skill</button>
+          </div>
           <p v-if="addError" class="b-error">{{ addError }}</p>
         </section>
 
@@ -1054,6 +1057,9 @@ onMounted(async () => {
   color: var(--accent); font-weight: 600;
 }
 .rail-btn--ghost:hover { background: var(--surface); border-color: var(--accent); }
+
+/* U122: "New skill" is a top-level action, not attached to the last card group */
+.new-skill-bar { margin-top: 1.2rem; padding-top: 0.9rem; border-top: 1px solid var(--border); }
 
 /* U117: grouped facts */
 .fact-filter { width: 100%; margin-bottom: 0.4rem; }
