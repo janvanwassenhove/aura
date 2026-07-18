@@ -282,8 +282,12 @@ body {
 /* U123: the wrapper is the query container (an element can't query its own
    size, only a descendant can), so .input-row reacts to the column width. */
 .input-area { container-type: inline-size; }
+/* U124: align to the bottom so as the textarea grows upward (Claude-Code style)
+   the action buttons stay pinned at the baseline. --ctrl-h keeps buttons and a
+   single-line input the same height. */
 .input-row {
-  display: flex; gap: 0.4rem; align-items: center; padding-top: 0.25rem; min-width: 0;
+  display: flex; gap: 0.4rem; align-items: flex-end; padding-top: 0.25rem; min-width: 0;
+  --ctrl-h: 36px;
 }
 .chat-input {
   flex: 1 1 0; min-width: 0; padding: 0.4rem 0.75rem;
@@ -292,13 +296,25 @@ body {
 }
 .chat-input:focus { border-color: var(--accent); }
 .chat-input:disabled { opacity: 0.5; cursor: not-allowed; }
-.input-actions { display: flex; gap: 0.4rem; align-items: center; flex-shrink: 0; }
-.input-row .btn-mic { flex-shrink: 0; }
+/* U124: auto-growing multi-line input */
+.chat-textarea {
+  resize: none; overflow-y: auto; box-sizing: border-box;
+  font-family: inherit; line-height: 1.4;
+  min-height: var(--ctrl-h); max-height: 160px;
+}
+.input-actions { display: flex; gap: 0.4rem; align-items: stretch; flex-shrink: 0; height: var(--ctrl-h); }
+.input-row .btn-mic { flex-shrink: 0; height: 100%; }
 
-.btn-primary { flex-shrink: 0; padding: 0.4rem 1rem; border-radius: var(--radius); background: var(--accent); color: var(--on-accent); font-size: 0.85rem; cursor: pointer; border: none; }
+.btn-primary {
+  flex-shrink: 0; height: var(--ctrl-h); padding: 0 1rem; border-radius: var(--radius);
+  background: var(--accent); color: var(--on-accent); font-size: 0.85rem; cursor: pointer; border: none;
+}
 
 @container (max-width: 340px) {
   .input-row { flex-direction: column-reverse; align-items: stretch; }
+  /* U124: column mode makes the textarea a VERTICAL flex item — don't let flex
+     override its auto-grown height; size it to content, full width via stretch. */
+  .chat-textarea { flex: 0 0 auto; width: 100%; }
   .input-actions { justify-content: flex-end; }
   .input-actions .btn-primary { flex: 1; }   /* Send fills the remaining width */
 }
