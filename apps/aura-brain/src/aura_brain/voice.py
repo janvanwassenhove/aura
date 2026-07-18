@@ -63,6 +63,61 @@ async def synthesize_b64(text: str, voice: str | None = None,
         return None
 
 
+# U135: Whisper reports the language as a full English name ("dutch") or an
+# ISO code depending on model/version — accept both spellings.
+_LANG_ALIASES = {
+    "nl": {"nl", "dutch", "flemish"},
+    "en": {"en", "english"},
+    "fr": {"fr", "french"},
+    "de": {"de", "german"},
+    "es": {"es", "spanish"},
+    "it": {"it", "italian"},
+}
+
+
+def _allowed_languages() -> set[str]:
+    """Household languages. Anything else is treated as a hallucination."""
+    raw = os.environ.get("VOICE_LANGUAGES", "nl,en,fr,de")
+    return {c.strip().lower() for c in raw.split(",") if c.strip()}
+
+
+def _reject_reason(result) -> str | None:
+    """Why this verbose_json transcript should be discarded, or None to keep."""
+    text = (getattr(result, "text", "") or "").strip()
+    if not text:
+        return "empty"
+
+    detected = str(getattr(result, "language", "") or "").strip().lower()
+    if detected:
+        allowed = _allowed_languages()
+        codes = {code for code, names in _LANG_ALIASES.items() if detected in names}
+        code = next(iter(codes), detected)
+        if code not in allowed:
+            return f"language {detected!r} not in {sorted(allowed)}"
+
+    # Classic Whisper hallucination signature: it "hears" speech in silence.
+    segments = getattr(result, "segments", None) or []
+    probs, logps = [], []
+    for seg in segments:
+        ns = getattr(seg, "no_speech_prob", None)
+        lp = getattr(seg, "avg_logprob", None)
+        if ns is None and isinstance(seg, dict):
+            ns, lp = seg.get("no_speech_prob"), seg.get("avg_logprob")
+        if ns is not None:
+            probs.append(float(ns))
+        if lp is not None:
+            logps.append(float(lp))
+    if probs:
+        max_ns = float(os.environ.get("STT_MAX_NO_SPEECH", "0.6"))
+        if sum(probs) / len(probs) > max_ns:
+            return f"no_speech_prob {sum(probs) / len(probs):.2f}"
+    if logps:
+        min_lp = float(os.environ.get("STT_MIN_LOGPROB", "-1.0"))
+        if sum(logps) / len(logps) < min_lp:
+            return f"avg_logprob {sum(logps) / len(logps):.2f}"
+    return None
+
+
 async def transcribe(data: bytes, filename: str = "audio.webm") -> str | None:
     """Speech → text via OpenAI (U36e voice input). None when unavailable."""
     if not os.environ.get("OPENAI_API_KEY"):
@@ -84,6 +139,14 @@ async def transcribe(data: bytes, filename: str = "audio.webm") -> str | None:
         lang = os.environ.get("ASSISTANT_LANGUAGE", "auto").lower()
         if lang in ("en", "nl", "fr", "de", "es", "it"):
             kwargs["language"] = lang
+        else:
+            # U135: unpinned auto-detect made Whisper hallucinate WHOLE
+            # sentences in random languages (Portuguese/Turkish) out of room
+            # noise. Use whisper-1's verbose_json so we get its own detected
+            # language + no-speech probability, and drop anything that isn't
+            # one of the household languages or that reads as silence.
+            kwargs["model"] = os.environ.get("STT_AUTO_MODEL", "whisper-1")
+            kwargs["response_format"] = "verbose_json"
         # U87/U89: prime STT with the wake word/name as bare VOCABULARY tokens
         # (not a sentence — a sentence gets echoed back verbatim on unclear
         # audio, which the LLM then answers, U89). A short word list only
@@ -92,6 +155,13 @@ async def transcribe(data: bytes, filename: str = "audio.webm") -> str | None:
         wake = os.environ.get("WAKE_WORD", name)
         kwargs["prompt"] = f"{wake} {name}"
         result = await client.audio.transcriptions.create(**kwargs)
+        # U135: hallucination gate — only for the auto path, where we asked for
+        # verbose_json and therefore have the detection signals.
+        if kwargs.get("response_format") == "verbose_json":
+            reason = _reject_reason(result)
+            if reason:
+                logger.info("STT discarded (%s): %r", reason, (result.text or "")[:60])
+                return None
         text = (result.text or "").strip()
         # Guard: if STT just echoed our priming words (unclear audio), discard.
         stripped = text.lower().strip(" .,!?").replace(wake.lower(), "").replace(name.lower(), "").strip()
