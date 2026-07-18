@@ -361,6 +361,13 @@ class VoiceLoop:
                     if peak < self._speech_peak * self._followup_peak_factor:
                         continue
 
+                # U129: wake-gated Realtime turn — hand the AUDIO straight to the
+                # Realtime API (audio→audio, multilingual) BEFORE spending a
+                # transcription. Opt-in (VOICE_ENGINE=realtime); any failure
+                # returns False and falls through to the classic pipeline.
+                if (wake_confirmed or in_followup) and await self._realtime_turn(wav):
+                    continue
+
                 if not in_barge:
                     text = (await voice.transcribe(wav, filename="robot.wav") or "").strip()
                 if not is_plausible_command(text):
@@ -447,6 +454,39 @@ class VoiceLoop:
         if peak < self._speech_peak:
             return ""
         return (await voice.transcribe(wav, filename="robot.wav") or "").strip()
+
+    async def _realtime_turn(self, wav: bytes) -> bool:
+        """U129: run one spoken turn through the OpenAI Realtime API and play
+        the audio reply. Returns True if handled; False (or on ANY error) means
+        'not handled' → the caller falls back to the classic pipeline."""
+        from aura_brain import realtime_voice
+
+        if not realtime_voice.realtime_enabled():
+            return False
+        try:
+            pcm = realtime_voice.wav_to_pcm24k(wav)
+            if not pcm:
+                return False
+            character = getattr(self._manager, "character", None) if self._manager else None
+            instructions = getattr(character, "character_prompt", "") or ""
+            voice_id = getattr(character, "voice_id", "") or "alloy"
+            transcript, audio_out = await realtime_voice.run_realtime_turn(
+                pcm, instructions=instructions, voice=voice_id)
+            if not audio_out:
+                return False
+            import base64
+
+            from shared_schemas.events.audio import TranscriptUpdated
+            await self._bus.publish(TranscriptUpdated(
+                session_id=self._session_id, transcript=transcript, is_final=True))
+            await self._robot.speak(transcript, audio_b64=base64.b64encode(audio_out).decode())
+            self.note_spoken(transcript)
+            logger.info("realtime turn done (%d chars, ~$%.4f total)",
+                        len(transcript), realtime_voice.METER.spent_usd())
+            return True
+        except Exception as exc:  # noqa: BLE001 — realtime is best-effort
+            logger.warning("realtime turn failed, using pipeline: %s", exc)
+            return False
 
     async def _handle(self, command: str) -> None:
         from shared_schemas.events.audio import TranscriptUpdated
