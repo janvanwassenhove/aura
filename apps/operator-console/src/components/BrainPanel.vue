@@ -20,25 +20,32 @@
       <div class="brain-body">
         <!-- ── Left rail: skills library + people ── -->
         <nav class="brain-rail">
-          <button :class="['rail-item', selected === '_skills' && 'rail-item--active']" @click="select('_skills')">
-            <span class="rail-avatar rail-avatar--skills"><Sparkles :size="15" /></span>
-            <span class="rail-label">Skills library</span>
-            <span class="rail-count">{{ skills.length }}</span>
-          </button>
-          <button :class="['rail-item', selected === '_graph' && 'rail-item--active']" @click="selectGraph()">
-            <span class="rail-avatar rail-avatar--skills"><Share2 :size="15" /></span>
-            <span class="rail-label">Graph</span>
-          </button>
-          <div class="rail-sep">People</div>
-          <button
-            v-for="p in store.people" :key="p.person_id"
-            :class="['rail-item', selected === p.person_id && 'rail-item--active']"
-            @click="select(p.person_id)"
-          >
-            <span class="rail-avatar">{{ initials(p.display_name) }}</span>
-            <span class="rail-label">{{ p.display_name }}</span>
-            <span :class="['rail-role', `rail-role--${p.role}`]">{{ p.role }}</span>
-          </button>
+          <!-- U119: fixed header — never scrolls -->
+          <div class="rail-top">
+            <button :class="['rail-item', selected === '_skills' && 'rail-item--active']" @click="select('_skills')">
+              <span class="rail-avatar rail-avatar--skills"><Sparkles :size="15" /></span>
+              <span class="rail-label">Skills library</span>
+              <span class="rail-count">{{ skills.length }}</span>
+            </button>
+            <button :class="['rail-item', selected === '_graph' && 'rail-item--active']" @click="selectGraph()">
+              <span class="rail-avatar rail-avatar--skills"><Share2 :size="15" /></span>
+              <span class="rail-label">Graph</span>
+            </button>
+            <div class="rail-sep">People</div>
+          </div>
+          <!-- U119: only the people list scrolls, and only when it overflows -->
+          <div class="rail-people">
+            <button
+              v-for="p in store.people" :key="p.person_id"
+              :class="['rail-item', selected === p.person_id && 'rail-item--active']"
+              @click="select(p.person_id)"
+            >
+              <span class="rail-avatar">{{ initials(p.display_name) }}</span>
+              <span class="rail-label">{{ p.display_name }}</span>
+              <span :class="['rail-role', `rail-role--${p.role}`]">{{ p.role }}</span>
+            </button>
+          </div>
+          <!-- U119: fixed footer — add person / unlock -->
           <div v-if="store.locked" class="rail-unlock">
             <p class="rail-locked">Profiles are locked.</p>
             <input v-model="unlockPass" type="password" class="rail-input" placeholder="Knowledge passphrase" @keydown.enter="doUnlock" />
@@ -917,9 +924,17 @@ onMounted(async () => {
 /* rail */
 .brain-rail {
   width: 15rem; border-right: 1px solid var(--border); padding: 0.75rem 0.6rem;
-  display: flex; flex-direction: column; gap: 0.25rem; overflow-y: auto;
+  display: flex; flex-direction: column; gap: 0.25rem; overflow: hidden;
   background: var(--surface-2);
 }
+/* U119: header/footer stay put; only the people list scrolls, and only when
+   it actually overflows — so a couple of people never shows a scrollbar. */
+.rail-top { display: flex; flex-direction: column; gap: 0.25rem; flex-shrink: 0; }
+.rail-people {
+  flex: 1; min-height: 0; overflow-y: auto;
+  display: flex; flex-direction: column; gap: 0.25rem;
+}
+.rail-add, .rail-unlock { flex-shrink: 0; }
 .rail-item {
   display: flex; align-items: center; gap: 0.55rem;
   background: none; border: none; border-radius: var(--radius-md);
@@ -1030,7 +1045,13 @@ onMounted(async () => {
 /* U112: source chips with icons */
 .chip-icon { flex-shrink: 0; opacity: 0.8; }
 .chip-muted { font-size: 0.6rem; opacity: 0.7; }
-.rail-btn--ghost { background: none; border-style: dashed; }
+/* U119: the ghost variant inherited white text (--accent-contrast) → invisible
+   on a light background. Give it readable text + a visible dashed border. */
+.rail-btn--ghost {
+  background: none; border: 1px dashed var(--border-strong);
+  color: var(--accent); font-weight: 600;
+}
+.rail-btn--ghost:hover { background: var(--surface); border-color: var(--accent); }
 
 /* U117: grouped facts */
 .fact-filter { width: 100%; margin-bottom: 0.4rem; }
