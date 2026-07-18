@@ -99,6 +99,27 @@ async def save_skill(body: dict) -> JSONResponse:
     return JSONResponse(_dump(skill))
 
 
+@router.post("/polish")
+async def polish_skill_draft(body: dict) -> JSONResponse:
+    """U118: rewrite a just-written skill body into tight, executable steps —
+    used at creation time so skills start out optimal. Returns the polished
+    body; the console decides whether to save it. (Declared before /{name}.)"""
+    from orchestrator.config import model_for_role
+    from orchestrator.llm import openai_chat
+    from orchestrator.skill_optimizer import polish_draft
+
+    body = body or {}
+    if not str(body.get("body", "")).strip():
+        return JSONResponse({"error": "body is required"}, status_code=422)
+    result = await polish_draft(
+        str(body.get("name", "")), str(body.get("description", "")),
+        str(body.get("body", "")), openai_chat, model=model_for_role("agent"),
+    )
+    if "error" in result:
+        return JSONResponse(result, status_code=422)
+    return JSONResponse(result)
+
+
 @router.get("/{name}/metrics")
 async def skill_metrics(name: str) -> JSONResponse:
     """U107: usage counts for a skill (uses, new signals since last optimize)."""

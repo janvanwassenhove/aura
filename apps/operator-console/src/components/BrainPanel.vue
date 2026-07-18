@@ -141,13 +141,19 @@
             </div>
             <textarea v-model="editSkillDraft.body" class="b-input b-skill-body" rows="6" placeholder="The procedure, step by step… Link with [[person-id]] or [[other-skill]]." aria-label="Skill procedure" />
             <div class="inline-add">
-              <button class="b-btn" :disabled="!editSkillDraft.name.trim() || !editSkillDraft.body.trim()" @click="saveSkillDraft()">Save</button>
+              <button class="b-btn" :disabled="savingSkill || !editSkillDraft.name.trim() || !editSkillDraft.body.trim()" @click="saveSkillDraft()">
+                {{ savingSkill ? 'Polishing…' : 'Save' }}
+              </button>
               <button class="b-btn b-btn--ghost" @click="editSkillDraft = null">Cancel</button>
               <button v-if="!editSkillIsNew" class="b-btn b-btn--danger" @click="deleteSkillDraft()">Delete</button>
+              <label class="refresh-toggle" title="Rewrite your draft into tight, executable steps before saving — same optimizer, at creation time">
+                <input type="checkbox" v-model="polishOnSave" /> ✨ polish on save
+              </label>
               <label v-if="!editSkillIsNew" class="refresh-toggle" title="Disabled skills stay saved but are never used">
                 <input type="checkbox" v-model="editSkillDraft.enabled" /> enabled
               </label>
             </div>
+            <p v-if="polishNote" class="content-hint">{{ polishNote }}</p>
           </div>
           <button v-else class="b-btn" @click="newSkillDraft()">+ New skill</button>
           <p v-if="addError" class="b-error">{{ addError }}</p>
@@ -654,23 +660,49 @@ function editSkillCard(sk: SkillItem): void {
   editSkillDraft.value = { ...sk }
 }
 
+// U118: skills start out optimal — the optimizer rewrites the draft at
+// creation time (opt-out via the checkbox; edits keep it too if left on).
+const polishOnSave = ref(true)
+const polishNote = ref('')
+const savingSkill = ref(false)
+
 async function saveSkillDraft(): Promise<void> {
-  if (!editSkillDraft.value) return
+  if (!editSkillDraft.value || savingSkill.value) return
   addError.value = ''
-  const payload = {
-    ...editSkillDraft.value,
-    name: editSkillDraft.value.name.trim().toLowerCase(),
-    triggers: editSkillTriggers.value.split(',').map(t => t.trim()).filter(Boolean),
+  polishNote.value = ''
+  savingSkill.value = true
+  try {
+    const payload = {
+      ...editSkillDraft.value,
+      name: editSkillDraft.value.name.trim().toLowerCase(),
+      triggers: editSkillTriggers.value.split(',').map(t => t.trim()).filter(Boolean),
+    }
+    if (polishOnSave.value) {
+      const p = await fetch(`${BRAIN_URL}/skills/polish`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: payload.name, description: payload.description, body: payload.body }),
+      }).catch(() => null)
+      if (p?.ok) {
+        const polished = await p.json()
+        if (polished.changed) {
+          payload.body = polished.body
+          polishNote.value = `✨ Polished before saving${polished.rationale ? ` — ${polished.rationale}` : ''}`
+        }
+      }
+      // Polish failing (offline, no key) is never a reason to lose the save.
+    }
+    const resp = await fetch(`${BRAIN_URL}/skills`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+    }).catch(() => null)
+    if (!resp || !resp.ok) {
+      addError.value = resp ? String((await resp.json().catch(() => ({}))).error ?? `HTTP ${resp.status}`) : 'brain unreachable'
+      return
+    }
+    editSkillDraft.value = null
+    await fetchSkills()
+  } finally {
+    savingSkill.value = false
   }
-  const resp = await fetch(`${BRAIN_URL}/skills`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
-  }).catch(() => null)
-  if (!resp || !resp.ok) {
-    addError.value = resp ? String((await resp.json().catch(() => ({}))).error ?? `HTTP ${resp.status}`) : 'brain unreachable'
-    return
-  }
-  editSkillDraft.value = null
-  await fetchSkills()
 }
 
 async function deleteSkillDraft(): Promise<void> {
@@ -794,6 +826,17 @@ async function addSkill(personId = ''): Promise<void> {
     person: personId,
     body: newSkill.value.body.trim(),
   }
+  // U118: quick-added skills get the creation-time polish too (best-effort).
+  try {
+    const p = await fetch(`${BRAIN_URL}/skills/polish`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: payload.name, description: payload.description, body: payload.body }),
+    })
+    if (p.ok) {
+      const polished = await p.json()
+      if (polished.changed) payload.body = polished.body
+    }
+  } catch { /* offline → save the raw draft */ }
   const resp = await fetch(`${BRAIN_URL}/skills`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
