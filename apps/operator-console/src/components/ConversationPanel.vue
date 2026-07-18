@@ -83,12 +83,15 @@
     <p v-if="teachHint" class="mic-status">🎓 {{ teachHint }}</p>
     <div class="input-area">
     <form class="input-row" @submit.prevent="submit">
-      <input
+      <textarea
+        ref="inputEl"
         v-model="conversationStore.pendingText"
-        type="text"
+        rows="1"
         placeholder="Type a message… or use the mic"
         :disabled="conversationStore.isProcessing"
-        class="chat-input"
+        class="chat-input chat-textarea"
+        @input="autoGrow"
+        @keydown="onInputKeydown"
       />
       <!-- U123: grouped so a narrow column can stack them above the input -->
       <div class="input-actions">
@@ -161,10 +164,31 @@ async function trySuggestion(text: string) {
   await submit()
 }
 
+const inputEl = ref<HTMLTextAreaElement | null>(null)
+
+// U124: auto-grow the textarea like Claude Code — reset to measure, then match
+// the content, capped so it never eats the whole conversation.
+function autoGrow(): void {
+  const el = inputEl.value
+  if (!el) return
+  el.style.height = 'auto'
+  el.style.height = `${Math.min(el.scrollHeight, 160)}px`
+}
+
+// Enter sends; Shift+Enter (or IME composition) inserts a newline.
+function onInputKeydown(ev: KeyboardEvent): void {
+  if (ev.key === 'Enter' && !ev.shiftKey && !ev.isComposing) {
+    ev.preventDefault()
+    submit()
+  }
+}
+
 async function submit() {
   const text = conversationStore.pendingText.trim()
   if (!text) return
   conversationStore.pendingText = ''
+  await nextTick()
+  autoGrow()   // collapse back to one line after sending
   await conversationStore.submitTurn(text)
 }
 
