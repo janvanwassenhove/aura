@@ -307,3 +307,35 @@ async def test_spin_uses_body_yaw_and_restores(adapter) -> None:
     moves = [n for n, _ in mini.calls[before:]]
     assert "set_target_body_yaw" in moves          # the real body twirl
     assert moves.count("set_target_body_yaw") >= 3  # out, back, recentre
+
+
+# ------------------------------------------------------------------
+# U138: dance music — a synthesized groove under the moves
+# ------------------------------------------------------------------
+
+async def test_groove_synth_is_audible_and_bounded(adapter) -> None:
+    await adapter.connect()
+    audio = adapter._synth_groove(beats=4, bpm=120.0, rate=8000)
+    beat_s = 60.0 / 120.0
+    assert len(audio) >= int(4 * beat_s * 8000)     # covers the requested bars
+    assert float(abs(audio).max()) <= 1.0            # never clips the DAC
+    assert float(abs(audio).max()) > 0.1             # and is actually audible
+
+
+async def test_dance_plays_a_groove(adapter, monkeypatch) -> None:
+    """The dance moves start music; DANCE_SOUND=false keeps the disco silent."""
+    played: list[int] = []
+    monkeypatch.setattr(type(adapter), "_play_groove",
+                        lambda self, beats, bpm: played.append(beats))
+    await adapter.connect()
+    for motion in ("dance", "bop", "sway", "spin"):
+        await adapter.execute_motion(MotionCommand(motion_id=motion, direction=None, manual=True))
+    assert len(played) == 4                          # every dance move grooves
+
+
+async def test_dance_sound_can_be_disabled(adapter, monkeypatch) -> None:
+    monkeypatch.setenv("DANCE_SOUND", "false")
+    await adapter.connect()
+    # _play_groove returns before touching the media backend.
+    adapter._play_groove(beats=4, bpm=120.0)
+    assert adapter._groove_files == []
