@@ -208,6 +208,33 @@ async def person_snapshots(person_id: str, _: None = Depends(_require_sensitive)
     return JSONResponse({"snapshots": _recognition_gallery.list(person_id)})
 
 
+@router.post("/people/{person_id}/snapshots/{snapshot_id}/wrong")
+async def snapshot_wrong(
+    person_id: str,
+    snapshot_id: str,
+    _: None = Depends(_require_sensitive),
+) -> JSONResponse:
+    """U136: 'that isn't them' — drop a misrecognized snapshot and re-file it as
+    an unknown sighting so the owner can tag it to the RIGHT person, which
+    re-enrols the face correctly and improves recognition."""
+    if _recognition_gallery is None:
+        return JSONResponse({"error": "no gallery"}, status_code=404)
+    snap = _recognition_gallery.mark_wrong(person_id, snapshot_id)
+    if snap is None:
+        return JSONResponse({"error": "unknown snapshot"}, status_code=404)
+    refiled = False
+    try:  # re-file for correct tagging when we kept the embedding + frame
+        from aura_brain import recognition_api
+
+        log = recognition_api.get_sightings() if hasattr(recognition_api, "get_sightings") else None
+        if log is not None and snap.embedding and snap.frame:
+            log.record(snap.frame, snap.embedding)
+            refiled = True
+    except Exception:  # noqa: BLE001 — the correction must never fail loudly
+        refiled = False
+    return JSONResponse({"removed": snapshot_id, "refiled_for_tagging": refiled})
+
+
 @router.delete("/people/{person_id}")
 async def forget_person(person_id: str) -> JSONResponse:
     """Right-to-be-forgotten: step-up required (destructive, ADR-008 §9)."""

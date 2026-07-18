@@ -38,6 +38,12 @@ def set_sightings(log: Any) -> None:
     _sightings = log
 
 
+def get_sightings() -> Any:
+    """U136: the unknown-visitor log, so a misrecognized snapshot can be
+    re-filed there for correct tagging."""
+    return _sightings
+
+
 @router.get("/status")
 async def status() -> JSONResponse:
     if _matcher is None:

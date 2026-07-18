@@ -259,7 +259,9 @@ class PerceptionLoop:
         # U127: snapshot KNOWN people so the owner can review recent sightings
         # per person (throttled + capped in the gallery).
         if person_id is not None and self._gallery is not None:
-            self._gallery.record(person_id, frame, confidence)
+            # U136: keep the embedding so a wrongly-matched snapshot can be
+            # re-filed for correct tagging.
+            self._gallery.record(person_id, frame, confidence, embedding=embedding)
 
         await self._transition(person_id or "", person_id, confidence)
 

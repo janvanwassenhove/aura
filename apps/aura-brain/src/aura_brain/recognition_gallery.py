@@ -38,6 +38,11 @@ class Snapshot:
     confidence: float
     snapshot_id: str = field(default_factory=lambda: str(uuid4()))
     seen_at: float = field(default_factory=time.time)
+    # U136: the face embedding behind this match. Kept so that flagging the
+    # snapshot as WRONG can re-file it for correct tagging (which re-enrols it
+    # against the right person and improves recognition).
+    embedding: list[float] | None = None
+    frame: bytes | None = None            # full frame, for re-filing
 
 
 class RecognitionGallery:
@@ -49,7 +54,13 @@ class RecognitionGallery:
         self._cooldown = cooldown_s
         self._last_capture: dict[str, float] = {}
 
-    def record(self, person_id: str, frame_png: bytes, confidence: float) -> Snapshot | None:
+    def record(
+        self,
+        person_id: str,
+        frame_png: bytes,
+        confidence: float,
+        embedding: list[float] | None = None,
+    ) -> Snapshot | None:
         """Store a throttled snapshot for a recognized person. Best-effort."""
         if not person_id:
             return None
@@ -62,9 +73,26 @@ class RecognitionGallery:
             return None
         self._last_capture[person_id] = now
         ring = self._by_person.setdefault(person_id, deque(maxlen=self._per_person))
-        snap = Snapshot(thumbnail=thumb, confidence=round(confidence, 3))
+        snap = Snapshot(thumbnail=thumb, confidence=round(confidence, 3),
+                        embedding=embedding, frame=frame_png)
         ring.appendleft(snap)
         return snap
+
+    def mark_wrong(self, person_id: str, snapshot_id: str) -> Snapshot | None:
+        """U136: 'that isn't them' — drop the snapshot and hand it back so the
+        caller can re-file it as an unknown sighting for correct tagging."""
+        ring = self._by_person.get(person_id)
+        if not ring:
+            return None
+        found = next((s for s in ring if s.snapshot_id == snapshot_id), None)
+        if found is None:
+            return None
+        remaining = [s for s in ring if s.snapshot_id != snapshot_id]
+        ring.clear()
+        ring.extend(remaining)
+        # Let a corrected face be re-captured straight away.
+        self._last_capture.pop(person_id, None)
+        return found
 
     def list(self, person_id: str) -> list[dict]:
         """Newest first — data URIs so the console renders them inline."""

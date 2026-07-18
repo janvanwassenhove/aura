@@ -71,3 +71,47 @@ def test_snapshots_endpoint_and_forget_wipes() -> None:
         # Forgetting the person wipes their snapshots too.
         client.delete("/knowledge/people/jan")
         assert client.get("/knowledge/people/jan/snapshots").json()["snapshots"] == []
+
+
+# ------------------------------------------------------------------
+# U136: flag a misrecognition → removed + re-filed for correct tagging
+# ------------------------------------------------------------------
+
+def test_mark_wrong_removes_and_returns_snapshot() -> None:
+    g = RecognitionGallery(cooldown_s=0.0)
+    a = g.record("jan", _png(), 0.9, embedding=[0.1, 0.2])
+    b = g.record("jan", _png((10, 20, 30)), 0.8, embedding=[0.3, 0.4])
+    assert len(g.list("jan")) == 2
+
+    removed = g.mark_wrong("jan", a.snapshot_id)
+    assert removed is not None and removed.embedding == [0.1, 0.2]
+    remaining = g.list("jan")
+    assert len(remaining) == 1 and remaining[0]["snapshot_id"] == b.snapshot_id
+    # Unknown ids are a no-op.
+    assert g.mark_wrong("jan", "nope") is None
+    assert g.mark_wrong("ghost", a.snapshot_id) is None
+
+
+def test_wrong_endpoint_refiles_for_tagging() -> None:
+    from aura_brain import recognition_api
+    from aura_brain.sightings import SightingLog
+
+    gallery = RecognitionGallery(cooldown_s=0.0)
+    log = SightingLog(capture_cooldown_s=0.0)
+    app = create_app()
+    with TestClient(app) as client:
+        knowledge_api.set_recognition_gallery(gallery)
+        recognition_api.set_sightings(log)
+        client.put("/knowledge/people/jappe", json={"display_name": "Jappe", "role": "family"})
+        snap = gallery.record("jappe", _png(), 0.71, embedding=[0.5, 0.6])
+
+        r = client.post(f"/knowledge/people/jappe/snapshots/{snap.snapshot_id}/wrong")
+        assert r.status_code == 200
+        body = r.json()
+        assert body["removed"] == snap.snapshot_id
+        assert body["refiled_for_tagging"] is True
+        # Gone from the person, and back in the unknown-visitor log to re-tag.
+        assert client.get("/knowledge/people/jappe/snapshots").json()["snapshots"] == []
+        assert len(log.list()) == 1
+
+        assert client.post("/knowledge/people/jappe/snapshots/bogus/wrong").status_code == 404
