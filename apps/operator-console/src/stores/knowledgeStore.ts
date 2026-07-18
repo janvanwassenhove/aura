@@ -142,6 +142,13 @@ export const useKnowledgeStore = defineStore('knowledge', () => {
     return resp !== null
   }
 
+  async function fetchSnapshots(personId: string): Promise<{ snapshot_id: string; seen_at: number; confidence: number; image: string }[]> {
+    // U127: recent recognition snapshots of this person (gated SENSITIVE).
+    const resp = await _request(`/people/${encodeURIComponent(personId)}/snapshots`)
+    if (!resp) return []
+    return (await resp.json()).snapshots ?? []
+  }
+
   async function ingestSources(personId: string, only?: { kind: string; value: string }): Promise<{ added_count: number; read: unknown[]; skipped: { kind: string; reason: string }[] } | null> {
     // U103: read the person's fetchable sources (blog/website/github) and
     // grow their facts — the brain graph grows with them.
@@ -338,7 +345,7 @@ export const useKnowledgeStore = defineStore('knowledge', () => {
     people, detail, tier, omkLoaded, locked, brainError, loading, error, recognitionEnabled,
     sightings,
     fetchTier, fetchPeople, inspectPerson, upsertPerson, saveDescription,
-    addFact, updateFact, deleteFact, ingestSources, importChats, exportBrain, renamePerson, forgetPerson, setConsent, lock,
+    addFact, updateFact, deleteFact, ingestSources, importChats, exportBrain, fetchSnapshots, renamePerson, forgetPerson, setConsent, lock,
     fetchRecognition, secure, teachFace,
     fetchSightings, sightingImageUrl, tagSighting, dismissSighting,
     clearDetail, $reset,

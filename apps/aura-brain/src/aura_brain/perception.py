@@ -187,6 +187,7 @@ class PerceptionLoop:
         gesture_detector: Any = None,  # HandGestureDetector | None (U36e)
         gesture_cooldown_s: float = 8.0,
         sighting_log: Any = None,      # SightingLog | None (U36f)
+        gallery: Any = None,           # RecognitionGallery | None (U127)
     ) -> None:
         self._bus = bus
         self._matcher = matcher
@@ -198,6 +199,7 @@ class PerceptionLoop:
         self._gestures = gesture_detector
         self._gesture_cooldown = gesture_cooldown_s
         self._sightings = sighting_log
+        self._gallery = gallery
         self._last_gesture_at = 0.0
         self._task: asyncio.Task | None = None
         self._last_seen: str | None = None  # person_id | _ABSENT | None(=never)
@@ -254,6 +256,10 @@ class PerceptionLoop:
         # U36f: log unrecognized passers-by (in-memory only) for easy tagging.
         if person_id is None and self._sightings is not None:
             self._sightings.record(frame, embedding)
+        # U127: snapshot KNOWN people so the owner can review recent sightings
+        # per person (throttled + capped in the gallery).
+        if person_id is not None and self._gallery is not None:
+            self._gallery.record(person_id, frame, confidence)
 
         await self._transition(person_id or "", person_id, confidence)
 

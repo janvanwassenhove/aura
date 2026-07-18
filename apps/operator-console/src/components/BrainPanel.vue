@@ -229,6 +229,14 @@
 
           <!-- Profile: About + Facts -->
           <template v-if="personTab === 'profile'">
+            <!-- U127: recent recognition snapshots — what Richie saw -->
+            <div v-if="snapshots.length" class="snap-strip">
+              <img v-for="s in snapshots" :key="s.snapshot_id" :src="s.image" class="snap-img"
+                   :alt="`Seen ${new Date(s.seen_at * 1000).toLocaleString()}`"
+                   :title="`Seen ${new Date(s.seen_at * 1000).toLocaleString()} · ${Math.round(s.confidence * 100)}%`" />
+            </div>
+            <p v-if="snapshots.length" class="content-hint snap-hint">Recent sightings — kept in memory only, wiped on restart.</p>
+
             <h3 class="content-title">About</h3>
             <textarea
               v-model="aboutDraft" class="b-input b-about" rows="2"
@@ -797,12 +805,19 @@ watch(() => nav.skillsRequest, async (r) => {
   }
 }, { immediate: true })
 
+const snapshots = ref<{ snapshot_id: string; seen_at: number; confidence: number; image: string }[]>([])
+
 async function select(id: string): Promise<void> {
   selected.value = id
   addError.value = ''
   personTab.value = 'profile'   // U112: fresh person → first tab
   heroMenuOpen.value = false
-  if (id !== '_skills') await store.inspectPerson(id)
+  snapshots.value = []
+  if (id !== '_skills') {
+    await store.inspectPerson(id)
+    // U127: recognition snapshots (empty unless recognition + sightings happened).
+    try { snapshots.value = await store.fetchSnapshots(id) } catch { snapshots.value = [] }
+  }
 }
 
 function openTarget(target: string): void {
@@ -1046,6 +1061,14 @@ onMounted(async () => {
 }
 .hero-menu-item:hover { background: var(--surface-2); }
 .hero-menu-item--danger { color: var(--danger-text, #e5484d); }
+
+/* U127: recognition snapshot strip */
+.snap-strip { display: flex; gap: 0.4rem; overflow-x: auto; padding-bottom: 0.3rem; margin-bottom: 0.3rem; }
+.snap-img {
+  height: 68px; width: auto; border-radius: var(--radius-md); flex-shrink: 0;
+  border: 1px solid var(--border-strong); object-fit: cover;
+}
+.snap-hint { margin-top: 0; }
 
 /* U112: source chips with icons */
 .chip-icon { flex-shrink: 0; opacity: 0.8; }

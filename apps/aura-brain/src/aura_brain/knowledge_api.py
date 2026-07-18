@@ -37,6 +37,12 @@ router = APIRouter(prefix="/knowledge")
 
 _store: KnowledgeStore | None = None
 _stepup_gate: StepUpGate | None = None
+_recognition_gallery = None  # U127: RecognitionGallery | None
+
+
+def set_recognition_gallery(gallery) -> None:
+    global _recognition_gallery
+    _recognition_gallery = gallery
 
 # Tier state — mutated at startup (set_omk_loaded) and by POST /knowledge/lock.
 class UnlockTier(StrEnum):
@@ -193,11 +199,22 @@ async def upsert_person(
     return JSONResponse(person.model_dump(mode="json"))
 
 
+@router.get("/people/{person_id}/snapshots")
+async def person_snapshots(person_id: str, _: None = Depends(_require_sensitive)) -> JSONResponse:
+    """U127: recent recognition snapshots of this person (in-memory, newest
+    first). Face images of a known person → gated to the SENSITIVE tier."""
+    if _recognition_gallery is None:
+        return JSONResponse({"snapshots": []})
+    return JSONResponse({"snapshots": _recognition_gallery.list(person_id)})
+
+
 @router.delete("/people/{person_id}")
 async def forget_person(person_id: str) -> JSONResponse:
     """Right-to-be-forgotten: step-up required (destructive, ADR-008 §9)."""
     await _require_stepup("delete_person", {"person_id": person_id})
     await _require().delete_person(person_id)
+    if _recognition_gallery is not None:  # U127: wipe their snapshots too
+        _recognition_gallery.forget(person_id)
     return JSONResponse({"deleted": person_id})
 
 

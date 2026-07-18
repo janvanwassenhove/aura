@@ -29,6 +29,7 @@ class RobotState(BaseModel):
     battery_pct: float = 100.0
     connected: bool = False
     adapter_name: str = "unknown"
+    tracking: bool = False  # U126: follow-me head tracking currently active?
 
 
 class MotionCue(BaseModel):
