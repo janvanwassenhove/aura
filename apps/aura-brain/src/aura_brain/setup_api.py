@@ -235,7 +235,7 @@ async def discover() -> JSONResponse:
 
 # ── Assistant preferences (U36h): call name + reply language ──────────
 
-_ALLOWED_LANGUAGES = {"auto", "en", "nl", "fr"}
+_ALLOWED_LANGUAGES = {"auto", "en", "nl", "fr", "de"}  # U130: + German
 
 
 _ALLOWED_VOICE_MODES = {"off", "wake_word"}

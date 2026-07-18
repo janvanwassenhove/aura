@@ -501,24 +501,30 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
                     session_id=session_id, response_text=character.greeting_message))
                 return
             import random
+            from datetime import datetime
+
+            from aura_brain import ambient
 
             angle = random.choice([
-                "reference the time of day",
+                "reference the weather outside",
                 "ask what they're up to right now",
-                "make a playful observation",
+                "make a playful observation about the time of day",
                 "callback to one of their profile facts or interests",
                 "sound genuinely curious about their day",
                 "keep it ultra-short and warm",
                 "offer to help with something concrete",
             ])
             try:
-                await ctx.pipeline.orchestrate(
+                note = await ambient.ambient_note(datetime.now().hour)
+                said = await ctx.pipeline.orchestrate(
                     f"(system note: {name} just walked up and you recognized "
-                    f"their face.) Greet {name} by name in ONE short spoken "
-                    f"sentence. Vary it: this time, {angle}. Never start with "
-                    f"the same words as your previous greeting. No lists.",
+                    f"their face. {note}) Greet {name} by name in ONE short, "
+                    f"warm, genuinely CURIOUS spoken sentence — sound interested, "
+                    f"not scripted. This time, {angle}. Never start with the same "
+                    f"words as before. No lists.",
                     session_id,
                 )
+                ambient.note_spontaneous(said)  # avoid repeating next time
             except Exception as exc:
                 logging.getLogger(__name__).debug("personalized greeting failed: %s", exc)
                 await ctx.bus.publish(ResponseDrafted(

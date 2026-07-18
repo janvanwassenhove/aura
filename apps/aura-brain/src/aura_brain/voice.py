@@ -77,8 +77,12 @@ async def transcribe(data: bytes, filename: str = "audio.webm") -> str | None:
             "model": os.environ.get("STT_MODEL", "gpt-4o-mini-transcribe"),
             "file": (filename, io.BytesIO(data)),
         }
+        # U130: multilingual (NL/EN/FR/DE) + code-switching. Forcing a single
+        # `language` breaks mixing Dutch and English in one sentence, so only
+        # pin it when the owner explicitly picked ONE language; otherwise let
+        # the model auto-detect (empty/"auto"/"multi" → no language pin).
         lang = os.environ.get("ASSISTANT_LANGUAGE", "auto").lower()
-        if lang in ("en", "nl", "fr"):  # bias STT toward the configured language
+        if lang in ("en", "nl", "fr", "de", "es", "it"):
             kwargs["language"] = lang
         # U87/U89: prime STT with the wake word/name as bare VOCABULARY tokens
         # (not a sentence — a sentence gets echoed back verbatim on unclear
