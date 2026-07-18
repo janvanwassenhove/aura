@@ -158,6 +158,23 @@
         </button>
       </div>
 
+      <!-- U137: dance moves -->
+      <h3 class="section-label mt-3">Dance</h3>
+      <div class="qa-grid">
+        <button class="qa-btn" :disabled="acting" title="Full routine: bop, sway and a twirl" @click="act('dance')">
+          <Music :size="13" /> Dance
+        </button>
+        <button class="qa-btn" :disabled="acting" title="Head bobbing to a beat" @click="act('bop')">
+          <MoveVertical :size="13" /> Bop
+        </button>
+        <button class="qa-btn" :disabled="acting" title="Slow side-to-side sway" @click="act('sway')">
+          <MoveHorizontal :size="13" /> Sway
+        </button>
+        <button class="qa-btn" :disabled="acting" title="Body twirl" @click="act('spin')">
+          <RotateCw :size="13" /> Spin
+        </button>
+      </div>
+
       <h3 class="section-label mt-3">Speak &amp; Move</h3>
       <div class="qa-grid">
         <button class="qa-btn" :disabled="acting" title="Wave + say hi" @click="perform('hi')">
@@ -224,7 +241,8 @@
 import { onMounted, onUnmounted, ref } from 'vue'
 import {
   Bell, Bot, ChevronRight, ChevronsDown, Eye, Hand, Laugh, Moon, MoveHorizontal, MoveVertical,
-  Mic, MicOff, Pencil, Power, RefreshCw, Sparkles, ThumbsUp, Volume1, Volume2, VolumeX,
+  Mic, MicOff, Music, Pencil, Power, RefreshCw, RotateCw, Sparkles, ThumbsUp,
+  Volume1, Volume2, VolumeX,
 } from 'lucide-vue-next'
 import { useRobotStore } from '../stores/robotStore'
 
@@ -460,7 +478,8 @@ async function act(motionId: string) {
     const resp = await fetch(`${BRAIN_URL}/robot/motion`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ motion_id: motionId, speed: 1.0, amplitude: 0.6 }),
+      // U137: manual → the robot pauses follow-me so the move is fully visible.
+      body: JSON.stringify({ motion_id: motionId, speed: 1.0, amplitude: 0.6, manual: true }),
     })
     if (!resp.ok) actError.value = 'Robot unreachable — is it switched on?'
   } catch {

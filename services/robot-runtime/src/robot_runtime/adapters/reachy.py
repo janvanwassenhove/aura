@@ -501,12 +501,23 @@ class ReachyRobotAdapter(RobotAdapter):
         follow_while_speaking = (
             os.environ.get("FOLLOW_WHILE_SPEAKING", "true").lower() == "true"
         )
-        keep_tracking = follow_while_speaking and motion in self._FOLLOW_GESTURES
+        # U137: a MANUAL quick action must be fully visible — head tracking
+        # would otherwise pull the head straight back mid-move (and the U126
+        # watchdog re-asserts it every few seconds), which is why nod/shake/
+        # wave/gesture looked like they "didn't work" from the panel.
+        keep_tracking = (
+            follow_while_speaking
+            and motion in self._FOLLOW_GESTURES
+            and not getattr(command, "manual", False)
+        )
         paused = False
         # wake_up/sleep/look_around manage the head themselves; don't touch them.
-        if self._tracking_on and not keep_tracking and motion not in (
-            "wake_up", "sleep", "look_around", "point"
-        ):
+        # wake_up/sleep manage tracking themselves (U102/U116) — never touch
+        # those. look_around/point normally steer the head on their own, but a
+        # MANUAL one still needs tracking paused to be visible (U137).
+        _self_managed = ("wake_up", "sleep") if getattr(command, "manual", False) else (
+            "wake_up", "sleep", "look_around", "point")
+        if self._tracking_on and not keep_tracking and motion not in _self_managed:
             try:
                 self._mini.stop_head_tracking()
                 paused = True
@@ -606,6 +617,47 @@ class ReachyRobotAdapter(RobotAdapter):
                     break
                 except Exception as exc:  # noqa: BLE001
                     logger.warning("goto_sleep() failed (attempt %d): %s", _attempt + 1, exc)
+        # U137: dance moves — rhythmic, repeating, meant to be watched.
+        elif motion == "bop":  # head bobbing to a beat, antennas keeping time
+            beat = 0.22 / speed
+            for i in range(6):
+                a = 0.9 * amp if i % 2 == 0 else -0.9 * amp
+                go(head=_rot("x", 0.28 * amp), antennas=[a, a], duration=beat)
+                go(head=_NEUTRAL, antennas=[-a, -a], duration=beat)
+        elif motion == "sway":  # slow side-to-side roll, body following
+            leg = 0.5 / speed
+            for _ in range(3):
+                go(head=_rot("y", 0.35 * amp), antennas=[0.6 * amp, -0.6 * amp], duration=leg)
+                go(head=_rot("y", -0.35 * amp), antennas=[-0.6 * amp, 0.6 * amp], duration=leg)
+            go(head=_NEUTRAL, antennas=[0.0, 0.0], duration=leg)
+        elif motion == "spin":  # body twirl — the daemon turns the torso
+            import time
+
+            try:
+                mini.set_automatic_body_yaw(False)
+                for target in (1.2 * amp, -1.2 * amp, 0.0):
+                    mini.set_target_body_yaw(target)
+                    time.sleep(0.55 / speed)
+            except Exception as exc:  # noqa: BLE001 — body yaw is optional
+                logger.warning("spin unavailable (%s) — swaying instead", exc)
+                go(head=_rot("z", 0.5 * amp)); go(head=_rot("z", -0.5 * amp)); go(head=_NEUTRAL)
+            finally:
+                if self._body_follow:
+                    try:
+                        mini.set_automatic_body_yaw(True)
+                    except Exception:  # noqa: BLE001
+                        pass
+        elif motion == "dance":  # the full routine: bop + sway + a twirl
+            beat = 0.24 / speed
+            for i in range(4):
+                a = amp if i % 2 == 0 else -amp
+                go(head=_rot("x", 0.25 * amp), antennas=[a, -a], duration=beat)
+                go(head=_rot("y", 0.3 * amp * (1 if i % 2 else -1)),
+                   antennas=[-a, a], duration=beat)
+            for _ in range(2):
+                go(head=_rot("z", 0.45 * amp), antennas=[amp, amp], duration=beat)
+                go(head=_rot("z", -0.45 * amp), antennas=[-amp, -amp], duration=beat)
+            go(head=_NEUTRAL, antennas=[0.0, 0.0], duration=0.4)
         elif motion == "look_around":  # idle curiosity: glance at 2 spots, settle
             import random
 

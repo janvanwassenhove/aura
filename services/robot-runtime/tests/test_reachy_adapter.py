@@ -52,6 +52,9 @@ class FakeMini:
     def set_automatic_body_yaw(self, enabled: bool) -> None:
         self.calls.append(("set_automatic_body_yaw", {"enabled": enabled}))
 
+    def set_target_body_yaw(self, yaw: float) -> None:
+        self.calls.append(("set_target_body_yaw", {"yaw": yaw}))
+
     def release_media(self) -> None:
         self.media_released = True
 
@@ -260,3 +263,47 @@ async def test_speed_scales_motion_duration(adapter) -> None:
     mini = adapter._created[0]
     durations = [kw["duration"] for name, kw in mini.calls if name == "goto_target"]
     assert durations[0] < durations[2]  # fast nod's legs are shorter than slow nod's
+
+
+# ------------------------------------------------------------------
+# U137: manual quick actions pause follow-me; dance moves exist
+# ------------------------------------------------------------------
+
+async def test_manual_motion_pauses_tracking(adapter) -> None:
+    """A manual quick action must pause head tracking even for a gesture that
+    normally keeps it (otherwise the daemon pulls the head back mid-move)."""
+    await adapter.connect()
+    await adapter.set_tracking(True)
+    mini = adapter._created[0]
+
+    before = len(mini.calls)
+    await adapter.execute_motion(MotionCommand(motion_id="nod", direction=None))
+    auto_moves = [n for n, _ in mini.calls[before:]]
+    assert "stop_head_tracking" not in auto_moves      # reply gesture keeps eye contact
+
+    before = len(mini.calls)
+    await adapter.execute_motion(MotionCommand(motion_id="nod", direction=None, manual=True))
+    manual_moves = [n for n, _ in mini.calls[before:]]
+    assert "stop_head_tracking" in manual_moves        # manual → fully visible
+    assert "start_head_tracking" in manual_moves       # and resumed after
+
+
+async def test_dance_moves_animate(adapter) -> None:
+    await adapter.connect()
+    for motion in ("dance", "bop", "sway"):
+        mini = adapter._created[0]
+        before = len(mini.calls)
+        await adapter.execute_motion(MotionCommand(motion_id=motion, direction=None, manual=True))
+        moves = [n for n, _ in mini.calls[before:]]
+        # A dance is a repeating routine, not a single pose.
+        assert moves.count("goto_target") >= 4, f"{motion} barely moved: {moves}"
+
+
+async def test_spin_uses_body_yaw_and_restores(adapter) -> None:
+    await adapter.connect()
+    mini = adapter._created[0]
+    before = len(mini.calls)
+    await adapter.execute_motion(MotionCommand(motion_id="spin", direction=None, manual=True))
+    moves = [n for n, _ in mini.calls[before:]]
+    assert "set_target_body_yaw" in moves          # the real body twirl
+    assert moves.count("set_target_body_yaw") >= 3  # out, back, recentre

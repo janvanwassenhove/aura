@@ -44,6 +44,9 @@ class MotionCommand(BaseModel):
     speed: float = 1.0
     amplitude: float = 0.5
     direction: str | None = "forward"
+    # U137: a MANUAL motion (quick action from the panel) pauses follow-me so
+    # the move is fully visible; reply gestures keep tracking for eye contact.
+    manual: bool = False
 
 
 class MotionTimeline(BaseModel):
