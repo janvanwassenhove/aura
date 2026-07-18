@@ -336,6 +336,7 @@ class VoiceLoop:
                     in_barge = True
                     text = barge_text
                 else:
+                    _t_cap_start = time.monotonic()
                     wav, peak = await self._robot.listen(self._window_s)
                     if peak < self._speech_peak:
                         continue  # silence — cheap skip, no STT
@@ -361,8 +362,18 @@ class VoiceLoop:
                     if peak < self._speech_peak * self._followup_peak_factor:
                         continue
 
+                # Phase 0 (U140): stash stage timestamps as locals; the trace is
+                # only opened once we reach a REAL turn (below), so the many
+                # early `continue` paths never leave a dangling trace. Fixed
+                # windows have no true endpoint → capture_end == endpoint_fired.
+                _mono = time.monotonic()
+                _mk = {"capture_start": locals().get("_t_cap_start", _mono - self._window_s),
+                       "capture_end": _mono, "endpoint_fired": _mono}
                 if not in_barge:
                     text = (await voice.transcribe(wav, filename="robot.wav") or "").strip()
+                    _mk["stt_final"] = time.monotonic()
+                else:
+                    _mk["stt_final"] = _mono  # barge transcript already in hand
                 if not is_plausible_command(text):
                     if text:
                         logger.debug("voice loop ignored implausible transcript: %r", text)
@@ -419,12 +430,23 @@ class VoiceLoop:
                         self._pipeline.steer(self._session_id, note)
                     self._manager.thinking()
 
+                # Phase 0 (U140): open the latency trace for this confirmed turn.
+                from aura_brain.turn_trace import LOG as _TRACE
+                trace = _TRACE.start(self._session_id,
+                                     engine=os.environ.get("VOICE_ENGINE", "pipeline"))
+                for _stage, _ts in _mk.items():
+                    trace.mark(_stage, _ts)
+                trace.transcript = command
+
                 # U129/U133: once we have a REAL turn, run it through Realtime
                 # (audio→audio) when that engine is selected; on any failure
                 # (or when the engine is 'pipeline') fall back to the classic
                 # transcribe→LLM→TTS handler so Richie always replies.
-                if not await self._realtime_turn(wav):
-                    await self._handle(command)
+                try:
+                    if not await self._realtime_turn(wav):
+                        await self._handle(command)
+                finally:
+                    _TRACE.finish(self._session_id)
             except asyncio.CancelledError:
                 raise
             except Exception as exc:  # the loop must never die
@@ -471,6 +493,11 @@ class VoiceLoop:
             character = getattr(self._manager, "character", None) if self._manager else None
             instructions = getattr(character, "character_prompt", "") or ""
             voice_id = getattr(character, "voice_id", "") or "alloy"
+            from aura_brain.turn_trace import LOG as _TRACE
+            _t = _TRACE.current(self._session_id)
+            if _t is not None:
+                _t.mark("llm_request_sent")
+                _t.mark("tts_request_sent")
             transcript, audio_out = await realtime_voice.run_realtime_turn(
                 pcm, instructions=instructions, voice=voice_id)
             if not audio_out:
@@ -478,9 +505,16 @@ class VoiceLoop:
             import base64
 
             from shared_schemas.events.audio import TranscriptUpdated
+            if _t is not None:
+                _t.mark("llm_final")
+                _t.mark("tts_first_audio")
             await self._bus.publish(TranscriptUpdated(
                 session_id=self._session_id, transcript=transcript, is_final=True))
+            if _t is not None:
+                _t.mark("playback_first_sample")
             await self._robot.speak(transcript, audio_b64=base64.b64encode(audio_out).decode())
+            if _t is not None:
+                _t.mark("playback_complete")
             self.note_spoken(transcript)
             logger.info("realtime turn done (%d chars, ~$%.4f total)",
                         len(transcript), realtime_voice.METER.spent_usd())
@@ -501,10 +535,16 @@ class VoiceLoop:
 
     async def _handle(self, command: str) -> None:
         from shared_schemas.events.audio import TranscriptUpdated
+        from aura_brain.turn_trace import LOG as _TRACE
 
         await self._bus.publish(TranscriptUpdated(
             session_id=self._session_id, transcript=command, is_final=True,
         ))
         logger.info("VoiceLoop heard: %r", command)
+        _t = _TRACE.current(self._session_id)
+        if _t is not None:
+            _t.mark("llm_request_sent")
         await self._pipeline.orchestrate(command, self._session_id)
+        if _t is not None:
+            _t.mark("llm_final")  # reply produced; _embody_reply now voices it
         # The reply's ResponseDrafted → note_spoken opens the follow-up window.
