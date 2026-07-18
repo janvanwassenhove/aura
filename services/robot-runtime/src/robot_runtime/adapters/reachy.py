@@ -86,6 +86,7 @@ class ReachyRobotAdapter(RobotAdapter):
         self._tracking_on = False
         self._body_follow = False  # U37: torso turns with the tracked face
         self._tracking_watchdog: asyncio.Task | None = None  # U126
+        self._groove_files: list[str] = []  # U138: dance-music temp WAVs
         import threading
 
         self._audio_abort = threading.Event()  # U84: barge-in cuts speech
@@ -367,6 +368,83 @@ class ReachyRobotAdapter(RobotAdapter):
         self._audio_abort.set()
         return True
 
+    # ------------------------------------------------------------------
+    # U138: dance music — a tiny synthesized groove so the moves have a beat
+    # ------------------------------------------------------------------
+
+    # A minor pentatonic: any random walk over these notes sounds musical.
+    _PENTATONIC = (220.00, 261.63, 293.66, 329.63, 392.00, 440.00)
+
+    def _synth_groove(self, beats: int, bpm: float, rate: int = 22_050) -> np.ndarray:
+        """Kick on the downbeats, hats on the offbeats, a pentatonic bass line.
+        Returns float32 mono in [-1, 1]."""
+        import random
+
+        beat_s = 60.0 / bpm
+        out = np.zeros(int(beats * beat_s * rate) + rate // 4, dtype=np.float32)
+
+        def _mix(at_s: float, wave: np.ndarray) -> None:
+            i = int(at_s * rate)
+            end = min(len(out), i + len(wave))
+            if end > i:
+                out[i:end] += wave[: end - i]
+
+        for b in range(beats):
+            t0 = b * beat_s
+            # Kick: 55 Hz sine with a fast exponential decay.
+            n = int(0.18 * rate)
+            t = np.arange(n) / rate
+            _mix(t0, (np.sin(2 * np.pi * 55 * t) * np.exp(-22 * t) * 0.9).astype(np.float32))
+            # Hat: filtered noise on the off-beat.
+            n = int(0.06 * rate)
+            t = np.arange(n) / rate
+            noise = np.random.default_rng(b).standard_normal(n).astype(np.float32)
+            _mix(t0 + beat_s / 2, (noise * np.exp(-60 * t) * 0.18).astype(np.float32))
+            # Bass/lead: one pentatonic note per beat, plucked envelope.
+            freq = random.choice(self._PENTATONIC)
+            n = int(min(0.9 * beat_s, 0.45) * rate)
+            t = np.arange(n) / rate
+            tone = (np.sin(2 * np.pi * freq * t) + 0.3 * np.sin(2 * np.pi * freq * 2 * t))
+            _mix(t0, (tone * np.exp(-6 * t) * 0.22).astype(np.float32))
+
+        peak = float(np.max(np.abs(out))) or 1.0
+        return np.clip(out / peak * 0.85, -1.0, 1.0)
+
+    def _play_groove(self, beats: int, bpm: float) -> None:
+        """Start the groove WITHOUT blocking, so the dance moves run over it.
+        Best-effort: no media backend or a synth hiccup just means a silent dance."""
+        if os.environ.get("DANCE_SOUND", "true").lower() != "true":
+            return
+        media = self._media()
+        if media is None:
+            return
+        try:
+            import struct
+            import tempfile
+            import wave
+
+            rate = 22_050
+            audio = self._synth_groove(beats, bpm, rate) * self._volume
+            samples = (np.clip(audio, -1.0, 1.0) * 32767.0).astype(np.int16)
+            with tempfile.NamedTemporaryFile(suffix=".wav", delete=False, dir="/dev/shm") as fh:
+                path = fh.name
+            with wave.open(path, "wb") as w:
+                w.setnchannels(1)
+                w.setsampwidth(2)
+                w.setframerate(rate)
+                w.writeframes(struct.pack(f"<{len(samples)}h", *samples.tolist()))
+            media.play_sound(path)  # playbin is async → returns immediately
+            self._groove_files.append(path)
+            # Keep /dev/shm tidy: drop the previous grooves once they're done.
+            while len(self._groove_files) > 3:
+                old = self._groove_files.pop(0)
+                try:
+                    os.remove(old)
+                except OSError:
+                    pass
+        except Exception as exc:  # noqa: BLE001 — music is decoration, never fatal
+            logger.debug("dance groove unavailable: %s", exc)
+
     async def capture_audio(self, duration_s: float = 3.0) -> bytes:
         media = self._media()
         if media is None:
@@ -617,22 +695,28 @@ class ReachyRobotAdapter(RobotAdapter):
                     break
                 except Exception as exc:  # noqa: BLE001
                     logger.warning("goto_sleep() failed (attempt %d): %s", _attempt + 1, exc)
-        # U137: dance moves — rhythmic, repeating, meant to be watched.
+        # U137/U138: dance moves — rhythmic, repeating, and set to a groove the
+        # robot synthesizes itself (DANCE_SOUND=false for a silent disco).
         elif motion == "bop":  # head bobbing to a beat, antennas keeping time
-            beat = 0.22 / speed
+            bpm = 120.0 * speed
+            beat = 60.0 / bpm
+            self._play_groove(beats=6, bpm=bpm)
             for i in range(6):
                 a = 0.9 * amp if i % 2 == 0 else -0.9 * amp
-                go(head=_rot("x", 0.28 * amp), antennas=[a, a], duration=beat)
-                go(head=_NEUTRAL, antennas=[-a, -a], duration=beat)
+                go(head=_rot("x", 0.28 * amp), antennas=[a, a], duration=beat / 2)
+                go(head=_NEUTRAL, antennas=[-a, -a], duration=beat / 2)
         elif motion == "sway":  # slow side-to-side roll, body following
-            leg = 0.5 / speed
+            bpm = 84.0 * speed
+            beat = 60.0 / bpm
+            self._play_groove(beats=7, bpm=bpm)
             for _ in range(3):
-                go(head=_rot("y", 0.35 * amp), antennas=[0.6 * amp, -0.6 * amp], duration=leg)
-                go(head=_rot("y", -0.35 * amp), antennas=[-0.6 * amp, 0.6 * amp], duration=leg)
-            go(head=_NEUTRAL, antennas=[0.0, 0.0], duration=leg)
+                go(head=_rot("y", 0.35 * amp), antennas=[0.6 * amp, -0.6 * amp], duration=beat)
+                go(head=_rot("y", -0.35 * amp), antennas=[-0.6 * amp, 0.6 * amp], duration=beat)
+            go(head=_NEUTRAL, antennas=[0.0, 0.0], duration=beat)
         elif motion == "spin":  # body twirl — the daemon turns the torso
             import time
 
+            self._play_groove(beats=4, bpm=110.0 * speed)
             try:
                 mini.set_automatic_body_yaw(False)
                 for target in (1.2 * amp, -1.2 * amp, 0.0):
@@ -648,16 +732,18 @@ class ReachyRobotAdapter(RobotAdapter):
                     except Exception:  # noqa: BLE001
                         pass
         elif motion == "dance":  # the full routine: bop + sway + a twirl
-            beat = 0.24 / speed
+            bpm = 120.0 * speed
+            half = 30.0 / bpm  # eighth notes — two moves per beat
+            self._play_groove(beats=7, bpm=bpm)
             for i in range(4):
                 a = amp if i % 2 == 0 else -amp
-                go(head=_rot("x", 0.25 * amp), antennas=[a, -a], duration=beat)
+                go(head=_rot("x", 0.25 * amp), antennas=[a, -a], duration=half)
                 go(head=_rot("y", 0.3 * amp * (1 if i % 2 else -1)),
-                   antennas=[-a, a], duration=beat)
+                   antennas=[-a, a], duration=half)
             for _ in range(2):
-                go(head=_rot("z", 0.45 * amp), antennas=[amp, amp], duration=beat)
-                go(head=_rot("z", -0.45 * amp), antennas=[-amp, -amp], duration=beat)
-            go(head=_NEUTRAL, antennas=[0.0, 0.0], duration=0.4)
+                go(head=_rot("z", 0.45 * amp), antennas=[amp, amp], duration=half)
+                go(head=_rot("z", -0.45 * amp), antennas=[-amp, -amp], duration=half)
+            go(head=_NEUTRAL, antennas=[0.0, 0.0], duration=half)
         elif motion == "look_around":  # idle curiosity: glance at 2 spots, settle
             import random
 
