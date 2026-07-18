@@ -339,3 +339,31 @@ async def test_dance_sound_can_be_disabled(adapter, monkeypatch) -> None:
     # _play_groove returns before touching the media backend.
     adapter._play_groove(beats=4, bpm=120.0)
     assert adapter._groove_files == []
+
+
+async def test_dance_uses_torso_and_recentres(adapter) -> None:
+    """U139: the full dance swings the TORSO too, and always lands square."""
+    await adapter.connect()
+    mini = adapter._created[0]
+    before = len(mini.calls)
+    await adapter.execute_motion(MotionCommand(motion_id="dance", direction=None, manual=True))
+    calls = mini.calls[before:]
+    yaws = [kw["yaw"] for name, kw in calls if name == "set_target_body_yaw"]
+    assert len(yaws) >= 6                      # torso swings throughout, not once
+    assert max(yaws) > 0 and min(yaws) < 0      # both directions
+    assert yaws[-1] == 0.0                      # lands facing forward
+    # And it still moves head/antennas — a whole-body routine.
+    assert sum(1 for n, _ in calls if n == "goto_target") >= 10
+
+
+async def test_dance_restores_body_follow(adapter) -> None:
+    """Body-follow was on before the dance → it must be on again after."""
+    await adapter.connect()
+    await adapter.set_body_follow(True)
+    mini = adapter._created[0]
+    before = len(mini.calls)
+    await adapter.execute_motion(MotionCommand(motion_id="dance", direction=None, manual=True))
+    yaw_toggles = [kw["enabled"] for n, kw in mini.calls[before:]
+                   if n == "set_automatic_body_yaw"]
+    assert yaw_toggles and yaw_toggles[0] is False   # paused during the routine
+    assert yaw_toggles[-1] is True                   # restored afterwards
