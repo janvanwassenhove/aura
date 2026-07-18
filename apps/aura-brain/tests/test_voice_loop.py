@@ -43,6 +43,23 @@ def test_note_spoken_opens_followup_and_guards_echo(monkeypatch) -> None:
     assert loop._followup_until > loop._speaking_until  # then a follow-up window
 
 
+def test_local_wake_confirmed_treats_transcript_as_command(monkeypatch) -> None:
+    """U128: when the local detector fired, the wake word counts as said even
+    if STT dropped it — the whole transcript is the command."""
+    loop = _loop(monkeypatch)
+    # STT transcribed only the command (no 'Richie'), but wake was confirmed
+    # locally → in_followup-style handling returns the text as-is.
+    assert loop._extract_command("zet de champions op", in_followup=True) == "zet de champions op"
+    # Without a wake (transcript path) the same text is ignored.
+    assert loop._extract_command("zet de champions op", in_followup=False) is None
+
+
+def test_default_build_has_no_local_detector(monkeypatch) -> None:
+    """U128: default install keeps the STT-fuzzy path (no local detector)."""
+    loop = _loop(monkeypatch)
+    assert loop._wake_detector is None
+
+
 def test_mode_and_wake_read_live_from_env(monkeypatch) -> None:
     loop = _loop(monkeypatch, wake="aura")
     assert loop._mode == "wake_word"
