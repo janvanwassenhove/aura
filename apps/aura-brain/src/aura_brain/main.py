@@ -794,6 +794,18 @@ def create_app() -> FastAPI:
     async def health() -> JSONResponse:
         return JSONResponse({"status": "ok", "service": "aura-brain", "phase": "1-scaffold"})
 
+    @app.get("/voice/realtime-cost")
+    async def realtime_cost() -> JSONResponse:
+        """U129: running Realtime spend estimate (this brain session)."""
+        import os as _os
+
+        from aura_brain.realtime_voice import METER
+        return JSONResponse({
+            "engine": _os.environ.get("VOICE_ENGINE", "pipeline"),
+            "model": _os.environ.get("REALTIME_MODEL", "gpt-4o-mini-realtime-preview"),
+            **METER.summary(),
+        })
+
     @app.websocket("/ws/events")
     async def ws_events(websocket: WebSocket) -> None:
         await ctx.broadcaster.connect(websocket)

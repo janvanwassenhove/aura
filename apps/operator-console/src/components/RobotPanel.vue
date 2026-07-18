@@ -17,6 +17,11 @@
     <div v-if="robotStore.isSpeaking && robotStore.currentTranscript" class="transcript-box">
       {{ robotStore.currentTranscript }}
     </div>
+    <!-- U129: live Realtime spend, only shown when that engine is active -->
+    <div v-if="realtimeCost && realtimeCost.engine === 'realtime'" class="rt-cost"
+         :title="`${realtimeCost.turns} turns · ${realtimeCost.model}`">
+      🎙️ Realtime ~${{ realtimeCost.estimated_usd.toFixed(4) }} <span class="rt-turns">({{ realtimeCost.turns }} turns)</span>
+    </div>
 
     <!-- U125: labelled toggle tiles — even 4-up grid, self-explanatory -->
     <div class="toggle-grid">
@@ -216,7 +221,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { onMounted, onUnmounted, ref } from 'vue'
 import {
   Bell, Bot, ChevronRight, ChevronsDown, Eye, Hand, Laugh, Moon, MoveHorizontal, MoveVertical,
   Mic, MicOff, Pencil, Power, RefreshCw, Sparkles, ThumbsUp, Volume1, Volume2, VolumeX,
@@ -232,6 +237,16 @@ const volume = ref(0.8)
 // U114: collapse the button farm + motion log so the camera stays in view.
 const actionsOpen = ref(false)
 const motionOpen = ref(false)
+
+// U129: live Realtime spend meter — polled while the panel is mounted.
+const realtimeCost = ref<{ engine: string; model: string; turns: number; estimated_usd: number } | null>(null)
+let costTimer: ReturnType<typeof setInterval> | undefined
+async function fetchRealtimeCost(): Promise<void> {
+  try {
+    const r = await fetch(`${BRAIN_URL}/voice/realtime-cost`)
+    realtimeCost.value = r.ok ? await r.json() : null
+  } catch { realtimeCost.value = null }
+}
 
 // U117: app logs (moved here from Settings) — local ring buffer.
 const logsOpen = ref(false)
@@ -425,7 +440,12 @@ async function applyVolume() {
   } catch { /* robot offline — slider stays local */ }
 }
 
-onMounted(() => { fetchCharacters(); fetchMic(); fetchSleep(); fetchProactive() })
+onMounted(() => {
+  fetchCharacters(); fetchMic(); fetchSleep(); fetchProactive()
+  fetchRealtimeCost()
+  costTimer = setInterval(fetchRealtimeCost, 10_000)  // U129: refresh spend
+})
+onUnmounted(() => { if (costTimer) clearInterval(costTimer) })
 onMounted(async () => {
   try {
     const resp = await fetch(`${BRAIN_URL}/robot/volume`)
@@ -472,6 +492,10 @@ function fmtTime(iso: string): string {
   border-radius: var(--radius-sm); color: var(--text); padding: 0.15rem 0.4rem;
   font-size: 0.78rem; font-family: inherit;
 }
+
+/* U129: realtime cost line */
+.rt-cost { font-size: 0.72rem; color: var(--text-faint); padding: 0.2rem 0; }
+.rt-turns { opacity: 0.7; }
 
 /* U114: compact status strip */
 .status-strip {
