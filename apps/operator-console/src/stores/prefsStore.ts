@@ -17,11 +17,13 @@ export const LANGUAGES: { id: Language; label: string }[] = [
 ]
 
 export type VoiceMode = 'off' | 'wake_word'
+export type VoiceEngine = 'pipeline' | 'realtime'  // U132
 
 export const usePrefsStore = defineStore('prefs', () => {
   const assistantName = ref('AURA')
   const language = ref<Language>('auto')
   const voiceMode = ref<VoiceMode>('off')
+  const voiceEngine = ref<VoiceEngine>('pipeline')
   const wakeWord = ref('AURA')
   const ttsVoice = ref('alloy')
   const saving = ref(false)
@@ -35,8 +37,8 @@ export const usePrefsStore = defineStore('prefs', () => {
         assistantName.value = data.assistant_name ?? 'AURA'
         language.value = (data.language ?? 'auto') as Language
         voiceMode.value = (data.voice_mode ?? 'off') as VoiceMode
+        voiceEngine.value = (data.voice_engine ?? 'pipeline') as VoiceEngine
         wakeWord.value = data.wake_word
-      ttsVoice.value = data.tts_voice ?? ttsVoice.value ?? assistantName.value
         ttsVoice.value = data.tts_voice ?? 'alloy'
       }
     } catch { /* keep defaults */ }
@@ -44,7 +46,7 @@ export const usePrefsStore = defineStore('prefs', () => {
 
   async function save(fields: {
     assistant_name?: string; language?: Language;
-    voice_mode?: VoiceMode; wake_word?: string; tts_voice?: string
+    voice_mode?: VoiceMode; voice_engine?: VoiceEngine; wake_word?: string; tts_voice?: string
   }): Promise<boolean> {
     saving.value = true
     error.value = null
@@ -62,6 +64,7 @@ export const usePrefsStore = defineStore('prefs', () => {
       assistantName.value = data.assistant_name
       language.value = data.language
       voiceMode.value = data.voice_mode
+      voiceEngine.value = data.voice_engine ?? voiceEngine.value
       wakeWord.value = data.wake_word
       ttsVoice.value = data.tts_voice ?? ttsVoice.value
       return true
@@ -73,5 +76,5 @@ export const usePrefsStore = defineStore('prefs', () => {
     }
   }
 
-  return { assistantName, language, voiceMode, wakeWord, ttsVoice, saving, error, fetchPrefs, save }
+  return { assistantName, language, voiceMode, voiceEngine, wakeWord, ttsVoice, saving, error, fetchPrefs, save }
 })

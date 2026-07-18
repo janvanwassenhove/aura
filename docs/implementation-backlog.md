@@ -394,6 +394,9 @@ the human can unblock it.
 - [x] **U131 — terloopse spraak: weer + nieuwsgierige toon, niet meer repetitief** · `pending`
   Nieuw `ambient.py`: `current_weather()` (Open-Meteo, geen key; WEATHER_LAT/LON, default Brussel, 15min-cache, best-effort), `time_of_day()`, en een ring van recente spontane regels. De greet-on-recognition-prompt krijgt nu een ambient-note (tijdstip + actueel weer + "herhaal deze recente regels NIET") en de instructie "één korte, warme, écht NIEUWSGIERIGE zin — klink geïnteresseerd, niet gescript"; de gesproken begroeting wordt onthouden zodat de volgende anders is. Zo verwijst Richie naar het weer en herhaalt hij zich niet meer. +5 tests. Brain groen.
 
+- [x] **U132 — conversation-engine-schakelaar in Settings + kostenteller-vindbaarheid** · `pending`
+  `VOICE_ENGINE` zat alleen in de .env. Nu een dropdown **Settings → Appearance → "Conversation engine"** (Pipeline ⇄ Realtime) via de prefs-API (`voice_engine`, gevalideerd pipeline|realtime, live in os.environ + persistent) — geen .env-editen of herstart meer nodig. De hint legt uit wat elk doet en verwijst naar de kostenteller. Die teller staat in het **Robot State**-paneel als "🎙️ Realtime ~$X (N turns)" en verschijnt zodra de engine op realtime staat (poll elke 10s via `GET /voice/realtime-cost`). Live geverifieerd: control + opties aanwezig, Deutsch in de taalkeuze. +1 test. Brain + console groen.
+
 ## Progress log (append-only; newest last)
 
 - 2026-06-21 — ledger created on `aura-autobuild`; Phase 0/0b complete, Phase 1 scaffold (U-pre) done before this loop started.

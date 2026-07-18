@@ -126,6 +126,18 @@
             <input id="wake-word" v-model="localWake" class="field-input" maxlength="24" :placeholder="localName" />
             <p class="conn-hint">Say “{{ localWake || localName }}, …” to start. After any reply the robot keeps listening so you can just answer.</p>
           </div>
+          <!-- U132: conversation engine — pipeline vs OpenAI Realtime -->
+          <div class="settings-field">
+            <label class="field-label" for="voice-engine">Conversation engine</label>
+            <select id="voice-engine" v-model="localVoiceEngine" class="field-select">
+              <option value="pipeline">Pipeline — STT → LLM → TTS (tools, cheaper)</option>
+              <option value="realtime">Realtime — natural speech-to-speech (beta)</option>
+            </select>
+            <p class="conn-hint">
+              <template v-if="localVoiceEngine === 'realtime'">Fluent, multilingual, opens only after the wake word. Bills audio while talking — watch the live cost in <strong>Robot State</strong>. Falls back to Pipeline on any error.</template>
+              <template v-else>The classic, tool-capable path. Switch to Realtime for the most human, low-latency conversation.</template>
+            </p>
+          </div>
           <div>
             <button class="btn-apply" :disabled="prefsStore.saving" @click="savePrefs">
               {{ prefsStore.saving ? 'Saving…' : 'Save' }}
@@ -423,6 +435,7 @@ const activeTab = ref<'llm' | 'connections' | 'appearance'>('llm')
 const localName = ref(prefsStore.assistantName)
 const localLang = ref(prefsStore.language)
 const localVoiceMode = ref(prefsStore.voiceMode)
+const localVoiceEngine = ref(prefsStore.voiceEngine)
 const localWake = ref(prefsStore.wakeWord)
 const localTtsVoice = ref(prefsStore.ttsVoice)
 
@@ -447,6 +460,7 @@ onMounted(async () => {
   localName.value = prefsStore.assistantName
   localLang.value = prefsStore.language
   localVoiceMode.value = prefsStore.voiceMode
+  localVoiceEngine.value = prefsStore.voiceEngine
   localWake.value = prefsStore.wakeWord
   localTtsVoice.value = prefsStore.ttsVoice
 })
@@ -457,6 +471,7 @@ async function savePrefs() {
     assistant_name: localName.value.trim() || 'AURA',
     language: localLang.value,
     voice_mode: localVoiceMode.value,
+    voice_engine: localVoiceEngine.value,
     wake_word: localWake.value.trim() || localName.value.trim() || 'AURA',
     tts_voice: localTtsVoice.value,
   })

@@ -239,6 +239,7 @@ _ALLOWED_LANGUAGES = {"auto", "en", "nl", "fr", "de"}  # U130: + German
 
 
 _ALLOWED_VOICE_MODES = {"off", "wake_word"}
+_ALLOWED_VOICE_ENGINES = {"pipeline", "realtime"}  # U132
 
 
 def _prefs_snapshot() -> dict:
@@ -246,6 +247,7 @@ def _prefs_snapshot() -> dict:
         "assistant_name": os.environ.get("ASSISTANT_NAME", "AURA"),
         "language": os.environ.get("ASSISTANT_LANGUAGE", "auto"),
         "voice_mode": os.environ.get("VOICE_MODE", "off"),
+        "voice_engine": os.environ.get("VOICE_ENGINE", "pipeline"),  # U132
         "wake_word": os.environ.get("WAKE_WORD", os.environ.get("ASSISTANT_NAME", "AURA")),
         "tts_voice": os.environ.get("TTS_VOICE", "alloy"),
         # U84: conversation-layer settings
@@ -294,6 +296,15 @@ async def set_prefs(body: dict) -> JSONResponse:
                 status_code=422,
             )
         updates["VOICE_MODE"] = voice_mode
+    voice_engine = (body or {}).get("voice_engine")
+    if voice_engine is not None:
+        voice_engine = voice_engine.strip().lower()
+        if voice_engine not in _ALLOWED_VOICE_ENGINES:
+            return JSONResponse(
+                {"error": f"voice_engine must be one of {sorted(_ALLOWED_VOICE_ENGINES)}"},
+                status_code=422,
+            )
+        updates["VOICE_ENGINE"] = voice_engine
     tts_voice = (body or {}).get("tts_voice")
     if tts_voice is not None:
         from aura_brain.voice import TTS_VOICES
