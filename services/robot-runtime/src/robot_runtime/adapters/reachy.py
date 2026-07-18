@@ -85,6 +85,7 @@ class ReachyRobotAdapter(RobotAdapter):
         # play at full amplitude, then resume it (U38-fix).
         self._tracking_on = False
         self._body_follow = False  # U37: torso turns with the tracked face
+        self._tracking_watchdog: asyncio.Task | None = None  # U126
         import threading
 
         self._audio_abort = threading.Event()  # U84: barge-in cuts speech
@@ -211,14 +212,40 @@ class ReachyRobotAdapter(RobotAdapter):
 
         self._mini = await asyncio.to_thread(_open)
         self._mode = RobotMode.ONLINE
+        # U126: follow-me watchdog — head tracking silently dies (a motion pauses
+        # it and a resume fails, the daemon drops the face, etc.) and then never
+        # comes back until a manual toggle. Re-assert it periodically so it
+        # self-heals within a few seconds. TRACKING_WATCHDOG_S=0 disables it.
+        if self._tracking_watchdog is None or self._tracking_watchdog.done():
+            self._tracking_watchdog = asyncio.ensure_future(self._tracking_watchdog_loop())
         logger.info(
             "ReachyRobotAdapter connected (host=%s mode=%s media=%s)",
             self._host, self._connection_mode, self._media_backend,
         )
 
+    async def _tracking_watchdog_loop(self) -> None:
+        interval = float(os.environ.get("TRACKING_WATCHDOG_S", "5"))
+        if interval <= 0:
+            return
+        while self._mini is not None:
+            await asyncio.sleep(interval)
+            # Only when follow-me SHOULD be on, and never mid-motion (the lock is
+            # held during a gesture/speech — re-asserting then would fight it).
+            if not self._tracking_on or self._mini is None or self._motion_lock.locked():
+                continue
+            try:
+                await asyncio.to_thread(self._mini.start_head_tracking)
+                if self._body_follow:
+                    await asyncio.to_thread(self._mini.set_automatic_body_yaw, True)
+            except Exception as exc:  # noqa: BLE001 — best-effort re-assert
+                logger.debug("tracking watchdog re-assert failed: %s", exc)
+
     async def disconnect(self) -> None:
         if self._mini is None:
             return
+        if self._tracking_watchdog is not None:
+            self._tracking_watchdog.cancel()
+            self._tracking_watchdog = None
         mini = self._mini
         self._mini = None
         self._mode = RobotMode.OFFLINE
@@ -246,6 +273,7 @@ class ReachyRobotAdapter(RobotAdapter):
             battery_pct=100.0,  # SDK exposes no battery reading yet
             connected=self._mini is not None,
             adapter_name="reachy",
+            tracking=self._tracking_on,  # U126: is follow-me actually on?
         )
 
     async def set_state(self, mode: RobotMode, behavior_state: BehaviorState) -> None:

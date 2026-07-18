@@ -57,6 +57,7 @@ class BrainContext:
         self.person_memory = None  # U109: PersonMemory | None
         self.proactive = None      # U110: ProactiveEngine | None
         self.pipeline = None
+        self.recognition_gallery = None  # U127: per-person snapshots
         self._perception = None
         self._robot_bridge = None
         self._maintenance = None
@@ -596,6 +597,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     _sighting_log = SightingLog()
     recognition_api.set_sightings(_sighting_log)
 
+    # U127: per-person recognition snapshots (in-memory, gated to SENSITIVE).
+    from aura_brain.recognition_gallery import RecognitionGallery
+
+    ctx.recognition_gallery = RecognitionGallery()
+    knowledge_api.set_recognition_gallery(ctx.recognition_gallery)
+
     ctx._perception = PerceptionLoop(
         ctx.bus, None, _robot, _boot_embedder,
         knowledge_store=ctx.knowledge_store,
@@ -603,6 +610,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         session_id=session_id,
         gesture_detector=_gesture_detector,
         sighting_log=_sighting_log,
+        gallery=ctx.recognition_gallery,
     )
     if _gesture_detector is not None or _boot_embedder.name != "null":
         ctx._perception.start()

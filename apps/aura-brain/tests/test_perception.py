@@ -181,6 +181,31 @@ async def test_unknown_face_lands_in_sighting_log() -> None:
     assert len(log.list()) == 1
 
 
+async def test_known_person_lands_in_recognition_gallery() -> None:
+    """U127: recognizing a KNOWN person drops a snapshot in their gallery."""
+    from aura_brain.recognition_gallery import RecognitionGallery
+
+    class PngRobot(FakeRobot):
+        async def camera_frame(self) -> bytes:
+            import io
+
+            from PIL import Image
+
+            buf = io.BytesIO()
+            Image.new("RGB", (64, 48), (30, 60, 90)).save(buf, format="PNG")
+            return buf.getvalue()
+
+    matcher = EmbeddingMatcher(OMK)
+    matcher.enroll("jan", JAN_FACE)
+    gallery = RecognitionGallery(cooldown_s=0.0)
+    bus = FakeBus()
+    loop = PerceptionLoop(bus, matcher, PngRobot(), ScriptedEmbedder([JAN_FACE]),
+                          knowledge_store=FakeStore({"jan": "Jan"}), gallery=gallery)
+    await loop.tick()
+    snaps = gallery.list("jan")
+    assert len(snaps) == 1 and snaps[0]["image"].startswith("data:image/jpeg")
+
+
 async def test_set_matcher_upgrades_running_loop() -> None:
     bus = FakeBus()
     loop = PerceptionLoop(bus, None, FakeRobot(), NullEmbedder())

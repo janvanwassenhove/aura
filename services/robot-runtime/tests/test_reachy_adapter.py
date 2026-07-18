@@ -149,6 +149,35 @@ async def test_wake_up_and_sleep_map_to_sdk_emotes(adapter) -> None:
     assert moves.index("set_automatic_body_yaw") < moves.index("goto_sleep")
 
 
+async def test_status_reports_tracking(adapter, monkeypatch) -> None:
+    """U126: follow-me state is visible in the status."""
+    monkeypatch.setenv("HEAD_TRACKING", "false")  # don't auto-enable on connect
+    await adapter.connect()
+    assert (await adapter.get_status()).tracking is False
+    await adapter.set_tracking(True)
+    assert (await adapter.get_status()).tracking is True
+
+
+async def test_tracking_watchdog_reasserts(adapter, monkeypatch) -> None:
+    """U126: the watchdog re-calls start_head_tracking while follow-me is on,
+    so a silently-dropped tracker self-heals."""
+    monkeypatch.setenv("HEAD_TRACKING", "false")
+    monkeypatch.setenv("TRACKING_WATCHDOG_S", "0.02")
+    await adapter.connect()
+    await adapter.set_tracking(True)
+    mini = adapter._created[0]
+    before = [n for n, _ in mini.calls].count("start_head_tracking")
+    import asyncio
+    await asyncio.sleep(0.07)  # let the watchdog fire a couple of times
+    after = [n for n, _ in mini.calls].count("start_head_tracking")
+    assert after > before
+    # When follow-me is OFF the watchdog must NOT re-assert it.
+    await adapter.set_tracking(False)
+    idle = [n for n, _ in mini.calls].count("start_head_tracking")
+    await asyncio.sleep(0.07)
+    assert [n for n, _ in mini.calls].count("start_head_tracking") == idle
+
+
 async def test_wake_up_resumes_tracking_after_sleep(adapter) -> None:
     """U116: sleep stops head tracking; the wake_up MOTION must restart it —
     otherwise the Sleep→Wake quick actions leave follow-me dead."""
