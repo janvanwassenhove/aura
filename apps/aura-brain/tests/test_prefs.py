@@ -49,6 +49,15 @@ def test_rejects_bad_language(client) -> None:
     assert c.post("/setup/prefs", json={"language": "xx"}).status_code == 422
 
 
+def test_voice_engine_toggle(client) -> None:
+    """U132: the conversation engine is switchable from prefs (Settings UI)."""
+    c, _ = client
+    assert c.get("/setup/prefs").json()["voice_engine"] == "pipeline"
+    r = c.post("/setup/prefs", json={"voice_engine": "realtime"})
+    assert r.status_code == 200 and r.json()["voice_engine"] == "realtime"
+    assert c.post("/setup/prefs", json={"voice_engine": "bogus"}).status_code == 422
+
+
 def test_rejects_bad_name(client) -> None:
     c, _ = client
     assert c.post("/setup/prefs", json={"assistant_name": "a/b<script>"}).status_code == 422
