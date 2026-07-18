@@ -153,6 +153,15 @@ class VoiceLoop:
         # suspend follow-up windows entirely; only the wake word counts.
         self._music_guard_s = float(os.environ.get("MUSIC_GUARD_S", "180"))
         self._music_until = 0.0
+        # U128: local wake-word — detect "Richie" on-device instead of
+        # transcribing every window over the network. None → keep the existing
+        # transcribe-then-fuzzy path (graceful fallback).
+        try:
+            from aura_brain.wakeword import build_detector
+            self._wake_detector = build_detector()
+        except Exception as exc:  # noqa: BLE001 — never block startup on this
+            logger.debug("wake detector unavailable: %s", exc)
+            self._wake_detector = None
 
     def note_music_started(self) -> None:
         """Called when a music tool ran: lyrics are about to hit the mic.
@@ -332,6 +341,18 @@ class VoiceLoop:
                         continue  # silence — cheap skip, no STT
 
                 in_followup = in_barge or time.monotonic() < self._followup_until
+                # U128: LOCAL wake gate — outside a follow-up window, detect the
+                # wake word on-device before spending a network STT call. No
+                # detector (or a follow-up window) → keep the old transcribe path.
+                wake_confirmed = False
+                if not in_followup and self._wake_detector is not None:
+                    try:
+                        wake_confirmed = await asyncio.to_thread(self._wake_detector.detect, wav)
+                    except Exception as exc:  # noqa: BLE001
+                        logger.debug("wake detect failed, falling back to STT: %s", exc)
+                        wake_confirmed = True  # let STT+fuzzy decide instead
+                    if not wake_confirmed:
+                        continue  # no wake word heard → skip STT entirely
                 # U91: a follow-up window accepts speech WITHOUT the wake word,
                 # so ambient noise/TV/echo can hallucinate a "command". Require
                 # a deliberately-louder utterance there (the user actually
@@ -352,12 +373,16 @@ class VoiceLoop:
                     logger.debug("voice loop ignored self-echo in follow-up: %r", text[:60])
                     continue
 
-                command = self._extract_command(text, in_followup)
+                # U128: a local-confirmed wake means the wake word WAS said even
+                # if STT dropped it — treat the transcript as command-bearing
+                # (strip a leading wake token if it did transcribe).
+                command = self._extract_command(text, in_followup or wake_confirmed)
                 if command is None:
                     continue
                 # U67: track the wake-word-less chain. Hearing the wake word
-                # resets it — a real user re-engaging restores full flow.
-                if wake_word_index(text, self._wake) >= 0:
+                # (transcribed OR locally detected, U128) resets it — a real
+                # user re-engaging restores full flow.
+                if wake_confirmed or wake_word_index(text, self._wake) >= 0:
                     self._followup_chain = 0
                 elif in_followup:
                     self._followup_chain += 1
