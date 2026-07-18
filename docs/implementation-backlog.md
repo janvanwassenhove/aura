@@ -397,6 +397,9 @@ the human can unblock it.
 - [x] **U132 — conversation-engine-schakelaar in Settings + kostenteller-vindbaarheid** · `pending`
   `VOICE_ENGINE` zat alleen in de .env. Nu een dropdown **Settings → Appearance → "Conversation engine"** (Pipeline ⇄ Realtime) via de prefs-API (`voice_engine`, gevalideerd pipeline|realtime, live in os.environ + persistent) — geen .env-editen of herstart meer nodig. De hint legt uit wat elk doet en verwijst naar de kostenteller. Die teller staat in het **Robot State**-paneel als "🎙️ Realtime ~$X (N turns)" en verschijnt zodra de engine op realtime staat (poll elke 10s via `GET /voice/realtime-cost`). Live geverifieerd: control + opties aanwezig, Deutsch in de taalkeuze. +1 test. Brain + console groen.
 
+- [x] **U133 — "Richie spreekt niet terug": Realtime-hang → timeout + circuit-breaker → pijplijn-fallback** · `pending`
+  Diagnose via de draaiende brain: `VOICE_ENGINE=realtime` én `turns:0` — de Realtime-tak werd genomen maar voltooide geen enkele beurt. Oorzaak: de Realtime-verbinding kon HANGEN (verkeerd audioformaat / geen realtime-entitlement / nooit een `response.done`); zonder timeout bevroor dat de spraaklus zónder terug te vallen. Fix: (1) `run_realtime_turn` staat nu onder `asyncio.wait_for` (REALTIME_TURN_TIMEOUT_S=15) → een hang gooit RuntimeError i.p.v. vast te lopen. (2) Circuit-breaker in de voice-loop: na 2 mislukte Realtime-beurten wordt Realtime voor de sessie uitgezet (`_realtime_broken`) met een duidelijke logregel — de pijplijn neemt de hele sessie over, geen 15s-hang meer per beurt. Zo praat Richie altijd terug, ook als Realtime (nog) niet werkt. Tests groen. NB: de live Realtime-audio blijft ongeverifieerd op de Pi; zet de engine terug op Pipeline in Settings tot we 'm samen live testen.
+
 ## Progress log (append-only; newest last)
 
 - 2026-06-21 — ledger created on `aura-autobuild`; Phase 0/0b complete, Phase 1 scaffold (U-pre) done before this loop started.
