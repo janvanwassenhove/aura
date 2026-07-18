@@ -501,7 +501,11 @@ class VoiceLoop:
             transcript, audio_out = await realtime_voice.run_realtime_turn(
                 pcm, instructions=instructions, voice=voice_id)
             if not audio_out:
-                return False
+                # U141: empty audio means the account/model returns no audio for
+                # Realtime (seen live: ~11s, 0 chars, 0 bytes every turn). That
+                # is a failure, not a fall-through — count it so the circuit
+                # breaker trips instead of wasting the timeout on every turn.
+                raise RuntimeError("realtime returned no audio (account/model not producing audio)")
             import base64
 
             from shared_schemas.events.audio import TranscriptUpdated
@@ -522,13 +526,15 @@ class VoiceLoop:
             return True
         except Exception as exc:  # noqa: BLE001 — realtime is best-effort
             self._realtime_fails = getattr(self, "_realtime_fails", 0) + 1
-            if self._realtime_fails >= 2:
+            # "no audio" is deterministic (the account/model just doesn't return
+            # audio) → disable immediately instead of wasting the timeout twice.
+            deterministic = "no audio" in str(exc)
+            if deterministic or self._realtime_fails >= 2:
                 self._realtime_broken = True
                 logger.warning(
-                    "realtime failed %d× (%s) — disabling Realtime for this "
-                    "session; using the pipeline. Switch the engine back to "
-                    "Pipeline in Settings, or restart to retry.",
-                    self._realtime_fails, exc)
+                    "Realtime disabled for this session (%s) — falling back to "
+                    "the pipeline so Richie replies. Set Conversation engine "
+                    "back to Pipeline in Settings (or restart to retry).", exc)
             else:
                 logger.warning("realtime turn failed, using pipeline: %s", exc)
             return False
