@@ -375,8 +375,17 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
                     reply_voice = character.voice_id
                 reply_speed = character.voice_speed or 1.0
 
+            # Phase 0 (U140): mark the TTS + playback stages on the live trace.
+            from aura_brain.turn_trace import LOG as _TRACE
+            _t = _TRACE.current(getattr(event, "session_id", "default"))
+
             async def _synth(chunk: str) -> str:
-                return await voice.synthesize_b64(chunk, reply_voice, speed=reply_speed)
+                if _t is not None:
+                    _t.mark("tts_request_sent")
+                audio = await voice.synthesize_b64(chunk, reply_voice, speed=reply_speed)
+                if _t is not None:
+                    _t.mark("tts_first_audio")
+                return audio
 
             # U83: streaming is default OFF — one synth + one continuous file
             # plays the whole answer smoothly (per-chunk playbin files gapped).
@@ -387,6 +396,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
                     async def _speak_chunk(chunk: str, audio_b64: str) -> None:
                         if ctx.conversation.tts_cancel.is_set():
                             raise asyncio.CancelledError
+                        if _t is not None:
+                            _t.mark("playback_first_sample")
                         await _robot.speak(chunk, audio_b64=audio_b64)
 
                     await stream_speech(capped, _synth, _speak_chunk)
@@ -394,7 +405,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
                     audio_b64 = await _synth(capped)
                     if ctx.conversation.tts_cancel.is_set():
                         return  # interrupted during synthesis — stay silent
+                    if _t is not None:
+                        _t.mark("playback_first_sample")
                     await _robot.speak(capped, audio_b64=audio_b64)
+                    if _t is not None:
+                        _t.mark("playback_complete")
 
             speak_task = asyncio.ensure_future(_do_speak())
             ctx.conversation.register_speak_task(speak_task)
@@ -799,6 +814,14 @@ def create_app() -> FastAPI:
     @app.get("/health")
     async def health() -> JSONResponse:
         return JSONResponse({"status": "ok", "service": "aura-brain", "phase": "1-scaffold"})
+
+    @app.get("/voice/turn-traces")
+    async def turn_traces(n: int = 20) -> JSONResponse:
+        """Phase 0 (U140): per-turn latency breakdown for the last N turns,
+        slowest first, with mouth-to-ear p50/p95."""
+        from aura_brain.turn_trace import LOG
+
+        return JSONResponse(LOG.report(n=max(1, min(n, 200))))
 
     @app.get("/voice/realtime-cost")
     async def realtime_cost() -> JSONResponse:
