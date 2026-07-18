@@ -276,16 +276,19 @@ body {
 .tool-succeeded { background: var(--ok-bg-deep); color: var(--ok-text); }
 .tool-failed { background: var(--danger-bg); color: var(--danger-text); }
 
-.input-row { display: flex; gap: 0.5rem; align-items: center; padding-top: 0.25rem; }
+/* U122: the input field shrinks; the action buttons never do, so the mic /
+   robot-mic / teach / send controls stay visible however narrow the chat gets. */
+.input-row { display: flex; gap: 0.4rem; align-items: center; padding-top: 0.25rem; min-width: 0; }
 .chat-input {
-  flex: 1; padding: 0.4rem 0.75rem;
+  flex: 1 1 0; min-width: 0; padding: 0.4rem 0.75rem;
   background: var(--surface-3); border: 1px solid var(--border); border-radius: var(--radius);
   color: var(--text); font-size: 0.85rem; outline: none;
 }
 .chat-input:focus { border-color: var(--accent); }
 .chat-input:disabled { opacity: 0.5; cursor: not-allowed; }
+.input-row .btn-mic { flex-shrink: 0; }
 
-.btn-primary { padding: 0.4rem 1rem; border-radius: var(--radius); background: var(--accent); color: var(--on-accent); font-size: 0.85rem; cursor: pointer; border: none; }
+.btn-primary { flex-shrink: 0; padding: 0.4rem 1rem; border-radius: var(--radius); background: var(--accent); color: var(--on-accent); font-size: 0.85rem; cursor: pointer; border: none; }
 .btn-primary:hover:not(:disabled) { background: var(--accent-hover); }
 .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
 .btn-ghost { background: transparent; border: none; color: var(--text-faint); cursor: pointer; padding: 0.25rem 0.5rem; }
