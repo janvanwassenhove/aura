@@ -188,13 +188,16 @@ class SkillStore:
         return skill
 
     def delete(self, name: str) -> bool:
+        if not _NAME_RE.match(name):  # SEC: no path traversal via the {name} route
+            return False
         path = self._dir / f"{name}.md"
         if not path.exists():
             return False
         path.unlink()
         self._loaded_at = 0.0
         for side in (self._obs_path(name), self._opt_path(name)):
-            side.unlink(missing_ok=True)
+            if side is not None:
+                side.unlink(missing_ok=True)
         logger.info("skill deleted: %s", name)
         return True
 
@@ -209,19 +212,27 @@ class SkillStore:
     def _metrics_dir(self) -> Path:
         return self._dir / ".metrics"
 
-    def _obs_path(self, name: str) -> Path:
+    def _obs_path(self, name: str) -> Path | None:
+        # SEC: the name reaches here from the /skills/{name}/... routes — never
+        # let it build a path outside .metrics/ (e.g. "../../etc/passwd").
+        if not _NAME_RE.match(name):
+            return None
         return self._metrics_dir / f"{name}.jsonl"
 
-    def _opt_path(self, name: str) -> Path:
+    def _opt_path(self, name: str) -> Path | None:
         # Records the observation count at the last optimization, so the UI
         # can surface "N new signals since you last optimized this skill".
+        if not _NAME_RE.match(name):
+            return None
         return self._metrics_dir / f"{name}.optimized"
 
     def record_observation(self, name: str, obs: dict) -> None:
         """Append one usage observation. Best-effort — never raises into a turn."""
+        path = self._obs_path(name)
+        if path is None:
+            return
         try:
             self._metrics_dir.mkdir(parents=True, exist_ok=True)
-            path = self._obs_path(name)
             entry = {"ts": round(time.time()), **obs}
             with path.open("a", encoding="utf-8") as fh:
                 fh.write(json.dumps(entry, ensure_ascii=False) + "\n")
@@ -234,7 +245,7 @@ class SkillStore:
 
     def observations(self, name: str) -> list[dict]:
         path = self._obs_path(name)
-        if not path.exists():
+        if path is None or not path.exists():
             return []
         out: list[dict] = []
         for line in path.read_text(encoding="utf-8").splitlines():
@@ -248,9 +259,12 @@ class SkillStore:
         return out
 
     def mark_optimized(self, name: str) -> None:
+        opt = self._opt_path(name)
+        if opt is None:
+            return
         try:
             self._metrics_dir.mkdir(parents=True, exist_ok=True)
-            self._opt_path(name).write_text(str(len(self.observations(name))), encoding="utf-8")
+            opt.write_text(str(len(self.observations(name))), encoding="utf-8")
         except OSError as exc:
             logger.debug("skill optimize-marker not written for %s: %s", name, exc)
 
@@ -258,8 +272,9 @@ class SkillStore:
         """Lightweight counts for the UI: total uses and new since last optimize."""
         obs = self.observations(name)
         prev = 0
+        opt = self._opt_path(name)
         try:
-            prev = int(self._opt_path(name).read_text(encoding="utf-8").strip() or "0")
+            prev = int(opt.read_text(encoding="utf-8").strip() or "0") if opt else 0
         except (OSError, ValueError):
             prev = 0
         last_ts = obs[-1]["ts"] if obs else None

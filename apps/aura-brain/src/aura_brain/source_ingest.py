@@ -79,13 +79,44 @@ def _source_label(url: str) -> str:
     return host.removeprefix("www.")
 
 
+def _is_public_http_url(url: str) -> bool:
+    """SEC (SSRF): only fetch public http(s) hosts. Reject other schemes and
+    loopback / private / link-local / reserved addresses so a source URL can't
+    make the brain hit localhost:8020, cloud metadata (169.254.169.254), etc."""
+    import ipaddress
+    import socket
+    from urllib.parse import urlparse
+
+    p = urlparse(url)
+    if p.scheme not in ("http", "https") or not p.hostname:
+        return False
+    host = p.hostname
+    try:
+        infos = socket.getaddrinfo(host, p.port or (443 if p.scheme == "https" else 80),
+                                   proto=socket.IPPROTO_TCP)
+    except (socket.gaierror, OSError):
+        return False
+    for info in infos:
+        ip = ipaddress.ip_address(info[4][0])
+        if (ip.is_private or ip.is_loopback or ip.is_link_local
+                or ip.is_reserved or ip.is_multicast or ip.is_unspecified):
+            return False
+    return True
+
+
 async def _fetch_page(url: str) -> str:
     """GET a page and return its stripped text. Seam for tests."""
+    if not _is_public_http_url(url):
+        raise httpx.RequestError(f"refused non-public URL: {url}")
     async with httpx.AsyncClient(
-        timeout=15.0, follow_redirects=True,
+        timeout=15.0, follow_redirects=True, max_redirects=5,
         headers={"User-Agent": "Mozilla/5.0 (AURA persona-graph)"},
     ) as client:
         page = await client.get(url)
+        # SEC: a public URL can 30x-redirect to an internal host — re-check the
+        # final URL that actually served the body.
+        if not _is_public_http_url(str(page.url)):
+            raise httpx.RequestError(f"refused redirect to non-public URL: {page.url}")
         page.raise_for_status()
         return _strip_html(page.text)
 
