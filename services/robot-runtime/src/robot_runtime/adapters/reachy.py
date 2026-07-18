@@ -731,19 +731,57 @@ class ReachyRobotAdapter(RobotAdapter):
                         mini.set_automatic_body_yaw(True)
                     except Exception:  # noqa: BLE001
                         pass
-        elif motion == "dance":  # the full routine: bop + sway + a twirl
+        elif motion == "dance":
+            # U139: the whole body goes in — head, antennas AND torso. The
+            # daemon eases the body toward each yaw target, so setting one
+            # between head legs makes the torso swing THROUGH the moves rather
+            # than after them.
             bpm = 120.0 * speed
-            half = 30.0 / bpm  # eighth notes — two moves per beat
-            self._play_groove(beats=7, bpm=bpm)
-            for i in range(4):
-                a = amp if i % 2 == 0 else -amp
-                go(head=_rot("x", 0.25 * amp), antennas=[a, -a], duration=half)
-                go(head=_rot("y", 0.3 * amp * (1 if i % 2 else -1)),
-                   antennas=[-a, a], duration=half)
-            for _ in range(2):
-                go(head=_rot("z", 0.45 * amp), antennas=[amp, amp], duration=half)
-                go(head=_rot("z", -0.45 * amp), antennas=[-amp, -amp], duration=half)
-            go(head=_NEUTRAL, antennas=[0.0, 0.0], duration=half)
+            half = 30.0 / bpm            # eighth notes — two moves per beat
+            twist = 1.0 * amp            # torso swing, radians
+            self._play_groove(beats=12, bpm=bpm)
+
+            def _yaw(target: float) -> None:
+                try:
+                    mini.set_target_body_yaw(target)
+                except Exception:  # noqa: BLE001 — no body yaw → head-only dance
+                    pass
+
+            try:
+                try:
+                    mini.set_automatic_body_yaw(False)  # don't fight the routine
+                except Exception:  # noqa: BLE001
+                    pass
+
+                # 1) Warm-up: bob with the torso rocking side to side.
+                for i in range(4):
+                    a = amp if i % 2 == 0 else -amp
+                    _yaw(twist * 0.5 if i % 2 == 0 else -twist * 0.5)
+                    go(head=_rot("x", 0.3 * amp), antennas=[a, -a], duration=half)
+                    go(head=_rot("y", 0.32 * amp * (1 if i % 2 else -1)),
+                       antennas=[-a, a], duration=half)
+
+                # 2) Big swings: torso and head lean into the same side.
+                for i in range(3):
+                    side = 1 if i % 2 == 0 else -1
+                    _yaw(twist * side)
+                    go(head=_rot("z", 0.5 * amp * side), antennas=[amp, amp], duration=half)
+                    go(head=_rot("y", 0.3 * amp * side), antennas=[-amp, -amp], duration=half)
+
+                # 3) Finale: a full twirl, then land square with a flourish.
+                for target in (twist, -twist, 0.0):
+                    _yaw(target)
+                    go(head=_rot("z", 0.45 * amp * (1 if target > 0 else -1)),
+                       antennas=[amp, -amp], duration=half)
+                go(head=_rot("x", 0.25 * amp), antennas=[amp, amp], duration=half)
+                go(head=_NEUTRAL, antennas=[0.0, 0.0], duration=half * 1.5)
+            finally:
+                _yaw(0.0)  # always land facing forward
+                if self._body_follow:
+                    try:
+                        mini.set_automatic_body_yaw(True)
+                    except Exception:  # noqa: BLE001
+                        pass
         elif motion == "look_around":  # idle curiosity: glance at 2 spots, settle
             import random
 
