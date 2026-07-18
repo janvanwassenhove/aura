@@ -111,3 +111,30 @@ async def test_propose_handles_garbage_model_output(store) -> None:
 
     result = await propose_optimization(store, "start-spotify", _garbage)
     assert "error" in result
+
+
+# ------------------------------------------------------------------
+# U118: creation-time polish (no store, no usage evidence)
+# ------------------------------------------------------------------
+
+async def test_polish_draft_rewrites_body() -> None:
+    from orchestrator.skill_optimizer import polish_draft
+
+    async def _chat(messages, model=None):
+        assert "vrt max" in messages[0]["content"]
+        return {"content": json.dumps({"changed": True, "rationale": "Numbered the steps.",
+                                       "body": "1. Open vrtmax.\n2. Cast to the living-room TV."})}
+
+    result = await polish_draft("vrtmax", "cast vrt", "ga naar vrt max en cast", _chat)
+    assert result["changed"] is True
+    assert result["body"].startswith("1. Open vrtmax.")
+
+
+async def test_polish_draft_survives_llm_failure() -> None:
+    from orchestrator.skill_optimizer import polish_draft
+
+    async def _boom(messages, model=None):
+        raise RuntimeError("no key")
+
+    result = await polish_draft("x", "", "do the thing", _boom)
+    assert "error" in result

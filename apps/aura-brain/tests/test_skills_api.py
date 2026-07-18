@@ -81,6 +81,23 @@ def test_metrics_and_optimize(client, monkeypatch) -> None:
     assert client.post("/skills/nope/optimize", json={}).status_code == 404
 
 
+def test_polish_endpoint(client, monkeypatch) -> None:
+    """U118: /skills/polish rewrites a draft body without saving anything."""
+    async def _fake_chat(messages, model=None):
+        import json as _j
+        return {"content": _j.dumps({"changed": True, "rationale": "Tighter.",
+                                     "body": "1. Do it properly."})}
+
+    monkeypatch.setattr("orchestrator.llm.openai_chat", _fake_chat)
+    r = client.post("/skills/polish", json={"name": "x", "description": "d", "body": "do it"})
+    assert r.status_code == 200
+    assert r.json()["body"] == "1. Do it properly."
+    # Nothing was saved — polish is advisory.
+    assert client.get("/skills").json()["skills"] == []
+    # Empty body → 422.
+    assert client.post("/skills/polish", json={"body": "  "}).status_code == 422
+
+
 def test_optimization_suggestions(client, monkeypatch) -> None:
     """U108: skills with enough new signals surface as proactive suggestions."""
     monkeypatch.setenv("SKILL_OPTIMIZE_THRESHOLD", "3")

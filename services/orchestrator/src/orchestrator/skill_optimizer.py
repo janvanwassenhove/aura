@@ -88,6 +88,56 @@ def _extract_json(raw: str) -> dict | None:
     return None
 
 
+_POLISH_PROMPT = """\
+You polish a freshly written "skill" — a step-by-step procedure an AI
+assistant will follow to execute a recurring task. The owner just wrote it in
+rough form; rewrite ONLY the body so the assistant executes it reliably:
+- Numbered, imperative, specific, checkable steps; prerequisites first.
+- Keep the owner's intent and every concrete detail (URLs, app names, names);
+  do not invent new capabilities.
+- Preserve [[wiki-links]]. Same language as the draft.
+
+Skill "{name}" — {description}
+Draft body:
+---
+{body}
+---
+
+Return ONLY a JSON object:
+{{"changed": true|false, "rationale": "<=1 sentence",
+  "body": "<the polished procedure, or the draft if already clean>"}}
+"""
+
+
+async def polish_draft(
+    name: str,
+    description: str,
+    body: str,
+    chat_fn: ChatFn,
+    *,
+    model: str | None = None,
+) -> dict:
+    """U118: rewrite a just-written skill body for optimal execution (no usage
+    evidence yet — pure writing quality). Never saves anything itself."""
+    prompt = _POLISH_PROMPT.format(
+        name=name or "unnamed", description=description or "(no description)",
+        body=body or "(empty)",
+    )
+    try:
+        resp = await chat_fn([{"role": "user", "content": prompt}], model=model)
+    except Exception as exc:  # noqa: BLE001
+        return {"error": f"polish failed ({type(exc).__name__})"}
+    data = _extract_json(resp.get("content") or "")
+    if not data or "body" not in data:
+        return {"error": "the model did not return a usable rewrite"}
+    polished = str(data["body"]).strip()
+    return {
+        "changed": bool(data.get("changed", True)) and polished != body.strip(),
+        "rationale": str(data.get("rationale", "")).strip(),
+        "body": polished or body,
+    }
+
+
 async def propose_optimization(
     store: Any,
     name: str,
