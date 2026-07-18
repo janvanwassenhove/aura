@@ -171,8 +171,12 @@ function draw(): void {
     if (n.kind !== 'fact') {
       ctx.fillStyle = 'rgba(226, 232, 240, 0.85)'
       ctx.font = '11px sans-serif'
-      ctx.textAlign = 'center'
-      ctx.fillText(n.label, n.x, n.y + n.r + 13)
+      // U120: keep labels inside the frame — right-align near the right edge,
+      // left-align near the left, so text never spills past the canvas.
+      const sx = n.x * view.scale + view.ox   // node x in screen space
+      if (sx > w - 90) { ctx.textAlign = 'right'; ctx.fillText(n.label, n.x - n.r - 4, n.y + 4) }
+      else if (sx < 90) { ctx.textAlign = 'left'; ctx.fillText(n.label, n.x + n.r + 4, n.y + 4) }
+      else { ctx.textAlign = 'center'; ctx.fillText(n.label, n.x, n.y + n.r + 13) }
     }
   }
 }

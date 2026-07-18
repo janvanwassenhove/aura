@@ -965,24 +965,26 @@ onMounted(async () => {
 .rail-err { color: var(--danger-text, #e5484d); font-size: 0.72rem; margin: 0; }
 
 /* content */
-.brain-content { flex: 1; overflow-y: auto; padding: 1.1rem 1.35rem 1.5rem; }
+.brain-content { flex: 1; min-width: 0; overflow-y: auto; overflow-x: hidden; padding: 1.1rem 1.35rem 1.5rem; }
 .brain-content--graph { display: flex; flex-direction: column; padding: 0.9rem; overflow: hidden; }
 .content-title { font-size: 0.8rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-faint); margin: 0 0 0.5rem; }
 .content-title--spaced { margin-top: 1.4rem; }
 .content-hint { font-size: 0.78rem; color: var(--text-faint); margin: 0 0 0.7rem; }
 .person-link { background: none; border: none; padding: 0; cursor: pointer; color: var(--accent); font: inherit; text-transform: none; letter-spacing: normal; font-weight: 600; }
 
-.skill-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); gap: 0.6rem; }
+/* U120: cards shrink to fit and wrap to a single column in a narrow dock,
+   so a long skill name can never force a horizontal scrollbar. */
+.skill-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(15rem, 100%), 1fr)); gap: 0.6rem; }
 .b-skill-card {
   border: 1px solid var(--border-strong); border-radius: var(--radius-lg);
-  background: var(--surface-2); padding: 0.7rem 0.8rem;
+  background: var(--surface-2); padding: 0.7rem 0.8rem; min-width: 0;
   display: flex; flex-direction: column; gap: 0.35rem;
   transition: transform 0.08s ease, box-shadow 0.08s ease;
 }
 .b-skill-card:hover { transform: translateY(-1px); box-shadow: var(--shadow-sm, 0 2px 8px rgba(0,0,0,0.12)); }
 .b-skill-card--off { opacity: 0.5; }
-.b-skill-head { display: flex; align-items: center; gap: 0.4rem; }
-.b-skill-name { font-family: ui-monospace, monospace; font-weight: 600; font-size: 0.8rem; flex: 1; }
+.b-skill-head { display: flex; align-items: center; gap: 0.4rem; min-width: 0; }
+.b-skill-name { font-family: ui-monospace, monospace; font-weight: 600; font-size: 0.8rem; flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .b-skill-desc { margin: 0; font-size: 0.75rem; color: var(--text-faint); }
 .b-skill-tags { display: flex; flex-wrap: wrap; gap: 0.25rem; }
 .b-tag { font-size: 0.65rem; padding: 0.08rem 0.4rem; border-radius: 999px; border: 1px solid var(--border); color: var(--text-faint); }
