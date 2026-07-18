@@ -361,13 +361,6 @@ class VoiceLoop:
                     if peak < self._speech_peak * self._followup_peak_factor:
                         continue
 
-                # U129: wake-gated Realtime turn — hand the AUDIO straight to the
-                # Realtime API (audio→audio, multilingual) BEFORE spending a
-                # transcription. Opt-in (VOICE_ENGINE=realtime); any failure
-                # returns False and falls through to the classic pipeline.
-                if (wake_confirmed or in_followup) and await self._realtime_turn(wav):
-                    continue
-
                 if not in_barge:
                     text = (await voice.transcribe(wav, filename="robot.wav") or "").strip()
                 if not is_plausible_command(text):
@@ -426,7 +419,12 @@ class VoiceLoop:
                         self._pipeline.steer(self._session_id, note)
                     self._manager.thinking()
 
-                await self._handle(command)
+                # U129/U133: once we have a REAL turn, run it through Realtime
+                # (audio→audio) when that engine is selected; on any failure
+                # (or when the engine is 'pipeline') fall back to the classic
+                # transcribe→LLM→TTS handler so Richie always replies.
+                if not await self._realtime_turn(wav):
+                    await self._handle(command)
             except asyncio.CancelledError:
                 raise
             except Exception as exc:  # the loop must never die
