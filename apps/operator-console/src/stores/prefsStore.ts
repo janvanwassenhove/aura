@@ -6,13 +6,14 @@ const BRAIN_URL =
   import.meta.env.VITE_ORCHESTRATOR_URL ??
   'http://localhost:8000'
 
-export type Language = 'auto' | 'en' | 'nl' | 'fr'
+export type Language = 'auto' | 'en' | 'nl' | 'fr' | 'de'
 
 export const LANGUAGES: { id: Language; label: string }[] = [
-  { id: 'auto', label: 'Auto (match me)' },
+  { id: 'auto', label: 'Auto (match me)' },   // U130: also handles NL/EN code-switching
   { id: 'en', label: 'English' },
   { id: 'nl', label: 'Nederlands' },
   { id: 'fr', label: 'Français' },
+  { id: 'de', label: 'Deutsch' },
 ]
 
 export type VoiceMode = 'off' | 'wake_word'

@@ -44,7 +44,9 @@ def test_set_name_and_language_persists(client) -> None:
 
 def test_rejects_bad_language(client) -> None:
     c, _ = client
-    assert c.post("/setup/prefs", json={"language": "de"}).status_code == 422
+    # 'de' is now valid (U130); a genuinely unknown code is still rejected.
+    assert c.post("/setup/prefs", json={"language": "de"}).status_code == 200
+    assert c.post("/setup/prefs", json={"language": "xx"}).status_code == 422
 
 
 def test_rejects_bad_name(client) -> None:

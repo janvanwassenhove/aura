@@ -35,7 +35,8 @@ from shared_schemas.robot.models import RobotMode
 logger = logging.getLogger(__name__)
 
 # Tool name → connector-service path (method, path)
-_LANGUAGE_NAMES = {"en": "English", "nl": "Dutch", "fr": "French"}
+_LANGUAGE_NAMES = {"en": "English", "nl": "Dutch", "fr": "French",
+                   "de": "German", "es": "Spanish", "it": "Italian"}  # U130
 
 
 def _label_distance(a: str, b: str, maxd: int = 2) -> bool:
