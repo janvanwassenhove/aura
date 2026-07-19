@@ -146,6 +146,13 @@ async def optimize_skill(name: str, body: dict | None = None) -> JSONResponse:
     )
     if "error" in result:
         return JSONResponse(result, status_code=422)
+    # U159: "already optimal" was a dead end — with nothing to apply, the
+    # console never called POST /skills{mark_optimized}, so the counter never
+    # reset and the suggestion banner stuck forever (and kept growing with
+    # every use). A review that concludes "no change needed" HAS consumed the
+    # evidence, so mark it here.
+    if not result.get("changed"):
+        _store.mark_optimized(name)
     return JSONResponse(result)
 
 

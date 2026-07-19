@@ -753,6 +753,9 @@ async function optimizeSkillCard(sk: SkillItem): Promise<void> {
       return
     }
     skillProposal.value = await resp.json()
+    // U159: an "already optimal" verdict consumes the signals server-side —
+    // refresh so the suggestion badge clears instead of sticking forever.
+    if (skillProposal.value && !skillProposal.value.changed) await fetchSkills()
   } finally {
     optimizing.value = ''
   }

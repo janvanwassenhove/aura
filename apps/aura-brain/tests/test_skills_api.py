@@ -81,6 +81,33 @@ def test_metrics_and_optimize(client, monkeypatch) -> None:
     assert client.post("/skills/nope/optimize", json={}).status_code == 404
 
 
+def test_already_optimal_verdict_consumes_the_signals(client, monkeypatch) -> None:
+    """U159: an 'already optimal' review used to be a dead end — nothing to
+    apply meant mark_optimized never ran, so the suggestion badge stuck
+    forever and grew with every further use."""
+    client.post("/skills", json={"name": "music", "description": "play music",
+                                 "body": "1. Open Spotify.\n2. Play."})
+    store = skills_api.get_store()
+    for i in range(9):  # past SKILL_OPTIMIZE_THRESHOLD (8)
+        store.record_observation("music", {"request": f"play thing {i}"})
+    assert client.get("/skills/music/metrics").json()["new_since_optimized"] == 9
+    assert [s["name"] for s in client.get("/skills/suggestions").json()["suggestions"]] == ["music"]
+
+    async def _fake_chat(messages, model=None):
+        import json as _j
+        return {"content": _j.dumps({"changed": False, "rationale": "Already tight.",
+                                     "body": "1. Open Spotify.\n2. Play."})}
+
+    monkeypatch.setattr("orchestrator.llm.openai_chat", _fake_chat)
+    prop = client.post("/skills/music/optimize", json={}).json()
+    assert prop["changed"] is False           # nothing to apply…
+    # …but the evidence WAS reviewed: counter reset, suggestion gone.
+    assert client.get("/skills/music/metrics").json()["new_since_optimized"] == 0
+    assert client.get("/skills/suggestions").json()["suggestions"] == []
+    # The stored body is untouched — a verdict is not a rewrite.
+    assert client.get("/skills/music").json()["body"].startswith("1. Open Spotify.")
+
+
 def test_polish_endpoint(client, monkeypatch) -> None:
     """U118: /skills/polish rewrites a draft body without saving anything."""
     async def _fake_chat(messages, model=None):

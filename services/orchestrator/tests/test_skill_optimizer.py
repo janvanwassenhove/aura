@@ -61,6 +61,34 @@ def test_metrics_track_new_since_optimized(store) -> None:
     assert m2["uses"] == 4 and m2["new_since_optimized"] == 1
 
 
+def test_metrics_survive_the_observation_cap(store, monkeypatch) -> None:
+    """U159: the marker used to be a raw observation count, which froze once a
+    skill hit the _MAX_OBS ring-buffer cap — len(obs) stopped growing so
+    new_since_optimized was stuck at 0 and suggestions died forever."""
+    from orchestrator import skills as _skills
+
+    monkeypatch.setattr(_skills, "_MAX_OBS", 5)
+    for i in range(5):
+        store.record_observation("start-spotify", {"request": f"r{i}"})
+    store.mark_optimized("start-spotify")
+    assert store.metrics("start-spotify")["new_since_optimized"] == 0
+
+    # More uses: the buffer stays capped at 5, but new signals must still show.
+    for i in range(3):
+        store.record_observation("start-spotify", {"request": f"n{i}"})
+    m = store.metrics("start-spotify")
+    assert m["uses"] == 5                      # ring buffer capped
+    assert m["new_since_optimized"] == 3       # …yet new signals are counted
+
+
+def test_legacy_count_marker_still_read(store) -> None:
+    """Markers written before U159 are a bare count — keep honouring them."""
+    for i in range(4):
+        store.record_observation("start-spotify", {"request": f"r{i}"})
+    (store._metrics_dir / "start-spotify.optimized").write_text("3", encoding="utf-8")
+    assert store.metrics("start-spotify")["new_since_optimized"] == 1
+
+
 def test_delete_removes_metrics(store) -> None:
     store.record_observation("start-spotify", {"request": "x"})
     assert store.delete("start-spotify")

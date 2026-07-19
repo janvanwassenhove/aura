@@ -226,6 +226,22 @@ class SkillStore:
             return None
         return self._metrics_dir / f"{name}.optimized"
 
+    @staticmethod
+    def _max_seq(obs: list[dict]) -> int:
+        """Highest observation sequence number present (0 if none carry one).
+
+        U159: ``seq`` is monotonic and never reset, and the ring buffer only
+        ever drops the OLDEST lines — so the maximum always survives the cap.
+        That makes it a reliable "how many uses have there been" counter, which
+        a raw line count is not."""
+        best = 0
+        for o in obs:
+            try:
+                best = max(best, int(o.get("seq", 0)))
+            except (TypeError, ValueError):
+                continue
+        return best
+
     def record_observation(self, name: str, obs: dict) -> None:
         """Append one usage observation. Best-effort — never raises into a turn."""
         path = self._obs_path(name)
@@ -233,7 +249,8 @@ class SkillStore:
             return
         try:
             self._metrics_dir.mkdir(parents=True, exist_ok=True)
-            entry = {"ts": round(time.time()), **obs}
+            seq = self._max_seq(self.observations(name)) + 1
+            entry = {"ts": round(time.time()), "seq": seq, **obs}
             with path.open("a", encoding="utf-8") as fh:
                 fh.write(json.dumps(entry, ensure_ascii=False) + "\n")
             # Cap: keep only the most recent _MAX_OBS lines.
@@ -259,27 +276,52 @@ class SkillStore:
         return out
 
     def mark_optimized(self, name: str) -> None:
+        """Record that the skill's accumulated usage evidence has been reviewed.
+
+        U159: stores ``seq:<n>`` — the highest observation sequence number at
+        review time — instead of a bare observation count. The bare count broke
+        once a skill reached _MAX_OBS: observations() is a ring buffer capped at
+        that many lines, so len(obs) froze at the cap and
+        ``new_since_optimized`` could never grow again (suggestions for
+        heavily-used skills silently stopped forever). Sequence numbers are
+        monotonic and the cap only drops the oldest lines, so the difference
+        stays exact. Legacy bare-count markers are still read (see metrics)."""
         opt = self._opt_path(name)
         if opt is None:
             return
         try:
             self._metrics_dir.mkdir(parents=True, exist_ok=True)
-            opt.write_text(str(len(self.observations(name))), encoding="utf-8")
+            opt.write_text(f"seq:{self._max_seq(self.observations(name))}",
+                           encoding="utf-8")
         except OSError as exc:
             logger.debug("skill optimize-marker not written for %s: %s", name, exc)
 
     def metrics(self, name: str) -> dict:
         """Lightweight counts for the UI: total uses and new since last optimize."""
         obs = self.observations(name)
-        prev = 0
         opt = self._opt_path(name)
+        raw = ""
         try:
-            prev = int(opt.read_text(encoding="utf-8").strip() or "0") if opt else 0
-        except (OSError, ValueError):
-            prev = 0
+            raw = opt.read_text(encoding="utf-8").strip() if opt else ""
+        except OSError:
+            raw = ""
+        if raw.startswith("seq:"):
+            try:
+                marked = int(raw[4:])
+            except ValueError:
+                marked = 0
+            # Exact even when the ring buffer has dropped old lines: seq is
+            # monotonic and its maximum always survives the cap.
+            new_since = max(0, self._max_seq(obs) - marked)
+        else:  # legacy marker: an observation count written before U159
+            try:
+                prev = int(raw or "0")
+            except ValueError:
+                prev = 0
+            new_since = max(0, len(obs) - prev)
         last_ts = obs[-1]["ts"] if obs else None
         return {
             "uses": len(obs),
-            "new_since_optimized": max(0, len(obs) - prev),
+            "new_since_optimized": new_since,
             "last_used": last_ts,
         }
