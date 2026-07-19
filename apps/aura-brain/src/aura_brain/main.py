@@ -117,6 +117,16 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     knowledge_api.set_store(ctx.knowledge_store)
     knowledge_api.set_omk_loaded(bool(_kpass))
 
+    # U160: ship a fictional demo profile so a fresh install can show what the
+    # brain does without putting a real person on a projector. Installed once;
+    # deleting it keeps it gone (DEMO_PERSONA=false to skip entirely).
+    from aura_brain.demo_persona import seed_demo_persona
+
+    # persistent=bool(_kpass): the in-memory store loses everything on restart,
+    # so she is re-seeded each boot there and no marker is written (a marker
+    # would outlive the data and block the real install from ever seeding).
+    await seed_demo_persona(ctx.knowledge_store, persistent=bool(_kpass))
+
     # U19c: step-up gate for destructive knowledge operations (ADR-008 §9).
     from aura_brain.stepup_gate import StepUpGate
 

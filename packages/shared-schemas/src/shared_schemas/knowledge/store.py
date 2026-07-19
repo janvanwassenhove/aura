@@ -37,9 +37,21 @@ class ConsentError(PermissionError):
 
 async def ensure_minor_learning_consent(store: "KnowledgeStore", person_id: str) -> None:
     """ADR-008 §10: a minor's profile gets no passive (observed) learning unless
-    the owner granted explicit consent. Shared by every store implementation."""
+    the owner granted explicit consent. Shared by every store implementation.
+
+    U160: role=DEMO is refused outright — the shipped demo profile is fictional
+    and curated; letting real conversations drift into it would quietly corrupt
+    the canned data every demo depends on (and hide real signals in a fake
+    person). Explicit facts can still be edited by the owner."""
     person = await store.get_person(person_id)
-    if person is not None and person.role == PersonRole.MINOR:
+    if person is None:
+        return
+    if person.role == PersonRole.DEMO:
+        raise ConsentError(
+            f"Passive learning disabled for demo profile {person_id!r} "
+            "(curated sample data — edit its facts explicitly instead)."
+        )
+    if person.role == PersonRole.MINOR:
         if not await store.has_consent(person_id, _OBSERVED_LEARNING):
             raise ConsentError(
                 f"Passive learning disabled for minor {person_id!r} "

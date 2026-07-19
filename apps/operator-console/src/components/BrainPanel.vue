@@ -66,6 +66,7 @@
               <select v-model="newP.role" class="rail-input">
                 <option value="owner">owner</option><option value="family">family</option>
                 <option value="guest">guest</option><option value="minor">minor</option>
+                <option value="demo">demo</option>
               </select>
               <button class="rail-btn" :disabled="!newP.id.trim() || !newP.name.trim() || addingP" @click="addPerson">
                 {{ addingP ? 'Adding…' : 'Add' }}
@@ -1006,6 +1007,9 @@ onMounted(async () => {
 .rail-role--owner { color: var(--ok-text, #2f9e6e); border-color: currentColor; }
 .rail-role--family { color: var(--accent); border-color: currentColor; }
 .rail-role--minor { color: var(--warn, #d9a441); border-color: currentColor; }
+/* U160: the shipped sample profile — muted + dashed so it never reads as a
+   real person at a glance (it is the one profile nobody in the room knows). */
+.rail-role--demo { color: var(--text-faint); border-style: dashed; }
 .rail-sep { font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-faint); margin: 0.6rem 0.4rem 0.15rem; }
 .rail-locked { font-size: 0.72rem; color: var(--warn, #d9a441); padding: 0.3rem 0.4rem; }
 .rail-unlock, .rail-add { display: flex; flex-direction: column; gap: 0.35rem; padding: 0.3rem 0.4rem; }

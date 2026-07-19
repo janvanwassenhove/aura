@@ -28,6 +28,11 @@ class PersonRole(StrEnum):
     FAMILY = "family"    # known household member — own limited profile
     GUEST = "guest"      # recognised but minimal
     MINOR = "minor"      # child — explicit-only by default, no passive learning (ADR-008 §10)
+    # U160: fictional, pre-filled profile that ships with the app so the owner
+    # can demo the brain (profile, graph, skills) without exposing real people
+    # or hand-typing data first. NOT a real person: it is never recognised from
+    # a face, and nothing is ever passively learned into it.
+    DEMO = "demo"
 
 
 class Person(BaseModel):
