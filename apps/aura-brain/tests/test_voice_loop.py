@@ -68,3 +68,27 @@ def test_mode_and_wake_read_live_from_env(monkeypatch) -> None:
     assert loop._mode == "off"
     monkeypatch.setenv("WAKE_WORD", "Richie")
     assert loop._wake == "richie"  # lower-cased for matching
+
+
+# ------------------------------------------------------------------
+# U148 (voice-brief §6.1): self-hearing guards
+# ------------------------------------------------------------------
+
+def test_echo_guard_checks_recent_reply_history(monkeypatch) -> None:
+    loop = _loop(monkeypatch)
+    loop.note_spoken("Waarom kon de fiets niet rechtop staan? Hij was te moe!")
+    loop.note_spoken("Iets heel anders over het weer vandaag.")
+    # A transcript matching an EARLIER reply (not just the last) is still echo.
+    assert loop._is_echo_of_last_reply("waarom kon de fiets niet rechtop staan hij was moe") is True
+    assert loop._is_echo_of_last_reply("zet de verwarming hoger alsjeblieft") is False
+
+
+def test_self_hearing_cooldown_after_speaking(monkeypatch) -> None:
+    monkeypatch.setenv("SELF_HEARING_COOLDOWN_S", "2.0")
+    loop = _loop(monkeypatch)
+    loop.note_spoken("Hallo daar!")
+    # Right after speaking we're still in the speaker-tail cooldown.
+    assert loop._in_self_hearing_cooldown() is True
+    # Simulate the robot having finished speaking well in the past.
+    loop._speaking_until = time.monotonic() - 10.0
+    assert loop._in_self_hearing_cooldown() is False

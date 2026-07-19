@@ -380,3 +380,39 @@ async def test_listening_and_thinking_cues(adapter) -> None:
         moves = [n for n, _ in mini.calls[before:]]
         assert "goto_target" in moves               # it actually moves
         assert "stop_head_tracking" not in moves     # keeps eyes on the speaker
+
+
+async def test_capture_endpoints_on_trailing_silence(adapter, monkeypatch) -> None:
+    """U148: capture stops shortly after speech ends instead of recording the
+    whole window. Fake media yields ~0.5 s of 'speech' then silence."""
+    monkeypatch.setenv("VOICE_ENDPOINTING", "true")
+    monkeypatch.setenv("ENDPOINT_MIN_SPEECH_S", "0.3")
+    monkeypatch.setenv("ENDPOINT_SILENCE_S", "0.4")
+    monkeypatch.setenv("ENDPOINT_VAD_GATE", "0.02")
+    await adapter.connect()
+
+    rate = 16_000
+    frame = rate // 20  # 50 ms frames
+    speech = (np.ones(frame, dtype=np.float32) * 0.2)     # above the gate
+    silence = (np.zeros(frame, dtype=np.float32))         # below the gate
+    plan = [speech] * 12 + [silence] * 40                 # 0.6 s speech, then quiet
+
+    class _FakeMedia:
+        def __init__(self):
+            self.i = 0
+            self.recording = False
+        def start_recording(self): self.recording = True
+        def stop_recording(self): self.recording = False
+        def get_input_audio_samplerate(self): return rate
+        def get_audio_sample(self):
+            if self.i < len(plan):
+                s = plan[self.i]; self.i += 1; return s
+            return silence
+
+    fake = _FakeMedia()
+    monkeypatch.setattr(adapter, "_media", lambda: fake)
+    pcm = await adapter.capture_audio(duration_s=5.0)
+    got_s = len(pcm) / 2 / 16_000
+    # Speech (0.6 s) + hang (0.4 s) ≈ ~1 s, well under the 5 s max window.
+    assert got_s < 2.0, f"endpointing did not cut early: {got_s:.2f}s"
+    assert got_s > 0.5

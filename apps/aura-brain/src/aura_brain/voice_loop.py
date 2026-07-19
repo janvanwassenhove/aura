@@ -226,18 +226,40 @@ class VoiceLoop:
         return (parts[1] if len(parts) > 1 else "").strip(" ,.!?-").strip()
 
     def _is_echo_of_last_reply(self, text: str) -> bool:
-        """True when the transcript is largely the robot's own last reply
-        bouncing back through the mic (word-overlap heuristic)."""
-        if not self._last_reply or len(text) < 8:
+        """U148 (brief §6.1): True when the transcript is largely one of the
+        robot's OWN recent replies bouncing back through the mic — checked
+        against a short history, not just the last one, since reverb/echo can
+        lag a couple of turns."""
+        if len(text) < 8:
             return False
         a = {w for w in text.lower().split() if len(w) > 3}
-        b = {w for w in self._last_reply.lower().split() if len(w) > 3}
         if not a:
             return False
-        return len(a & b) / len(a) >= 0.6
+        for reply in ([self._last_reply] + list(getattr(self, "_recent_replies", []))):
+            if not reply:
+                continue
+            b = {w for w in reply.lower().split() if len(w) > 3}
+            if b and len(a & b) / len(a) >= 0.6:
+                return True
+        return False
+
+    def _in_self_hearing_cooldown(self) -> bool:
+        """U148 (§6.1): just after the robot stops speaking, the mic still hears
+        the speaker tail / room reverb. Reject non-wake transcripts during that
+        short cooldown so they can't spawn a phantom turn."""
+        cd = float(os.environ.get("SELF_HEARING_COOLDOWN_S", "1.2"))
+        return time.monotonic() < self._speaking_until + cd
 
     def note_spoken(self, text: str) -> None:
         self._last_reply = (text or "")[:200]
+        # U148: keep a small history for the echo guard (reverb lags turns).
+        hist = getattr(self, "_recent_replies", None)
+        if hist is None:
+            from collections import deque
+            self._recent_replies = deque(maxlen=3)
+            hist = self._recent_replies
+        if text:
+            hist.appendleft(text[:200])
         """Called when the robot speaks: guard against echo + open a follow-up
         window so the user can reply without the wake word. The follow-up
         chain is capped (U67) — after a few wake-word-less turns the wake word
@@ -378,10 +400,16 @@ class VoiceLoop:
                     if text:
                         logger.debug("voice loop ignored implausible transcript: %r", text)
                     continue
-                # U91: reject a transcript that is (fuzzily) the robot's OWN
-                # last reply echoing back through the mic in a follow-up window.
+                # U91/U148: reject a transcript that is (fuzzily) one of the
+                # robot's OWN recent replies echoing back through the mic.
                 if in_followup and not in_barge and self._is_echo_of_last_reply(text):
-                    logger.debug("voice loop ignored self-echo in follow-up: %r", text[:60])
+                    logger.info("voice loop discarded self-echo in follow-up: %r", text[:60])
+                    continue
+                # U148 (§6.1): reject anything captured in the speaker-tail
+                # cooldown right after Richie spoke — that is the classic
+                # self-hearing phantom (a NEW turn from the robot's own audio).
+                if in_followup and not in_barge and self._in_self_hearing_cooldown():
+                    logger.info("voice loop discarded self-hearing (cooldown): %r", text[:60])
                     continue
 
                 # U128: a local-confirmed wake means the wake word WAS said even

@@ -451,6 +451,15 @@ class ReachyRobotAdapter(RobotAdapter):
             logger.warning("capture_audio: media disabled — returning silence")
             return bytes(int(duration_s * 16_000) * 2)
 
+        # U148 (voice-brief §5.1): endpoint on trailing silence instead of
+        # always recording the full window. `duration_s` becomes the MAX; the
+        # capture stops ~ENDPOINT_SILENCE_S after speech ends, so a short
+        # command returns fast. VOICE_ENDPOINTING=false → the old fixed window.
+        endpointing = os.environ.get("VOICE_ENDPOINTING", "true").lower() == "true"
+        min_speech_s = float(os.environ.get("ENDPOINT_MIN_SPEECH_S", "0.3"))
+        silence_hang_s = float(os.environ.get("ENDPOINT_SILENCE_S", "0.6"))
+        vad_gate = float(os.environ.get("ENDPOINT_VAD_GATE", "0.02"))
+
         def _record() -> bytes:
             import time
 
@@ -460,6 +469,11 @@ class ReachyRobotAdapter(RobotAdapter):
             deadline = time.monotonic() + duration_s
             needed = int(rate * duration_s)
             got = 0
+            heard_speech = False
+            speech_samples = 0
+            silent_samples = 0
+            hang = int((rate or 16_000) * silence_hang_s)
+            min_speech = int((rate or 16_000) * min_speech_s)
             while time.monotonic() < deadline and got < needed:
                 sample = media.get_audio_sample()
                 if sample is not None and len(sample):
@@ -468,6 +482,19 @@ class ReachyRobotAdapter(RobotAdapter):
                         arr = arr.mean(axis=1)
                     chunks.append(arr)
                     got += len(arr)
+                    if endpointing:
+                        # Cheap frame VAD: is this chunk above the speech gate?
+                        level = float(np.abs(arr.astype(np.float32) /
+                                             (32768.0 if np.abs(arr).max() > 1.5 else 1.0)).mean())
+                        if level > vad_gate:
+                            heard_speech = True
+                            speech_samples += len(arr)
+                            silent_samples = 0
+                        elif heard_speech:
+                            silent_samples += len(arr)
+                            # Enough real speech, then a clear pause → done.
+                            if speech_samples >= min_speech and silent_samples >= hang:
+                                break
                 else:
                     time.sleep(0.01)
             media.stop_recording()
