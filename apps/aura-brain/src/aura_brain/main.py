@@ -323,6 +323,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     async def _embody_reply(event: ResponseDrafted) -> None:
         text = (event.response_text or "").strip()
+        # U146: the Realtime engine already voiced this reply — the console
+        # still shows it (it's on the event stream), but don't speak it twice.
+        if getattr(event, "already_voiced", False):
+            return
         # U100: sleep mode → stay completely quiet.
         if os.environ.get("ROBOT_ASLEEP", "false").lower() == "true":
             return
