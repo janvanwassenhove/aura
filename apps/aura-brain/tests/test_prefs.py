@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import os
+
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -11,12 +13,22 @@ from aura_brain import setup_api
 
 @pytest.fixture()
 def client(tmp_path, monkeypatch):
+    # The setup API applies prefs with os.environ.update() (setup_api.py) — e.g.
+    # POSTing voice_engine=realtime sets VOICE_ENGINE globally. monkeypatch only
+    # tracks keys it set, so snapshot/restore the whole env to keep these tests
+    # from leaking VOICE_ENGINE/VOICE_MODE/etc. into unrelated tests (surfaced by
+    # pytest-randomly ordering: note_spoken/streaming tests read VOICE_ENGINE).
+    _snapshot = dict(os.environ)
     monkeypatch.setenv("AURA_ENV_FILE", str(tmp_path / ".env"))
     monkeypatch.delenv("ASSISTANT_NAME", raising=False)
     monkeypatch.delenv("ASSISTANT_LANGUAGE", raising=False)
     app = FastAPI()
     app.include_router(setup_api.router)
-    return TestClient(app), tmp_path
+    try:
+        yield TestClient(app), tmp_path
+    finally:
+        os.environ.clear()
+        os.environ.update(_snapshot)
 
 
 def test_defaults(client) -> None:

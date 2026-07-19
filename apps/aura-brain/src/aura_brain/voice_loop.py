@@ -438,7 +438,12 @@ class VoiceLoop:
                 # made phantom turns). Only start a turn once we have a real
                 # command.
                 if not command:
+                    # U153: bracket the second listen window so the trace shows
+                    # it as its own `second_capture` segment instead of burying
+                    # a whole window inside `llm_queue`.
+                    _mk["second_capture_start"] = time.monotonic()
                     command = await self._capture_command()
+                    _mk["second_capture_end"] = time.monotonic()
                     if not is_plausible_command(command):
                         continue
 
@@ -539,26 +544,62 @@ class VoiceLoop:
             character = getattr(self._manager, "character", None) if self._manager else None
             instructions = getattr(character, "character_prompt", "") or ""
             voice_id = getattr(character, "voice_id", "") or "alloy"
+            import base64
+
             from aura_brain.turn_trace import LOG as _TRACE
+            from shared_schemas.events.audio import TranscriptUpdated
+            from shared_schemas.events.conversation import ResponseDrafted
             _t = _TRACE.current(self._session_id)
             if _t is not None:
                 _t.mark("llm_request_sent")
                 _t.mark("tts_request_sent")
+
+            # U153: stream playback — start speaking the first ~1.4 s segment as
+            # soon as the Realtime API generates it, instead of buffering the
+            # whole reply (seen live: ~6 s of dead air before Richie spoke). A
+            # background consumer plays segments in order while generation
+            # continues. Off via REALTIME_STREAMING=false → whole-utterance path.
+            stream = (os.environ.get("REALTIME_STREAMING", "true").lower() == "true"
+                      and hasattr(self._robot, "speak_segment"))
+            on_segment = None
+            consumer: asyncio.Task | None = None
+            seg_queue: asyncio.Queue = asyncio.Queue()
+            first = {"marked": False}
+            if stream:
+                async def on_segment(seg: bytes) -> None:  # noqa: F811 — enqueue
+                    await seg_queue.put(seg)
+
+                async def _consume() -> None:
+                    while True:
+                        seg = await seg_queue.get()
+                        if seg is None:  # sentinel → all segments generated
+                            return
+                        if not first["marked"]:
+                            first["marked"] = True
+                            if _t is not None:
+                                _t.mark("tts_first_audio")
+                                _t.mark("playback_first_sample")
+                        try:
+                            await self._robot.speak_segment(base64.b64encode(seg).decode())
+                        except Exception as exc:  # noqa: BLE001 — best-effort
+                            logger.debug("segment playback failed: %s", exc)
+
+                consumer = asyncio.ensure_future(_consume())
+
             transcript, audio_out = await realtime_voice.run_realtime_turn(
-                pcm, text=command, instructions=instructions, voice=voice_id)
+                pcm, text=command, instructions=instructions, voice=voice_id,
+                on_segment=on_segment)
             if not audio_out:
                 # U141: empty audio means the account/model returns no audio for
                 # Realtime (seen live: ~11s, 0 chars, 0 bytes every turn). That
                 # is a failure, not a fall-through — count it so the circuit
                 # breaker trips instead of wasting the timeout on every turn.
+                if consumer is not None:
+                    await seg_queue.put(None)
+                    consumer.cancel()
                 raise RuntimeError("realtime returned no audio (account/model not producing audio)")
-            import base64
-
-            from shared_schemas.events.audio import TranscriptUpdated
-            from shared_schemas.events.conversation import ResponseDrafted
             if _t is not None:
                 _t.mark("llm_final")
-                _t.mark("tts_first_audio")
             # U146: the "YOU" bubble is what the USER said (our STT command),
             # NOT the realtime reply; the reply is shown as RICHIE via
             # ResponseDrafted(already_voiced) so it isn't spoken a second time.
@@ -566,9 +607,14 @@ class VoiceLoop:
                 session_id=self._session_id, transcript=command or transcript, is_final=True))
             await self._bus.publish(ResponseDrafted(
                 session_id=self._session_id, response_text=transcript, already_voiced=True))
-            if _t is not None:
-                _t.mark("playback_first_sample")
-            await self._robot.speak(transcript, audio_b64=base64.b64encode(audio_out).decode())
+            if consumer is not None:
+                await seg_queue.put(None)  # signal end; consumer drains remaining
+                await consumer            # wait for the last segment to finish
+            else:
+                if _t is not None:
+                    _t.mark("tts_first_audio")
+                    _t.mark("playback_first_sample")
+                await self._robot.speak(transcript, audio_b64=base64.b64encode(audio_out).decode())
             if _t is not None:
                 _t.mark("playback_complete")
             self.note_spoken(transcript)

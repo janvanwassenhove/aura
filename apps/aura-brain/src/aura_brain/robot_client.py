@@ -65,6 +65,14 @@ class RobotClient:
             body["audio_b64"] = audio_b64
         return (await self._request("POST", "/robot/speak", body)).json().get("ok", False)
 
+    async def speak_segment(self, audio_b64: str) -> bool:
+        """U153: play ONE PCM segment of a streamed reply (see the robot
+        /robot/speak/segment route). Segments serialize on the robot so they
+        play back-to-back; the first one starts as soon as it's generated,
+        cutting mouth-to-ear latency versus buffering the whole utterance."""
+        return (await self._request(
+            "POST", "/robot/speak/segment", {"audio_b64": audio_b64})).json().get("ok", False)
+
     async def execute_motion(self, command: MotionCommand) -> bool:
         body = command.model_dump(mode="json")
         return (await self._request("POST", "/robot/motion", body)).json().get("ok", False)

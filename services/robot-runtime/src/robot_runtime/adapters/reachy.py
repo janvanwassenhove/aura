@@ -296,8 +296,23 @@ class ReachyRobotAdapter(RobotAdapter):
         else:
             logger.info("Reachy speak (no audio payload): %r", text[:80])
 
-    async def play_audio(self, audio_bytes: bytes, sample_rate: int = 24_000) -> None:
-        """Play PCM s16le mono. Default rate 24 kHz (OpenAI TTS output)."""
+    async def play_audio(
+        self,
+        audio_bytes: bytes,
+        sample_rate: int = 24_000,
+        *,
+        normalize: bool = True,
+        tail_margin: float = 0.4,
+    ) -> None:
+        """Play PCM s16le mono. Default rate 24 kHz (OpenAI TTS output).
+
+        U153 streaming: when playing a reply as consecutive segments, pass
+        ``normalize=False`` (each segment's own peak would otherwise be pushed
+        to 0.95, pumping the volume between segments — Realtime PCM is already
+        near full-scale) and a small ``tail_margin`` (the default 0.4 s wait
+        after every segment would insert audible gaps into one continuous
+        reply).
+        """
         media = self._media()
         if media is None:
             logger.warning("play_audio skipped: media backend disabled")
@@ -309,12 +324,13 @@ class ReachyRobotAdapter(RobotAdapter):
             import time
             import wave
 
-            # s16le mono → peak-normalize to 0.95 (quiet TTS uses full range),
-            # then apply the app volume (U36e/U36g).
+            # s16le mono → (optionally) peak-normalize to 0.95 (quiet TTS uses
+            # full range), then apply the app volume (U36e/U36g).
             pcm = np.frombuffer(audio_bytes, dtype=np.int16).astype(np.float32) / 32768.0
-            peak = float(np.max(np.abs(pcm))) if len(pcm) else 0.0
-            if peak > 0.01:
-                pcm = pcm * (0.95 / peak)
+            if normalize:
+                peak = float(np.max(np.abs(pcm))) if len(pcm) else 0.0
+                if peak > 0.01:
+                    pcm = pcm * (0.95 / peak)
             pcm = np.clip(pcm * self._volume, -1.0, 1.0)
             samples = (pcm * 32767.0).astype(np.int16)
             duration = len(samples) / sample_rate if sample_rate else 0.0
@@ -338,7 +354,7 @@ class ReachyRobotAdapter(RobotAdapter):
                 # playbin is async; block for the audio duration (+margin) so
                 # nothing else grabs the sink — but wake every 100 ms so a
                 # barge-in can cut the speech instantly (U84).
-                deadline = time.monotonic() + duration + 0.4
+                deadline = time.monotonic() + duration + tail_margin
                 while time.monotonic() < deadline:
                     if self._audio_abort.is_set():
                         try:  # stop the playbin NOW

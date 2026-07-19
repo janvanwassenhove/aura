@@ -110,7 +110,15 @@ class FakeRobotAdapter(RobotAdapter):
             self._played_audio.append(audio_bytes)
         await asyncio.sleep(len(text) * 0.01)  # simulate ~10 ms per char
 
-    async def play_audio(self, audio_bytes: bytes) -> None:
+    async def play_audio(
+        self,
+        audio_bytes: bytes,
+        sample_rate: int = 24_000,
+        *,
+        normalize: bool = True,
+        tail_margin: float = 0.4,
+    ) -> None:
+        self._played_audio.append(audio_bytes)
         await asyncio.sleep(len(audio_bytes) / _FAKE_AUDIO_SAMPLE_RATE / 2)
 
     async def capture_audio(self, duration_s: float = 3.0) -> bytes:

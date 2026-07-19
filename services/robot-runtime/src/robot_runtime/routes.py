@@ -100,6 +100,37 @@ async def speak(body: dict) -> JSONResponse:
     return JSONResponse({"ok": True, "audio": audio_bytes is not None})
 
 
+@router.post("/robot/speak/segment")
+async def speak_segment(body: dict) -> JSONResponse:
+    """U153 streaming playback: play ONE PCM segment of a reply as it arrives
+    from the Realtime API, instead of buffering the whole utterance first.
+
+    This bypasses the behaviour engine's speak() (gestures + paired
+    SpeechPlaybackStarted/Completed events) on purpose — the brain owns the
+    conversation UI state, and firing those events per segment would spam the
+    console and re-trigger gestures many times per reply. Segments serialize
+    on the adapter's motion lock, so they play back-to-back in order. Uses
+    ``normalize=False`` + a small tail margin so the segments don't pump in
+    volume or leave gaps (see ReachyAdapter.play_audio)."""
+    assert engine is not None
+    _touch()
+    audio_b64 = body.get("audio_b64")
+    if not audio_b64:
+        return JSONResponse({"error": "audio_b64 is required"}, status_code=422)
+    import base64
+
+    try:
+        audio_bytes = base64.b64decode(audio_b64)
+    except Exception:
+        return JSONResponse({"error": "audio_b64 is not valid base64"}, status_code=422)
+    adapter = getattr(engine, "_adapter", None)
+    play = getattr(adapter, "play_audio", None)
+    if play is None:
+        return JSONResponse({"error": "adapter has no play_audio"}, status_code=501)
+    await play(audio_bytes, normalize=False, tail_margin=0.06)
+    return JSONResponse({"ok": True})
+
+
 # ------------------------------------------------------------------
 # Motion
 # ------------------------------------------------------------------
