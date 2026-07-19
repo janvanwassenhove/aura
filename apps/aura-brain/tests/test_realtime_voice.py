@@ -77,6 +77,7 @@ class _FakeConn:
         import types as _t
         self.session = _t.SimpleNamespace(update=self._noop)
         self.input_audio_buffer = _t.SimpleNamespace(append=self._noop, commit=self._noop)
+        self.conversation = _t.SimpleNamespace(item=_t.SimpleNamespace(create=self._noop))
         self.response = _t.SimpleNamespace(create=self._noop)
 
     async def _noop(self, *a, **k): ...

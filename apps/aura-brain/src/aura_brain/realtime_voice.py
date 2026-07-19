@@ -101,7 +101,9 @@ ConnFactory = Callable[[str], Any]  # model -> async context manager
 def _default_conn_factory(model: str):
     from openai import AsyncOpenAI
 
-    return AsyncOpenAI().beta.realtime.connect(model=model)
+    # U144: GA Realtime path. The old `beta.realtime` shape is disabled
+    # server-side (close 4000 invalid_request_error.beta_api_shape_disabled).
+    return AsyncOpenAI().realtime.connect(model=model)
 
 
 # U143: candidate Realtime models, newest-GA first. probe() walks these to find
@@ -186,24 +188,34 @@ async def _run_realtime_turn_inner(
     usage: dict | None = None
 
     async with factory(model) as conn:
+        # U144: GA session shape (type:realtime + audio output).
         await conn.session.update(session={
-            "modalities": ["audio", "text"],
+            "type": "realtime",
+            "output_modalities": ["audio"],
             "instructions": instructions or "You are a friendly robot assistant. "
             "Reply in the language the user speaks (Dutch, English, French or German).",
-            "voice": voice,
-            "input_audio_format": "pcm16",
-            "output_audio_format": "pcm16",
-            "input_audio_transcription": {"model": "whisper-1"},
+            "audio": {
+                "output": {"format": {"type": "audio/pcm", "rate": 24000}, "voice": voice},
+            },
         })
-        await conn.input_audio_buffer.append(audio=base64.b64encode(pcm_in).decode())
-        await conn.input_audio_buffer.commit()
+        # U144: send the whole utterance as ONE conversation item (input_audio
+        # content) instead of input_audio_buffer.append + commit — the buffer
+        # path races the async websocket send and the server sees a 0 ms buffer
+        # ("input_audio_buffer_commit_empty"). The item form is atomic.
+        await conn.conversation.item.create(item={
+            "type": "message", "role": "user",
+            "content": [{"type": "input_audio", "audio": base64.b64encode(pcm_in).decode()}],
+        })
         await conn.response.create()
 
         async for event in conn:
             etype = getattr(event, "type", "")
-            if etype == "response.audio.delta":
+            # GA names first, older names kept as a fallback.
+            if etype in ("response.output_audio.delta", "response.audio.delta"):
                 audio_out += base64.b64decode(getattr(event, "delta", "") or "")
-            elif etype in ("response.audio_transcript.delta", "response.text.delta"):
+            elif etype in ("response.output_audio_transcript.delta",
+                           "response.audio_transcript.delta",
+                           "response.output_text.delta", "response.text.delta"):
                 transcript_parts.append(getattr(event, "delta", "") or "")
             elif etype == "response.done":
                 resp = getattr(event, "response", None)
@@ -255,7 +267,8 @@ async def _probe_model(model: str, factory: ConnFactory) -> dict:
     async def _run() -> dict:
         got_text = False
         async with factory(model) as conn:
-            await conn.session.update(session={"modalities": ["text"]})
+            await conn.session.update(session={
+                "type": "realtime", "output_modalities": ["text"]})
             await conn.conversation.item.create(item={
                 "type": "message", "role": "user",
                 "content": [{"type": "input_text", "text": "Say the word ready."}],
@@ -263,7 +276,7 @@ async def _probe_model(model: str, factory: ConnFactory) -> dict:
             await conn.response.create()
             async for event in conn:
                 etype = getattr(event, "type", "")
-                if etype in ("response.text.delta", "response.output_text.delta"):
+                if etype in ("response.output_text.delta", "response.text.delta"):
                     got_text = True
                 elif etype == "response.done":
                     break
@@ -278,16 +291,12 @@ async def _probe_model(model: str, factory: ConnFactory) -> dict:
     except asyncio.TimeoutError:
         return {"ok": False, "model": model, "reason": "timed out — model likely not accessible on this key"}
     except Exception as exc:  # noqa: BLE001
-        msg = str(exc)
-        hint = msg
-        low = msg.lower()
-        if "model" in low and ("not" in low or "does not exist" in low or "404" in low):
-            hint = f"model {model!r} not available to this key — try another REALTIME_MODEL, or your account lacks Realtime access"
-        elif "401" in low or "invalid" in low or "authenticat" in low:
-            hint = "the API key was rejected for Realtime"
-        elif "quota" in low or "429" in low:
-            hint = "rate-limited / out of quota for Realtime"
-        return {"ok": False, "model": model, "reason": f"{type(exc).__name__}: {hint}"}
+        # U144: surface the RAW server close reason (e.g. a websocket close code
+        # + reason) so we never guess. The bare exception str often hides it.
+        raw = getattr(exc, "reason", None) or str(exc)
+        code = getattr(exc, "code", None)
+        detail = f"{raw}" + (f" (close {code})" if code else "")
+        return {"ok": False, "model": model, "reason": f"{type(exc).__name__}: {detail}"}
 
 
 def _usage_dict(usage: Any) -> dict | None:
