@@ -537,6 +537,12 @@ class VoiceLoop:
         # latency to every turn; the pipeline handles the whole session.
         if getattr(self, "_realtime_broken", False) or not realtime_voice.realtime_enabled():
             return False
+        # U154: conversation-session mode (default) — one persistent Realtime
+        # connection with server-side VAD instead of one turn per connection.
+        # REALTIME_SESSION=false → the U153 per-turn path below.
+        from aura_brain import realtime_session
+        if realtime_session.session_enabled() and hasattr(self._robot, "stream_audio"):
+            return await self._realtime_session_turn(command)
         try:
             pcm = realtime_voice.wav_to_pcm24k(wav)
             if not pcm:
@@ -635,6 +641,56 @@ class VoiceLoop:
                     "back to Pipeline in Settings (or restart to retry).", exc)
             else:
                 logger.warning("realtime turn failed, using pipeline: %s", exc)
+            return False
+
+    async def _realtime_session_turn(self, command: str) -> bool:
+        """U154: open a conversation session — the robot mic streams into ONE
+        persistent Realtime connection, server VAD does the turn-taking, and
+        the user talks freely (no wake word) until the idle timeout. The
+        already-captured first command seeds the session so it's answered
+        immediately. Returns True if the session handled ≥1 turn."""
+        from aura_brain import realtime_session, realtime_voice
+        from aura_brain.turn_trace import LOG as _TRACE
+        from shared_schemas.events.audio import TranscriptUpdated
+
+        try:
+            character = getattr(self._manager, "character", None) if self._manager else None
+            instructions = getattr(character, "character_prompt", "") or ""
+            voice_id = getattr(character, "voice_id", "") or "alloy"
+            _t = _TRACE.current(self._session_id)
+            if _t is not None:
+                _t.mark("llm_request_sent")
+                _t.mark("tts_request_sent")
+            if command:
+                await self._bus.publish(TranscriptUpdated(
+                    session_id=self._session_id, transcript=command, is_final=True))
+            sess = realtime_session.RealtimeSession(
+                robot=self._robot, bus=self._bus, session_id=self._session_id,
+                instructions=instructions, voice=voice_id,
+                on_reply=self.note_spoken, trace=_t)
+            logger.info("realtime session opening (command=%r)", command[:60])
+            await sess.run(initial_text=command)
+            if _t is not None:
+                _t.mark("playback_complete")
+            if sess.turns == 0:
+                # Never produced a reply — treat like the U141 no-audio case so
+                # the circuit breaker can trip instead of looping silently.
+                raise RuntimeError("realtime session produced no audio turns")
+            logger.info("realtime session done: %d turns (%s), ~$%.4f total",
+                        sess.turns, sess.closed_reason, realtime_voice.METER.spent_usd())
+            self._realtime_fails = 0
+            return True
+        except Exception as exc:  # noqa: BLE001 — session is best-effort
+            self._realtime_fails = getattr(self, "_realtime_fails", 0) + 1
+            deterministic = "no audio" in str(exc)
+            if deterministic or self._realtime_fails >= 2:
+                self._realtime_broken = True
+                logger.warning(
+                    "Realtime session disabled for this session (%s) — falling "
+                    "back to the pipeline. Set Conversation engine back to "
+                    "Pipeline in Settings (or restart to retry).", exc)
+            else:
+                logger.warning("realtime session failed, using pipeline: %s", exc)
             return False
 
     async def _handle(self, command: str) -> None:

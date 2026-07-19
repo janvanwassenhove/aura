@@ -69,3 +69,31 @@ async def test_speak_rejects_invalid_base64() -> None:
         assert resp.status_code == 422
     finally:
         await _teardown(bus)
+
+
+async def test_speak_segment_plays_directly() -> None:
+    """U153: segment playback bypasses the behaviour engine, plays via adapter."""
+    adapter, bus = await _setup()
+    try:
+        pcm = b"\x01\x02" * 120
+        resp = _client().post("/robot/speak/segment", json={
+            "audio_b64": base64.b64encode(pcm).decode()})
+        assert resp.status_code == 200 and resp.json() == {"ok": True}
+        assert adapter.played_audio == [pcm]
+        assert adapter.spoken_texts == []  # no speak() involved
+    finally:
+        await _teardown(bus)
+
+
+async def test_audio_stream_yields_pcm_chunks() -> None:
+    """U154: the mic stream route emits raw s16le chunks with rate headers."""
+    adapter, bus = await _setup()
+    try:
+        with _client().stream("GET", "/robot/audio/stream") as resp:
+            assert resp.status_code == 200
+            assert resp.headers["x-sample-rate"] == "16000"
+            body = b"".join(resp.iter_bytes())
+        # Fake adapter: 10 chunks of 100 ms silence @ 16 kHz s16le.
+        assert len(body) == 10 * 1600 * 2
+    finally:
+        await _teardown(bus)

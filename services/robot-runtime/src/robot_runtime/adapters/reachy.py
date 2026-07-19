@@ -549,6 +549,92 @@ class ReachyRobotAdapter(RobotAdapter):
 
         return await asyncio.to_thread(_record)
 
+    async def stream_audio(self, chunk_ms: int = 100):
+        """U154: continuous mic stream — yields s16le mono 16 kHz PCM chunks of
+        ~chunk_ms until the consumer stops iterating (conversation-session mode:
+        the brain forwards these to the Realtime API, which does the endpointing
+        server-side — no fixed windows, no local STT).
+
+        Gain: a slowly-decaying running peak instead of per-capture
+        normalization, so the level is smooth across chunks (per-chunk peak
+        normalization would pump the noise floor between words).
+        """
+        media = self._media()
+        chunk_n16 = int(16_000 * chunk_ms / 1000)
+        if media is None:
+            # Dev without hardware: a finite silence stream so a session can
+            # open and idle-close instead of hanging forever.
+            for _ in range(50):
+                await asyncio.sleep(chunk_ms / 1000)
+                yield bytes(chunk_n16 * 2)
+            return
+
+        import queue as _queue
+        import threading
+
+        stop = threading.Event()
+        out: _queue.Queue[bytes | None] = _queue.Queue(maxsize=100)
+
+        def _pump() -> None:
+            import time
+
+            media.start_recording()
+            rate = media.get_input_audio_samplerate() or 16_000
+            chunk_n = int(rate * chunk_ms / 1000)
+            buf = np.zeros(0, dtype=np.float32)
+            running_peak = 0.02
+            target = float(os.environ.get("MIC_TARGET_PEAK", "0.5"))
+            max_gain = float(os.environ.get("MIC_MAX_GAIN", "40"))
+            try:
+                while not stop.is_set():
+                    sample = media.get_audio_sample()
+                    if sample is None or not len(sample):
+                        time.sleep(0.01)
+                        continue
+                    arr = np.asarray(sample)
+                    if arr.ndim > 1:
+                        arr = arr.mean(axis=1)
+                    arr = arr.astype(np.float32)
+                    if np.abs(arr).max() > 1.5:  # int-scaled → float
+                        arr = arr / 32768.0
+                    buf = np.concatenate([buf, arr])
+                    while len(buf) >= chunk_n:
+                        chunk, buf = buf[:chunk_n], buf[chunk_n:]
+                        if rate != 16_000:
+                            n_out = int(len(chunk) * 16_000 / rate)
+                            x_old = np.linspace(0.0, 1.0, num=len(chunk), endpoint=False)
+                            x_new = np.linspace(0.0, 1.0, num=n_out, endpoint=False)
+                            chunk = np.interp(x_new, x_old, chunk).astype(np.float32)
+                        peak = float(np.abs(chunk).max()) if len(chunk) else 0.0
+                        running_peak = max(peak, running_peak * 0.98, 1e-4)
+                        chunk = chunk * min(target / running_peak, max_gain)
+                        data = (np.clip(chunk, -1.0, 1.0) * 32767).astype(np.int16).tobytes()
+                        try:
+                            out.put_nowait(data)
+                        except _queue.Full:  # consumer stalled → drop oldest
+                            try:
+                                out.get_nowait()
+                                out.put_nowait(data)
+                            except _queue.Empty:
+                                pass
+            finally:
+                try:
+                    media.stop_recording()
+                except Exception:  # noqa: BLE001 — teardown is best-effort
+                    pass
+                out.put(None)
+
+        thread = threading.Thread(target=_pump, name="mic-stream", daemon=True)
+        thread.start()
+        try:
+            while True:
+                data = await asyncio.to_thread(out.get)
+                if data is None:
+                    return
+                yield data
+        finally:
+            stop.set()
+
     # ------------------------------------------------------------------
     # Vision
     # ------------------------------------------------------------------

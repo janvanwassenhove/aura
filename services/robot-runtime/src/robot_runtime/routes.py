@@ -131,6 +131,32 @@ async def speak_segment(body: dict) -> JSONResponse:
     return JSONResponse({"ok": True})
 
 
+@router.get("/robot/audio/stream")
+async def audio_stream():
+    """U154 conversation-session mode: stream the mic continuously as raw
+    s16le mono 16 kHz PCM chunks (chunked HTTP — no WebSocket needed for a
+    one-way stream). The brain forwards these to the Realtime API, whose
+    server-side VAD does the endpointing — this replaces fixed capture
+    windows entirely while a session is active."""
+    from fastapi.responses import StreamingResponse
+
+    assert adapter is not None
+    _touch()
+    stream = getattr(adapter, "stream_audio", None)
+    if stream is None:
+        return JSONResponse({"error": "adapter has no stream_audio"}, status_code=501)
+
+    async def _gen():
+        async for chunk in stream():
+            yield chunk
+
+    return StreamingResponse(
+        _gen(),
+        media_type="audio/L16",
+        headers={"X-Sample-Rate": "16000", "X-Channels": "1"},
+    )
+
+
 # ------------------------------------------------------------------
 # Motion
 # ------------------------------------------------------------------

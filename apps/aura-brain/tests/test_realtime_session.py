@@ -1,0 +1,180 @@
+"""U154: conversation-session mode — persistent Realtime connection, server VAD.
+
+All fakes, no network: a fake robot mic stream + a fake Realtime connection.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import base64
+import os
+import time
+
+os.environ.setdefault("LLM_PROVIDER", "echo")
+
+import numpy as np
+import pytest
+
+from aura_brain.realtime_session import (
+    RealtimeSession,
+    _resample_16k_to_24k,
+    session_enabled,
+)
+from aura_brain.realtime_voice import CostMeter
+
+
+# ------------------------------------------------------------------
+# Helpers / fakes
+# ------------------------------------------------------------------
+
+class _Ev:
+    def __init__(self, type, **kw):
+        self.type = type
+        for k, v in kw.items():
+            setattr(self, k, v)
+
+
+class _FakeConn:
+    """Stands in for the OpenAI Realtime connection; records appends."""
+
+    def __init__(self, events, hang_after: bool = False):
+        self._events = events
+        self._hang = hang_after
+        self.appended: list[bytes] = []
+        import types as _t
+        self.session = _t.SimpleNamespace(update=self._noop)
+        self.conversation = _t.SimpleNamespace(item=_t.SimpleNamespace(create=self._noop))
+        self.response = _t.SimpleNamespace(create=self._noop)
+        self.input_audio_buffer = _t.SimpleNamespace(append=self._append)
+
+    async def _noop(self, *a, **k): ...
+
+    async def _append(self, audio: str = "", **k):
+        self.appended.append(base64.b64decode(audio))
+
+    async def __aenter__(self): return self
+    async def __aexit__(self, *a): return False
+
+    async def __aiter__(self):
+        for e in self._events:
+            await asyncio.sleep(0.01)  # realistic pacing: mic pumps in between
+            yield e
+        while self._hang:  # simulate an open connection with no traffic
+            await asyncio.sleep(0.05)
+
+
+class _FakeRobot:
+    def __init__(self, chunks: int = 5, chunk: bytes | None = None):
+        self._chunks = chunks
+        # Non-silent int16 so resampling has real content.
+        self._chunk = chunk if chunk is not None else (
+            (np.ones(1600, dtype=np.int16) * 1000).tobytes())
+        self.segments: list[bytes] = []
+
+    async def stream_audio(self):
+        for _ in range(self._chunks):
+            await asyncio.sleep(0.001)
+            yield self._chunk
+        # keep the "mic" open a little so the events task decides the ending
+        await asyncio.sleep(0.3)
+
+    async def speak_segment(self, audio_b64: str) -> bool:
+        self.segments.append(base64.b64decode(audio_b64))
+        return True
+
+
+class _Bus:
+    def __init__(self):
+        self.events = []
+
+    async def publish(self, event):
+        self.events.append(event)
+
+
+# ------------------------------------------------------------------
+# Unit bits
+# ------------------------------------------------------------------
+
+def test_session_enabled_default_on(monkeypatch) -> None:
+    monkeypatch.delenv("REALTIME_SESSION", raising=False)
+    assert session_enabled() is True
+    monkeypatch.setenv("REALTIME_SESSION", "false")
+    assert session_enabled() is False
+
+
+def test_resample_16k_to_24k_length() -> None:
+    pcm16 = (np.ones(1600, dtype=np.int16) * 500).tobytes()  # 100 ms @ 16 kHz
+    out = _resample_16k_to_24k(pcm16)
+    assert len(out) == 2400 * 2  # 100 ms @ 24 kHz, s16le
+    assert _resample_16k_to_24k(b"") == b""
+
+
+# ------------------------------------------------------------------
+# Full session flow
+# ------------------------------------------------------------------
+
+async def test_session_streams_mic_plays_segments_and_publishes(monkeypatch) -> None:
+    monkeypatch.setenv("REALTIME_SEGMENT_MS", "1")  # tiny → every delta flushes
+    monkeypatch.setenv("SELF_HEARING_COOLDOWN_S", "0")
+    reply_audio = base64.b64encode(b"\x01\x02" * 60).decode()
+    events = [
+        _Ev("input_audio_buffer.speech_started"),
+        _Ev("conversation.item.input_audio_transcription.completed",
+            transcript="vertel eens een mop"),
+        _Ev("response.output_audio_transcript.delta", delta="Waarom fietst een kip?"),
+        _Ev("response.output_audio.delta", delta=reply_audio),
+        _Ev("response.done", response=type("R", (), {"usage": {
+            "input_token_details": {"audio_tokens": 100},
+            "output_token_details": {"audio_tokens": 200},
+        }})()),
+    ]
+    conn = _FakeConn(events)
+    robot = _FakeRobot()
+    bus = _Bus()
+    meter = CostMeter()
+    heard: list[str] = []
+    sess = RealtimeSession(robot=robot, bus=bus, instructions="Wees Richie",
+                           conn_factory=lambda m: conn, meter=meter,
+                           on_reply=heard.append)
+    await sess.run(initial_text="")
+    await asyncio.sleep(0.01)  # let fire-and-forget speak_segment land
+
+    assert conn.appended, "mic chunks must reach input_audio_buffer.append"
+    assert robot.segments and robot.segments[0] == b"\x01\x02" * 60
+    types = [type(e).__name__ for e in bus.events]
+    assert "TranscriptUpdated" in types      # the user's words (server STT)
+    assert "ResponseDrafted" in types        # Richie's reply, already voiced
+    drafted = next(e for e in bus.events if type(e).__name__ == "ResponseDrafted")
+    assert drafted.already_voiced is True
+    assert sess.turns == 1 and meter.turns == 1
+    assert heard == ["Waarom fietst een kip?"]  # echo guard was fed
+
+
+async def test_session_gates_mic_while_playing(monkeypatch) -> None:
+    """§6.1 half-duplex: mic chunks during playback are dropped, not appended."""
+    monkeypatch.setenv("SELF_HEARING_COOLDOWN_S", "0")
+    conn = _FakeConn([])
+    robot = _FakeRobot(chunks=3)
+    sess = RealtimeSession(robot=robot, bus=_Bus(), conn_factory=lambda m: conn)
+    sess._playing_until = time.monotonic() + 60  # Richie is "speaking"
+    await sess._pump_mic(conn)
+    assert conn.appended == []
+
+
+async def test_session_idle_timeout_closes(monkeypatch) -> None:
+    monkeypatch.setenv("REALTIME_SESSION_IDLE_S", "0.2")
+    conn = _FakeConn([], hang_after=True)   # open connection, no traffic
+    robot = _FakeRobot(chunks=2)
+    sess = RealtimeSession(robot=robot, bus=_Bus(), conn_factory=lambda m: conn)
+    t0 = time.monotonic()
+    await asyncio.wait_for(sess.run(), timeout=5.0)
+    assert "idle" in sess.closed_reason or "mic stream ended" in sess.closed_reason
+    assert time.monotonic() - t0 < 4.0
+
+
+async def test_session_raises_on_error_event() -> None:
+    conn = _FakeConn([_Ev("error", error="model_not_found")])
+    robot = _FakeRobot(chunks=1)
+    sess = RealtimeSession(robot=robot, bus=_Bus(), conn_factory=lambda m: conn)
+    with pytest.raises(RuntimeError):
+        await sess.run()
