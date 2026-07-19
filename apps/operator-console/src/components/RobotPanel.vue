@@ -458,10 +458,19 @@ async function applyVolume() {
   } catch { /* robot offline — slider stays local */ }
 }
 
+// U152: poll /robot/status so the title bar reflects reality even if the
+// RobotConnected WS event was missed (camera streams but status said offline).
+async function syncRobotStatus(): Promise<void> {
+  try {
+    const r = await fetch(`${BRAIN_URL}/robot/status`)
+    robotStore.syncFromStatus(r.ok ? await r.json() : null)
+  } catch { /* leave last known state */ }
+}
+
 onMounted(() => {
   fetchCharacters(); fetchMic(); fetchSleep(); fetchProactive()
-  fetchRealtimeCost()
-  costTimer = setInterval(fetchRealtimeCost, 10_000)  // U129: refresh spend
+  fetchRealtimeCost(); syncRobotStatus()
+  costTimer = setInterval(() => { fetchRealtimeCost(); syncRobotStatus() }, 8_000)
 })
 onUnmounted(() => { if (costTimer) clearInterval(costTimer) })
 onMounted(async () => {

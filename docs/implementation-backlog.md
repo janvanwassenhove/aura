@@ -454,6 +454,9 @@ the human can unblock it.
 - [x] **U151 — verwarrende titelbalk-status ("Connected · offline") gelabeld** · `pending`
   Twee losse statussen stonden zonder onderwerp naast elkaar → las tegenstrijdig. Nu gelabeld: **"App: Connected"** (de console↔brain event-stream-WebSocket) en **"Robot: online/offline"** (de verbinding met de Pi), met een groen/rood CPU-icoon dat de robot-connectie kleurt. Tooltips verduidelijken elk ("Console ↔ brain event stream" / "Robot connection"). Console 56 groen. Bijkomend: na de netwerk-drop is de Pi weer online (status connected/tracking true) en de U150-endpointing-fix (vast venster) is alsnog gedeployed + herstart.
 
+- [x] **U152 — "Robot: offline" terwijl camera live is: status uit /robot/status pollen** · `pending`
+  De console zette `connected` ALLEEN via WS-events (RobotConnected). Miste die (robot verbond vóór de console, of tijdens de netwerk-drop), dan bleef de titelbalk "offline" terwijl de camera-stream (directe HTTP) prima werkte — verwarrend. Fix: `robotStore.syncFromStatus()` + een poll van `/robot/status` elke 8s in RobotPanel → de titelbalk volgt nu de echte robot-connectie (de brain rapporteerde al `connected:true, online`). Console 56 groen. NB: hiermee samen de latency-meting uit de traces vastgelegd voor de baseline: mouth-to-ear ~12,5s, opgesplitst als capture 3,9s / stt 1,5s / een verdachte queue 5,0s / realtime-generatie+buffer 6,0s — de grootste hap is dat Realtime de HELE audio buffert vóór afspelen; streaming daarvan is de volgende Phase-1-unit.
+
 ## Progress log (append-only; newest last)
 
 - 2026-06-21 — ledger created on `aura-autobuild`; Phase 0/0b complete, Phase 1 scaffold (U-pre) done before this loop started.

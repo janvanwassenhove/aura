@@ -93,6 +93,15 @@ export const useRobotStore = defineStore('robot', () => {
     }
   }
 
+  // U152: sync from a /robot/status poll. WS events (RobotConnected) can be
+  // missed if the robot connected before the console opened or during a network
+  // blip, leaving the title bar wrongly "offline" while the camera streams fine.
+  function syncFromStatus(s: { connected?: boolean; mode?: string } | null): void {
+    if (!s) return
+    connected.value = s.connected === true
+    if (s.mode) mode.value = s.mode
+  }
+
   function $reset() {
     mode.value = 'unknown'
     behaviorState.value = 'idle'
@@ -104,5 +113,5 @@ export const useRobotStore = defineStore('robot', () => {
     lastRecognized.value = null
   }
 
-  return { mode, behaviorState, isSpeaking, currentTranscript, uptime, connected, motionLog, lastRecognized, statusBadgeClass, applyEvent, $reset }
+  return { mode, behaviorState, isSpeaking, currentTranscript, uptime, connected, motionLog, lastRecognized, statusBadgeClass, applyEvent, syncFromStatus, $reset }
 })
