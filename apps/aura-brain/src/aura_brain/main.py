@@ -840,7 +840,7 @@ def create_app() -> FastAPI:
         from aura_brain.realtime_voice import METER
         return JSONResponse({
             "engine": _os.environ.get("VOICE_ENGINE", "pipeline"),
-            "model": _os.environ.get("REALTIME_MODEL", "gpt-4o-mini-realtime-preview"),
+            "model": _os.environ.get("REALTIME_MODEL", "gpt-realtime"),
             **METER.summary(),
         })
 

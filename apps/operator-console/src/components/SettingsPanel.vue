@@ -143,7 +143,7 @@
                 {{ rtChecking ? 'Checking…' : 'Test Realtime access' }}
               </button>
               <span v-if="rtResult" :class="['rt-verdict', rtResult.ok ? 'rt-ok' : 'rt-bad']">
-                {{ rtResult.ok ? '✓ works' : '✗' }} {{ rtResult.reason }}
+                {{ rtResult.ok ? '✓' : '✗' }} {{ rtResult.hint || rtResult.reason }}
               </span>
             </div>
           </div>
@@ -447,7 +447,7 @@ const localVoiceMode = ref(prefsStore.voiceMode)
 const localVoiceEngine = ref(prefsStore.voiceEngine)
 // U142: Realtime access self-check.
 const rtChecking = ref(false)
-const rtResult = ref<{ ok: boolean; reason: string; model: string } | null>(null)
+const rtResult = ref<{ ok: boolean; reason: string; model: string; hint?: string } | null>(null)
 async function checkRealtime(): Promise<void> {
   rtChecking.value = true
   rtResult.value = null

@@ -104,6 +104,19 @@ def _default_conn_factory(model: str):
     return AsyncOpenAI().beta.realtime.connect(model=model)
 
 
+# U143: candidate Realtime models, newest-GA first. probe() walks these to find
+# one the account actually serves, so the owner never guesses a model name.
+_MODEL_CANDIDATES = (
+    "gpt-realtime",
+    "gpt-4o-realtime-preview",
+    "gpt-4o-mini-realtime-preview",
+)
+
+
+def _default_realtime_model() -> str:
+    return os.environ.get("REALTIME_MODEL") or _MODEL_CANDIDATES[0]
+
+
 def wav_to_pcm24k(wav_bytes: bytes) -> bytes | None:
     """Decode a WAV window → raw PCM16 mono @ 24 kHz (Realtime input format)."""
     import io
@@ -164,7 +177,7 @@ async def _run_realtime_turn_inner(
     conn_factory: ConnFactory | None,
     meter: CostMeter | None,
 ) -> tuple[str, bytes]:
-    model = os.environ.get("REALTIME_MODEL", "gpt-4o-mini-realtime-preview")
+    model = _default_realtime_model()
     factory = conn_factory or _default_conn_factory
     meter = meter or METER
 
@@ -204,16 +217,40 @@ async def _run_realtime_turn_inner(
 
 
 async def probe(conn_factory: ConnFactory | None = None) -> dict:
-    """U142: does this account/model actually support Realtime? A tiny
-    TEXT-only round-trip that reports exactly what happens, so the owner can
-    tell an account/access problem from a config one — instead of a silent
-    'no audio'. Never raises; returns a structured verdict."""
+    """U142/U143: does this account support Realtime, and WITH WHICH MODEL? A
+    tiny TEXT-only round-trip against each candidate model; returns the first
+    that works (with its name so the owner can pin REALTIME_MODEL), else the
+    most informative failure. Never raises."""
     import asyncio
 
-    model = os.environ.get("REALTIME_MODEL", "gpt-4o-mini-realtime-preview")
     if not os.environ.get("OPENAI_API_KEY"):
-        return {"ok": False, "model": model, "reason": "no OPENAI_API_KEY set"}
+        return {"ok": False, "model": _default_realtime_model(), "reason": "no OPENAI_API_KEY set"}
     factory = conn_factory or _default_conn_factory
+
+    # Try the configured model first, then the GA/preview candidates.
+    pinned = os.environ.get("REALTIME_MODEL")
+    candidates = ([pinned] if pinned else []) + [
+        m for m in _MODEL_CANDIDATES if m != pinned]
+
+    last = {"ok": False, "model": candidates[0], "reason": "no candidates"}
+    for model in candidates:
+        result = await _probe_model(model, factory)
+        if result["ok"]:
+            result["hint"] = (
+                f"Realtime works with '{model}'. "
+                + ("" if pinned == model else f"Set REALTIME_MODEL={model} to pin it."))
+            return result
+        last = result
+        # A hard "no access / bad key / quota" won't change per model — stop early.
+        if any(w in result["reason"].lower() for w in ("rejected", "quota", "rate-limited")):
+            break
+    last.setdefault("hint", "Realtime is not usable on this key — see the reason above.")
+    last["tried"] = candidates
+    return last
+
+
+async def _probe_model(model: str, factory: ConnFactory) -> dict:
+    import asyncio
 
     async def _run() -> dict:
         got_text = False
