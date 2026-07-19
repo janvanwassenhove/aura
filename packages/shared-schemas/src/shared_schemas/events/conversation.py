@@ -16,3 +16,6 @@ class IntentRecognized(BaseEvent):
 class ResponseDrafted(BaseEvent):
     event_type: Literal["ResponseDrafted"] = "ResponseDrafted"
     response_text: str
+    # U146: the Realtime engine already spoke this reply itself, so the embody
+    # subscriber must show it (console) but NOT synthesize+play it again.
+    already_voiced: bool = False

@@ -152,20 +152,23 @@ def realtime_enabled() -> bool:
 async def run_realtime_turn(
     pcm_in: bytes,
     *,
+    text: str = "",
     instructions: str = "",
     voice: str = "alloy",
     conn_factory: ConnFactory | None = None,
     meter: CostMeter | None = None,
 ) -> tuple[str, bytes]:
-    """One turn: PCM16 audio in → (transcript, PCM16 audio out). Raises on any
-    failure (incl. TIMEOUT) so the caller can fall back to the classic
+    """One turn → (reply transcript, PCM16 audio out). If ``text`` is given the
+    turn is driven by that exact text (our STT command — reliable, and much
+    faster than uploading audio); otherwise the captured PCM audio is sent.
+    Raises on any failure (incl. TIMEOUT) so the caller can fall back to the
     pipeline — a stalled Realtime connection must never freeze the voice loop."""
     import asyncio
 
     timeout = float(os.environ.get("REALTIME_TURN_TIMEOUT_S", "15"))
     try:
         return await asyncio.wait_for(
-            _run_realtime_turn_inner(pcm_in, instructions, voice, conn_factory, meter),
+            _run_realtime_turn_inner(pcm_in, text, instructions, voice, conn_factory, meter),
             timeout=timeout,
         )
     except asyncio.TimeoutError as exc:
@@ -174,6 +177,7 @@ async def run_realtime_turn(
 
 async def _run_realtime_turn_inner(
     pcm_in: bytes,
+    text: str,
     instructions: str,
     voice: str,
     conn_factory: ConnFactory | None,
@@ -198,14 +202,17 @@ async def _run_realtime_turn_inner(
                 "output": {"format": {"type": "audio/pcm", "rate": 24000}, "voice": voice},
             },
         })
-        # U144: send the whole utterance as ONE conversation item (input_audio
-        # content) instead of input_audio_buffer.append + commit — the buffer
-        # path races the async websocket send and the server sees a 0 ms buffer
-        # ("input_audio_buffer_commit_empty"). The item form is atomic.
+        # U146: prefer the exact STT text — the fixed-window capture degrades
+        # the audio (a wake word + trailing silence), which made Realtime greet
+        # generically instead of answering. Sending the transcript we already
+        # have is reliable and faster (no big audio upload / flush). Fall back
+        # to the raw audio only when no text is available.
+        if text:
+            content = [{"type": "input_text", "text": text}]
+        else:
+            content = [{"type": "input_audio", "audio": base64.b64encode(pcm_in).decode()}]
         await conn.conversation.item.create(item={
-            "type": "message", "role": "user",
-            "content": [{"type": "input_audio", "audio": base64.b64encode(pcm_in).decode()}],
-        })
+            "type": "message", "role": "user", "content": content})
         await conn.response.create()
 
         async for event in conn:

@@ -443,7 +443,7 @@ class VoiceLoop:
                 # (or when the engine is 'pipeline') fall back to the classic
                 # transcribe→LLM→TTS handler so Richie always replies.
                 try:
-                    if not await self._realtime_turn(wav):
+                    if not await self._realtime_turn(wav, command):
                         await self._handle(command)
                 finally:
                     _TRACE.finish(self._session_id)
@@ -475,7 +475,7 @@ class VoiceLoop:
             return ""
         return (await voice.transcribe(wav, filename="robot.wav") or "").strip()
 
-    async def _realtime_turn(self, wav: bytes) -> bool:
+    async def _realtime_turn(self, wav: bytes, command: str = "") -> bool:
         """U129: run one spoken turn through the OpenAI Realtime API and play
         the audio reply. Returns True if handled; False (or on ANY error) means
         'not handled' → the caller falls back to the classic pipeline."""
@@ -499,7 +499,7 @@ class VoiceLoop:
                 _t.mark("llm_request_sent")
                 _t.mark("tts_request_sent")
             transcript, audio_out = await realtime_voice.run_realtime_turn(
-                pcm, instructions=instructions, voice=voice_id)
+                pcm, text=command, instructions=instructions, voice=voice_id)
             if not audio_out:
                 # U141: empty audio means the account/model returns no audio for
                 # Realtime (seen live: ~11s, 0 chars, 0 bytes every turn). That
@@ -509,11 +509,17 @@ class VoiceLoop:
             import base64
 
             from shared_schemas.events.audio import TranscriptUpdated
+            from shared_schemas.events.conversation import ResponseDrafted
             if _t is not None:
                 _t.mark("llm_final")
                 _t.mark("tts_first_audio")
+            # U146: the "YOU" bubble is what the USER said (our STT command),
+            # NOT the realtime reply; the reply is shown as RICHIE via
+            # ResponseDrafted(already_voiced) so it isn't spoken a second time.
             await self._bus.publish(TranscriptUpdated(
-                session_id=self._session_id, transcript=transcript, is_final=True))
+                session_id=self._session_id, transcript=command or transcript, is_final=True))
+            await self._bus.publish(ResponseDrafted(
+                session_id=self._session_id, response_text=transcript, already_voiced=True))
             if _t is not None:
                 _t.mark("playback_first_sample")
             await self._robot.speak(transcript, audio_b64=base64.b64encode(audio_out).decode())
