@@ -65,6 +65,24 @@ class RobotClient:
             body["audio_b64"] = audio_b64
         return (await self._request("POST", "/robot/speak", body)).json().get("ok", False)
 
+    async def stream_audio(self):
+        """U154: async iterator over the robot's continuous mic stream (raw
+        s16le mono 16 kHz PCM chunks from GET /robot/audio/stream). Runs until
+        the robot closes the stream or the consumer stops iterating. No read
+        timeout — a conversation session is long-lived by design."""
+        if self._client is not None:  # injected ASGI/test client
+            async with self._client.stream("GET", "/robot/audio/stream") as resp:
+                resp.raise_for_status()
+                async for chunk in resp.aiter_bytes():
+                    yield chunk
+            return
+        timeout = httpx.Timeout(10.0, read=None)  # connect fast, read forever
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            async with client.stream("GET", f"{self._base_url}/robot/audio/stream") as resp:
+                resp.raise_for_status()
+                async for chunk in resp.aiter_bytes():
+                    yield chunk
+
     async def speak_segment(self, audio_b64: str) -> bool:
         """U153: play ONE PCM segment of a streamed reply (see the robot
         /robot/speak/segment route). Segments serialize on the robot so they

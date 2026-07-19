@@ -122,6 +122,7 @@ async def test_realtime_turn_streams_segments(monkeypatch) -> None:
     monkeypatch.setenv("VOICE_ENGINE", "realtime")
     monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
     monkeypatch.setenv("REALTIME_STREAMING", "true")
+    monkeypatch.setenv("REALTIME_SESSION", "false")  # U153 per-turn path
     monkeypatch.setenv("LISTENING_CUE", "false")
 
     from aura_brain import realtime_voice
@@ -152,6 +153,7 @@ async def test_realtime_turn_falls_back_to_whole_without_streaming(monkeypatch) 
     monkeypatch.setenv("VOICE_ENGINE", "realtime")
     monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
     monkeypatch.setenv("REALTIME_STREAMING", "false")
+    monkeypatch.setenv("REALTIME_SESSION", "false")  # U153 per-turn path
     monkeypatch.setenv("LISTENING_CUE", "false")
 
     from aura_brain import realtime_voice
@@ -171,3 +173,66 @@ async def test_realtime_turn_falls_back_to_whole_without_streaming(monkeypatch) 
     assert handled is True
     assert robot.segments == []
     assert len(robot.whole) == 1  # one whole-utterance speak
+
+
+# ------------------------------------------------------------------
+# U154: conversation-session mode routes through RealtimeSession
+# ------------------------------------------------------------------
+
+class _StreamRobot(_SegRobot):
+    async def stream_audio(self):  # marks session capability
+        yield b"\x00\x00"
+
+
+async def test_realtime_turn_uses_session_when_enabled(monkeypatch) -> None:
+    monkeypatch.setenv("VOICE_ENGINE", "realtime")
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+    monkeypatch.setenv("REALTIME_SESSION", "true")
+    monkeypatch.setenv("LISTENING_CUE", "false")
+
+    from aura_brain import realtime_session
+
+    runs: list[str] = []
+
+    class _FakeSession:
+        def __init__(self, **kw):
+            self.turns = 0
+            self.closed_reason = ""
+
+        async def run(self, initial_text: str = "") -> None:
+            runs.append(initial_text)
+            self.turns = 2  # a real back-and-forth happened
+
+    monkeypatch.setattr(realtime_session, "RealtimeSession", _FakeSession)
+
+    robot = _StreamRobot()
+    loop = VoiceLoop(robot=robot, pipeline=None, bus=_NullBus(),
+                     default_wake_word="richie")
+    handled = await loop._realtime_turn(b"fakewav", command="vertel een mop")
+    assert handled is True
+    assert runs == ["vertel een mop"]  # first command seeds the session
+
+
+async def test_realtime_session_failure_counts_toward_breaker(monkeypatch) -> None:
+    monkeypatch.setenv("VOICE_ENGINE", "realtime")
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+    monkeypatch.setenv("REALTIME_SESSION", "true")
+    monkeypatch.setenv("LISTENING_CUE", "false")
+
+    from aura_brain import realtime_session
+
+    class _DeadSession:
+        def __init__(self, **kw):
+            self.turns = 0
+            self.closed_reason = ""
+
+        async def run(self, initial_text: str = "") -> None:
+            raise RuntimeError("connection refused")
+
+    monkeypatch.setattr(realtime_session, "RealtimeSession", _DeadSession)
+
+    loop = VoiceLoop(robot=_StreamRobot(), pipeline=None, bus=_NullBus(),
+                     default_wake_word="richie")
+    assert await loop._realtime_turn(b"w", command="mop") is False
+    assert await loop._realtime_turn(b"w", command="mop") is False
+    assert loop._realtime_broken is True  # two failures trip the breaker
