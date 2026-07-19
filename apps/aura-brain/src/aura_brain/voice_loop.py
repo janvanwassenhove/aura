@@ -271,7 +271,13 @@ class VoiceLoop:
         # That stops room noise / Whisper gibberish from being taken as replies
         # in a no-wake-word window (the "phantom conversations"). Set FOLLOWUP_S
         # to e.g. 8 to re-enable natural "just answer" follow-ups.
-        followup_s = self._followup_s
+        # U149: in Realtime mode, ALWAYS require the wake word next turn. The
+        # follow-up window (wake-word-free) was letting the robot's own audio /
+        # ambient spawn phantom Realtime replies ("Waarover wil je meer horen?"
+        # with no user turn). Realtime is conversational enough that re-waking
+        # each turn is fine — and it kills the phantom at the source.
+        realtime = os.environ.get("VOICE_ENGINE", "pipeline").lower() == "realtime"
+        followup_s = 0.0 if realtime else self._followup_s
         if followup_s <= 0 or now < self._music_until:
             self._followup_until = 0.0  # wake word required
         elif self._followup_chain < self._max_followup_chain:
