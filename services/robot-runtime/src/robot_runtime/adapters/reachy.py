@@ -565,6 +565,7 @@ class ReachyRobotAdapter(RobotAdapter):
     _FOLLOW_GESTURES = frozenset({
         "nod", "tilt", "shake", "gesture", "wave",
         "mood_happy", "mood_excited", "mood_apologetic", "mood_curious", "mood_attentive",
+        "listening", "thinking",  # U147: keep eyes on the speaker while listening
     })
 
     def _run_motion_tracked(self, command: MotionCommand) -> None:
@@ -782,6 +783,17 @@ class ReachyRobotAdapter(RobotAdapter):
                         mini.set_automatic_body_yaw(True)
                     except Exception:  # noqa: BLE001
                         pass
+        elif motion == "listening":
+            # U147: attentive-listening cue — a small lean toward the speaker
+            # with antennas perked forward, held briefly. Deliberately gentle:
+            # a big move would add motor noise to the mic mid-capture (brief §5.3).
+            perk = 0.5 * amp
+            go(head=_rot("x", 0.12 * amp), antennas=[perk, perk], duration=0.35)
+        elif motion == "thinking":
+            # U147: a slow "let me think" head roll while a reply is generated,
+            # so the delay reads as considered, not frozen.
+            go(head=_rot("y", 0.18 * amp), antennas=[0.3 * amp, 0.5 * amp], duration=0.5)
+            go(head=_rot("y", -0.12 * amp), antennas=[0.5 * amp, 0.3 * amp], duration=0.5)
         elif motion == "look_around":  # idle curiosity: glance at 2 spots, settle
             import random
 
