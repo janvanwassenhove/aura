@@ -93,6 +93,13 @@ class ReachyRobotAdapter(RobotAdapter):
         # Raw (pre-normalization) peak of the last mic capture — lets the voice
         # loop tell silence from speech cheaply, without transcribing (U47).
         self._last_raw_peak = 0.0
+        # U155: appsrc streaming playback — estimated monotonic time until the
+        # pushed audio finishes. Past it → the next push starts a NEW utterance
+        # (start_playing re-stamps the PTS so the mixer doesn't place it in the
+        # past after a silence gap).
+        self._appsrc_until = 0.0
+        # U156: whether the WebRTC AEC pipeline was activated on connect.
+        self._aec_active = False
 
     def last_capture_peak(self) -> float:
         return self._last_raw_peak
@@ -165,9 +172,72 @@ class ReachyRobotAdapter(RobotAdapter):
     # Lifecycle
     # ------------------------------------------------------------------
 
+    def _force_webrtc_aec(self) -> None:
+        """U156: route audio through the SDK's WebRTC echo-cancellation path.
+
+        The SDK ships webrtcdsp + webrtcechoprobe wiring (software AEC: the
+        speaker signal is the far-end reference, subtracted from the mic), but
+        only builds it in the autoaudiosrc fallback branch — the presence of
+        ~/.asoundrc (our robot) selects plain alsasrc/alsasink instead, and the
+        measured echo residual there is ~9x louder than user speech at the mic
+        (raw rms 1900 vs ~400 peak speech). Forcing the fallback branch enables
+        the AEC chain; ALSA's default device is the same XMOS card, so audio
+        still flows through the same hardware. Guarded by ROBOT_WEBRTC_AEC.
+        """
+        try:
+            from reachy_mini.media import audio_gstreamer
+
+            audio_gstreamer.has_reachymini_asoundrc = lambda: False
+            audio_gstreamer.get_audio_device = lambda *_a, **_k: None
+            # The fallback branch creates autoaudiosrc/autoaudiosink, but
+            # autodetect picks pulse/openal here (no PulseAudio on the Pi →
+            # "Connection refused" / "Could not open device", capture dead).
+            # Map them to the explicit ALSA devices from ~/.asoundrc instead —
+            # same XMOS card, but now routed through webrtcdsp + echoprobe.
+            Gst = audio_gstreamer.Gst
+            orig_make = Gst.ElementFactory.make
+
+            def _make(factory_name, name=None):
+                if factory_name == "autoaudiosrc":
+                    el = orig_make("alsasrc", name)
+                    if el is not None:
+                        el.set_property("device", "reachymini_audio_src")
+                    return el
+                if factory_name == "autoaudiosink":
+                    el = orig_make("alsasink", name)
+                    if el is not None:
+                        el.set_property("device", "reachymini_audio_sink")
+                    return el
+                if factory_name == "webrtcdsp":
+                    el = orig_make("webrtcdsp", name)
+                    if el is not None:
+                        # Measured: without this the echo passes through
+                        # uncancelled — webrtcdsp relies on pipeline latency
+                        # accounting to align the far-end reference, and the
+                        # dmix/dsnoop topology breaks it. Delay-agnostic mode
+                        # estimates the delay from the signals themselves.
+                        el.set_property("delay-agnostic", True)
+                        el.set_property("extended-filter", True)
+                        el.set_property("noise-suppression", True)
+                        # AGC re-amplifies the cancelled residual back to
+                        # speech level, defeating the AEC — measured: residual
+                        # rms ~4400 with AGC vs the converging trend without.
+                        el.set_property("gain-control", False)
+                    return el
+                return orig_make(factory_name, name)
+
+            Gst.ElementFactory.make = staticmethod(_make)
+            self._aec_active = True
+            logger.info("WebRTC AEC forced: alsa reachymini devices + webrtcdsp/echoprobe")
+        except Exception as exc:  # noqa: BLE001 — fall back to plain audio
+            logger.warning("could not force WebRTC AEC path: %s", exc)
+
     async def connect(self) -> None:
         def _open() -> Any:
             from reachy_mini import ReachyMini  # lazy: optional dependency
+
+            if os.environ.get("ROBOT_WEBRTC_AEC", "false").lower() == "true":
+                self._force_webrtc_aec()
 
             if self._media_backend != "no_media":
                 self._prime_media()
@@ -379,9 +449,57 @@ class ReachyRobotAdapter(RobotAdapter):
         async with self._motion_lock:  # hold the lock so nothing cuts the speech
             await asyncio.to_thread(_play)
 
+    async def play_stream_segment(self, audio_bytes: bytes, sample_rate: int = 24_000) -> None:
+        """U155: gapless streaming playback via the SDK's appsrc pipeline.
+
+        push_audio_sample feeds an audiomixer with a live silence branch, so
+        consecutive segments play back-to-back with NO per-segment pipeline
+        restart (the playbin path rebuilt a playbin per segment — the audible
+        stutter). Returns as soon as the audio is buffered; the pipeline plays
+        it asynchronously. When the AEC path is active (U156) this route also
+        feeds the echo probe, so the mic capture has Richie's voice cancelled.
+        """
+        media = self._media()
+        if media is None:
+            logger.warning("play_stream_segment skipped: media backend disabled")
+            return
+
+        def _push() -> None:
+            import time
+
+            pcm = np.frombuffer(audio_bytes, dtype=np.int16).astype(np.float32) / 32768.0
+            pcm = np.clip(pcm * self._volume, -1.0, 1.0)
+            out_rate = media.get_output_audio_samplerate() or 16_000
+            if sample_rate != out_rate and len(pcm):
+                n_out = int(len(pcm) * out_rate / sample_rate)
+                x_old = np.linspace(0.0, 1.0, num=len(pcm), endpoint=False)
+                x_new = np.linspace(0.0, 1.0, num=n_out, endpoint=False)
+                pcm = np.interp(x_new, x_old, pcm).astype(np.float32)
+            now = time.monotonic()
+            if now >= self._appsrc_until:
+                # Previous utterance finished (or first ever) → re-stamp the
+                # PTS so the mixer schedules this at the current running time
+                # instead of contiguously after audio that ended long ago.
+                media.start_playing()
+                self._appsrc_until = now
+            media.push_audio_sample(pcm)
+            self._appsrc_until = max(self._appsrc_until, now) + (
+                len(pcm) / out_rate if out_rate else 0.0)
+
+        await asyncio.to_thread(_push)
+
     def stop_audio(self) -> bool:
-        """U84 barge-in: abort the current utterance immediately."""
+        """U84 barge-in: abort the current utterance immediately. Cuts both
+        playback paths: the playbin whole-utterance path (abort event) and the
+        U155 appsrc streaming path (clear_player flushes queued audio)."""
         self._audio_abort.set()
+        media = self._media()
+        if media is not None:
+            try:
+                media.clear_player()
+            except Exception:  # noqa: BLE001 — flush is best-effort
+                pass
+        self._appsrc_until = 0.0
         return True
 
     # ------------------------------------------------------------------
@@ -549,7 +667,7 @@ class ReachyRobotAdapter(RobotAdapter):
 
         return await asyncio.to_thread(_record)
 
-    async def stream_audio(self, chunk_ms: int = 100):
+    async def stream_audio(self, chunk_ms: int = 100, raw: bool = False):
         """U154: continuous mic stream — yields s16le mono 16 kHz PCM chunks of
         ~chunk_ms until the consumer stops iterating (conversation-session mode:
         the brain forwards these to the Realtime API, which does the endpointing
@@ -557,7 +675,10 @@ class ReachyRobotAdapter(RobotAdapter):
 
         Gain: a slowly-decaying running peak instead of per-capture
         normalization, so the level is smooth across chunks (per-chunk peak
-        normalization would pump the noise floor between words).
+        normalization would pump the noise floor between words). ``raw=True``
+        skips gain entirely — needed for echo/AEC measurements (U156): the AGC
+        normalizes both room noise and speaker echo to the same peak, hiding
+        the true attenuation.
         """
         media = self._media()
         chunk_n16 = int(16_000 * chunk_ms / 1000)
@@ -605,9 +726,10 @@ class ReachyRobotAdapter(RobotAdapter):
                             x_old = np.linspace(0.0, 1.0, num=len(chunk), endpoint=False)
                             x_new = np.linspace(0.0, 1.0, num=n_out, endpoint=False)
                             chunk = np.interp(x_new, x_old, chunk).astype(np.float32)
-                        peak = float(np.abs(chunk).max()) if len(chunk) else 0.0
-                        running_peak = max(peak, running_peak * 0.98, 1e-4)
-                        chunk = chunk * min(target / running_peak, max_gain)
+                        if not raw:
+                            peak = float(np.abs(chunk).max()) if len(chunk) else 0.0
+                            running_peak = max(peak, running_peak * 0.98, 1e-4)
+                            chunk = chunk * min(target / running_peak, max_gain)
                         data = (np.clip(chunk, -1.0, 1.0) * 32767).astype(np.int16).tobytes()
                         try:
                             out.put_nowait(data)

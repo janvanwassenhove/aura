@@ -121,12 +121,16 @@ class FakeRobotAdapter(RobotAdapter):
         self._played_audio.append(audio_bytes)
         await asyncio.sleep(len(audio_bytes) / _FAKE_AUDIO_SAMPLE_RATE / 2)
 
-    async def stream_audio(self, chunk_ms: int = 100):
+    async def stream_audio(self, chunk_ms: int = 100, raw: bool = False):
         """U154: finite silence stream (~1 s) so session tests/dev complete."""
         chunk = bytes(int(16_000 * chunk_ms / 1000) * 2)
         for _ in range(10):
             await asyncio.sleep(0.001)
             yield chunk
+
+    async def play_stream_segment(self, audio_bytes: bytes, sample_rate: int = 24_000) -> None:
+        """U155: gapless segment playback — recorded like play_audio."""
+        self._played_audio.append(audio_bytes)
 
     async def capture_audio(self, duration_s: float = 3.0) -> bytes:
         await asyncio.sleep(duration_s)
