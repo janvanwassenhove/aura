@@ -367,3 +367,16 @@ async def test_dance_restores_body_follow(adapter) -> None:
                    if n == "set_automatic_body_yaw"]
     assert yaw_toggles and yaw_toggles[0] is False   # paused during the routine
     assert yaw_toggles[-1] is True                   # restored afterwards
+
+
+async def test_listening_and_thinking_cues(adapter) -> None:
+    """U147: attentive-listening cues animate and keep tracking (follow gesture)."""
+    await adapter.connect()
+    await adapter.set_tracking(True)
+    mini = adapter._created[0]
+    for motion in ("listening", "thinking"):
+        before = len(mini.calls)
+        await adapter.execute_motion(MotionCommand(motion_id=motion, direction=None))
+        moves = [n for n, _ in mini.calls[before:]]
+        assert "goto_target" in moves               # it actually moves
+        assert "stop_head_tracking" not in moves     # keeps eyes on the speaker

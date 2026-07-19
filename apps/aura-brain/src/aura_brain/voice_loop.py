@@ -430,6 +430,18 @@ class VoiceLoop:
                         self._pipeline.steer(self._session_id, note)
                     self._manager.thinking()
 
+                # U147: attentive-listening cue — a gentle "I heard you, let me
+                # think" motion during the reply delay so the wait reads as
+                # considered, not frozen. Fire-and-forget so it never adds
+                # latency; off via LISTENING_CUE=false.
+                if os.environ.get("LISTENING_CUE", "true").lower() == "true":
+                    try:
+                        from shared_schemas.robot.models import MotionCommand as _MC
+                        asyncio.ensure_future(self._robot.execute_motion(
+                            _MC(motion_id="thinking", speed=1.0, amplitude=0.6, direction=None)))
+                    except Exception:  # noqa: BLE001 — cue is decoration
+                        pass
+
                 # Phase 0 (U140): open the latency trace for this confirmed turn.
                 from aura_brain.turn_trace import LOG as _TRACE
                 trace = _TRACE.start(self._session_id,
