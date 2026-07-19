@@ -202,6 +202,7 @@ async def test_session_barge_in_cuts_playback(monkeypatch) -> None:
 async def test_session_barge_in_off_keeps_gate(monkeypatch) -> None:
     """Default (no AEC): mic gated during playback; no barge-in triggers."""
     monkeypatch.delenv("REALTIME_BARGE_IN", raising=False)
+    monkeypatch.setenv("REALTIME_TAIL_MAX_S", "0.2")  # fake 60s playback clock
     events = [
         _Ev("input_audio_buffer.speech_started"),
         _Ev("response.done", response=type("R", (), {"usage": {}})()),

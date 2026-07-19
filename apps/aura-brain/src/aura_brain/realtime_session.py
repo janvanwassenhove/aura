@@ -176,6 +176,13 @@ class RealtimeSession:
                         self.closed_reason = f"idle {self._idle_s:.0f}s"
                         return
             finally:
+                # U157: let the tail of the last reply finish before closing
+                # the mic stream — its teardown stops the robot's SHARED audio
+                # pipeline (stop_recording → NULL), which would clip the reply.
+                tail = self._playing_until - time.monotonic()
+                if tail > 0:
+                    cap = float(os.environ.get("REALTIME_TAIL_MAX_S", "20"))
+                    await asyncio.sleep(min(tail + 0.3, cap))
                 for t in (mic, events):
                     t.cancel()
                 logger.info("realtime session closed (%s): %d turns, ~$%.4f total",

@@ -100,6 +100,9 @@ class ReachyRobotAdapter(RobotAdapter):
         self._appsrc_until = 0.0
         # U156: whether the WebRTC AEC pipeline was activated on connect.
         self._aec_active = False
+        # U157: conversational body language while speaking + idle re-acquire.
+        self._talk_task: asyncio.Task | None = None
+        self._idle_scan_task: asyncio.Task | None = None
 
     def last_capture_peak(self) -> float:
         return self._last_raw_peak
@@ -279,6 +282,15 @@ class ReachyRobotAdapter(RobotAdapter):
                         self._body_follow = True
                     except Exception as exc:  # noqa: BLE001
                         logger.warning("body follow not started: %s", exc)
+            # U157: audio-reactive head sway — the SDK analyses everything the
+            # robot plays (incl. our U155 streamed reply segments) and composes
+            # subtle PTS-synced head offsets ON TOP of face tracking daemon-side.
+            # He keeps looking at you AND moves like he's talking.
+            if os.environ.get("HEAD_WOBBLE", "true").lower() == "true":
+                try:
+                    mini.enable_wobbling()
+                except Exception as exc:  # noqa: BLE001 — cosmetic
+                    logger.warning("head wobble not enabled: %s", exc)
             return mini
 
         self._mini = await asyncio.to_thread(_open)
@@ -289,6 +301,12 @@ class ReachyRobotAdapter(RobotAdapter):
         # self-heals within a few seconds. TRACKING_WATCHDOG_S=0 disables it.
         if self._tracking_watchdog is None or self._tracking_watchdog.done():
             self._tracking_watchdog = asyncio.ensure_future(self._tracking_watchdog_loop())
+        # U157: idle re-acquire — the daemon only follows a face it can SEE;
+        # once you leave the narrow camera view for >2 s it drops the aim and
+        # the head just sits there ("follow me stopt buiten een gesprek").
+        # A slow periodic look-around lets the tracker re-find you.
+        if self._idle_scan_task is None or self._idle_scan_task.done():
+            self._idle_scan_task = asyncio.ensure_future(self._idle_scan_loop())
         logger.info(
             "ReachyRobotAdapter connected (host=%s mode=%s media=%s)",
             self._host, self._connection_mode, self._media_backend,
@@ -311,12 +329,90 @@ class ReachyRobotAdapter(RobotAdapter):
             except Exception as exc:  # noqa: BLE001 — best-effort re-assert
                 logger.debug("tracking watchdog re-assert failed: %s", exc)
 
+    async def _idle_scan_loop(self) -> None:
+        """U157: when follow-me is on but nobody is (or was) in view, sweep the
+        head slowly every IDLE_SCAN_S so the face tracker can re-acquire. The
+        daemon composes our sweep with the face aim by tracking weight: with a
+        face in view the aim dominates (sweep is invisible); with no face the
+        sweep drives the head. IDLE_SCAN_S=0 disables."""
+        import random
+        import time
+
+        interval = float(os.environ.get("IDLE_SCAN_S", "45"))
+        if interval <= 0:
+            return
+        while self._mini is not None:
+            await asyncio.sleep(interval)
+            mini = self._mini
+            if mini is None:
+                break
+            if not self._tracking_on:            # follow-me off, or asleep
+                continue
+            if time.monotonic() < self._appsrc_until + 2.0:
+                continue                          # talking — don't scan mid-reply
+            if self._motion_lock.locked():
+                continue                          # a gesture/speech is running
+            try:
+                async with self._motion_lock:
+                    def _scan() -> None:
+                        for yaw in (0.45, -0.45, 0.0):
+                            mini.goto_target(
+                                head=_rot("z", yaw * random.uniform(0.8, 1.2)),
+                                duration=1.8)
+
+                    await asyncio.to_thread(_scan)
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:  # noqa: BLE001 — scan is best-effort
+                logger.debug("idle scan failed: %s", exc)
+
+    def _ensure_talk_task(self) -> None:
+        """U157: start the talking-antenna loop for the current utterance."""
+        if os.environ.get("TALK_ANTENNAS", "true").lower() != "true":
+            return
+        if self._talk_task is None or self._talk_task.done():
+            self._talk_task = asyncio.ensure_future(self._talk_gesture_loop())
+
+    async def _talk_gesture_loop(self) -> None:
+        """Subtle antenna accents while streamed speech is playing — antennas
+        don't touch the head, so face tracking (and the wobbler) keep working.
+        Ends by itself shortly after the playback clock runs out."""
+        import random
+        import time
+
+        try:
+            while self._mini is not None and time.monotonic() < self._appsrc_until + 0.5:
+                await asyncio.sleep(random.uniform(1.2, 2.4))
+                mini = self._mini
+                if mini is None or time.monotonic() >= self._appsrc_until:
+                    break
+                if self._motion_lock.locked():
+                    continue
+                a = random.uniform(0.25, 0.55) * random.choice((1.0, -1.0))
+                b = a * random.uniform(0.3, 1.0)
+                async with self._motion_lock:
+                    def _wiggle() -> None:
+                        mini.goto_target(antennas=[a, b], duration=0.5)
+                        mini.goto_target(antennas=[0.0, 0.0], duration=0.7)
+
+                    await asyncio.to_thread(_wiggle)
+        except asyncio.CancelledError:
+            pass
+        except Exception as exc:  # noqa: BLE001 — decoration only
+            logger.debug("talk gesture loop failed: %s", exc)
+
     async def disconnect(self) -> None:
         if self._mini is None:
             return
         if self._tracking_watchdog is not None:
             self._tracking_watchdog.cancel()
             self._tracking_watchdog = None
+        if self._idle_scan_task is not None:
+            self._idle_scan_task.cancel()
+            self._idle_scan_task = None
+        if self._talk_task is not None:
+            self._talk_task.cancel()
+            self._talk_task = None
         mini = self._mini
         self._mini = None
         self._mode = RobotMode.OFFLINE
@@ -487,6 +583,8 @@ class ReachyRobotAdapter(RobotAdapter):
                 len(pcm) / out_rate if out_rate else 0.0)
 
         await asyncio.to_thread(_push)
+        # U157: conversational body language for the duration of the utterance.
+        self._ensure_talk_task()
 
     def stop_audio(self) -> bool:
         """U84 barge-in: abort the current utterance immediately. Cuts both
