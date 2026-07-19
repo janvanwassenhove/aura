@@ -78,7 +78,9 @@ async def test_speak_segment_plays_directly() -> None:
         pcm = b"\x01\x02" * 120
         resp = _client().post("/robot/speak/segment", json={
             "audio_b64": base64.b64encode(pcm).decode()})
-        assert resp.status_code == 200 and resp.json() == {"ok": True}
+        assert resp.status_code == 200
+        # U155: default path is the gapless appsrc pipeline.
+        assert resp.json() == {"ok": True, "path": "appsrc"}
         assert adapter.played_audio == [pcm]
         assert adapter.spoken_texts == []  # no speak() involved
     finally:

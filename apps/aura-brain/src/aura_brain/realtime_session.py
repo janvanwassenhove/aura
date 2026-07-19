@@ -104,6 +104,14 @@ class RealtimeSession:
     def _speaker_tail_s(self) -> float:
         return float(os.environ.get("SELF_HEARING_COOLDOWN_S", "1.2"))
 
+    @property
+    def _barge_in(self) -> bool:
+        """U156: full duplex — keep the mic streaming during playback and let
+        the server VAD interrupt Richie mid-sentence. Requires the robot's
+        WebRTC AEC path (ROBOT_WEBRTC_AEC on the Pi), otherwise the server
+        hears Richie's own voice; hence opt-in and OFF by default."""
+        return os.environ.get("REALTIME_BARGE_IN", "false").lower() == "true"
+
     # -- run -----------------------------------------------------------
 
     async def run(self, initial_text: str = "") -> None:
@@ -176,12 +184,15 @@ class RealtimeSession:
     # -- mic → server --------------------------------------------------
 
     async def _pump_mic(self, conn) -> None:
+        barge = self._barge_in
         async for chunk in self._robot.stream_audio():
             if not chunk:
                 continue
             # Half-duplex gate: drop mic audio while Richie is (probably still)
             # speaking, plus a speaker tail — the classic §6.1 self-hearing fix.
-            if time.monotonic() < self._playing_until + self._speaker_tail_s:
+            # With AEC + barge-in (U156) the mic keeps streaming: the echo is
+            # cancelled robot-side, so the server can hear the user interrupt.
+            if not barge and time.monotonic() < self._playing_until + self._speaker_tail_s:
                 continue
             pcm24 = _resample_16k_to_24k(chunk)
             if pcm24:
@@ -199,62 +210,102 @@ class RealtimeSession:
             os.environ.get("REALTIME_SEGMENT_MS", "1400")) / 1000)
         reply_parts: list[str] = []
 
+        # U155: ORDERED playback — a dedicated consumer posts segments one by
+        # one. The previous fire-and-forget ensure_future could deliver
+        # segments out of order and hit the 10 s HTTP timeout on long replies
+        # (segments queued behind earlier playback) → audible hangs mid-reply.
+        play_q: asyncio.Queue[bytes | None] = asyncio.Queue()
+
+        async def _consume() -> None:
+            while True:
+                data = await play_q.get()
+                if data is None:
+                    return
+                if not self._first_segment_played:
+                    self._first_segment_played = True
+                    if self._trace is not None:
+                        self._trace.mark("tts_first_audio")
+                        self._trace.mark("playback_first_sample")
+                try:
+                    await self._robot.speak_segment(base64.b64encode(data).decode())
+                except Exception as exc:  # noqa: BLE001 — drop, don't die
+                    logger.debug("segment playback failed: %s", exc)
+
+        consumer = asyncio.ensure_future(_consume())
+
         async def _play(data: bytes) -> None:
             dur = len(data) / (24_000 * 2)
             now = time.monotonic()
-            # Segments queue on the robot's motion lock → playback is serial;
-            # extend the clock by each segment's duration.
+            # The robot's appsrc path buffers and returns immediately →
+            # playback is serial in push order; extend the estimate clock.
             self._playing_until = max(now, self._playing_until) + dur
-            if not self._first_segment_played:
-                self._first_segment_played = True
-                if self._trace is not None:
-                    self._trace.mark("tts_first_audio")
-                    self._trace.mark("playback_first_sample")
-            asyncio.ensure_future(
-                self._robot.speak_segment(base64.b64encode(data).decode()))
+            await play_q.put(data)
 
-        async for event in conn:
-            etype = getattr(event, "type", "")
-            if etype in ("response.output_audio.delta", "response.audio.delta"):
-                self._last_activity = time.monotonic()
-                seg += base64.b64decode(getattr(event, "delta", "") or "")
-                if len(seg) >= seg_bytes:
-                    await _play(bytes(seg))
-                    seg = bytearray()
-            elif etype in ("response.output_audio_transcript.delta",
-                           "response.audio_transcript.delta"):
-                reply_parts.append(getattr(event, "delta", "") or "")
-            elif etype in ("input_audio_buffer.speech_started",
-                           "input_audio_buffer.speech_stopped"):
-                self._last_activity = time.monotonic()
-            elif etype in ("conversation.item.input_audio_transcription.completed",
-                           "conversation.item.audio_transcription.completed"):
-                text = (getattr(event, "transcript", "") or "").strip()
-                if text:
-                    await self._bus.publish(TranscriptUpdated(
-                        session_id=self._session_id, transcript=text,
-                        is_final=True))
-            elif etype == "response.done":
-                if seg:  # flush the reply's tail
-                    await _play(bytes(seg))
-                    seg = bytearray()
-                self._last_activity = time.monotonic()
-                self.turns += 1
-                reply = "".join(reply_parts).strip()
-                reply_parts.clear()
-                if reply:
-                    await self._bus.publish(ResponseDrafted(
-                        session_id=self._session_id, response_text=reply,
-                        already_voiced=True))
-                    if self._on_reply is not None:
-                        self._on_reply(reply)
-                if self._trace is not None and self.turns == 1:
-                    self._trace.mark("llm_final")
-                    self._trace.reply_chars = len(reply)
-                resp = getattr(event, "response", None)
-                self._meter.add(_usage_dict(getattr(resp, "usage", None)))
-            elif etype == "error":
-                err = getattr(event, "error", "")
-                # Session-level VAD/turn errors shouldn't kill the whole
-                # conversation loop; real failures (auth, model) should.
-                raise RuntimeError(f"realtime session error: {err}")
+        try:
+            async for event in conn:
+                etype = getattr(event, "type", "")
+                if etype in ("response.output_audio.delta", "response.audio.delta"):
+                    self._last_activity = time.monotonic()
+                    seg += base64.b64decode(getattr(event, "delta", "") or "")
+                    if len(seg) >= seg_bytes:
+                        await _play(bytes(seg))
+                        seg = bytearray()
+                elif etype in ("response.output_audio_transcript.delta",
+                               "response.audio_transcript.delta"):
+                    reply_parts.append(getattr(event, "delta", "") or "")
+                elif etype == "input_audio_buffer.speech_started":
+                    self._last_activity = time.monotonic()
+                    # U156: user starts talking while Richie is still playing →
+                    # true barge-in (only reachable with AEC full duplex; in
+                    # half-duplex the gated mic can't trigger this mid-reply).
+                    if self._barge_in and time.monotonic() < self._playing_until:
+                        logger.info("barge-in: user interrupts — cutting playback")
+                        seg = bytearray()          # drop unplayed audio
+                        self._playing_until = 0.0
+                        try:
+                            await self._robot.stop_audio()
+                        except Exception:  # noqa: BLE001 — cut is best-effort
+                            pass
+                        try:
+                            await conn.response.cancel()
+                        except Exception:  # noqa: BLE001 — may already be done
+                            pass
+                elif etype == "input_audio_buffer.speech_stopped":
+                    self._last_activity = time.monotonic()
+                elif etype in ("conversation.item.input_audio_transcription.completed",
+                               "conversation.item.audio_transcription.completed"):
+                    text = (getattr(event, "transcript", "") or "").strip()
+                    if text:
+                        await self._bus.publish(TranscriptUpdated(
+                            session_id=self._session_id, transcript=text,
+                            is_final=True))
+                elif etype == "response.done":
+                    if seg:  # flush the reply's tail
+                        await _play(bytes(seg))
+                        seg = bytearray()
+                    self._last_activity = time.monotonic()
+                    self.turns += 1
+                    reply = "".join(reply_parts).strip()
+                    reply_parts.clear()
+                    if reply:
+                        await self._bus.publish(ResponseDrafted(
+                            session_id=self._session_id, response_text=reply,
+                            already_voiced=True))
+                        if self._on_reply is not None:
+                            self._on_reply(reply)
+                    if self._trace is not None and self.turns == 1:
+                        self._trace.mark("llm_final")
+                        self._trace.reply_chars = len(reply)
+                    resp = getattr(event, "response", None)
+                    self._meter.add(_usage_dict(getattr(resp, "usage", None)))
+                elif etype == "error":
+                    err = getattr(event, "error", "")
+                    # Session-level VAD/turn errors shouldn't kill the whole
+                    # conversation loop; real failures (auth, model) should.
+                    raise RuntimeError(f"realtime session error: {err}")
+        finally:
+            await play_q.put(None)  # drain remaining segments, then stop
+            try:
+                await asyncio.wait_for(consumer, timeout=30.0)
+            except (asyncio.TimeoutError, asyncio.CancelledError):
+                consumer.cancel()

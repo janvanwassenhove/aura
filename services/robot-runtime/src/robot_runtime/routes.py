@@ -124,15 +124,26 @@ async def speak_segment(body: dict) -> JSONResponse:
     except Exception:
         return JSONResponse({"error": "audio_b64 is not valid base64"}, status_code=422)
     adapter = getattr(engine, "_adapter", None)
+    # U155: prefer the gapless appsrc path — no per-segment pipeline restart
+    # (the playbin path's rebuild per segment was the audible stutter), returns
+    # once buffered, and feeds the AEC echo probe when active (U156).
+    # ROBOT_APPSRC_PLAYBACK=false → the old blocking playbin path.
+    import os as _os
+
+    stream_play = getattr(adapter, "play_stream_segment", None)
+    if stream_play is not None and _os.environ.get(
+            "ROBOT_APPSRC_PLAYBACK", "true").lower() == "true":
+        await stream_play(audio_bytes)
+        return JSONResponse({"ok": True, "path": "appsrc"})
     play = getattr(adapter, "play_audio", None)
     if play is None:
         return JSONResponse({"error": "adapter has no play_audio"}, status_code=501)
     await play(audio_bytes, normalize=False, tail_margin=0.06)
-    return JSONResponse({"ok": True})
+    return JSONResponse({"ok": True, "path": "playbin"})
 
 
 @router.get("/robot/audio/stream")
-async def audio_stream():
+async def audio_stream(raw: bool = False):
     """U154 conversation-session mode: stream the mic continuously as raw
     s16le mono 16 kHz PCM chunks (chunked HTTP — no WebSocket needed for a
     one-way stream). The brain forwards these to the Realtime API, whose
@@ -146,8 +157,14 @@ async def audio_stream():
     if stream is None:
         return JSONResponse({"error": "adapter has no stream_audio"}, status_code=501)
 
+    import inspect
+
+    kwargs = {}
+    if "raw" in inspect.signature(stream).parameters:
+        kwargs["raw"] = raw
+
     async def _gen():
-        async for chunk in stream():
+        async for chunk in stream(**kwargs):
             yield chunk
 
     return StreamingResponse(

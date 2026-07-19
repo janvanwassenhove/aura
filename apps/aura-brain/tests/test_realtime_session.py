@@ -41,13 +41,17 @@ class _FakeConn:
         self._events = events
         self._hang = hang_after
         self.appended: list[bytes] = []
+        self.cancelled = 0
         import types as _t
         self.session = _t.SimpleNamespace(update=self._noop)
         self.conversation = _t.SimpleNamespace(item=_t.SimpleNamespace(create=self._noop))
-        self.response = _t.SimpleNamespace(create=self._noop)
+        self.response = _t.SimpleNamespace(create=self._noop, cancel=self._cancel)
         self.input_audio_buffer = _t.SimpleNamespace(append=self._append)
 
     async def _noop(self, *a, **k): ...
+
+    async def _cancel(self, *a, **k):
+        self.cancelled += 1
 
     async def _append(self, audio: str = "", **k):
         self.appended.append(base64.b64decode(audio))
@@ -71,7 +75,7 @@ class _FakeRobot:
             (np.ones(1600, dtype=np.int16) * 1000).tobytes())
         self.segments: list[bytes] = []
 
-    async def stream_audio(self):
+    async def stream_audio(self, raw: bool = False):
         for _ in range(self._chunks):
             await asyncio.sleep(0.001)
             yield self._chunk
@@ -81,6 +85,10 @@ class _FakeRobot:
     async def speak_segment(self, audio_b64: str) -> bool:
         self.segments.append(base64.b64decode(audio_b64))
         return True
+
+    async def stop_audio(self) -> dict:
+        self.stopped = getattr(self, "stopped", 0) + 1
+        return {"ok": True}
 
 
 class _Bus:
@@ -170,6 +178,41 @@ async def test_session_idle_timeout_closes(monkeypatch) -> None:
     await asyncio.wait_for(sess.run(), timeout=5.0)
     assert "idle" in sess.closed_reason or "mic stream ended" in sess.closed_reason
     assert time.monotonic() - t0 < 4.0
+
+
+async def test_session_barge_in_cuts_playback(monkeypatch) -> None:
+    """U156: with AEC full duplex, speech during playback cuts Richie off."""
+    monkeypatch.setenv("REALTIME_BARGE_IN", "true")
+    monkeypatch.setenv("REALTIME_SEGMENT_MS", "1")
+    reply_audio = base64.b64encode(b"\x01\x02" * 60).decode()
+    events = [
+        _Ev("response.output_audio.delta", delta=reply_audio),  # playing…
+        _Ev("input_audio_buffer.speech_started"),               # user interrupts
+        _Ev("response.done", response=type("R", (), {"usage": {}})()),
+    ]
+    conn = _FakeConn(events)
+    robot = _FakeRobot(chunks=2)
+    sess = RealtimeSession(robot=robot, bus=_Bus(), conn_factory=lambda m: conn)
+    await sess.run()
+    assert getattr(robot, "stopped", 0) == 1     # playback was cut
+    assert conn.cancelled == 1                   # response cancelled server-side
+    assert sess._playing_until == 0.0
+
+
+async def test_session_barge_in_off_keeps_gate(monkeypatch) -> None:
+    """Default (no AEC): mic gated during playback; no barge-in triggers."""
+    monkeypatch.delenv("REALTIME_BARGE_IN", raising=False)
+    events = [
+        _Ev("input_audio_buffer.speech_started"),
+        _Ev("response.done", response=type("R", (), {"usage": {}})()),
+    ]
+    conn = _FakeConn(events)
+    robot = _FakeRobot(chunks=2)
+    sess = RealtimeSession(robot=robot, bus=_Bus(), conn_factory=lambda m: conn)
+    sess._playing_until = time.monotonic() + 60
+    await sess.run()
+    assert getattr(robot, "stopped", 0) == 0
+    assert conn.cancelled == 0
 
 
 async def test_session_raises_on_error_event() -> None:
