@@ -139,12 +139,15 @@ async def transcribe(data: bytes, filename: str = "audio.webm") -> str | None:
         lang = os.environ.get("ASSISTANT_LANGUAGE", "auto").lower()
         if lang in ("en", "nl", "fr", "de", "es", "it"):
             kwargs["language"] = lang
-        else:
-            # U135: unpinned auto-detect made Whisper hallucinate WHOLE
-            # sentences in random languages (Portuguese/Turkish) out of room
-            # noise. Use whisper-1's verbose_json so we get its own detected
-            # language + no-speech probability, and drop anything that isn't
-            # one of the household languages or that reads as silence.
+        # U145: the U135 hallucination gate is now OPT-IN. It swapped the auto
+        # path to whisper-1 (for its verbose_json no-speech/language signals),
+        # but whisper-1 is markedly worse than gpt-4o-mini-transcribe and
+        # returned EMPTY transcripts on real robot-mic audio — so Richie never
+        # heard a command. Keep the good model by default; only use the
+        # verbose_json gate when STT_HALLUCINATION_GATE=true. The wake-word
+        # requirement + echo/music guards are the primary defence against the
+        # foreign-language loop.
+        elif os.environ.get("STT_HALLUCINATION_GATE", "false").lower() == "true":
             kwargs["model"] = os.environ.get("STT_AUTO_MODEL", "whisper-1")
             kwargs["response_format"] = "verbose_json"
         # U87/U89: prime STT with the wake word/name as bare VOCABULARY tokens
