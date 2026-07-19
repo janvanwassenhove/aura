@@ -455,14 +455,15 @@ class ReachyRobotAdapter(RobotAdapter):
         # always recording the full window. `duration_s` becomes the MAX; the
         # capture stops ~ENDPOINT_SILENCE_S after speech ends, so a short
         # command returns fast. VOICE_ENDPOINTING=false → the old fixed window.
-        # U149: conservative defaults — a too-short hang cut natural
-        # inter-word/after-wake-word pauses mid-sentence ("vertel …" → "fertelde")
-        # and the short clip hurt STT. Only endpoint after a CLEAR, sustained
-        # pause (1.2 s) following real speech (0.6 s). Still trims the long tail
-        # off a finished command; VOICE_ENDPOINTING=false restores fixed windows.
-        endpointing = os.environ.get("VOICE_ENDPOINTING", "true").lower() == "true"
+        # U150: energy-VAD endpointing is OFF by default. Without interim
+        # transcripts it can't tell the natural pause BETWEEN the wake word and
+        # the command ("hey Richie … vertel eens een mop") from the end of the
+        # utterance, so it cut mid-sentence ("fertelde") and left Richie with a
+        # fragment. The fixed window is reliable; proper (transcript-aware)
+        # endpointing returns in Phase 2. Opt back in with VOICE_ENDPOINTING=true.
+        endpointing = os.environ.get("VOICE_ENDPOINTING", "false").lower() == "true"
         min_speech_s = float(os.environ.get("ENDPOINT_MIN_SPEECH_S", "0.6"))
-        silence_hang_s = float(os.environ.get("ENDPOINT_SILENCE_S", "1.2"))
+        silence_hang_s = float(os.environ.get("ENDPOINT_SILENCE_S", "1.5"))
         vad_gate = float(os.environ.get("ENDPOINT_VAD_GATE", "0.02"))
 
         def _record() -> bytes:
