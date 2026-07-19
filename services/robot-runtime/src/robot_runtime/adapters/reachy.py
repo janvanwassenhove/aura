@@ -288,6 +288,14 @@ class ReachyRobotAdapter(RobotAdapter):
             # He keeps looking at you AND moves like he's talking.
             if os.environ.get("HEAD_WOBBLE", "true").lower() == "true":
                 try:
+                    # U158: the SDK default YAW sway is 7.5° at 0.6 Hz — a slow
+                    # gaze wander that reads as "looking past you" while he
+                    # talks. Tame yaw hard, keep the nodding (pitch) alive.
+                    from reachy_mini.motion import speech_tapper as _tapper
+
+                    _tapper.SWAY_A_YAW_DEG = float(os.environ.get("WOBBLE_YAW_DEG", "2.0"))
+                    _tapper.SWAY_A_PITCH_DEG = float(os.environ.get("WOBBLE_PITCH_DEG", "4.0"))
+                    _tapper.SWAY_A_ROLL_DEG = float(os.environ.get("WOBBLE_ROLL_DEG", "2.0"))
                     mini.enable_wobbling()
                 except Exception as exc:  # noqa: BLE001 — cosmetic
                     logger.warning("head wobble not enabled: %s", exc)
@@ -338,7 +346,7 @@ class ReachyRobotAdapter(RobotAdapter):
         import random
         import time
 
-        interval = float(os.environ.get("IDLE_SCAN_S", "45"))
+        interval = float(os.environ.get("IDLE_SCAN_S", "25"))
         if interval <= 0:
             return
         while self._mini is not None:
@@ -355,10 +363,16 @@ class ReachyRobotAdapter(RobotAdapter):
             try:
                 async with self._motion_lock:
                     def _scan() -> None:
-                        for yaw in (0.45, -0.45, 0.0):
+                        # U158: wider sweep (±~40°) WITH holds — the detector
+                        # needs a few steady frames at each heading to spot a
+                        # face; a continuous pan gave it nothing to lock onto.
+                        # body_yaw=None: keep the torso where it is (the
+                        # goto_target default of 0.0 silently recentred it).
+                        for yaw in (0.7, -0.7, 0.0):
                             mini.goto_target(
-                                head=_rot("z", yaw * random.uniform(0.8, 1.2)),
-                                duration=1.8)
+                                head=_rot("z", yaw * random.uniform(0.85, 1.15)),
+                                duration=1.4, body_yaw=None)
+                            time.sleep(0.6)  # hold: give detection a chance
 
                     await asyncio.to_thread(_scan)
             except asyncio.CancelledError:
@@ -392,8 +406,11 @@ class ReachyRobotAdapter(RobotAdapter):
                 b = a * random.uniform(0.3, 1.0)
                 async with self._motion_lock:
                     def _wiggle() -> None:
-                        mini.goto_target(antennas=[a, b], duration=0.5)
-                        mini.goto_target(antennas=[0.0, 0.0], duration=0.7)
+                        # U158: body_yaw=None — the default 0.0 silently spun
+                        # the torso back to centre on EVERY wiggle, turning the
+                        # robot away from the person he's talking to.
+                        mini.goto_target(antennas=[a, b], duration=0.5, body_yaw=None)
+                        mini.goto_target(antennas=[0.0, 0.0], duration=0.7, body_yaw=None)
 
                     await asyncio.to_thread(_wiggle)
         except asyncio.CancelledError:
@@ -990,7 +1007,12 @@ class ReachyRobotAdapter(RobotAdapter):
 
         def go(head: np.ndarray | None = None, antennas: list[float] | None = None,
                duration: float = dur) -> None:
-            mini.goto_target(head=head, antennas=antennas, duration=duration)
+            # U158: body_yaw=None keeps the torso where it is — the SDK default
+            # of 0.0 silently recentred the body on every gesture leg, turning
+            # the robot away from the person it was facing. Dance routines steer
+            # the torso explicitly via set_target_body_yaw, unaffected.
+            mini.goto_target(head=head, antennas=antennas, duration=duration,
+                             body_yaw=None)
 
         if motion == "nod":  # pitch down, back up
             angle = 0.35 * amp

@@ -30,7 +30,7 @@ class FakeMini:
         self.media_released = False
         self.client = types.SimpleNamespace(disconnect=lambda: self.calls.append(("disconnect", {})))
 
-    def goto_target(self, head=None, antennas=None, duration=0.5) -> None:
+    def goto_target(self, head=None, antennas=None, duration=0.5, body_yaw=0.0) -> None:
         self.calls.append(("goto_target", {"head": head, "antennas": antennas, "duration": duration}))
 
     def look_at_world(self, x, y, z, duration=1.0):
