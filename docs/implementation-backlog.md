@@ -427,6 +427,9 @@ the human can unblock it.
 - [x] **U142 — "moet ik iets doen voor Realtime?": zelf-check die de échte reden toont** · `pending`
   I.p.v. een stille "no audio" nu een diagnose. `realtime_voice.probe()` doet een kleine TEXT-only Realtime-round-trip en rapporteert precies wat er gebeurt: verbonden + antwoord, of een gerichte reden — "model X niet beschikbaar op deze key / account heeft geen Realtime-toegang", "key geweigerd", "rate-limited/quota", of "timed out — model waarschijnlijk niet toegankelijk". `POST /voice/realtime-check` + een **"Test Realtime access"-knop** in Settings → Appearance (naast de engine-dropdown, alleen bij Realtime) met een groen ✓/rood ✗ + de reden. Zo weet de eigenaar of het aan zijn kant ligt (toegang aanzetten / ander REALTIME_MODEL) of niet. Injecteerbare connectie → 3 tests zonder netwerk. Brain + console groen.
 
+- [x] **U143 — Realtime-model verouderd: kandidaat-modellen + auto-detectie** · `pending`
+  De screenshot bewees dat het account WEL Realtime-toegang heeft (Audio→Realtime-tab in de playground), dus geen activatie nodig — de oorzaak was mijn modelnaam. `gpt-4o-mini-realtime-preview` is vervangen door het GA-model `gpt-realtime`. Nu: `_MODEL_CANDIDATES` (gpt-realtime → gpt-4o-realtime-preview → gpt-4o-mini-realtime-preview), `_default_realtime_model()` (REALTIME_MODEL of de eerste kandidaat), en de default overal omgezet naar `gpt-realtime`. `probe()` (de "Test Realtime access"-knop) loopt nu de kandidaten af, retourneert de EERSTE die werkt mét de hint "Realtime works with 'X'. Set REALTIME_MODEL=X to pin it." — of stopt vroeg bij een key/quota-fout (die verandert niet per model). De UI toont die hint. +9 realtime-tests groen, console 56 groen.
+
 ## Progress log (append-only; newest last)
 
 - 2026-06-21 — ledger created on `aura-autobuild`; Phase 0/0b complete, Phase 1 scaffold (U-pre) done before this loop started.
