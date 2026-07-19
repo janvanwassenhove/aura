@@ -823,6 +823,15 @@ def create_app() -> FastAPI:
 
         return JSONResponse(LOG.report(n=max(1, min(n, 200))))
 
+    @app.post("/voice/realtime-check")
+    async def realtime_check() -> JSONResponse:
+        """U142: probe whether Realtime actually works on this account/model —
+        so the owner knows if THEY need to do something (enable access, change
+        the model) rather than staring at a silent failure."""
+        from aura_brain.realtime_voice import probe
+
+        return JSONResponse(await probe())
+
     @app.get("/voice/realtime-cost")
     async def realtime_cost() -> JSONResponse:
         """U129: running Realtime spend estimate (this brain session)."""

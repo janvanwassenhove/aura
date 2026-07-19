@@ -203,6 +203,56 @@ async def _run_realtime_turn_inner(
     return "".join(transcript_parts).strip(), bytes(audio_out)
 
 
+async def probe(conn_factory: ConnFactory | None = None) -> dict:
+    """U142: does this account/model actually support Realtime? A tiny
+    TEXT-only round-trip that reports exactly what happens, so the owner can
+    tell an account/access problem from a config one — instead of a silent
+    'no audio'. Never raises; returns a structured verdict."""
+    import asyncio
+
+    model = os.environ.get("REALTIME_MODEL", "gpt-4o-mini-realtime-preview")
+    if not os.environ.get("OPENAI_API_KEY"):
+        return {"ok": False, "model": model, "reason": "no OPENAI_API_KEY set"}
+    factory = conn_factory or _default_conn_factory
+
+    async def _run() -> dict:
+        got_text = False
+        async with factory(model) as conn:
+            await conn.session.update(session={"modalities": ["text"]})
+            await conn.conversation.item.create(item={
+                "type": "message", "role": "user",
+                "content": [{"type": "input_text", "text": "Say the word ready."}],
+            })
+            await conn.response.create()
+            async for event in conn:
+                etype = getattr(event, "type", "")
+                if etype in ("response.text.delta", "response.output_text.delta"):
+                    got_text = True
+                elif etype == "response.done":
+                    break
+                elif etype == "error":
+                    err = getattr(event, "error", "")
+                    return {"ok": False, "model": model, "reason": f"api error: {err}"}
+        return {"ok": got_text, "model": model,
+                "reason": "connected and responded" if got_text else "connected but no response"}
+
+    try:
+        return await asyncio.wait_for(_run(), timeout=float(os.environ.get("REALTIME_TURN_TIMEOUT_S", "15")))
+    except asyncio.TimeoutError:
+        return {"ok": False, "model": model, "reason": "timed out — model likely not accessible on this key"}
+    except Exception as exc:  # noqa: BLE001
+        msg = str(exc)
+        hint = msg
+        low = msg.lower()
+        if "model" in low and ("not" in low or "does not exist" in low or "404" in low):
+            hint = f"model {model!r} not available to this key — try another REALTIME_MODEL, or your account lacks Realtime access"
+        elif "401" in low or "invalid" in low or "authenticat" in low:
+            hint = "the API key was rejected for Realtime"
+        elif "quota" in low or "429" in low:
+            hint = "rate-limited / out of quota for Realtime"
+        return {"ok": False, "model": model, "reason": f"{type(exc).__name__}: {hint}"}
+
+
 def _usage_dict(usage: Any) -> dict | None:
     if usage is None:
         return None
