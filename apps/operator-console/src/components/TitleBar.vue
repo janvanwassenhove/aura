@@ -4,13 +4,15 @@
       <Bot :size="17" class="titlebar-logo" />
       <span class="titlebar-name">{{ prefsStore.assistantName }}</span>
       <span class="titlebar-sep" />
-      <span class="titlebar-status" :title="`Event stream: ${wsStatus}`">
+      <!-- U151: label each status by its subject — "Connected · offline" side
+           by side read as contradictory. App = console↔brain; Robot = the Pi. -->
+      <span class="titlebar-status" :title="`Console ↔ brain event stream: ${wsStatus}`">
         <span :class="['status-dot', `status-dot--${wsStatus}`]" />
-        {{ wsLabel }}
+        App: {{ wsLabel }}
       </span>
-      <span class="titlebar-status" :title="`Robot: ${robotStore.mode}`">
-        <Cpu :size="12" class="status-icon" />
-        {{ robotStore.mode }}
+      <span class="titlebar-status" :title="`Robot connection: ${robotStore.mode}`">
+        <Cpu :size="12" :class="['status-icon', robotStore.connected ? 'status-icon--ok' : 'status-icon--off']" />
+        Robot: {{ robotStore.connected ? robotStore.mode : 'offline' }}
       </span>
     </div>
 
@@ -117,6 +119,8 @@ function winControl(action: 'minimize' | 'toggleMaximize' | 'close') {
   font-size: 0.72rem; color: var(--text-muted);
 }
 .status-icon { color: var(--text-faint); }
+.status-icon--ok { color: var(--ok-text, #2f9e6e); }
+.status-icon--off { color: var(--danger-text, #e5484d); }
 .status-dot { width: 8px; height: 8px; border-radius: 50%; }
 .status-dot--open { background: var(--ok); }
 .status-dot--connecting { background: var(--warn); }

@@ -451,6 +451,9 @@ the human can unblock it.
 - [x] **U150 — endpointing standaard UIT: kapte tussen wake-word en commando af** · `pending`
   Live-diagnose (`voice-check`): transcript was alléén "Richie" — de energy-VAD-endpointing kapte de opname af in de natuurlijke pauze TUSSEN het wake-word en het commando ("hey Richie … vertel eens een mop"), dus alleen "Richie" bereikte de STT → bare wake → niks. Zonder interim-transcripts kan energy-VAD die pauze niet van het einde van de zin onderscheiden (§5.1: dat vergt transcript-bewuste endpointing, Phase 2). Eerlijke §9-beslissing: `VOICE_ENDPOINTING=false` als default → het betrouwbare vaste venster hersteld (waarmee de mop vóór U148 gewoon werd verteld). De endpointing-code + opt-in blijven voor Phase 2. Robot 27 groen. NB: bij het deployen viel de Pi van het netwerk (SSH-timeout) — de fix staat in git maar moet nog naar de Pi zodra die weer bereikbaar is; de robot-mic-onbereikbaarheid verklaart mogelijk mee waarom er niks gebeurde.
 
+- [x] **U151 — verwarrende titelbalk-status ("Connected · offline") gelabeld** · `pending`
+  Twee losse statussen stonden zonder onderwerp naast elkaar → las tegenstrijdig. Nu gelabeld: **"App: Connected"** (de console↔brain event-stream-WebSocket) en **"Robot: online/offline"** (de verbinding met de Pi), met een groen/rood CPU-icoon dat de robot-connectie kleurt. Tooltips verduidelijken elk ("Console ↔ brain event stream" / "Robot connection"). Console 56 groen. Bijkomend: na de netwerk-drop is de Pi weer online (status connected/tracking true) en de U150-endpointing-fix (vast venster) is alsnog gedeployed + herstart.
+
 ## Progress log (append-only; newest last)
 
 - 2026-06-21 — ledger created on `aura-autobuild`; Phase 0/0b complete, Phase 1 scaffold (U-pre) done before this loop started.
