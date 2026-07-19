@@ -137,6 +137,15 @@
               <template v-if="localVoiceEngine === 'realtime'">Fluent, multilingual, opens only after the wake word. Bills audio while talking — watch the live cost in <strong>Robot State</strong>. Falls back to Pipeline on any error.</template>
               <template v-else>The classic, tool-capable path. Switch to Realtime for the most human, low-latency conversation.</template>
             </p>
+            <!-- U142: does Realtime actually work on this account? -->
+            <div v-if="localVoiceEngine === 'realtime'" class="rt-check">
+              <button class="btn-conn btn-ghost btn-small" :disabled="rtChecking" @click="checkRealtime">
+                {{ rtChecking ? 'Checking…' : 'Test Realtime access' }}
+              </button>
+              <span v-if="rtResult" :class="['rt-verdict', rtResult.ok ? 'rt-ok' : 'rt-bad']">
+                {{ rtResult.ok ? '✓ works' : '✗' }} {{ rtResult.reason }}
+              </span>
+            </div>
           </div>
           <div>
             <button class="btn-apply" :disabled="prefsStore.saving" @click="savePrefs">
@@ -436,6 +445,21 @@ const localName = ref(prefsStore.assistantName)
 const localLang = ref(prefsStore.language)
 const localVoiceMode = ref(prefsStore.voiceMode)
 const localVoiceEngine = ref(prefsStore.voiceEngine)
+// U142: Realtime access self-check.
+const rtChecking = ref(false)
+const rtResult = ref<{ ok: boolean; reason: string; model: string } | null>(null)
+async function checkRealtime(): Promise<void> {
+  rtChecking.value = true
+  rtResult.value = null
+  try {
+    const r = await fetch(`${BRAIN_URL_LOGS}/voice/realtime-check`, { method: 'POST' })
+    rtResult.value = r.ok ? await r.json() : { ok: false, reason: `HTTP ${r.status}`, model: '' }
+  } catch {
+    rtResult.value = { ok: false, reason: 'brain unreachable', model: '' }
+  } finally {
+    rtChecking.value = false
+  }
+}
 const localWake = ref(prefsStore.wakeWord)
 const localTtsVoice = ref(prefsStore.ttsVoice)
 
@@ -770,4 +794,9 @@ const ConnStatusBadge = defineComponent({
 .mr-name em { font-style: normal; color: var(--text-faint); font-size: 0.68rem; }
 .mr-input { max-width: 11rem; }
 .mr-save { margin-top: 0.4rem; }
+/* U142: Realtime access self-check */
+.rt-check { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.4rem; flex-wrap: wrap; }
+.rt-verdict { font-size: 0.74rem; }
+.rt-ok { color: var(--ok-text, #2f9e6e); }
+.rt-bad { color: var(--danger-text, #e5484d); }
 </style>

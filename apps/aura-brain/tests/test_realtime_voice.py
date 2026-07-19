@@ -121,3 +121,34 @@ def test_realtime_enabled_gates_on_engine_and_key(monkeypatch) -> None:
     assert realtime_voice.realtime_enabled() is True
     monkeypatch.setenv("VOICE_ENGINE", "pipeline")
     assert realtime_voice.realtime_enabled() is False  # default engine
+
+
+# ------------------------------------------------------------------
+# U142: Realtime access self-check
+# ------------------------------------------------------------------
+
+class _ProbeConn(_FakeConn):
+    def __init__(self, events):
+        super().__init__(events)
+        import types as _t
+        self.conversation = _t.SimpleNamespace(item=_t.SimpleNamespace(create=self._noop))
+
+
+async def test_probe_reports_success(monkeypatch) -> None:
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+    events = [_Ev("response.text.delta", delta="ready"), _Ev("response.done")]
+    r = await realtime_voice.probe(conn_factory=lambda m: _ProbeConn(events))
+    assert r["ok"] is True and "responded" in r["reason"]
+
+
+async def test_probe_reports_api_error(monkeypatch) -> None:
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+    events = [_Ev("error", error="model_not_found")]
+    r = await realtime_voice.probe(conn_factory=lambda m: _ProbeConn(events))
+    assert r["ok"] is False and "model_not_found" in r["reason"]
+
+
+async def test_probe_without_key(monkeypatch) -> None:
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    r = await realtime_voice.probe()
+    assert r["ok"] is False and "OPENAI_API_KEY" in r["reason"]
