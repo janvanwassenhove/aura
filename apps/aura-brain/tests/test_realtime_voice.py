@@ -108,6 +108,30 @@ async def test_run_realtime_turn_collects_audio_and_usage() -> None:
     assert meter.turns == 1 and meter.audio_out == 800
 
 
+async def test_run_realtime_turn_streams_segments(monkeypatch) -> None:
+    # U153: with a small segment size, audio deltas are flushed to on_segment
+    # as they arrive (streaming playback) and the tail is flushed at the end.
+    monkeypatch.setenv("REALTIME_SEGMENT_MS", "1")  # 1 ms @ 24 kHz*2B ≈ 48 bytes
+    chunk = base64.b64encode(b"\x01\x02" * 50).decode()  # 100 bytes ≥ threshold
+    events = [
+        _Ev("response.audio.delta", delta=chunk),
+        _Ev("response.audio.delta", delta=base64.b64encode(b"\x03" * 10).decode()),
+        _Ev("response.done", response=type("R", (), {"usage": {}})()),
+    ]
+    segments: list[bytes] = []
+
+    async def _on_segment(seg: bytes) -> None:
+        segments.append(seg)
+
+    _, out = await run_realtime_turn(
+        b"\x00" * 10, conn_factory=lambda m: _FakeConn(events), on_segment=_on_segment)
+    # First delta (100 B) flushed as a full segment; the 10 B tail flushed after.
+    assert len(segments) == 2
+    assert segments[0] == b"\x01\x02" * 50
+    assert segments[1] == b"\x03" * 10
+    assert out == b"\x01\x02" * 50 + b"\x03" * 10  # full buffer still returned
+
+
 async def test_run_realtime_turn_raises_on_error_event() -> None:
     events = [_Ev("error", error="boom")]
     with pytest.raises(RuntimeError):

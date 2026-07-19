@@ -157,18 +157,25 @@ async def run_realtime_turn(
     voice: str = "alloy",
     conn_factory: ConnFactory | None = None,
     meter: CostMeter | None = None,
+    on_segment: Callable[[bytes], Awaitable[None]] | None = None,
 ) -> tuple[str, bytes]:
     """One turn → (reply transcript, PCM16 audio out). If ``text`` is given the
     turn is driven by that exact text (our STT command — reliable, and much
     faster than uploading audio); otherwise the captured PCM audio is sent.
-    Raises on any failure (incl. TIMEOUT) so the caller can fall back to the
-    pipeline — a stalled Realtime connection must never freeze the voice loop."""
+
+    U153: if ``on_segment`` is given, it's awaited with each ~REALTIME_SEGMENT_MS
+    slice of audio AS IT ARRIVES — so playback can start on the first segment
+    instead of waiting for the whole reply (the 6 s buffering the traces showed).
+    ``on_segment`` must return quickly (enqueue, don't block) or it stalls the
+    receive loop. Raises on any failure (incl. TIMEOUT) so the caller can fall
+    back to the pipeline — a stalled connection must never freeze the loop."""
     import asyncio
 
     timeout = float(os.environ.get("REALTIME_TURN_TIMEOUT_S", "15"))
     try:
         return await asyncio.wait_for(
-            _run_realtime_turn_inner(pcm_in, text, instructions, voice, conn_factory, meter),
+            _run_realtime_turn_inner(pcm_in, text, instructions, voice,
+                                     conn_factory, meter, on_segment),
             timeout=timeout,
         )
     except asyncio.TimeoutError as exc:
@@ -182,6 +189,7 @@ async def _run_realtime_turn_inner(
     voice: str,
     conn_factory: ConnFactory | None,
     meter: CostMeter | None,
+    on_segment: Callable[[bytes], Awaitable[None]] | None = None,
 ) -> tuple[str, bytes]:
     model = _default_realtime_model()
     factory = conn_factory or _default_conn_factory
@@ -190,6 +198,9 @@ async def _run_realtime_turn_inner(
     audio_out = bytearray()
     transcript_parts: list[str] = []
     usage: dict | None = None
+    # U153: stream playback in coarse segments (24 kHz PCM16 → 48000 bytes/s).
+    seg = bytearray()
+    seg_bytes = int(24_000 * 2 * float(os.environ.get("REALTIME_SEGMENT_MS", "1400")) / 1000)
 
     async with factory(model) as conn:
         # U144: GA session shape (type:realtime + audio output).
@@ -219,7 +230,13 @@ async def _run_realtime_turn_inner(
             etype = getattr(event, "type", "")
             # GA names first, older names kept as a fallback.
             if etype in ("response.output_audio.delta", "response.audio.delta"):
-                audio_out += base64.b64decode(getattr(event, "delta", "") or "")
+                chunk = base64.b64decode(getattr(event, "delta", "") or "")
+                audio_out += chunk
+                if on_segment is not None:
+                    seg += chunk
+                    if len(seg) >= seg_bytes:
+                        await on_segment(bytes(seg))  # enqueue a segment to play
+                        seg = bytearray()
             elif etype in ("response.output_audio_transcript.delta",
                            "response.audio_transcript.delta",
                            "response.output_text.delta", "response.text.delta"):
@@ -231,6 +248,8 @@ async def _run_realtime_turn_inner(
             elif etype == "error":
                 raise RuntimeError(f"realtime error: {getattr(event, 'error', '')}")
 
+    if on_segment is not None and seg:
+        await on_segment(bytes(seg))  # flush the tail
     meter.add(usage)
     return "".join(transcript_parts).strip(), bytes(audio_out)
 

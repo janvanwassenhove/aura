@@ -38,6 +38,10 @@ logger = logging.getLogger(__name__)
 
 STAGES = (
     "capture_start", "capture_end", "endpoint_fired", "stt_final",
+    # U153: a bare wake word ("Richie" alone) triggers a SECOND full listen
+    # window for the actual command — this is the big gap the traces showed
+    # inside llm_queue. These marks bracket it so it's visible, not hidden.
+    "second_capture_start", "second_capture_end",
     "llm_request_sent", "llm_first_token", "llm_final",
     "tts_request_sent", "tts_first_audio",
     "playback_first_sample", "playback_complete",
@@ -48,6 +52,9 @@ _SEGMENTS = (
     ("capture", "capture_start", "capture_end"),
     ("endpoint_wait", "capture_end", "endpoint_fired"),
     ("stt", "endpoint_fired", "stt_final"),
+    # U153: only present on bare-wake turns; otherwise the marks are absent and
+    # this segment is None while llm_queue spans stt_final → llm_request_sent.
+    ("second_capture", "second_capture_start", "second_capture_end"),
     ("llm_queue", "stt_final", "llm_request_sent"),
     ("llm", "llm_request_sent", "llm_final"),
     ("tts", "tts_request_sent", "tts_first_audio"),

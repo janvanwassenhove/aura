@@ -92,3 +92,82 @@ def test_self_hearing_cooldown_after_speaking(monkeypatch) -> None:
     # Simulate the robot having finished speaking well in the past.
     loop._speaking_until = time.monotonic() - 10.0
     assert loop._in_self_hearing_cooldown() is False
+
+
+# ------------------------------------------------------------------
+# U153: streaming Realtime playback (segments, not a buffered utterance)
+# ------------------------------------------------------------------
+
+class _SegRobot:
+    """Records streamed segments vs. whole-utterance speak calls."""
+
+    def __init__(self) -> None:
+        self.segments: list[str] = []
+        self.whole: list[str] = []
+
+    async def speak_segment(self, audio_b64: str) -> bool:
+        self.segments.append(audio_b64)
+        return True
+
+    async def speak(self, text: str, audio_b64: str | None = None) -> bool:
+        self.whole.append(text)
+        return True
+
+
+class _NullBus:
+    async def publish(self, *_a, **_k) -> None: ...
+
+
+async def test_realtime_turn_streams_segments(monkeypatch) -> None:
+    monkeypatch.setenv("VOICE_ENGINE", "realtime")
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+    monkeypatch.setenv("REALTIME_STREAMING", "true")
+    monkeypatch.setenv("LISTENING_CUE", "false")
+
+    from aura_brain import realtime_voice
+
+    robot = _SegRobot()
+    loop = VoiceLoop(robot=robot, pipeline=None, bus=_NullBus(),
+                     default_wake_word="richie")
+
+    monkeypatch.setattr(realtime_voice, "wav_to_pcm24k", lambda _w: b"\x00" * 10)
+
+    async def _fake_turn(pcm, *, text, instructions, voice, on_segment=None, **_k):
+        # Emit two segments as the reply "generates".
+        if on_segment is not None:
+            await on_segment(b"\x01" * 8)
+            await on_segment(b"\x02" * 8)
+        return "Waarom fietst een kip? Om aan de overkant te komen!", b"\x01" * 8 + b"\x02" * 8
+
+    monkeypatch.setattr(realtime_voice, "run_realtime_turn", _fake_turn)
+
+    handled = await loop._realtime_turn(b"fakewav", command="vertel een mop")
+    assert handled is True
+    # Streamed as two segments; the whole-utterance speak path was NOT used.
+    assert len(robot.segments) == 2
+    assert robot.whole == []
+
+
+async def test_realtime_turn_falls_back_to_whole_without_streaming(monkeypatch) -> None:
+    monkeypatch.setenv("VOICE_ENGINE", "realtime")
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+    monkeypatch.setenv("REALTIME_STREAMING", "false")
+    monkeypatch.setenv("LISTENING_CUE", "false")
+
+    from aura_brain import realtime_voice
+
+    robot = _SegRobot()
+    loop = VoiceLoop(robot=robot, pipeline=None, bus=_NullBus(),
+                     default_wake_word="richie")
+    monkeypatch.setattr(realtime_voice, "wav_to_pcm24k", lambda _w: b"\x00" * 10)
+
+    async def _fake_turn(pcm, *, text, instructions, voice, on_segment=None, **_k):
+        assert on_segment is None  # streaming disabled → no segment callback
+        return "Hallo!", b"\x09" * 16
+
+    monkeypatch.setattr(realtime_voice, "run_realtime_turn", _fake_turn)
+
+    handled = await loop._realtime_turn(b"fakewav", command="zeg hallo")
+    assert handled is True
+    assert robot.segments == []
+    assert len(robot.whole) == 1  # one whole-utterance speak
