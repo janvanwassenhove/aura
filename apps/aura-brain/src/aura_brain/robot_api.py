@@ -173,6 +173,19 @@ async def tracking(body: dict) -> JSONResponse:
         return _unavailable(exc)
 
 
+@router.post("/aim")
+async def aim(body: dict) -> JSONResponse:
+    """U161: manual head/torso aiming from the console joystick."""
+    try:
+        return JSONResponse(await _robot.aim(
+            yaw=body.get("yaw", 0.0),
+            pitch=body.get("pitch", 0.0),
+            body_yaw=body.get("body_yaw"),
+        ))
+    except (httpx.HTTPError, OSError) as exc:
+        return _unavailable(exc)
+
+
 @router.post("/body_follow")
 async def body_follow(body: dict) -> JSONResponse:
     """U37: torso turns with the tracked face."""

@@ -132,6 +132,15 @@ class FakeRobotAdapter(RobotAdapter):
         """U155: gapless segment playback — recorded like play_audio."""
         self._played_audio.append(audio_bytes)
 
+    async def aim(self, yaw: float = 0.0, pitch: float = 0.0,
+                  body_yaw: float | None = None, duration: float = 0.35) -> dict:
+        """U161: manual head/torso aim — records the last commanded direction."""
+        paused = self._tracking
+        self._tracking = False
+        self._last_aim = {"yaw": yaw, "pitch": pitch, "body_yaw": body_yaw,
+                          "tracking_paused": paused}
+        return self._last_aim
+
     async def capture_audio(self, duration_s: float = 3.0) -> bytes:
         await asyncio.sleep(duration_s)
         # Return synthetic silence (16-bit PCM zeros)

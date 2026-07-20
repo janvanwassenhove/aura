@@ -25,6 +25,25 @@
         </template>
       </div>
 
+      <!-- U161: aim the head by dragging on the picture — the ball sits where
+           you last pointed, so the control reads like "look there", not
+           "press left four times". -->
+      <div
+        v-if="aimOpen"
+        ref="padEl"
+        class="aim-pad"
+        title="Drag to aim the head — double-click to centre"
+        @pointerdown="startAim"
+        @pointermove="moveAim"
+        @pointerup="endAim"
+        @pointercancel="endAim"
+        @dblclick="centreAim"
+      >
+        <div class="aim-cross aim-cross--h" />
+        <div class="aim-cross aim-cross--v" />
+        <div class="aim-ball" :style="ballStyle" />
+      </div>
+
       <!-- Recognition overlay -->
       <div v-if="recognized" class="recognized-overlay">
         <UserCheck v-if="recognized.known" :size="13" />
@@ -32,6 +51,32 @@
         {{ recognized.known ? recognized.display_name : 'Unknown face' }}
         <span v-if="recognized.known" class="confidence">{{ Math.round(recognized.confidence * 100) }}%</span>
       </div>
+
+      <button
+        class="aim-toggle"
+        :class="{ 'aim-toggle--on': aimOpen }"
+        :title="aimOpen ? 'Hide manual aim' : 'Aim the head and torso manually'"
+        @click="aimOpen = !aimOpen"
+      >
+        <Move :size="13" />
+      </button>
+    </div>
+
+    <!-- Torso: a separate axis from the head, so it gets its own control -->
+    <div v-if="aimOpen" class="aim-bar">
+      <div class="aim-row">
+        <label class="aim-label" for="torso">Torso</label>
+        <input
+          id="torso" v-model.number="bodyYaw" class="aim-slider" type="range"
+          min="-1" max="1" step="0.02" @input="sendAim" @dblclick="centreTorso"
+        />
+        <button class="aim-mini" title="Centre the torso" @click="centreTorso">⌖</button>
+      </div>
+      <p v-if="trackingPaused" class="aim-note">
+        Follow-me paused while you aim.
+        <button class="aim-link" :disabled="resuming" @click="resumeTracking">Resume follow-me</button>
+      </p>
+      <p v-else class="aim-note aim-note--faint">Drag on the picture to aim · double-click to centre</p>
     </div>
 
     <!-- Recognition / enrollment -->
@@ -51,7 +96,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
-import { ScanFace, UserCheck, UserX, Video, VideoOff } from 'lucide-vue-next'
+import { Move, ScanFace, UserCheck, UserX, Video, VideoOff } from 'lucide-vue-next'
 import { useRobotStore } from '../stores/robotStore'
 
 const BRAIN_URL = import.meta.env.VITE_BRAIN_URL ?? import.meta.env.VITE_ORCHESTRATOR_URL ?? 'http://localhost:8000'
@@ -110,6 +155,92 @@ async function enroll() {
   }
 }
 
+// ── U161: manual aim (head via the pad, torso via its own slider) ──
+const aimOpen = ref(false)
+const padEl = ref<HTMLElement | null>(null)
+const aimX = ref(0)          // -1..1, left → right   (head yaw)
+const aimY = ref(0)          // -1..1, up   → down    (head pitch)
+const bodyYaw = ref(0)       // -1..1                 (torso yaw)
+const dragging = ref(false)
+const trackingPaused = ref(false)
+const resuming = ref(false)
+
+const ballStyle = computed(() => ({
+  left: `${((aimX.value + 1) / 2) * 100}%`,
+  top: `${((aimY.value + 1) / 2) * 100}%`,
+}))
+
+// The robot moves far slower than pointermove fires; sending every event would
+// queue hundreds of poses and the head would keep moving long after you let go.
+// Send at most one in flight, always with the LATEST position (coalesced).
+let inFlight = false
+let pendingSend = false
+
+async function sendAim(): Promise<void> {
+  if (inFlight) { pendingSend = true; return }
+  inFlight = true
+  try {
+    const resp = await fetch(`${BRAIN_URL}/robot/aim`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ yaw: aimX.value, pitch: aimY.value, body_yaw: bodyYaw.value }),
+    }).catch(() => null)
+    if (resp?.ok) {
+      const r = await resp.json().catch(() => ({}))
+      if (r.tracking_paused) trackingPaused.value = true
+    }
+  } finally {
+    inFlight = false
+    if (pendingSend) { pendingSend = false; void sendAim() }
+  }
+}
+
+function pointToAim(ev: PointerEvent): void {
+  const el = padEl.value
+  if (!el) return
+  const r = el.getBoundingClientRect()
+  aimX.value = Math.max(-1, Math.min(1, ((ev.clientX - r.left) / r.width) * 2 - 1))
+  aimY.value = Math.max(-1, Math.min(1, ((ev.clientY - r.top) / r.height) * 2 - 1))
+}
+
+function startAim(ev: PointerEvent): void {
+  dragging.value = true
+  ;(ev.currentTarget as HTMLElement).setPointerCapture?.(ev.pointerId)
+  pointToAim(ev)
+  void sendAim()
+}
+
+function moveAim(ev: PointerEvent): void {
+  if (!dragging.value) return
+  pointToAim(ev)
+  void sendAim()
+}
+
+function endAim(): void { dragging.value = false }
+
+function centreAim(): void {
+  aimX.value = 0
+  aimY.value = 0
+  void sendAim()
+}
+
+function centreTorso(): void {
+  bodyYaw.value = 0
+  void sendAim()
+}
+
+async function resumeTracking(): Promise<void> {
+  resuming.value = true
+  try {
+    const resp = await fetch(`${BRAIN_URL}/robot/tracking`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enabled: true }),
+    }).catch(() => null)
+    if (resp?.ok) trackingPaused.value = false
+  } finally {
+    resuming.value = false
+  }
+}
+
 onMounted(fetchRecognitionStatus)
 onUnmounted(() => { if (retryTimer) clearTimeout(retryTimer) })
 </script>
@@ -143,6 +274,45 @@ onUnmounted(() => { if (retryTimer) clearTimeout(retryTimer) })
   backdrop-filter: blur(4px);
 }
 .confidence { opacity: 0.75; }
+
+/* U161: aim pad — a ball you drag on the live picture */
+.aim-pad { position: absolute; inset: 0; cursor: grab; touch-action: none; }
+.aim-pad:active { cursor: grabbing; }
+.aim-cross { position: absolute; background: rgba(255, 255, 255, 0.18); pointer-events: none; }
+.aim-cross--h { left: 8%; right: 8%; top: 50%; height: 1px; }
+.aim-cross--v { top: 8%; bottom: 8%; left: 50%; width: 1px; }
+.aim-ball {
+  position: absolute; width: 30px; height: 30px;
+  margin: -15px 0 0 -15px; border-radius: 50%;
+  border: 2px solid #fff; background: rgba(255, 255, 255, 0.22);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35), 0 2px 8px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(2px); pointer-events: none;
+  transition: left 0.08s linear, top 0.08s linear;
+}
+.aim-toggle {
+  position: absolute; right: 0.5rem; top: 0.5rem;
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px; border-radius: 6px;
+  background: var(--overlay); color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.25); cursor: pointer;
+  backdrop-filter: blur(4px);
+}
+.aim-toggle--on { background: var(--accent); border-color: var(--accent); }
+.aim-bar { margin-top: 0.45rem; }
+.aim-row { display: flex; align-items: center; gap: 0.5rem; }
+.aim-label { font-size: 0.72rem; color: var(--text-muted); min-width: 3rem; }
+.aim-slider { flex: 1; accent-color: var(--accent); }
+.aim-mini {
+  background: none; border: 1px solid var(--border-strong); color: var(--text-muted);
+  border-radius: 4px; width: 22px; height: 22px; cursor: pointer; line-height: 1;
+}
+.aim-mini:hover { color: var(--text); }
+.aim-note { font-size: 0.7rem; color: var(--warn, #d9a441); margin: 0.3rem 0 0; }
+.aim-note--faint { color: var(--text-faint); }
+.aim-link {
+  background: none; border: none; padding: 0; cursor: pointer;
+  color: var(--accent); text-decoration: underline; font-size: inherit;
+}
 .enroll-row { display: flex; gap: 0.4rem; }
 .enroll-btn { display: inline-flex; align-items: center; gap: 0.3rem; font-size: 0.78rem; padding: 0.3rem 0.7rem; white-space: nowrap; }
 .enroll-msg { font-size: 0.72rem; margin: 0.3rem 0 0; }

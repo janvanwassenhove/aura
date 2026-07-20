@@ -237,6 +237,42 @@ async def listen(body: dict) -> Response:
 # ------------------------------------------------------------------
 
 
+@router.post("/robot/aim")
+async def aim(body: dict) -> JSONResponse:
+    """U161: point the head (camera) and torso from the console joystick.
+
+    yaw/pitch/body_yaw are -1..1 fractions of the safe range; body_yaw may be
+    omitted to leave the torso alone. Aiming pauses follow-me (see
+    ReachyRobotAdapter.aim) — the console's tracking toggle gives it back.
+    """
+    assert adapter is not None
+    _touch()
+    fn = getattr(adapter, "aim", None)
+    if fn is None:
+        return JSONResponse({"error": "adapter cannot aim"}, status_code=501)
+    body = body or {}
+
+    def _num(key: str, default: float | None) -> float | None:
+        raw = body.get(key, default)
+        if raw is None:
+            return None
+        try:
+            return max(-1.0, min(1.0, float(raw)))
+        except (TypeError, ValueError):
+            return default
+
+    try:
+        result = await fn(
+            yaw=_num("yaw", 0.0) or 0.0,
+            pitch=_num("pitch", 0.0) or 0.0,
+            body_yaw=_num("body_yaw", None),
+            duration=float(body.get("duration", 0.35) or 0.35),
+        )
+    except RuntimeError as exc:
+        return JSONResponse({"error": str(exc)}, status_code=409)
+    return JSONResponse({"ok": True, **(result or {})})
+
+
 @router.post("/robot/tracking")
 async def set_tracking(body: dict) -> JSONResponse:
     assert adapter is not None
