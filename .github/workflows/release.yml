@@ -48,6 +48,8 @@ jobs:
   test:
     if: "!contains(github.event.head_commit.message, '[skip release]')"
     runs-on: ubuntu-latest
+    env:
+      LLM_PROVIDER: echo   # U168b: never depend on a real key in CI
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
