@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import pytest
-
 from aura_brain.demo_persona import DEMO_FACTS, DEMO_PERSON_ID, seed_demo_persona
 from shared_schemas.knowledge import InMemoryKnowledgeStore
 from shared_schemas.knowledge.models import ObservedSignal, Person, PersonRole

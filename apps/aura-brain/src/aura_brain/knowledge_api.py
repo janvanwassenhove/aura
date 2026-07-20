@@ -22,8 +22,6 @@ from enum import StrEnum
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import JSONResponse
-
-from aura_brain.stepup_gate import StepUpDeniedError, StepUpGate, StepUpTimeout
 from shared_schemas.knowledge import (
     ConsentError,
     ConsentRecord,
@@ -32,6 +30,8 @@ from shared_schemas.knowledge import (
     PersonRole,
     ProfileFact,
 )
+
+from aura_brain.stepup_gate import StepUpDeniedError, StepUpGate, StepUpTimeout
 
 router = APIRouter(prefix="/knowledge")
 

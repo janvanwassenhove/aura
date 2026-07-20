@@ -4,10 +4,9 @@ from __future__ import annotations
 
 import logging
 
+from aura_brain import logs_api
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-
-from aura_brain import logs_api
 
 
 def _client() -> TestClient:

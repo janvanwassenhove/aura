@@ -10,7 +10,6 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
-
 from orchestrator.skills import Skill, SkillStore
 
 router = APIRouter(prefix="/skills", tags=["skills"])

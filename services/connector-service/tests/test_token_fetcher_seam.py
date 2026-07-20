@@ -5,7 +5,6 @@ registry threads the fetcher into the connectors that need it."""
 from __future__ import annotations
 
 import pytest
-
 from connector_service.connectors.errors import ConnectorAuthError
 from connector_service.connectors.github import GitHubConnector
 from connector_service.registry import ConnectorRegistry

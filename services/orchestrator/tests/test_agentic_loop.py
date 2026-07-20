@@ -7,7 +7,6 @@ import os
 os.environ.setdefault("LLM_PROVIDER", "echo")
 
 import pytest
-
 from orchestrator import pipeline as pipeline_mod
 from orchestrator.approval_manager import ApprovalManager
 from orchestrator.context_builder import ContextBuilder

@@ -33,9 +33,8 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-
-from shared_events.bus import AsyncEventBus
 from shared_events.broadcaster import WebSocketBroadcaster
+from shared_events.bus import AsyncEventBus
 
 
 class BrainContext:
@@ -94,15 +93,15 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     from memory_service.db.session import init_db
     from memory_service.scheduler import ReminderScheduler
     from memory_service.store import SQLiteMemoryStore
-
-    # --- U19d: knowledge store (ADR-008). Encrypted at rest if a passphrase is
-    # set (OMK via scrypt), else in-memory for dev. ---
-    from aura_brain import knowledge_api
     from shared_schemas.knowledge import (
         EncryptedKnowledgeStore,
         InMemoryKnowledgeStore,
         crypto,
     )
+
+    # --- U19d: knowledge store (ADR-008). Encrypted at rest if a passphrase is
+    # set (OMK via scrypt), else in-memory for dev. ---
+    from aura_brain import knowledge_api
 
     _kpass = os.environ.get("KNOWLEDGE_PASSPHRASE")
     if _kpass:
@@ -142,8 +141,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     # U110: proactive Richie — voice fired reminders and a daily briefing out of
     # his own initiative (reusing the embodiment pipeline via ResponseDrafted).
-    from aura_brain.proactive import ProactiveEngine
     from shared_schemas.events.system import ReminderTriggered
+
+    from aura_brain.proactive import ProactiveEngine
 
     ctx.proactive = ProactiveEngine(ctx.bus, session_id=session_id)
     ctx.bus.subscribe(ReminderTriggered, ctx.proactive.on_reminder)
@@ -151,10 +151,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # --- U3: connector module ---
     from connector_service import routes as connector_routes
     from connector_service.registry import ConnectorRegistry
-    from shared_config import ConnectorServiceSettings
 
     # U7 seam: connectors fetch tokens from identity in-process (no HTTP hop).
     from identity_service.main import get_valid_token as _identity_token
+    from shared_config import ConnectorServiceSettings
 
     connector_registry = ConnectorRegistry(
         settings=ConnectorServiceSettings(), token_fetcher=_identity_token,
@@ -253,8 +253,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         ctx.pipeline.set_skill_store(_skills_api.get_store())
 
     # U19e: judgment/anticipation layer — injects minimal personal context per turn.
-    from shared_schemas.knowledge import JudgmentLayer
     from shared_schemas.events.perception import PersonRecognized
+    from shared_schemas.knowledge import JudgmentLayer
 
     _judgment = JudgmentLayer(ctx.knowledge_store)
     ctx.pipeline.set_judgment_layer(_judgment)
@@ -265,6 +265,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     if os.environ.get("PERSON_MEMORY_ENABLED", "true").lower() == "true":
         from orchestrator.config import model_for_role
         from orchestrator.llm import openai_chat
+
         from aura_brain.person_memory import PersonMemory
 
         ctx.person_memory = PersonMemory(
@@ -276,10 +277,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     # U36: robot proxy for the console (video panel + quick actions) and the
     # greet-on-recognition flow. One RobotClient serves both.
-    from aura_brain import robot_api
-    from aura_brain.robot_client import RobotClient
     from shared_schemas.events.conversation import ResponseDrafted
     from shared_schemas.robot.models import MotionCommand
+
+    from aura_brain import robot_api
+    from aura_brain.robot_client import RobotClient
 
     _robot = RobotClient()
     robot_api.init(_robot)
@@ -755,15 +757,15 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     _briefing_task = None
 
     async def _build_brief() -> str:
-        name = os.environ.get("ASSISTANT_NAME", "AURA")
         try:
             reminders = await ctx.memory_store.get_reminders()
         except Exception:  # noqa: BLE001
             reminders = []
         if reminders:
             items = "; ".join(r.text for r in reminders[:5])
-            return f"Goedemorgen! Je hebt {len(reminders)} herinnering{'en' if len(reminders) != 1 else ''} openstaan: {items}."
-        return f"Goedemorgen! Er staan geen herinneringen open — een rustige start. Ik ben er als je iets nodig hebt."
+            meervoud = 'en' if len(reminders) != 1 else ''
+            return f"Goedemorgen! Je hebt {len(reminders)} herinnering{meervoud} openstaan: {items}."
+        return "Goedemorgen! Er staan geen herinneringen open — een rustige start. Ik ben er als je iets nodig hebt."
 
     async def _briefing_loop() -> None:
         while True:
@@ -906,8 +908,9 @@ def create_app() -> FastAPI:
 
     # U59: owner-taught skills — CRUD API; the store is shared with the
     # pipeline in the lifespan (pipeline doesn't exist yet at mount time).
-    from aura_brain import skills_api
     from orchestrator.skills import SkillStore
+
+    from aura_brain import skills_api
 
     skills_api.init(SkillStore())
     app.include_router(skills_api.router)

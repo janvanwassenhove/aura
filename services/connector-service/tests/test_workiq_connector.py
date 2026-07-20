@@ -7,9 +7,7 @@ from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-
 from connector_service.connectors.errors import ConnectorAuthError
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -36,7 +34,7 @@ def _now_iso() -> str:
     return datetime.now(UTC).isoformat()
 
 
-def _make_connector(obo_token: str = "fake-obo-token") -> "WorkIQConnector":
+def _make_connector(obo_token: str = "fake-obo-token"):  # -> WorkIQConnector (lazy import below)
     from connector_service.connectors.workiq import WorkIQConnector
     with patch("msal.ConfidentialClientApplication", return_value=_mock_msal_app(obo_token)):
         return WorkIQConnector(

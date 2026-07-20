@@ -5,11 +5,10 @@ from __future__ import annotations
 import io
 
 import pytest
-from fastapi import FastAPI
-from fastapi.testclient import TestClient
-
 from aura_brain import recognition_api
 from aura_brain.sightings import SightingLog
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
 from shared_schemas.knowledge import crypto
 from shared_schemas.knowledge.recognition import EmbeddingMatcher
 

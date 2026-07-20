@@ -34,8 +34,8 @@ def test_embeddings_encrypted_at_rest() -> None:
     blob = m._enrolled["jan"]
     assert b"0.123456" not in blob  # ciphertext, not the raw vector
     # A different OMK cannot read it.
-    from cryptography.exceptions import InvalidTag
     import pytest
+    from cryptography.exceptions import InvalidTag
     other = EmbeddingMatcher(b"x" * 32)
     other._enrolled = dict(m._enrolled)
     with pytest.raises(InvalidTag):

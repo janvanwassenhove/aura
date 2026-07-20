@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from shared_personas import Persona, get_persona_config
 from robot_runtime.behavior.timeline_builder import (
     create_idle_timeline,
     create_speaking_timeline,
 )
+from shared_personas import Persona, get_persona_config
 
 
 def test_short_text_produces_at_least_one_cue() -> None:

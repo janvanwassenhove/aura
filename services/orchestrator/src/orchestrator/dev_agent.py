@@ -26,8 +26,9 @@ import shlex
 from enum import StrEnum
 from pathlib import Path
 
-from orchestrator.approval_manager import ApprovalDeniedError, ApprovalManager, ApprovalTimeout
 from shared_events.bus import AsyncEventBus
+
+from orchestrator.approval_manager import ApprovalDeniedError, ApprovalManager, ApprovalTimeout
 
 logger = logging.getLogger(__name__)
 

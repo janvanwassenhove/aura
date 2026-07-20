@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import pytest
-
 from robot_runtime.adapters.fake import FakeRobotAdapter
 from robot_runtime.engine.behavior import BehaviorEngine
 from robot_runtime.offline_loop import OfflineBehaviorLoop

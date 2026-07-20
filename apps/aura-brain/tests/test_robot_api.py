@@ -4,10 +4,9 @@ from __future__ import annotations
 
 import httpx
 import pytest
+from aura_brain import robot_api
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-
-from aura_brain import robot_api
 
 
 class FakeRobotClient:

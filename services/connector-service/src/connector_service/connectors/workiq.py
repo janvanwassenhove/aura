@@ -22,14 +22,13 @@ from datetime import UTC, datetime
 
 import httpx
 import msal
+from shared_config import ConnectorServiceSettings
+from shared_schemas.m365.connector import M365Connector
+from shared_schemas.m365.models import CalendarEvent, MailItem, Task, TeamsMessage
 
 from connector_service.connectors.errors import (
     ConnectorAuthError,
-    ConnectorUnavailableError,
 )
-from shared_schemas.m365.connector import M365Connector
-from shared_schemas.m365.models import CalendarEvent, MailItem, Task, TeamsMessage
-from shared_config import ConnectorServiceSettings
 
 logger = logging.getLogger(__name__)
 

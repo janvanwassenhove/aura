@@ -7,7 +7,6 @@ from uuid import UUID
 
 import pytest
 from pydantic import ValidationError
-
 from shared_schemas.events import (
     ApprovalDenied,
     ApprovalGranted,
@@ -40,7 +39,6 @@ from shared_schemas.events import (
     UserSpeechDetected,
 )
 from shared_schemas.robot.models import RobotMode
-
 
 # Minimal valid kwargs for each event type
 _SESSION = "test-session"

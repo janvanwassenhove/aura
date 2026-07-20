@@ -12,8 +12,8 @@ os.environ.setdefault("TTS_PROVIDER", "kokoro")
 os.environ.setdefault("ORCHESTRATOR_URL", "http://localhost:9999")
 os.environ.setdefault("MEMORY_SERVICE_URL", "http://localhost:9999")
 
-from fastapi.testclient import TestClient
 from conversation_runtime.main import create_app
+from fastapi.testclient import TestClient
 
 
 @pytest.fixture(scope="module")

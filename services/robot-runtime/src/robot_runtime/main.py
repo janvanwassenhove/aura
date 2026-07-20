@@ -3,19 +3,18 @@
 from __future__ import annotations
 
 import os
-
-from contextlib import asynccontextmanager
 from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from shared_events.broadcaster import WebSocketBroadcaster
+from shared_events.bus import AsyncEventBus
+from shared_personas import Persona
 
 from robot_runtime import routes
 from robot_runtime.adapters.fake import FakeRobotAdapter
 from robot_runtime.engine.behavior import BehaviorEngine
-from shared_events.broadcaster import WebSocketBroadcaster
-from shared_events.bus import AsyncEventBus
-from shared_personas import Persona
 
 
 @asynccontextmanager

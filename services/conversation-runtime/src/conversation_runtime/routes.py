@@ -7,12 +7,12 @@ import logging
 import httpx
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse
-
-from conversation_runtime.session_manager import SessionManager
 from shared_events.bus import AsyncEventBus
 from shared_schemas.events.audio import TranscriptUpdated
 from shared_schemas.events.conversation import ResponseDrafted
 from shared_schemas.voice.providers import STTProvider, TTSProvider
+
+from conversation_runtime.session_manager import SessionManager
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -174,121 +174,6 @@ async def audio_turn(websocket: WebSocket, session_id: str) -> None:
 
             await _persist_turn(session_id, "user", transcript)
             await _persist_turn(session_id, "assistant", reply)
-
-            audio = await _tts.synthesize(reply)
-            await websocket.send_bytes(audio)
-
-    except WebSocketDisconnect:
-        pass
-    finally:
-        _sessions.end(session_id)
-
-
-
-# ------------------------------------------------------------------
-# Health
-# ------------------------------------------------------------------
-
-
-@router.get("/health")
-async def health() -> JSONResponse:
-    return JSONResponse({
-        "status": "ok",
-        "active_sessions": _sessions.active_count() if _sessions else 0,
-    })
-
-
-# ------------------------------------------------------------------
-# Session
-# ------------------------------------------------------------------
-
-
-@router.post("/conversation/sessions")
-async def create_session() -> JSONResponse:
-    assert _sessions is not None
-    session = _sessions.create()
-    return JSONResponse({"session_id": session.session_id})
-
-
-@router.delete("/conversation/sessions/{session_id}")
-async def end_session(session_id: str) -> JSONResponse:
-    assert _sessions is not None
-    _sessions.end(session_id)
-    return JSONResponse({"ok": True})
-
-
-# ------------------------------------------------------------------
-# Text turn (no audio)
-# ------------------------------------------------------------------
-
-
-@router.post("/conversation/turn")
-async def text_turn(body: dict) -> JSONResponse:
-    """Process a text-only turn; returns assistant reply as text."""
-    assert _sessions is not None
-    assert _bus is not None
-
-    session_id = body.get("session_id", "default")
-    text = body.get("text", "")
-    if not text:
-        return JSONResponse({"error": "text is required"}, status_code=422)
-
-    _sessions.touch(session_id)
-
-    await _bus.publish(
-        TranscriptUpdated(
-            session_id=session_id,
-            transcript=text,
-            is_final=True,
-        )
-    )
-
-    # Stub: echo reply until LLM is wired
-    reply = f"[echo] {text}"
-    await _bus.publish(
-        ResponseDrafted(
-            session_id=session_id,
-            response_text=reply,
-        )
-    )
-
-    return JSONResponse({"session_id": session_id, "reply": reply})
-
-
-# ------------------------------------------------------------------
-# Audio WebSocket turn
-# ------------------------------------------------------------------
-
-
-@router.websocket("/conversation/audio/{session_id}")
-async def audio_turn(websocket: WebSocket, session_id: str) -> None:
-    assert _stt is not None
-    assert _tts is not None
-    assert _bus is not None
-    assert _sessions is not None
-
-    await websocket.accept()
-    _sessions.get_or_create(session_id)
-
-    try:
-        while True:
-            raw = await websocket.receive_bytes()
-            transcript = await _stt.transcribe(raw)
-            _sessions.touch(session_id)
-
-            await _bus.publish(
-                TranscriptUpdated(
-                    session_id=session_id,
-                    transcript=transcript,
-                    is_final=True,
-                )
-            )
-
-            # Stub reply
-            reply = f"[echo] {transcript}"
-            await _bus.publish(
-                ResponseDrafted(session_id=session_id, response_text=reply)
-            )
 
             audio = await _tts.synthesize(reply)
             await websocket.send_bytes(audio)

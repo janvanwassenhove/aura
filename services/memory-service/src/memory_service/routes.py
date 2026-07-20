@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, datetime
+from datetime import datetime
 
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
+from shared_schemas.memory.models import Reminder, Todo, Turn
 
 from memory_service.store import SQLiteMemoryStore
-from shared_schemas.memory.models import Reminder, Todo, Turn
 
 router = APIRouter(prefix="/memory")
 

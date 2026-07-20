@@ -2,17 +2,15 @@
 
 from __future__ import annotations
 
-import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from shared_config import ConnectorServiceSettings
 
 from connector_service import routes
 from connector_service.registry import ConnectorRegistry
-from shared_config import ConnectorServiceSettings
 
 
 @asynccontextmanager

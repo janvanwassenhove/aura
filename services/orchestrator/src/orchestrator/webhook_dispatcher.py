@@ -11,10 +11,8 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from datetime import UTC, datetime
 
 import httpx
-
 from shared_events.bus import AsyncEventBus
 from shared_schemas.events.base import BaseEvent
 from shared_schemas.gateway.models import WebhookRegistration

@@ -10,12 +10,10 @@ os.environ.setdefault("LLM_PROVIDER", "echo")
 os.environ.setdefault("STT_PROVIDER", "null")
 os.environ.setdefault("TTS_PROVIDER", "null")
 
-import pytest
-from fastapi.testclient import TestClient
-
 from aura_brain import knowledge_api
 from aura_brain.main import create_app
 from aura_brain.recognition_gallery import RecognitionGallery
+from fastapi.testclient import TestClient
 
 
 def _png(color=(80, 120, 200)) -> bytes:

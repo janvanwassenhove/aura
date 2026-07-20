@@ -3,11 +3,10 @@
 from __future__ import annotations
 
 import pytest
-from fastapi.testclient import TestClient
-
-from connector_service.connectors.mock import MockM365Connector
 from connector_service import routes
+from connector_service.connectors.mock import MockM365Connector
 from connector_service.main import create_app
+from fastapi.testclient import TestClient
 
 
 @pytest.fixture

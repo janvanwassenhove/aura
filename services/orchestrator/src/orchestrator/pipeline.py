@@ -9,16 +9,6 @@ import os
 import time
 
 import httpx
-
-from orchestrator.approval_manager import ApprovalDeniedError, ApprovalManager, ApprovalTimeout
-from orchestrator.context_builder import ContextBuilder
-from orchestrator.dev_agent import DevAgentTool
-from orchestrator.fallback_agent import FallbackAgent
-from orchestrator.intent_router import IntentRouter
-from orchestrator.llm import local_chat, openai_chat
-from orchestrator.persona_manager import PersonaManager
-from orchestrator import laptop_tools
-from orchestrator.tool_schemas import LADDER_NOTE, build_tool_specs
 from shared_events.bus import AsyncEventBus
 from shared_policies import APPROVAL_REQUIRED
 from shared_schemas.events.conversation import IntentRecognized, ResponseDrafted
@@ -31,6 +21,16 @@ from shared_schemas.events.orchestrator import (
 )
 from shared_schemas.events.system import TurnLatencyMeasured
 from shared_schemas.robot.models import RobotMode
+
+from orchestrator import laptop_tools
+from orchestrator.approval_manager import ApprovalDeniedError, ApprovalManager, ApprovalTimeout
+from orchestrator.context_builder import ContextBuilder
+from orchestrator.dev_agent import DevAgentTool
+from orchestrator.fallback_agent import FallbackAgent
+from orchestrator.intent_router import IntentRouter
+from orchestrator.llm import local_chat, openai_chat
+from orchestrator.persona_manager import PersonaManager
+from orchestrator.tool_schemas import LADDER_NOTE, build_tool_specs
 
 logger = logging.getLogger(__name__)
 
@@ -714,7 +714,8 @@ class OrchestratorPipeline:
                                    "OpenAI or Anthropic key)]")
                 else:
                     from shared_schemas.events.orchestrator import (
-                        ComputerControlEnded, ComputerControlStarted,
+                        ComputerControlEnded,
+                        ComputerControlStarted,
                     )
 
                     goal = arguments.get("goal", "")

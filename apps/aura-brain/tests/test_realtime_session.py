@@ -14,14 +14,12 @@ os.environ.setdefault("LLM_PROVIDER", "echo")
 
 import numpy as np
 import pytest
-
 from aura_brain.realtime_session import (
     RealtimeSession,
     _resample_16k_to_24k,
     session_enabled,
 )
 from aura_brain.realtime_voice import CostMeter
-
 
 # ------------------------------------------------------------------
 # Helpers / fakes

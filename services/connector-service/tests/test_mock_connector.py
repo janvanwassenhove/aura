@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import pytest
-
 from connector_service.connectors.mock import MockM365Connector
 from shared_schemas.m365.models import CalendarEvent, MailItem, Task, TeamsMessage
 

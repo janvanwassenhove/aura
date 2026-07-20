@@ -11,7 +11,6 @@ import types
 
 import numpy as np
 import pytest
-
 from shared_schemas.robot.models import (
     BehaviorState,
     MotionCommand,
@@ -414,7 +413,9 @@ async def test_capture_endpoints_on_trailing_silence(adapter, monkeypatch) -> No
         def get_input_audio_samplerate(self): return rate
         def get_audio_sample(self):
             if self.i < len(plan):
-                s = plan[self.i]; self.i += 1; return s
+                s = plan[self.i]
+                self.i += 1
+                return s
             return silence
 
     fake = _FakeMedia()

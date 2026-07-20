@@ -6,7 +6,6 @@ import asyncio
 import uuid
 
 import pytest
-
 from orchestrator.offline_queue import MAX_QUEUE_SIZE, OfflineQueue
 from shared_events.bus import AsyncEventBus
 from shared_schemas.events.orchestrator import ApprovalRequested

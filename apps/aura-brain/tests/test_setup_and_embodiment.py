@@ -3,11 +3,10 @@
 from __future__ import annotations
 
 import pytest
-from fastapi import FastAPI
-from fastapi.testclient import TestClient
-
 from aura_brain import setup_api
 from aura_brain.embodiment import gesture_for
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
 from shared_schemas.knowledge import InMemoryKnowledgeStore
 from shared_schemas.knowledge.models import Person, PersonRole, ProfileFact
 

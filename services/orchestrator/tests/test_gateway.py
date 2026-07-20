@@ -3,13 +3,11 @@
 from __future__ import annotations
 
 import asyncio
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
-import httpx
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-
 from orchestrator.gateway import (
     GatewayActionError,
     GatewayAuthError,
@@ -19,15 +17,11 @@ from orchestrator.gateway import (
 )
 from orchestrator.webhook_dispatcher import WebhookDispatcher
 from shared_events.bus import AsyncEventBus
+from shared_schemas.events.robot import RobotModeChanged
 from shared_schemas.gateway.models import (
-    AuditEntry,
     CommandStatus,
     GatewayAction,
-    SENSITIVE_ACTIONS,
-    WebhookRegistration,
 )
-from shared_schemas.events.robot import RobotModeChanged
-
 
 # ===========================================================================
 # Fixtures

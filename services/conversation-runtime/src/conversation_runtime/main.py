@@ -8,11 +8,11 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from shared_events.bus import AsyncEventBus
+from shared_schemas.voice.providers import STTProvider, TTSProvider
 
 from conversation_runtime import routes
 from conversation_runtime.session_manager import SessionManager
-from shared_events.bus import AsyncEventBus
-from shared_schemas.voice.providers import STTProvider, TTSProvider
 
 
 def _build_stt() -> STTProvider:

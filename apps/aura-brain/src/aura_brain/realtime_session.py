@@ -351,5 +351,5 @@ class RealtimeSession:
             await play_q.put(None)  # drain remaining segments, then stop
             try:
                 await asyncio.wait_for(consumer, timeout=30.0)
-            except (asyncio.TimeoutError, asyncio.CancelledError):
+            except (TimeoutError, asyncio.CancelledError):
                 consumer.cancel()

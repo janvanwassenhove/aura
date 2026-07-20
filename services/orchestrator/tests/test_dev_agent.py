@@ -5,11 +5,9 @@ from __future__ import annotations
 import asyncio
 
 import pytest
-
+from orchestrator.approval_manager import ApprovalManager
 from orchestrator.dev_agent import DevAgentTool, OperationType, classify_operation
-from orchestrator.approval_manager import ApprovalDeniedError, ApprovalManager
 from shared_events.bus import AsyncEventBus
-
 
 # ---------------------------------------------------------------------------
 # Operation classification

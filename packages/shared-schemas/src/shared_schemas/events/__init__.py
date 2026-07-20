@@ -19,21 +19,22 @@ from shared_schemas.events.conversation import IntentRecognized, ResponseDrafted
 from shared_schemas.events.orchestrator import (
     AgentRoundCompleted,
     AgentRoundStarted,
-    ComputerControlEnded,
-    ComputerControlStarted,
     ApprovalDenied,
     ApprovalGranted,
     ApprovalRequested,
     AuthRequiredEvent,
+    ComputerControlEnded,
+    ComputerControlStarted,
     ToolCallFailed,
     ToolCallRequested,
     ToolCallSucceeded,
 )
+from shared_schemas.events.perception import GestureDetected, PersonRecognized
 from shared_schemas.events.robot import RobotConnected, RobotDisconnected, RobotModeChanged
 from shared_schemas.events.system import (
-    MaintenanceReport,
     BackendHeartbeatFailed,
     BackendHeartbeatOk,
+    MaintenanceReport,
     OfflineQueueSyncCompleted,
     OfflineQueueSyncStarted,
     OfflineRequestQueued,
@@ -41,7 +42,6 @@ from shared_schemas.events.system import (
     ReminderTriggered,
     TurnLatencyMeasured,
 )
-from shared_schemas.events.perception import GestureDetected, PersonRecognized
 
 __all__ = [
     "BaseEvent",

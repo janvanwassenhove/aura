@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-
 from robot_runtime import routes
 from robot_runtime.adapters.fake import FakeRobotAdapter
 

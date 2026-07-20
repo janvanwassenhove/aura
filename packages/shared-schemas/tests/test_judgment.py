@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import pytest
-
 from shared_schemas.knowledge.judgment import JudgmentLayer
 from shared_schemas.knowledge.models import (
     ObservedSignal,
@@ -95,7 +94,6 @@ async def test_minor_excludes_observed_signals(
     await store.add_fact(ProfileFact(person_id="kid", key="age", value="8"))
 
     # Record a high-confidence signal — it must NOT appear in the context.
-    from shared_schemas.knowledge.store import ensure_minor_learning_consent
     from shared_schemas.knowledge.models import ConsentRecord
 
     consent = ConsentRecord(person_id="kid", granted_by="owner", scope="observed_learning")

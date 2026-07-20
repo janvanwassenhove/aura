@@ -418,10 +418,13 @@ async def run_audio_mode(args) -> None:
         speech_end = time.perf_counter()
 
         # streaming STT (single call here; swap for Realtime API for true streaming)
-        import io, wave
+        import io
+        import wave
         wav = io.BytesIO()
         with wave.open(wav, "wb") as w:
-            w.setnchannels(1); w.setsampwidth(2); w.setframerate(16_000)
+            w.setnchannels(1)
+            w.setsampwidth(2)
+            w.setframerate(16_000)
             w.writeframes(rec.tobytes())
         wav.seek(0)
         tr = await client.audio.transcriptions.create(

@@ -33,7 +33,6 @@ import os
 from typing import Any
 
 import numpy as np
-
 from shared_schemas.robot.adapter import RobotAdapter
 from shared_schemas.robot.models import (
     BehaviorState,
@@ -1218,7 +1217,9 @@ class ReachyRobotAdapter(RobotAdapter):
                     time.sleep(0.55 / speed)
             except Exception as exc:  # noqa: BLE001 — body yaw is optional
                 logger.warning("spin unavailable (%s) — swaying instead", exc)
-                go(head=_rot("z", 0.5 * amp)); go(head=_rot("z", -0.5 * amp)); go(head=_NEUTRAL)
+                go(head=_rot("z", 0.5 * amp))
+                go(head=_rot("z", -0.5 * amp))
+                go(head=_NEUTRAL)
             finally:
                 if self._body_follow:
                     try:

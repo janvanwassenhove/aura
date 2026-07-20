@@ -7,7 +7,6 @@ import os
 os.environ.setdefault("LLM_PROVIDER", "echo")
 
 import pytest
-
 from orchestrator import laptop_tools
 from orchestrator.tool_schemas import LADDER_NOTE, TOOL_LAYERS, TOOL_SCHEMAS
 from shared_policies import APPROVAL_REQUIRED, MODE_TOOL_MAP

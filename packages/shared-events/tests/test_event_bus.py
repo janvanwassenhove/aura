@@ -1,6 +1,7 @@
 """Tests for AsyncEventBus."""
 
 import asyncio
+
 import pytest
 from shared_events.bus import AsyncEventBus, EventBusNotStartedError
 from shared_schemas.events.robot import RobotConnected

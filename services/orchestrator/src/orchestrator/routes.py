@@ -11,8 +11,11 @@ import httpx
 from fastapi import APIRouter, Header, Query
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
+from shared_personas import Persona
+from shared_schemas.gateway.models import CommandStatus
 
 from orchestrator.approval_manager import ApprovalManager
+from orchestrator.config import get_config, update_config
 from orchestrator.context_builder import ContextBuilder
 from orchestrator.gateway import (
     GatewayActionError,
@@ -29,11 +32,7 @@ from orchestrator.presentation import (
     PresentationManager,
     SlideOutOfRangeError,
 )
-from orchestrator.config import get_config, update_config
 from orchestrator.webhook_dispatcher import WebhookDispatcher
-from shared_personas import Persona
-from shared_schemas.gateway.models import CommandStatus
-
 
 # ------------------------------------------------------------------
 # LLM config schemas

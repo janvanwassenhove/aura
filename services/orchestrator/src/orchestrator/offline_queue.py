@@ -14,12 +14,10 @@ import json
 import logging
 import os
 import uuid
-from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from dataclasses import dataclass
+from datetime import UTC, datetime
 
 import aiosqlite
-
-from shared_events.bus import AsyncEventBus
 from shared_events.bus import AsyncEventBus
 from shared_policies import APPROVAL_REQUIRED
 from shared_schemas.events.orchestrator import ApprovalRequested
@@ -88,7 +86,7 @@ class OfflineQueue:
             id=str(uuid.uuid4()),
             tool_name=tool_name,
             arguments=arguments,
-            queued_at=datetime.now(tz=timezone.utc).isoformat(),
+            queued_at=datetime.now(tz=UTC).isoformat(),
         )
         await self._db.execute(
             "INSERT INTO offline_queue (id, tool_name, arguments, queued_at, status) VALUES (?,?,?,?,?)",

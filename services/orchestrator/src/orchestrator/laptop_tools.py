@@ -55,7 +55,7 @@ async def _run_argv(argv: list[str], cwd: str | None, timeout: float = 60.0) -> 
         out, _ = await asyncio.wait_for(proc.communicate(), timeout=timeout)
     except FileNotFoundError:
         return f"[{argv[0]}: not found on this machine]"
-    except asyncio.TimeoutError:
+    except TimeoutError:
         proc.kill()
         return f"[{argv[0]}: timed out after {timeout:.0f}s]"
     except Exception as exc:  # noqa: BLE001

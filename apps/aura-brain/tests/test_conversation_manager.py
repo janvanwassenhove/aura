@@ -4,11 +4,8 @@ from __future__ import annotations
 
 import asyncio
 
-import pytest
-
 from aura_brain.characters import CharacterStore
 from aura_brain.conversation_manager import ConversationManager, ConversationState
-
 
 # ── state transitions ────────────────────────────────────────────────
 

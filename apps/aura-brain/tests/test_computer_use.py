@@ -6,10 +6,7 @@ import base64
 from dataclasses import dataclass, field
 from typing import Any
 
-import pytest
-
 from aura_brain.computer_use import ComputerUseAgent
-
 
 # -- fakes ------------------------------------------------------------------
 
@@ -275,6 +272,7 @@ class _BigScreenBackend(FakeBackend):
     def screenshot(self) -> bytes:
         # Real PNG so PIL can resize it.
         import io
+
         from PIL import Image
         buf = io.BytesIO()
         Image.new("RGB", (3440, 1440), (30, 30, 30)).save(buf, format="PNG")
@@ -293,6 +291,7 @@ def test_scaled_backend_downscales_view_and_upscales_clicks() -> None:
     assert abs(x - 1720) <= 2 and abs(y - 720) <= 3  # lands on the real center
 
     import io
+
     from PIL import Image
     img = Image.open(io.BytesIO(sb.screenshot()))
     assert img.size == (w, h)  # the screenshot really is downscaled

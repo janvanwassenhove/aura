@@ -10,9 +10,8 @@ os.environ.setdefault("LLM_PROVIDER", "echo")
 os.environ.setdefault("STT_PROVIDER", "null")
 os.environ.setdefault("TTS_PROVIDER", "null")
 
-from fastapi.testclient import TestClient
-
 from aura_brain.main import create_app
+from fastapi.testclient import TestClient
 
 
 def test_inspect_edit_erase_profile() -> None:
@@ -51,9 +50,10 @@ def test_unknown_person_is_404() -> None:
 
 def test_person_description_and_skill_references() -> None:
     """U63: describe a person + see their skills from their profile."""
+    import tempfile
+
     from aura_brain import skills_api
     from orchestrator.skills import Skill, SkillStore
-    import tempfile
 
     app = create_app()
     with TestClient(app) as client, tempfile.TemporaryDirectory() as tmp:
@@ -97,9 +97,10 @@ def test_description_lands_in_judgment_context() -> None:
 
 def test_wikilink_mentions_appear_as_backlinks() -> None:
     """U68: a skill that mentions [[person]] shows in their profile as backlink."""
+    import tempfile
+
     from aura_brain import skills_api
     from orchestrator.skills import Skill, SkillStore
-    import tempfile
 
     app = create_app()
     with TestClient(app) as client, tempfile.TemporaryDirectory() as tmp:
@@ -117,7 +118,8 @@ def test_wikilink_mentions_appear_as_backlinks() -> None:
 
 def test_lock_then_unlock_with_passphrase(monkeypatch) -> None:
     """U94: /knowledge/unlock re-elevates to SENSITIVE with the right passphrase."""
-    import os, tempfile
+    import os
+    import tempfile
     monkeypatch.setenv("KNOWLEDGE_PASSPHRASE", "super-secret-pass")
     monkeypatch.setenv("KNOWLEDGE_SALT", "testsalt")
     monkeypatch.setenv("DATABASE_URL", "sqlite+aiosqlite:///:memory:")

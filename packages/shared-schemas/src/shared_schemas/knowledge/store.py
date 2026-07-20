@@ -35,7 +35,7 @@ class ConsentError(PermissionError):
     """Raised when passive learning is attempted without required consent."""
 
 
-async def ensure_minor_learning_consent(store: "KnowledgeStore", person_id: str) -> None:
+async def ensure_minor_learning_consent(store: KnowledgeStore, person_id: str) -> None:
     """ADR-008 §10: a minor's profile gets no passive (observed) learning unless
     the owner granted explicit consent. Shared by every store implementation.
 

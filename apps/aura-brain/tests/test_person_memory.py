@@ -9,7 +9,6 @@ os.environ.setdefault("DATABASE_URL", "sqlite+aiosqlite:///:memory:")
 os.environ.setdefault("LLM_PROVIDER", "echo")
 
 import pytest
-
 from aura_brain.person_memory import MEMORY_KEY, PersonMemory
 from shared_schemas.knowledge import InMemoryKnowledgeStore, Person, PersonRole
 

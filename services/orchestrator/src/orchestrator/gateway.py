@@ -7,14 +7,13 @@ import hmac
 import logging
 import time
 from collections import defaultdict, deque
-from datetime import UTC, datetime
 
 from shared_schemas.gateway.models import (
+    SENSITIVE_ACTIONS,
     AuditEntry,
     CommandStatus,
     GatewayAction,
     GatewayCommand,
-    SENSITIVE_ACTIONS,
 )
 
 logger = logging.getLogger(__name__)

@@ -11,10 +11,9 @@ os.environ.setdefault("STT_PROVIDER", "null")
 os.environ.setdefault("TTS_PROVIDER", "null")
 
 import pytest
-from fastapi.testclient import TestClient
-
 from aura_brain import brain_transfer
 from aura_brain.main import create_app
+from fastapi.testclient import TestClient
 
 _CHATGPT_EXPORT = [{
     "title": "Robot ideas",

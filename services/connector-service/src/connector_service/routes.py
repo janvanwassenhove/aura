@@ -7,7 +7,6 @@ from typing import TYPE_CHECKING
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import JSONResponse
-
 from shared_schemas.m365.connector import M365Connector
 
 if TYPE_CHECKING:
@@ -17,7 +16,7 @@ router = APIRouter(prefix="/connector")
 logger = logging.getLogger(__name__)
 
 _connector: M365Connector | None = None
-_registry: "ConnectorRegistry | None" = None
+_registry: ConnectorRegistry | None = None
 
 
 def set_connector(connector: M365Connector) -> None:
@@ -25,7 +24,7 @@ def set_connector(connector: M365Connector) -> None:
     _connector = connector
 
 
-def set_registry(registry: "ConnectorRegistry") -> None:
+def set_registry(registry: ConnectorRegistry) -> None:
     global _registry
     _registry = registry
 

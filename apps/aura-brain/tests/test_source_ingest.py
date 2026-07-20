@@ -11,10 +11,9 @@ os.environ.setdefault("STT_PROVIDER", "null")
 os.environ.setdefault("TTS_PROVIDER", "null")
 
 import pytest
-from fastapi.testclient import TestClient
-
 from aura_brain import source_ingest
 from aura_brain.main import create_app
+from fastapi.testclient import TestClient
 
 _PAGE = "<html><body><nav>menu</nav><p>" + "I write about home automation and 3D printing. " * 10 + "</p></body></html>"
 

@@ -23,10 +23,9 @@ import time
 from collections import defaultdict
 
 import httpx
-
 from shared_events.bus import AsyncEventBus
-from shared_schemas.events.system import BackendHeartbeatFailed, BackendHeartbeatOk
 from shared_schemas.events.robot import RobotModeChanged
+from shared_schemas.events.system import BackendHeartbeatFailed, BackendHeartbeatOk
 from shared_schemas.robot.models import RobotMode
 
 logger = logging.getLogger(__name__)

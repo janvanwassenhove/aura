@@ -40,10 +40,14 @@ class MockM365Connector(M365Connector):
         """Mock OneDrive listing (no Microsoft account needed)."""
         now = datetime.now(UTC)
         return [
-            {"name": "Q3 Report.docx", "size_kb": 148, "modified": (now - timedelta(days=1)).isoformat(), "folder": "Documents"},
-            {"name": "Roadmap.xlsx", "size_kb": 92, "modified": (now - timedelta(days=3)).isoformat(), "folder": "Documents"},
-            {"name": "Team Photo.jpg", "size_kb": 2048, "modified": (now - timedelta(days=10)).isoformat(), "folder": "Pictures"},
-            {"name": "Budget 2026.xlsx", "size_kb": 64, "modified": (now - timedelta(hours=6)).isoformat(), "folder": "Finance"},
+            {"name": "Q3 Report.docx", "size_kb": 148, "modified": (now - timedelta(days=1)).isoformat(),
+            "folder": "Documents"},
+            {"name": "Roadmap.xlsx", "size_kb": 92, "modified": (now - timedelta(days=3)).isoformat(),
+            "folder": "Documents"},
+            {"name": "Team Photo.jpg", "size_kb": 2048, "modified": (now - timedelta(days=10)).isoformat(),
+            "folder": "Pictures"},
+            {"name": "Budget 2026.xlsx", "size_kb": 64, "modified": (now - timedelta(hours=6)).isoformat(),
+            "folder": "Finance"},
         ]
 
     async def get_unread_mail(self, limit: int = 10) -> list[MailItem]:
@@ -82,7 +86,6 @@ class MockM365Connector(M365Connector):
         ]
 
     async def create_task(self, title: str, plan_id: str = "", due_date: str = "") -> Task:
-        from datetime import date
         parsed_due: datetime | None = None
         if due_date:
             parsed_due = datetime.fromisoformat(due_date).replace(tzinfo=UTC)

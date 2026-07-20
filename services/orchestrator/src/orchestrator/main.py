@@ -8,21 +8,21 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from shared_events.bus import AsyncEventBus
+from shared_personas import Persona
 
 from orchestrator import routes
 from orchestrator.approval_manager import ApprovalManager
 from orchestrator.context_builder import ContextBuilder
 from orchestrator.fallback_agent import FallbackAgent
+from orchestrator.gateway import GatewayManager
 from orchestrator.heartbeat import HeartbeatMonitor
 from orchestrator.intent_router import IntentRouter
 from orchestrator.offline_queue import OfflineQueue
 from orchestrator.persona_manager import PersonaManager
 from orchestrator.pipeline import OrchestratorPipeline
-from orchestrator.gateway import GatewayManager
 from orchestrator.presentation import PresentationManager
 from orchestrator.webhook_dispatcher import WebhookDispatcher
-from shared_events.bus import AsyncEventBus
-from shared_personas import Persona
 
 
 @asynccontextmanager
