@@ -111,11 +111,19 @@ async function ensureBootstrap(splashWindow) {
 
   if (!hasUv()) {
     say('Installing the Python runtime (one-time)…')
-    // Official uv installer; puts uv.exe on the user PATH for future runs.
-    execSync('powershell -NoProfile -ExecutionPolicy Bypass -Command "irm https://astral.sh/uv/install.ps1 | iex"',
-      { stdio: 'ignore', shell: true, timeout: 300_000 })
-    // Current process PATH doesn't pick up the new location automatically.
-    process.env.PATH = `${process.env.USERPROFILE}\\.local\\bin;${process.env.PATH}`
+    // Official uv installer; puts uv on the user PATH for future runs.
+    // U166: per-platform — the PowerShell one-liner only exists on Windows,
+    // so the macOS/Linux installers could never bootstrap.
+    if (process.platform === 'win32') {
+      execSync('powershell -NoProfile -ExecutionPolicy Bypass -Command "irm https://astral.sh/uv/install.ps1 | iex"',
+        { stdio: 'ignore', shell: true, timeout: 300_000 })
+      // Current process PATH doesn't pick up the new location automatically.
+      process.env.PATH = `${process.env.USERPROFILE}\\.local\\bin;${process.env.PATH}`
+    } else {
+      execSync('curl -LsSf https://astral.sh/uv/install.sh | sh',
+        { stdio: 'ignore', shell: true, timeout: 300_000 })
+      process.env.PATH = `${process.env.HOME}/.local/bin:${process.env.PATH}`
+    }
     if (!hasUv()) throw new Error('uv installation failed — install it from https://astral.sh/uv and restart AURA')
   }
 
