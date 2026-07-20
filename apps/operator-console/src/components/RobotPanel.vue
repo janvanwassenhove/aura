@@ -238,7 +238,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import {
   Bell, Bot, ChevronRight, ChevronsDown, Eye, Hand, Laugh, Moon, MoveHorizontal, MoveVertical,
   Mic, MicOff, Music, Pencil, Power, RefreshCw, RotateCw, Sparkles, ThumbsUp,
@@ -283,7 +283,9 @@ async function toggleLogs(): Promise<void> {
   if (logsOpen.value) await fetchAppLogs()
 }
 
-const tracking = ref(true) // adapter enables head tracking on connect
+// U162: follow-me is shared state (see robotStore) — the camera panel's
+// Follow/Manual switch is the same setting, so it must not be a local ref.
+const tracking = computed(() => robotStore.tracking)
 
 // U99: microphone (wake-word listening) on/off — sets VOICE_MODE via prefs.
 const micOn = ref(true)
@@ -396,16 +398,9 @@ async function savePersona() {
 }
 
 async function toggleTracking() {
-  tracking.value = !tracking.value
-  try {
-    await fetch(`${BRAIN_URL}/robot/tracking`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ enabled: tracking.value }),
-    })
-  } catch {
-    tracking.value = !tracking.value // revert on failure
-  }
+  // U162: drive the SHARED store — this toggle and the camera's Follow/Manual
+  // switch are the same setting, and a second local ref made them disagree.
+  await robotStore.setTracking(!tracking.value, BRAIN_URL)
 }
 
 // Speak & Move combos (U36g): text + gesture in one action.

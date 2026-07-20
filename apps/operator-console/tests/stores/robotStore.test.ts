@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 import { useRobotStore } from '../../src/stores/robotStore'
 
@@ -76,5 +76,61 @@ describe('robotStore', () => {
     store.$reset()
     expect(store.mode).toBe('unknown')
     expect(store.connected).toBe(false)
+  })
+})
+
+describe('robotStore — follow-me mode (U162)', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    vi.restoreAllMocks()
+  })
+
+  it('defaults to following (the adapter enables tracking on connect)', () => {
+    expect(useRobotStore().tracking).toBe(true)
+  })
+
+  it('setTracking flips the shared state and calls the brain', async () => {
+    const store = useRobotStore()
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true })
+    vi.stubGlobal('fetch', fetchMock)
+
+    expect(await store.setTracking(false, 'http://brain')).toBe(true)
+    expect(store.tracking).toBe(false)          // → Manual mode
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://brain/robot/tracking',
+      expect.objectContaining({ method: 'POST', body: JSON.stringify({ enabled: false }) }),
+    )
+  })
+
+  it('reverts when the robot refuses, so the UI never claims a mode it is not in', async () => {
+    const store = useRobotStore()
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 503 }))
+
+    expect(await store.setTracking(false, 'http://brain')).toBe(false)
+    expect(store.tracking).toBe(true)           // still following
+  })
+
+  it('reverts when the brain is unreachable', async () => {
+    const store = useRobotStore()
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')))
+
+    expect(await store.setTracking(false, 'http://brain')).toBe(false)
+    expect(store.tracking).toBe(true)
+  })
+
+  it('syncFromStatus takes the robot as source of truth', () => {
+    const store = useRobotStore()
+    // A motion (or the follow-me watchdog) changed tracking without us asking.
+    store.syncFromStatus({ connected: true, mode: 'home', tracking: false })
+    expect(store.tracking).toBe(false)
+    store.syncFromStatus({ connected: true, mode: 'home', tracking: true })
+    expect(store.tracking).toBe(true)
+  })
+
+  it('syncFromStatus leaves tracking alone when the robot omits it', () => {
+    const store = useRobotStore()
+    store.syncFromStatus({ connected: true, mode: 'home', tracking: false })
+    store.syncFromStatus({ connected: true, mode: 'home' })   // older payload
+    expect(store.tracking).toBe(false)
   })
 })
