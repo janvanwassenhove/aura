@@ -216,6 +216,46 @@ async def test_session_barge_in_off_keeps_gate(monkeypatch) -> None:
     assert conn.cancelled == 0
 
 
+async def test_turn_detection_is_not_trigger_happy(monkeypatch) -> None:
+    """U163: the default eagerness fired on any pause, so noise became turns."""
+    from aura_brain.realtime_session import _turn_detection
+
+    monkeypatch.delenv("REALTIME_VAD_EAGERNESS", raising=False)
+    assert _turn_detection("semantic_vad") == {
+        "type": "semantic_vad", "eagerness": "low"}
+
+    monkeypatch.setenv("REALTIME_VAD_EAGERNESS", "high")
+    assert _turn_detection("semantic_vad")["eagerness"] == "high"
+
+    server = _turn_detection("server_vad")
+    assert server["type"] == "server_vad"
+    assert server["silence_duration_ms"] >= 500      # don't cut on a breath
+    assert server["threshold"] > 0.5                 # above room tone
+
+
+async def test_seed_utterance_tail_cannot_trigger_a_second_reply(monkeypatch) -> None:
+    """U163: seeding with initial_text answers the sentence; the mic then opens
+    on its TAIL and produced a duplicate answer to the same sentence."""
+    monkeypatch.setenv("REALTIME_SEED_MUTE_S", "60")   # still muted during test
+    monkeypatch.setenv("SELF_HEARING_COOLDOWN_S", "0")
+    conn = _FakeConn([_Ev("response.done", response=type("R", (), {"usage": {}})())])
+    robot = _FakeRobot(chunks=5)
+    sess = RealtimeSession(robot=robot, bus=_Bus(), conn_factory=lambda m: conn)
+
+    await sess.run(initial_text="vertel eens een mop")
+    assert conn.appended == []          # nothing from the mic reached the server
+
+
+async def test_mic_opens_after_the_seed_mute_expires(monkeypatch) -> None:
+    monkeypatch.setenv("REALTIME_SEED_MUTE_S", "0")    # expired immediately
+    monkeypatch.setenv("SELF_HEARING_COOLDOWN_S", "0")
+    conn = _FakeConn([])
+    robot = _FakeRobot(chunks=3)
+    sess = RealtimeSession(robot=robot, bus=_Bus(), conn_factory=lambda m: conn)
+    await sess._pump_mic(conn)
+    assert conn.appended, "the mic must resume once the seed tail has passed"
+
+
 async def test_session_raises_on_error_event() -> None:
     conn = _FakeConn([_Ev("error", error="model_not_found")])
     robot = _FakeRobot(chunks=1)

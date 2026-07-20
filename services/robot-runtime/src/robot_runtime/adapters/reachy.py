@@ -874,9 +874,20 @@ class ReachyRobotAdapter(RobotAdapter):
             rate = media.get_input_audio_samplerate() or 16_000
             chunk_n = int(rate * chunk_ms / 1000)
             buf = np.zeros(0, dtype=np.float32)
-            running_peak = 0.02
             target = float(os.environ.get("MIC_TARGET_PEAK", "0.5"))
             max_gain = float(os.environ.get("MIC_MAX_GAIN", "40"))
+            # U163: the AGC must never chase the room's noise floor. Gate on
+            # RMS, not peak: measured in a normal room, ambient clatter is
+            # ~0.010 RMS with transient peaks up to 0.09, while speech is
+            # sustained (0.05+ RMS). A peak gate lets every door-click through;
+            # an RMS gate tells "someone is talking" from "something ticked".
+            # Below the gate the chunk is passed through UNGAINED. Without this
+            # a quiet room decayed running_peak toward ~0, the gain ran up to
+            # 40x, and room tone reached the server at speech level — the
+            # remote VAD then "heard" a turn every few seconds and Richie
+            # answered noise ("conversatie slaat op hol").
+            gate = float(os.environ.get("MIC_STREAM_GATE", "0.02"))
+            running_peak = max(gate, 0.02)
             try:
                 while not stop.is_set():
                     sample = media.get_audio_sample()
@@ -898,9 +909,18 @@ class ReachyRobotAdapter(RobotAdapter):
                             x_new = np.linspace(0.0, 1.0, num=n_out, endpoint=False)
                             chunk = np.interp(x_new, x_old, chunk).astype(np.float32)
                         if not raw:
-                            peak = float(np.abs(chunk).max()) if len(chunk) else 0.0
-                            running_peak = max(peak, running_peak * 0.98, 1e-4)
-                            chunk = chunk * min(target / running_peak, max_gain)
+                            rms = float(np.sqrt(np.mean(chunk * chunk))) if len(chunk) else 0.0
+                            if rms >= gate:
+                                # Someone is actually talking: level it toward
+                                # the target using the peak (avoids clipping).
+                                peak = float(np.abs(chunk).max())
+                                running_peak = max(peak, running_peak * 0.98, gate)
+                                chunk = chunk * min(target / running_peak, max_gain)
+                            else:
+                                # Room tone / a stray click: pass it through
+                                # ungained so the far-end VAD hears quiet as
+                                # quiet instead of a turn.
+                                running_peak = max(running_peak * 0.98, gate)
                         data = (np.clip(chunk, -1.0, 1.0) * 32767).astype(np.int16).tobytes()
                         try:
                             out.put_nowait(data)
