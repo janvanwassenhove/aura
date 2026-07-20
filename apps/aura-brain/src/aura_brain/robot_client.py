@@ -102,6 +102,15 @@ class RobotClient:
         """One PNG frame from the robot's camera (U18 perception loop)."""
         return (await self._request("GET", "/robot/camera/frame")).content
 
+    async def aim(self, yaw: float = 0.0, pitch: float = 0.0,
+                  body_yaw: float | None = None) -> dict:
+        """U161: point the head (camera) / torso. Values are -1..1 fractions of
+        the robot's safe range; body_yaw=None leaves the torso alone."""
+        payload: dict = {"yaw": yaw, "pitch": pitch}
+        if body_yaw is not None:
+            payload["body_yaw"] = body_yaw
+        return (await self._request("POST", "/robot/aim", payload)).json()
+
     async def set_tracking(self, enabled: bool) -> dict:
         return (await self._request("POST", "/robot/tracking", {"enabled": enabled})).json()
 

@@ -154,6 +154,62 @@ class ReachyRobotAdapter(RobotAdapter):
         self._tracking_on = enabled
         return enabled
 
+    # U161: manual aiming (console joystick). Head yaw/pitch and torso yaw are
+    # driven directly; ranges are conservative so the pad can never command a
+    # pose the neck can't reach.
+    AIM_YAW_MAX = 0.70      # rad, ±40°
+    AIM_PITCH_MAX = 0.40    # rad, ±23°
+    AIM_BODY_MAX = 1.20     # rad, ±69°
+
+    async def aim(
+        self,
+        yaw: float = 0.0,
+        pitch: float = 0.0,
+        body_yaw: float | None = None,
+        duration: float = 0.35,
+    ) -> dict:
+        """Point the head (and optionally the torso) at a normalized direction.
+
+        ``yaw``/``pitch``/``body_yaw`` are -1..1 fractions of the safe range,
+        which is what a 2-D joystick naturally produces.
+
+        Face tracking is PAUSED on the first aim: the daemon would otherwise
+        pull the head straight back to the nearest face and the pad would feel
+        dead (the same fight U137 hit with quick actions). Follow-me is resumed
+        explicitly via the console toggle — auto-resuming would snap the head
+        away from wherever the operator just pointed it.
+        """
+        if self._mini is None:
+            raise RuntimeError("not connected")
+
+        def _clamp(v: float, lim: float) -> float:
+            return max(-lim, min(lim, float(v) * lim))
+
+        y = _clamp(yaw, self.AIM_YAW_MAX)
+        p = _clamp(pitch, self.AIM_PITCH_MAX)
+        b = None if body_yaw is None else _clamp(body_yaw, self.AIM_BODY_MAX)
+
+        paused = False
+        if self._tracking_on:
+            try:
+                await asyncio.to_thread(self._mini.stop_head_tracking)
+                if self._body_follow:
+                    await asyncio.to_thread(self._mini.set_automatic_body_yaw, False)
+                self._tracking_on = False   # stops the U126 watchdog re-asserting
+                paused = True
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("could not pause tracking for manual aim: %s", exc)
+
+        pose = _rot("z", y) @ _rot("x", p)
+
+        def _go() -> None:
+            self._mini.goto_target(head=pose, duration=max(0.05, duration),
+                                   body_yaw=b)
+
+        async with self._motion_lock:
+            await asyncio.to_thread(_go)
+        return {"yaw": y, "pitch": p, "body_yaw": b, "tracking_paused": paused}
+
     async def set_body_follow(self, enabled: bool) -> bool:
         """U37: turn the torso along with the face. The SDK's head tracking only
         moves the neck (mechanically limited); automatic body yaw makes the

@@ -87,6 +87,44 @@ async def test_speak_segment_plays_directly() -> None:
         await _teardown(bus)
 
 
+async def test_aim_clamps_and_pauses_tracking() -> None:
+    """U161: joystick aim — values clamp to -1..1 and follow-me is paused so
+    the daemon doesn't pull the head straight back to the nearest face."""
+    adapter, bus = await _setup()
+    try:
+        await adapter.set_tracking(True)
+        resp = _client().post("/robot/aim", json={"yaw": 3.0, "pitch": -0.5,
+                                                  "body_yaw": 0.25})
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["ok"] is True
+        assert body["yaw"] == 1.0            # clamped from 3.0
+        assert body["pitch"] == -0.5
+        assert body["body_yaw"] == 0.25
+        assert body["tracking_paused"] is True
+    finally:
+        await _teardown(bus)
+
+
+async def test_aim_leaves_torso_alone_when_omitted() -> None:
+    adapter, bus = await _setup()
+    try:
+        body = _client().post("/robot/aim", json={"yaw": 0.2}).json()
+        assert body["body_yaw"] is None      # torso untouched
+        assert body["pitch"] == 0.0
+    finally:
+        await _teardown(bus)
+
+
+async def test_aim_rejects_junk_values() -> None:
+    adapter, bus = await _setup()
+    try:
+        body = _client().post("/robot/aim", json={"yaw": "left", "pitch": None}).json()
+        assert body["yaw"] == 0.0 and body["pitch"] == 0.0   # falls back, no 500
+    finally:
+        await _teardown(bus)
+
+
 async def test_audio_stream_yields_pcm_chunks() -> None:
     """U154: the mic stream route emits raw s16le chunks with rate headers."""
     adapter, bus = await _setup()
