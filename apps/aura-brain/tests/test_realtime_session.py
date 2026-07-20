@@ -182,7 +182,11 @@ async def test_session_barge_in_cuts_playback(monkeypatch) -> None:
     """U156: with AEC full duplex, speech during playback cuts Richie off."""
     monkeypatch.setenv("REALTIME_BARGE_IN", "true")
     monkeypatch.setenv("REALTIME_SEGMENT_MS", "1")
-    reply_audio = base64.b64encode(b"\x01\x02" * 60).decode()
+    # U168e: ~1.25 s of audio, NOT 120 bytes (2.5 ms). The barge branch needs
+    # monotonic() < playing_until when speech_started arrives ~10 ms later —
+    # a 2.5 ms window only "passed" on Windows because its clock ticks in
+    # ~15 ms steps; Linux's precise clock exposed the race.
+    reply_audio = base64.b64encode(b"\x01\x02" * 30_000).decode()
     events = [
         _Ev("response.output_audio.delta", delta=reply_audio),  # playing…
         _Ev("input_audio_buffer.speech_started"),               # user interrupts

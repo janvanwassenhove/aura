@@ -245,7 +245,12 @@ async def test_wake_word_still_works_during_music_guard(loop_env, monkeypatch) -
         task.cancel()
         with pytest.raises(asyncio.CancelledError):
             await task
-    assert pipeline.commands == ["zet de muziek zachter"]
+    # U168e: assert CONTENT, not an exact count — between the first command
+    # landing and task.cancel() the scripted robot keeps replaying the same
+    # utterance, so how many copies pile up is a race (7 on Linux CI, 1 on
+    # Windows only thanks to its coarse 15 ms sleep granularity).
+    assert pipeline.commands, "wake word during music guard must reach the pipeline"
+    assert all(c == "zet de muziek zachter" for c in pipeline.commands)
 
 
 async def test_barge_without_wake_word_is_ignored_as_echo(loop_env, monkeypatch) -> None:
