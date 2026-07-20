@@ -25,6 +25,11 @@ export const useRobotStore = defineStore('robot', () => {
   const connected = ref(false)
   const motionLog = ref<MotionLogEntry[]>([])
   const lastRecognized = ref<RecognizedPerson | null>(null)
+  // U162: follow-me lives HERE, not in a component. Two surfaces drive it (the
+  // Robot panel's Follow toggle and the camera's Follow/Manual switch); with a
+  // ref per component they drifted apart and the robot fought the operator —
+  // one showing "following" while the other had just aimed manually.
+  const tracking = ref(true)   // the adapter enables head tracking on connect
 
   const statusBadgeClass = computed(() => {
     if (!connected.value) return 'badge-gray'
@@ -96,10 +101,32 @@ export const useRobotStore = defineStore('robot', () => {
   // U152: sync from a /robot/status poll. WS events (RobotConnected) can be
   // missed if the robot connected before the console opened or during a network
   // blip, leaving the title bar wrongly "offline" while the camera streams fine.
-  function syncFromStatus(s: { connected?: boolean; mode?: string } | null): void {
+  function syncFromStatus(s: { connected?: boolean; mode?: string; tracking?: boolean } | null): void {
     if (!s) return
     connected.value = s.connected === true
     if (s.mode) mode.value = s.mode
+    // U162: the robot is the source of truth — a motion or the follow-me
+    // watchdog can change tracking without the console asking.
+    if (typeof s.tracking === 'boolean') tracking.value = s.tracking
+  }
+
+  /** U162: flip follow-me on the robot; reverts on failure so the UI never
+   *  claims a mode the robot isn't in. Returns whether it took. */
+  async function setTracking(enabled: boolean, brainUrl: string): Promise<boolean> {
+    const previous = tracking.value
+    tracking.value = enabled          // optimistic: the switch feels instant
+    try {
+      const resp = await fetch(`${brainUrl}/robot/tracking`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled }),
+      })
+      if (!resp.ok) throw new Error(String(resp.status))
+      return true
+    } catch {
+      tracking.value = previous
+      return false
+    }
   }
 
   function $reset() {
@@ -111,7 +138,8 @@ export const useRobotStore = defineStore('robot', () => {
     connected.value = false
     motionLog.value = []
     lastRecognized.value = null
+    tracking.value = true
   }
 
-  return { mode, behaviorState, isSpeaking, currentTranscript, uptime, connected, motionLog, lastRecognized, statusBadgeClass, applyEvent, syncFromStatus, $reset }
+  return { mode, behaviorState, isSpeaking, currentTranscript, uptime, connected, motionLog, lastRecognized, tracking, statusBadgeClass, applyEvent, syncFromStatus, setTracking, $reset }
 })

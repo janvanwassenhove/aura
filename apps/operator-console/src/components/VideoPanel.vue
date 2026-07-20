@@ -27,9 +27,11 @@
 
       <!-- U161: aim the head by dragging on the picture — the ball sits where
            you last pointed, so the control reads like "look there", not
-           "press left four times". -->
+           "press left four times".
+           U162: only in Manual mode. In Follow mode the pad is not rendered at
+           all, so aiming and face-tracking can never fight over the head. -->
       <div
-        v-if="aimOpen"
+        v-if="manualMode"
         ref="padEl"
         class="aim-pad"
         title="Drag to aim the head — double-click to centre"
@@ -52,18 +54,30 @@
         <span v-if="recognized.known" class="confidence">{{ Math.round(recognized.confidence * 100) }}%</span>
       </div>
 
-      <button
-        class="aim-toggle"
-        :class="{ 'aim-toggle--on': aimOpen }"
-        :title="aimOpen ? 'Hide manual aim' : 'Aim the head and torso manually'"
-        @click="aimOpen = !aimOpen"
-      >
-        <Move :size="13" />
-      </button>
+      <!-- U162: one explicit switch. The robot is either following you or
+           taking aim from you — never both, so they cannot fight. -->
+      <div class="mode-switch" role="group" aria-label="Head control mode">
+        <button
+          :class="['mode-btn', !manualMode && 'mode-btn--on']"
+          :disabled="switching"
+          title="The robot follows the nearest face"
+          @click="setMode(false)"
+        >
+          <Eye :size="12" /> Follow
+        </button>
+        <button
+          :class="['mode-btn', manualMode && 'mode-btn--on']"
+          :disabled="switching"
+          title="You aim the head and torso — follow-me is off"
+          @click="setMode(true)"
+        >
+          <Move :size="12" /> Manual
+        </button>
+      </div>
     </div>
 
     <!-- Torso: a separate axis from the head, so it gets its own control -->
-    <div v-if="aimOpen" class="aim-bar">
+    <div v-if="manualMode" class="aim-bar">
       <div class="aim-row">
         <label class="aim-label" for="torso">Torso</label>
         <input
@@ -72,12 +86,9 @@
         />
         <button class="aim-mini" title="Centre the torso" @click="centreTorso">⌖</button>
       </div>
-      <p v-if="trackingPaused" class="aim-note">
-        Follow-me paused while you aim.
-        <button class="aim-link" :disabled="resuming" @click="resumeTracking">Resume follow-me</button>
-      </p>
-      <p v-else class="aim-note aim-note--faint">Drag on the picture to aim · double-click to centre</p>
+      <p class="aim-note aim-note--faint">Drag on the picture to aim · double-click to centre</p>
     </div>
+    <p v-if="modeError" class="aim-note aim-note--err">{{ modeError }}</p>
 
     <!-- Recognition / enrollment -->
     <div v-if="recognitionEnabled === false" class="hint mt-2">
@@ -96,7 +107,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
-import { Move, ScanFace, UserCheck, UserX, Video, VideoOff } from 'lucide-vue-next'
+import { Eye, Move, ScanFace, UserCheck, UserX, Video, VideoOff } from 'lucide-vue-next'
 import { useRobotStore } from '../stores/robotStore'
 
 const BRAIN_URL = import.meta.env.VITE_BRAIN_URL ?? import.meta.env.VITE_ORCHESTRATOR_URL ?? 'http://localhost:8000'
@@ -156,14 +167,39 @@ async function enroll() {
 }
 
 // ── U161: manual aim (head via the pad, torso via its own slider) ──
-const aimOpen = ref(false)
+// ── U162: gated behind an explicit Follow/Manual mode ──
 const padEl = ref<HTMLElement | null>(null)
 const aimX = ref(0)          // -1..1, left → right   (head yaw)
 const aimY = ref(0)          // -1..1, up   → down    (head pitch)
 const bodyYaw = ref(0)       // -1..1                 (torso yaw)
 const dragging = ref(false)
-const trackingPaused = ref(false)
-const resuming = ref(false)
+const switching = ref(false)
+const modeError = ref('')
+
+// Manual is simply "follow-me is off" — deriving it from the shared store
+// instead of a second local flag is what keeps the Robot panel's Follow toggle
+// and this switch from disagreeing.
+const manualMode = computed(() => !robotStore.tracking)
+
+async function setMode(manual: boolean): Promise<void> {
+  if (switching.value || manual === manualMode.value) return
+  switching.value = true
+  modeError.value = ''
+  try {
+    if (!(await robotStore.setTracking(!manual, BRAIN_URL))) {
+      modeError.value = 'Could not switch mode — is the robot reachable?'
+      return
+    }
+    if (manual) {
+      // Start from where the head actually is (centre) rather than wherever
+      // the ball was left last time, which would yank the head on first drag.
+      aimX.value = 0
+      aimY.value = 0
+    }
+  } finally {
+    switching.value = false
+  }
+}
 
 const ballStyle = computed(() => ({
   left: `${((aimX.value + 1) / 2) * 100}%`,
@@ -177,6 +213,10 @@ let inFlight = false
 let pendingSend = false
 
 async function sendAim(): Promise<void> {
+  // U162: never aim while following — the guard lives here too, not just in
+  // the template, so a stale drag (or a keyboard nudge on the slider) can't
+  // slip a pose through after the mode flipped back to Follow.
+  if (!manualMode.value) return
   if (inFlight) { pendingSend = true; return }
   inFlight = true
   try {
@@ -186,7 +226,9 @@ async function sendAim(): Promise<void> {
     }).catch(() => null)
     if (resp?.ok) {
       const r = await resp.json().catch(() => ({}))
-      if (r.tracking_paused) trackingPaused.value = true
+      // The robot pauses tracking on any aim; mirror that so the switch
+      // shows Manual even if the pose came from somewhere else.
+      if (r.tracking_paused) robotStore.tracking = false
     }
   } finally {
     inFlight = false
@@ -228,20 +270,20 @@ function centreTorso(): void {
   void sendAim()
 }
 
-async function resumeTracking(): Promise<void> {
-  resuming.value = true
+// U162: read the real mode on open — the robot may already be in Manual (a
+// motion paused tracking, or the Robot panel toggled it) and the switch must
+// not claim otherwise.
+async function fetchRobotMode(): Promise<void> {
   try {
-    const resp = await fetch(`${BRAIN_URL}/robot/tracking`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ enabled: true }),
-    }).catch(() => null)
-    if (resp?.ok) trackingPaused.value = false
-  } finally {
-    resuming.value = false
-  }
+    const resp = await fetch(`${BRAIN_URL}/robot/status`)
+    if (resp.ok) robotStore.syncFromStatus(await resp.json())
+  } catch { /* offline — keep whatever the store has */ }
 }
 
-onMounted(fetchRecognitionStatus)
+onMounted(() => {
+  void fetchRecognitionStatus()
+  void fetchRobotMode()
+})
 onUnmounted(() => { if (retryTimer) clearTimeout(retryTimer) })
 </script>
 
@@ -289,15 +331,23 @@ onUnmounted(() => { if (retryTimer) clearTimeout(retryTimer) })
   backdrop-filter: blur(2px); pointer-events: none;
   transition: left 0.08s linear, top 0.08s linear;
 }
-.aim-toggle {
+/* U162: segmented Follow | Manual switch, floating on the picture */
+.mode-switch {
   position: absolute; right: 0.5rem; top: 0.5rem;
-  display: inline-flex; align-items: center; justify-content: center;
-  width: 26px; height: 26px; border-radius: 6px;
-  background: var(--overlay); color: #fff;
-  border: 1px solid rgba(255, 255, 255, 0.25); cursor: pointer;
-  backdrop-filter: blur(4px);
+  display: inline-flex; border-radius: 6px; overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: var(--overlay); backdrop-filter: blur(4px);
 }
-.aim-toggle--on { background: var(--accent); border-color: var(--accent); }
+.mode-btn {
+  display: inline-flex; align-items: center; gap: 0.25rem;
+  padding: 0.2rem 0.5rem; font-size: 0.66rem; font-weight: 600;
+  background: none; border: none; color: #fff; cursor: pointer;
+  opacity: 0.65;
+}
+.mode-btn + .mode-btn { border-left: 1px solid rgba(255, 255, 255, 0.25); }
+.mode-btn:hover:not(:disabled) { opacity: 1; }
+.mode-btn--on { background: var(--accent); opacity: 1; }
+.mode-btn:disabled { cursor: default; }
 .aim-bar { margin-top: 0.45rem; }
 .aim-row { display: flex; align-items: center; gap: 0.5rem; }
 .aim-label { font-size: 0.72rem; color: var(--text-muted); min-width: 3rem; }
@@ -309,10 +359,7 @@ onUnmounted(() => { if (retryTimer) clearTimeout(retryTimer) })
 .aim-mini:hover { color: var(--text); }
 .aim-note { font-size: 0.7rem; color: var(--warn, #d9a441); margin: 0.3rem 0 0; }
 .aim-note--faint { color: var(--text-faint); }
-.aim-link {
-  background: none; border: none; padding: 0; cursor: pointer;
-  color: var(--accent); text-decoration: underline; font-size: inherit;
-}
+.aim-note--err { color: var(--danger-text, #e5484d); }
 .enroll-row { display: flex; gap: 0.4rem; }
 .enroll-btn { display: inline-flex; align-items: center; gap: 0.3rem; font-size: 0.78rem; padding: 0.3rem 0.7rem; white-space: nowrap; }
 .enroll-msg { font-size: 0.72rem; margin: 0.3rem 0 0; }
