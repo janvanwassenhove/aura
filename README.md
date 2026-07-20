@@ -115,6 +115,11 @@ uv run --package aura-brain   --extra dev pytest apps/aura-brain/tests
 
 # Console
 cd apps/operator-console && npm test && npm run build
+
+# One-time per clone: privacy gate — blocks committing personal data
+# (voice logs, databases, recordings, keys, .env files, personal e-mails).
+# CI enforces the same scan on every push, so skipping this only delays the block.
+git config core.hooksPath .githooks
 ```
 
 Key rules (see [.specify/memory/constitution.md](.specify/memory/constitution.md)):

@@ -1,0 +1,19 @@
+#!/bin/sh
+# U167: privacy gate — refuses to commit personal/sensitive data.
+#
+# Activated once per clone with:   git config core.hooksPath .githooks
+# (CI runs the same scanner over the full tree as the enforced backstop, so
+# bypassing this locally with --no-verify still gets caught on push.)
+
+if command -v python >/dev/null 2>&1; then
+  PY=python
+elif command -v python3 >/dev/null 2>&1; then
+  PY=python3
+elif command -v py >/dev/null 2>&1; then
+  PY="py -3"
+else
+  echo "pre-commit: python not found - skipping privacy scan (CI will still enforce it)"
+  exit 0
+fi
+
+$PY "$(git rev-parse --show-toplevel)/scripts/privacy_scan.py" --staged

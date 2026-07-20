@@ -53,6 +53,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+      - name: Privacy scan (U167 — nothing personal ships in a release)
+        run: python scripts/privacy_scan.py --all
       - name: Install uv
         run: pip install uv
       - name: Sync workspace
