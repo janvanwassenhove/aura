@@ -1,10 +1,12 @@
 name: CI
 
+# U166: this repo's branches are master + aura-autobuild — the old
+# main/develop triggers meant CI never actually ran on pushes.
 on:
   push:
-    branches: [main, develop]
+    branches: [master, main, aura-autobuild]
   pull_request:
-    branches: [main]
+    branches: [master, main]
 
 jobs:
   test:

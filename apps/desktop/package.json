@@ -73,6 +73,7 @@
         ]
       }
     ],
+    "artifactName": "AURA-${version}-${os}-${arch}.${ext}",
     "win": {
       "target": [
         "nsis"
@@ -83,7 +84,26 @@
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
-      "shortcutName": "AURA"
+      "shortcutName": "AURA",
+      "artifactName": "AURA-${version}-windows-setup.${ext}"
+    },
+    "mac": {
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "icon": "build/icon.png",
+      "identity": null,
+      "category": "public.app-category.productivity"
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "icon": "build/icon.png",
+      "category": "Utility",
+      "synopsis": "AURA - embodied AI assistant for Reachy Mini"
     }
   }
 }

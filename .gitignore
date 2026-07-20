@@ -62,3 +62,4 @@ logs/
 .github/apm
 # Windows crash dumps
 *.stackdump
+skills/.metrics/

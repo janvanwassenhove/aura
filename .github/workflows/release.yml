@@ -1,15 +1,52 @@
-# U37-installer: tag v* → run all suites → build the NSIS installer → GitHub Release.
+# U166: automated releases on every push to master.
+#
+#   push to master ─→ test gate ─┬→ build installers (Windows / macOS / Linux)
+#                                ├→ demo-stack screenshots (optional, no PII)
+#                                └→ tag + GitHub Release with notes, ledger
+#                                   highlights, screenshots and all installers
+#
+# Screenshots are privacy-safe BY CONSTRUCTION: they come from a stack booted
+# inside the runner (fake robot, echo LLM, in-memory store) whose only profile
+# is the fictional demo persona — no camera, no keys, no personal data exists
+# in that environment. Skip a release with "[skip release]" in the commit.
+
 name: Release
 
 on:
   push:
-    tags: ["v*"]
+    branches: [master, main]
+    tags: ["v*"]          # manual tags keep working as before
+  workflow_dispatch:
 
 permissions:
   contents: write
 
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false   # never abort a half-published release
+
 jobs:
+  version:
+    if: "!contains(github.event.head_commit.message, '[skip release]')"
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+      tag: ${{ steps.v.outputs.tag }}
+    steps:
+      - id: v
+        run: |
+          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            TAG="${GITHUB_REF#refs/tags/}"
+            VERSION="${TAG#v}"
+          else
+            VERSION="1.${{ github.run_number }}.0"
+            TAG="v${VERSION}"
+          fi
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+
   test:
+    if: "!contains(github.event.head_commit.message, '[skip release]')"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -39,9 +76,81 @@ jobs:
           npm test
           npm run build
 
-  installer:
-    needs: test
-    runs-on: windows-latest
+  # Boot a throwaway demo stack and photograph the app. Optional: a release
+  # without screenshots beats no release, so failures here never block.
+  screenshots:
+    if: "!contains(github.event.head_commit.message, '[skip release]')"
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install uv
+        run: pip install uv
+      - name: Sync workspace
+        run: uv sync --all-packages
+      - name: Build console against the local demo brain
+        working-directory: apps/operator-console
+        env:
+          VITE_BRAIN_URL: http://localhost:8020
+          VITE_CONVERSATION_URL: http://localhost:8020   # chat posts go here
+          VITE_ROBOT_RUNTIME_WS: ws://localhost:8020/ws/events
+        run: |
+          npm ci
+          npm run build
+      - name: Boot the demo stack (fake robot + echo LLM + demo persona)
+        run: |
+          # Fully isolated state: an empty skills vault and a throwaway DB, so
+          # nothing that happens to sit in the checkout or runner can leak
+          # into the screenshots. The only profile is the fictional demo one.
+          mkdir -p "$RUNNER_TEMP/demo-skills" "$RUNNER_TEMP/demo-data"
+          ROBOT_ADAPTER=fake PORT=8001 \
+            nohup uv run --package robot-runtime robot-runtime > robot.log 2>&1 &
+          LLM_PROVIDER=echo PORT=8020 ROBOT_RUNTIME_URL=http://localhost:8001 \
+            CORS_ORIGINS='*' DEMO_PERSONA=true VOICE_MODE=off \
+            SKILLS_DIR="$RUNNER_TEMP/demo-skills" \
+            DATABASE_URL="sqlite+aiosqlite:///$RUNNER_TEMP/demo-data/memory.db" \
+            nohup uv run --package aura-brain aura-brain > brain.log 2>&1 &
+          for url in http://localhost:8001/health http://localhost:8020/health; do
+            for i in $(seq 1 60); do
+              curl -sf "$url" > /dev/null && break
+              sleep 2
+            done
+            curl -sf "$url" > /dev/null || { echo "$url never came up"; cat robot.log brain.log; exit 1; }
+          done
+      - name: Serve the console
+        working-directory: apps/operator-console
+        run: nohup npx vite preview --port 4173 > preview.log 2>&1 &
+      - name: Capture screenshots
+        run: |
+          npm install --no-save playwright
+          npx playwright install --with-deps chromium
+          CONSOLE_URL=http://localhost:4173 OUT_DIR=shots \
+            node .github/scripts/release-screenshots.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: screenshots
+          path: shots/*.png
+          if-no-files-found: error
+
+  build:
+    needs: [version, test]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            args: --win nsis
+          - os: macos-latest
+            args: --mac dmg zip --arm64 --x64
+          - os: ubuntu-latest
+            args: --linux AppImage deb
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -52,14 +161,93 @@ jobs:
         run: |
           npm ci
           npm run build
-      - name: Build NSIS installer
+      - name: Build installers
         working-directory: apps/desktop
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"   # unsigned mac build
         run: |
           npm ci
-          npx electron-builder --win nsis --publish never
-      - name: Release
+          npx electron-builder ${{ matrix.args }} --publish never -c.extraMetadata.version=${{ needs.version.outputs.version }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: installers-${{ matrix.os }}
+          path: |
+            apps/desktop/dist/*.exe
+            apps/desktop/dist/*.dmg
+            apps/desktop/dist/*.zip
+            apps/desktop/dist/*.AppImage
+            apps/desktop/dist/*.deb
+          if-no-files-found: error
+
+  release:
+    needs: [version, test, build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0        # full history: notes diff against the last tag
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: installers-*
+          path: installers
+          merge-multiple: true
+      - uses: actions/download-artifact@v4
+        continue-on-error: true  # screenshots are optional by design
+        with:
+          name: screenshots
+          path: shots
+      - name: Compose release notes
+        env:
+          TAG: ${{ needs.version.outputs.tag }}
+          REPO: ${{ github.repository }}
+        run: |
+          PREV=$(git tag --list 'v*' --sort=-creatordate | head -1 || true)
+          {
+            echo "## AURA ${TAG}"
+            echo
+            # New ledger entries since the previous release — the units are the
+            # real changelog, written as each feature landed.
+            if [ -n "$PREV" ]; then
+              HIGHLIGHTS=$(git diff "$PREV"..HEAD -- docs/implementation-backlog.md \
+                | grep -oP '^\+\- \[x\] \*\*\K[^*]+' | sed 's/^/- /' || true)
+            else
+              HIGHLIGHTS=""
+            fi
+            if [ -n "$HIGHLIGHTS" ]; then
+              echo "### Nieuw in deze release"
+              echo "$HIGHLIGHTS"
+              echo
+            fi
+            if compgen -G "shots/*.png" > /dev/null; then
+              echo "### Screenshots"
+              echo "_Captured from a fresh demo instance (fictional demo profile only — no personal data)._"
+              echo
+              for f in shots/*.png; do
+                name=$(basename "$f")
+                echo "![${name}](https://github.com/${REPO}/releases/download/${TAG}/${name})"
+                echo
+              done
+            fi
+            echo "### Installatie"
+            echo "| Platform | Bestand |"
+            echo "|---|---|"
+            echo "| Windows | \`AURA-*-windows-setup.exe\` |"
+            echo "| macOS (Apple Silicon) | \`AURA-*-mac-arm64.dmg\` |"
+            echo "| macOS (Intel) | \`AURA-*-mac-x64.dmg\` |"
+            echo "| Linux | \`AURA-*-linux-x86_64.AppImage\` of \`.deb\` |"
+            echo
+            echo "> macOS/Linux: eerste start installeert de Python-runtime (uv) automatisch; macOS-builds zijn niet genotariseerd — open via rechtsklik → Open."
+            echo
+          } > notes.md
+          cat notes.md
+      - name: Publish release
         uses: softprops/action-gh-release@v2
         with:
-          files: apps/desktop/dist/*.exe
+          tag_name: ${{ needs.version.outputs.tag }}
+          target_commitish: ${{ github.sha }}
+          body_path: notes.md
           generate_release_notes: true
+          files: |
+            installers/*
+            shots/*.png
           draft: false
