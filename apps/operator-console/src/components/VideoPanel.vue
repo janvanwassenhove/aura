@@ -60,10 +60,13 @@
         <button
           :class="['mode-btn', !manualMode && 'mode-btn--on']"
           :disabled="switching"
-          title="The robot follows the nearest face"
+          :title="followTitle"
           @click="setMode(false)"
         >
           <Eye :size="12" /> Follow
+          <!-- U165: a still head looks the same whether the tracker is broken
+               or simply has nobody in view — say which it is. -->
+          <span v-if="!manualMode" :class="['face-dot', robotStore.faceVisible && 'face-dot--on']" />
         </button>
         <button
           :class="['mode-btn', manualMode && 'mode-btn--on']"
@@ -180,6 +183,13 @@ const modeError = ref('')
 // instead of a second local flag is what keeps the Robot panel's Follow toggle
 // and this switch from disagreeing.
 const manualMode = computed(() => !robotStore.tracking)
+
+const followTitle = computed(() => {
+  if (manualMode.value) return 'The robot follows the nearest face'
+  return robotStore.faceVisible
+    ? 'Following — a face is in view'
+    : 'Following, but no face in view right now (it will look around to find one)'
+})
 
 async function setMode(manual: boolean): Promise<void> {
   if (switching.value || manual === manualMode.value) return
@@ -347,6 +357,12 @@ onUnmounted(() => { if (retryTimer) clearTimeout(retryTimer) })
 .mode-btn + .mode-btn { border-left: 1px solid rgba(255, 255, 255, 0.25); }
 .mode-btn:hover:not(:disabled) { opacity: 1; }
 .mode-btn--on { background: var(--accent); opacity: 1; }
+/* U165: lit = a face is actually in view; dim = following but nobody there */
+.face-dot {
+  width: 5px; height: 5px; border-radius: 50%;
+  background: rgba(255, 255, 255, 0.35); margin-left: 0.1rem;
+}
+.face-dot--on { background: var(--ok, #2f9e6e); box-shadow: 0 0 4px var(--ok, #2f9e6e); }
 .mode-btn:disabled { cursor: default; }
 .aim-bar { margin-top: 0.45rem; }
 .aim-row { display: flex; align-items: center; gap: 0.5rem; }

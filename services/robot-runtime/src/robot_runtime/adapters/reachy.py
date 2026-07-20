@@ -142,12 +142,16 @@ class ReachyRobotAdapter(RobotAdapter):
 
         def _toggle() -> None:
             if enabled:
-                self._mini.start_head_tracking()
+                self._mini.start_head_tracking(1.0)
                 if self._body_follow:  # re-apply torso follow with tracking
                     self._mini.set_automatic_body_yaw(True)
             else:
-                self._mini.stop_head_tracking()
-                self._mini.goto_target(head=_NEUTRAL, duration=1.0)
+                # U165: weight 0 PAUSES detection without tearing the tracker
+                # down (SDK: "for cheap on/off"). stop_head_tracking() destroys
+                # the FaceTracker thread and its camera hookup; rebuilding that
+                # on every Manual/Follow flip made re-acquisition unreliable.
+                self._mini.start_head_tracking(0.0)
+                self._mini.goto_target(head=_NEUTRAL, duration=1.0, body_yaw=None)
 
         async with self._motion_lock:
             await asyncio.to_thread(_toggle)
@@ -203,7 +207,11 @@ class ReachyRobotAdapter(RobotAdapter):
         paused = False
         if self._tracking_on:
             try:
-                await asyncio.to_thread(self._mini.stop_head_tracking)
+                # U165: pause with weight 0 instead of stop_head_tracking() —
+                # the ball fires an aim per drag event, and tearing the daemon's
+                # FaceTracker down and back up that often left it unable to
+                # re-acquire ("auto face tracking no longer works").
+                await asyncio.to_thread(self._mini.start_head_tracking, 0.0)
                 if self._body_follow:
                     await asyncio.to_thread(self._mini.set_automatic_body_yaw, False)
                 self._tracking_on = False   # stops the U126 watchdog re-asserting
@@ -517,6 +525,23 @@ class ReachyRobotAdapter(RobotAdapter):
     # State
     # ------------------------------------------------------------------
 
+    def _face_visible(self) -> bool | None:
+        """U165: does the daemon's tracker currently SEE a face?
+
+        Diagnosing "follow-me doesn't work" was guesswork because a still head
+        looks identical whether the tracker is broken or simply has nobody to
+        look at. Never blocks (wait=False) and never raises into a status call.
+        """
+        if self._mini is None or not self._tracking_on:
+            return None
+        try:
+            target = self._mini.get_tracked_face(wait=False)
+        except Exception:  # noqa: BLE001 — diagnostics must not break status
+            return None
+        if target is None:
+            return None
+        return bool(getattr(target, "detected", False))
+
     async def get_status(self) -> RobotState:
         return RobotState(
             mode=self._mode,
@@ -525,6 +550,7 @@ class ReachyRobotAdapter(RobotAdapter):
             connected=self._mini is not None,
             adapter_name="reachy",
             tracking=self._tracking_on,  # U126: is follow-me actually on?
+            face_visible=await asyncio.to_thread(self._face_visible),
         )
 
     async def set_state(self, mode: RobotMode, behavior_state: BehaviorState) -> None:
@@ -1057,7 +1083,10 @@ class ReachyRobotAdapter(RobotAdapter):
             "wake_up", "sleep", "look_around", "point")
         if self._tracking_on and not keep_tracking and motion not in _self_managed:
             try:
-                self._mini.stop_head_tracking()
+                # U165: weight 0 pauses; stop_head_tracking() tore the tracker
+                # down and rebuilt it on EVERY gesture — needless churn on the
+                # daemon's camera thread, and a way for follow-me to die.
+                self._mini.start_head_tracking(0.0)
                 paused = True
             except Exception:  # noqa: BLE001
                 pass
@@ -1066,7 +1095,7 @@ class ReachyRobotAdapter(RobotAdapter):
         finally:
             if paused:
                 try:
-                    self._mini.start_head_tracking()
+                    self._mini.start_head_tracking(1.0)
                 except Exception as exc:  # noqa: BLE001
                     # U116: don't die silently — this was how follow-me "randomly" stopped.
                     logger.warning("could not resume head tracking after %s: %s", motion, exc)

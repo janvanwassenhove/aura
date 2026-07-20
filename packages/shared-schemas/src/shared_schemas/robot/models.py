@@ -30,6 +30,11 @@ class RobotState(BaseModel):
     connected: bool = False
     adapter_name: str = "unknown"
     tracking: bool = False  # U126: follow-me head tracking currently active?
+    # U165: is the daemon's face tracker actually SEEING someone right now?
+    # "Follow is on" and "it has a face to follow" are different things, and
+    # only the second explains why the head is or isn't moving. None = unknown
+    # (adapter can't report it).
+    face_visible: bool | None = None
 
 
 class MotionCue(BaseModel):

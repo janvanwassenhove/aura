@@ -134,3 +134,23 @@ describe('robotStore — follow-me mode (U162)', () => {
     expect(store.tracking).toBe(false)
   })
 })
+
+describe('robotStore — face visibility (U165)', () => {
+  beforeEach(() => setActivePinia(createPinia()))
+
+  it('reports whether the robot actually sees a face', () => {
+    const store = useRobotStore()
+    expect(store.faceVisible).toBeNull()          // unknown until the robot says
+    store.syncFromStatus({ connected: true, tracking: true, face_visible: true })
+    expect(store.faceVisible).toBe(true)
+    store.syncFromStatus({ connected: true, tracking: true, face_visible: false })
+    expect(store.faceVisible).toBe(false)
+  })
+
+  it('falls back to unknown when the robot omits the field', () => {
+    const store = useRobotStore()
+    store.syncFromStatus({ connected: true, tracking: true, face_visible: true })
+    store.syncFromStatus({ connected: true, tracking: true })   // older robot
+    expect(store.faceVisible).toBeNull()
+  })
+})

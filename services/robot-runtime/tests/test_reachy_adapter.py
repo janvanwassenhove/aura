@@ -46,8 +46,11 @@ class FakeMini:
     def stop_head_tracking(self) -> None:
         self.calls.append(("stop_head_tracking", {}))
 
-    def start_head_tracking(self) -> None:
-        self.calls.append(("start_head_tracking", {}))
+    def start_head_tracking(self, weight: float = 1.0) -> None:
+        self.calls.append(("start_head_tracking", {"weight": weight}))
+
+    def get_tracked_face(self, wait: bool = True, timeout: float = 5.0):
+        return types.SimpleNamespace(detected=False)
 
     def set_automatic_body_yaw(self, enabled: bool) -> None:
         self.calls.append(("set_automatic_body_yaw", {"enabled": enabled}))
@@ -278,14 +281,19 @@ async def test_manual_motion_pauses_tracking(adapter) -> None:
 
     before = len(mini.calls)
     await adapter.execute_motion(MotionCommand(motion_id="nod", direction=None))
-    auto_moves = [n for n, _ in mini.calls[before:]]
-    assert "stop_head_tracking" not in auto_moves      # reply gesture keeps eye contact
+    auto = mini.calls[before:]
+    # Reply gesture keeps eye contact: not paused at all.
+    assert all(kw.get("weight") != 0.0 for n, kw in auto if n == "start_head_tracking")
+    assert "stop_head_tracking" not in [n for n, _ in auto]
 
     before = len(mini.calls)
     await adapter.execute_motion(MotionCommand(motion_id="nod", direction=None, manual=True))
-    manual_moves = [n for n, _ in mini.calls[before:]]
-    assert "stop_head_tracking" in manual_moves        # manual → fully visible
-    assert "start_head_tracking" in manual_moves       # and resumed after
+    manual = [(n, kw) for n, kw in mini.calls[before:] if n == "start_head_tracking"]
+    weights = [kw["weight"] for _, kw in manual]
+    # U165: paused with weight 0 and resumed at 1 — never torn down, because
+    # rebuilding the daemon's FaceTracker on every gesture broke re-acquisition.
+    assert weights == [0.0, 1.0]
+    assert "stop_head_tracking" not in [n for n, _ in mini.calls[before:]]
 
 
 async def test_dance_moves_animate(adapter) -> None:
@@ -508,3 +516,41 @@ async def test_aim_still_clamps_to_the_safe_range(adapter) -> None:
     assert abs(over["yaw"]) == adapter.AIM_YAW_MAX
     assert abs(over["pitch"]) == adapter.AIM_PITCH_MAX
     assert abs(over["body_yaw"]) == adapter.AIM_BODY_MAX
+
+
+async def test_aim_pauses_tracking_without_tearing_it_down(adapter) -> None:
+    """U165: the ball fires an aim per drag event. Pausing with weight 0 keeps
+    the daemon's FaceTracker thread (and its camera hookup) alive; the old
+    stop_head_tracking() rebuilt it on every drag, which is how follow-me
+    ended up unable to re-acquire a face."""
+    await adapter.connect()
+    await adapter.set_tracking(True)
+    mini = adapter._created[0]
+
+    before = len(mini.calls)
+    await adapter.aim(yaw=0.5)
+    calls = mini.calls[before:]
+    assert "stop_head_tracking" not in [n for n, _ in calls]
+    assert [kw["weight"] for n, kw in calls if n == "start_head_tracking"] == [0.0]
+    assert adapter._tracking_on is False          # watchdog must not re-assert
+
+    # Switching back to Follow resumes at full weight.
+    before = len(mini.calls)
+    await adapter.set_tracking(True)
+    resumed = [kw["weight"] for n, kw in mini.calls[before:] if n == "start_head_tracking"]
+    assert resumed == [1.0]
+
+
+async def test_status_reports_whether_a_face_is_in_view(adapter) -> None:
+    """U165: 'following' and 'has someone to follow' are different states, and
+    only the second explains a head that isn't moving."""
+    await adapter.connect()
+    await adapter.set_tracking(False)
+    assert (await adapter.get_status()).face_visible is None   # not following
+
+    await adapter.set_tracking(True)
+    assert (await adapter.get_status()).face_visible is False  # nobody in view
+
+    mini = adapter._created[0]
+    mini.get_tracked_face = lambda wait=True, timeout=5.0: types.SimpleNamespace(detected=True)
+    assert (await adapter.get_status()).face_visible is True
