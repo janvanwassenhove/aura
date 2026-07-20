@@ -5,7 +5,7 @@ from __future__ import annotations
 from aura_brain.wizard import SetupWizard
 from shared_schemas.knowledge import EncryptedKnowledgeStore, crypto
 
-PASSPHRASE = "correct-horse-battery"
+PASSPHRASE = "correct-horse-battery"  # test fixture, privacy-ok
 
 
 class ScriptedIO:

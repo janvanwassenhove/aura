@@ -121,8 +121,8 @@ def test_workiq_raises_connector_auth_error_on_msal_failure():
 # ---------------------------------------------------------------------------
 
 async def test_workiq_list_calendar_events(monkeypatch):
-    fake_obo_token = "fake-obo-token"
-    fake_user_token = "fake-user-token"
+    fake_obo_token = "fake-obo-token"  # privacy-ok
+    fake_user_token = "fake-user-token"  # privacy-ok
 
     fake_events = [
         {
@@ -176,8 +176,8 @@ async def test_workiq_list_calendar_events(monkeypatch):
 async def test_workiq_token_not_in_logs(caplog):
     import logging
 
-    fake_obo_token = "super-secret-bearer-token-xyz"
-    fake_user_token = "fake-user-token"
+    fake_obo_token = "super-secret-bearer-token-xyz"  # privacy-ok
+    fake_user_token = "fake-user-token"  # privacy-ok
 
     mock_response = MagicMock()
     mock_response.raise_for_status = MagicMock()

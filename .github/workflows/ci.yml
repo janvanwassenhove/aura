@@ -9,6 +9,22 @@ on:
     branches: [master, main]
 
 jobs:
+  # U167: enforced backstop for the pre-commit privacy hook — the hook can be
+  # bypassed (--no-verify, fresh clone without core.hooksPath); this cannot.
+  privacy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Privacy scan (no personal data in the tree)
+        run: python scripts/privacy_scan.py --all
+      - name: Scanner self-tests
+        run: |
+          pip install pytest
+          pytest scripts/test_privacy_scan.py -q
+
   test:
     runs-on: ubuntu-latest
     steps:
