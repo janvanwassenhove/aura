@@ -416,3 +416,62 @@ async def test_capture_endpoints_on_trailing_silence(adapter, monkeypatch) -> No
     # Speech (0.6 s) + hang (0.4 s) ≈ ~1 s, well under the 5 s max window.
     assert got_s < 2.0, f"endpointing did not cut early: {got_s:.2f}s"
     assert got_s > 0.5
+
+
+async def test_stream_audio_does_not_amplify_room_noise(adapter, monkeypatch) -> None:
+    """U163: the streaming AGC used to chase the noise floor — in a quiet room
+    the gain ran to 40x and room tone reached the far-end VAD at speech level,
+    so the session "heard" turns constantly and Richie answered noise."""
+    await adapter.connect()
+    rate = 16_000
+    frame = rate // 20
+    # Measured on the real robot in a normal room: ~0.010 RMS of room tone
+    # with transient clicks peaking near 0.09. A PEAK gate would let this
+    # through and amplify it; only an RMS gate calls it silence.
+    quiet = np.full(frame, 0.002, dtype=np.float32)
+    quiet[0] = 0.09                                   # a door click
+
+    class _FakeMedia:
+        def start_recording(self): ...
+        def stop_recording(self): ...
+        def get_input_audio_samplerate(self): return rate
+        def get_audio_sample(self): return quiet
+
+    monkeypatch.setattr(adapter, "_media", lambda: _FakeMedia())
+
+    chunks = []
+    async for c in adapter.stream_audio(chunk_ms=100):
+        chunks.append(c)
+        if len(chunks) >= 6:
+            break
+
+    peak = max(np.abs(np.frombuffer(c, dtype=np.int16)).max() for c in chunks)
+    # Ungained, the 0.09 click stays ~2950/32767 and the tone ~65. Anything
+    # near the 0.5 target (~16000) means the AGC blew the room up into
+    # "speech" and the far-end VAD will keep hearing turns.
+    assert peak < 3500, f"room tone amplified to {peak} — the VAD will hear turns"
+
+
+async def test_stream_audio_still_levels_real_speech(adapter, monkeypatch) -> None:
+    """The gate must not mute actual speech — it should still reach the target."""
+    await adapter.connect()
+    rate = 16_000
+    frame = rate // 20
+    speech = np.full(frame, 0.05, dtype=np.float32)   # quiet speech, above gate
+
+    class _FakeMedia:
+        def start_recording(self): ...
+        def stop_recording(self): ...
+        def get_input_audio_samplerate(self): return rate
+        def get_audio_sample(self): return speech
+
+    monkeypatch.setattr(adapter, "_media", lambda: _FakeMedia())
+
+    chunks = []
+    async for c in adapter.stream_audio(chunk_ms=100):
+        chunks.append(c)
+        if len(chunks) >= 6:
+            break
+
+    peak = max(np.abs(np.frombuffer(c, dtype=np.int16)).max() for c in chunks)
+    assert peak > 8000, f"speech only reached {peak} — too quiet for the far end"

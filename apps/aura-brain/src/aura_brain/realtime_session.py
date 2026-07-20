@@ -49,6 +49,28 @@ def session_enabled() -> bool:
     return os.environ.get("REALTIME_SESSION", "true").lower() == "true"
 
 
+def _turn_detection(vad: str) -> dict:
+    """Server-side turn detection config (U163).
+
+    semantic_vad decides end-of-turn from meaning as well as silence; its
+    ``eagerness`` controls how readily it commits. The default fires on short
+    pauses, which — combined with an over-amplified mic — made the session
+    treat room noise as turns and reply to nothing. ``low`` waits for a clear
+    end-of-turn. server_vad instead takes explicit silence/threshold numbers.
+    """
+    if vad == "semantic_vad":
+        return {
+            "type": "semantic_vad",
+            "eagerness": os.environ.get("REALTIME_VAD_EAGERNESS", "low"),
+        }
+    return {
+        "type": vad,
+        "threshold": float(os.environ.get("REALTIME_VAD_THRESHOLD", "0.6")),
+        "silence_duration_ms": int(os.environ.get("REALTIME_VAD_SILENCE_MS", "900")),
+        "prefix_padding_ms": int(os.environ.get("REALTIME_VAD_PREFIX_MS", "300")),
+    }
+
+
 def _resample_16k_to_24k(chunk: bytes) -> bytes:
     """Mic chunks arrive as s16le mono 16 kHz; Realtime input is 24 kHz."""
     audio = np.frombuffer(chunk, dtype=np.int16)
@@ -86,6 +108,8 @@ class RealtimeSession:
         # Playback clock: mic chunks are dropped while now < _playing_until
         # (+ a speaker tail) so the server never hears Richie's own voice.
         self._playing_until = 0.0
+        # U163: mic stays shut until this time (seed-utterance tail, see run()).
+        self._mic_open_at = 0.0
         self._first_segment_played = False
         self.turns = 0
         self.closed_reason = ""
@@ -131,7 +155,11 @@ class RealtimeSession:
                 "audio": {
                     "input": {
                         "format": {"type": "audio/pcm", "rate": 24000},
-                        "turn_detection": {"type": vad},
+                        # U163: eagerness=low — the default fires on the
+                        # slightest pause, so room noise and the tail of a
+                        # reply became "turns" and Richie answered nothing.
+                        # Low waits for a clear end-of-turn.
+                        "turn_detection": _turn_detection(vad),
                         "transcription": {"model": os.environ.get(
                             "STT_MODEL", "gpt-4o-mini-transcribe")},
                     },
@@ -149,6 +177,13 @@ class RealtimeSession:
                     "content": [{"type": "input_text", "text": initial_text}]})
                 await conn.response.create()
                 self._last_activity = time.monotonic()
+                # U163: that utterance is already answered, but the mic stream
+                # opens on its TAIL (and the room's reverb of it). Feeding that
+                # to the server VAD produced a second, duplicate reply to the
+                # same sentence — the "double answer" in the transcript. Hold
+                # the mic shut until the sentence has fully died away.
+                self._mic_open_at = time.monotonic() + float(
+                    os.environ.get("REALTIME_SEED_MUTE_S", "1.5"))
 
             mic = asyncio.ensure_future(self._pump_mic(conn))
             events = asyncio.ensure_future(self._pump_events(conn))
@@ -199,6 +234,8 @@ class RealtimeSession:
             # speaking, plus a speaker tail — the classic §6.1 self-hearing fix.
             # With AEC + barge-in (U156) the mic keeps streaming: the echo is
             # cancelled robot-side, so the server can hear the user interrupt.
+            if time.monotonic() < self._mic_open_at:
+                continue  # U163: tail of the already-answered seed utterance
             if not barge and time.monotonic() < self._playing_until + self._speaker_tail_s:
                 continue
             pcm24 = _resample_16k_to_24k(chunk)
