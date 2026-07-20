@@ -21,13 +21,16 @@ async def test_known_actions_map_to_keys() -> None:
 async def test_play_pause_sends_key(monkeypatch) -> None:
     sent: list[int] = []
     monkeypatch.setattr(pipeline_mod, "_send_media_key", lambda vk: sent.append(vk))
-    monkeypatch.setattr(pipeline_mod.os, "name", "nt")
+    # U168: patch the seam, NOT the global os.name — that flips
+    # pathlib.Path to WindowsPath process-wide and crashes pytest
+    # internals on Linux CI.
+    monkeypatch.setattr(pipeline_mod, "_is_windows", lambda: True)
     result = await _media_control("play_pause")
     assert sent == [0xB3]
     assert "play pause" in result
 
 
 async def test_non_windows_is_graceful(monkeypatch) -> None:
-    monkeypatch.setattr(pipeline_mod.os, "name", "posix")
+    monkeypatch.setattr(pipeline_mod, "_is_windows", lambda: False)
     result = await _media_control("next")
     assert "only supported on Windows" in result

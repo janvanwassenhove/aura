@@ -120,6 +120,14 @@ def _send_media_key(vk: int) -> None:
     user32.keybd_event(vk, 0, _KEYUP, 0)
 
 
+def _is_windows() -> bool:
+    """Seam for tests (U168). Tests used to monkeypatch the GLOBAL os.name to
+    "nt", which flips pathlib.Path to WindowsPath process-wide — on Linux CI
+    even pytest's own internals then crash with "cannot instantiate
+    'WindowsPath' on your system". Patch THIS instead."""
+    return os.name == "nt"
+
+
 async def _media_control(action: str) -> str:
     """Control the laptop's media playback (real desktop apps like Spotify)."""
     key = (action or "").strip().lower()
@@ -127,7 +135,7 @@ async def _media_control(action: str) -> str:
     if vk is None:
         return (f"[media_control: unknown action {action!r}. Use one of: "
                 f"{', '.join(sorted(_MEDIA_KEYS))}.]")
-    if os.name != "nt":
+    if not _is_windows():
         return "[media_control: media keys are only supported on Windows here.]"
     try:
         await asyncio.to_thread(_send_media_key, vk)
@@ -166,7 +174,7 @@ async def _launch_app(name: str) -> str:
                 f"Registered apps: {available}. Add it in Capabilities.]")
     import shlex
 
-    argv = shlex.split(cmd, posix=(os.name != "nt"))
+    argv = shlex.split(cmd, posix=not _is_windows())
     try:
         proc = await asyncio.create_subprocess_exec(
             *argv,

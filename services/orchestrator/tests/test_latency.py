@@ -31,7 +31,12 @@ async def test_turn_emits_latency_event() -> None:
         ContextBuilder(), PersonaManager(),
     )
     await pipeline.orchestrate("hello", "s1")
-    await asyncio.sleep(0)
+    # U168: bounded wait instead of a single sleep(0) — bus dispatch may need
+    # more than one scheduler hop; on Linux CI one yield wasn't always enough.
+    for _ in range(200):
+        if measured:
+            break
+        await asyncio.sleep(0.01)
 
     assert len(measured) == 1
     evt = measured[0]
