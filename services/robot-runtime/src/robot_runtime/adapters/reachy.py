@@ -171,7 +171,17 @@ class ReachyRobotAdapter(RobotAdapter):
         """Point the head (and optionally the torso) at a normalized direction.
 
         ``yaw``/``pitch``/``body_yaw`` are -1..1 fractions of the safe range,
-        which is what a 2-D joystick naturally produces.
+        expressed in the OPERATOR's frame — the one the console pad draws on:
+
+            +yaw       → look toward the RIGHT of the camera picture
+            +pitch     → look DOWN (toward the floor)
+            +body_yaw  → turn the torso toward the RIGHT of the picture
+
+        U164: these are negated before going to the SDK, whose head frame is
+        right-handed (+z yaw turns LEFT, +x pitch tilts UP). Measured on the
+        robot: yaw=+1 used to swing the camera onto what had been on its left,
+        and pitch=+1 raised the view to the ceiling — so dragging the ball
+        right/down moved the head left/up and the whole control felt mirrored.
 
         Face tracking is PAUSED on the first aim: the daemon would otherwise
         pull the head straight back to the nearest face and the pad would feel
@@ -183,7 +193,8 @@ class ReachyRobotAdapter(RobotAdapter):
             raise RuntimeError("not connected")
 
         def _clamp(v: float, lim: float) -> float:
-            return max(-lim, min(lim, float(v) * lim))
+            # Negated: operator frame (right/down positive) → SDK frame.
+            return max(-lim, min(lim, -float(v) * lim))
 
         y = _clamp(yaw, self.AIM_YAW_MAX)
         p = _clamp(pitch, self.AIM_PITCH_MAX)

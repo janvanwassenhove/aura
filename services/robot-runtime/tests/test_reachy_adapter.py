@@ -475,3 +475,36 @@ async def test_stream_audio_still_levels_real_speech(adapter, monkeypatch) -> No
 
     peak = max(np.abs(np.frombuffer(c, dtype=np.int16)).max() for c in chunks)
     assert peak > 8000, f"speech only reached {peak} — too quiet for the far end"
+
+
+async def test_aim_uses_the_operator_frame_not_the_sdk_frame(adapter) -> None:
+    """U164: the console pad draws on the camera picture, so +yaw must mean
+    "look toward the RIGHT of the picture" and +pitch "look DOWN".
+
+    The SDK head frame is right-handed (+z yaw turns LEFT, +x pitch tilts UP),
+    so aim() negates. Measured on the real robot before the fix: yaw=+1 swung
+    the camera onto what had been on its LEFT and pitch=+1 raised the view to
+    the ceiling — the control felt mirrored on both axes.
+    """
+    await adapter.connect()
+
+    right = await adapter.aim(yaw=1.0)
+    assert right["yaw"] < 0, "drag right must produce a right-turning (negative) SDK yaw"
+
+    left = await adapter.aim(yaw=-1.0)
+    assert left["yaw"] > 0 and left["yaw"] == -right["yaw"]
+
+    down = await adapter.aim(pitch=1.0)
+    assert down["pitch"] < 0, "drag down must tilt the head down, not up"
+
+    torso_right = await adapter.aim(body_yaw=1.0)
+    assert torso_right["body_yaw"] < 0, "slider right must turn the torso right"
+
+
+async def test_aim_still_clamps_to_the_safe_range(adapter) -> None:
+    """The negation must not break the mechanical limits."""
+    await adapter.connect()
+    over = await adapter.aim(yaw=5.0, pitch=-5.0, body_yaw=9.0)
+    assert abs(over["yaw"]) == adapter.AIM_YAW_MAX
+    assert abs(over["pitch"]) == adapter.AIM_PITCH_MAX
+    assert abs(over["body_yaw"]) == adapter.AIM_BODY_MAX
