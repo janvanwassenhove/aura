@@ -2,10 +2,6 @@
 
 from __future__ import annotations
 
-import os
-
-import pytest
-
 from orchestrator import pipeline as pipeline_mod
 from orchestrator.pipeline import _MEDIA_KEYS, _media_control
 

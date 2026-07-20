@@ -20,11 +20,11 @@ import os
 from typing import Literal
 
 import httpx
-
-from connector_service.connectors.errors import ConnectorAuthError, ConnectorUnavailableError
+from shared_config import ConnectorServiceSettings
 from shared_schemas.m365.connector import M365Connector
 from shared_schemas.m365.models import CalendarEvent, MailItem, Task, TeamsMessage
-from shared_config import ConnectorServiceSettings
+
+from connector_service.connectors.errors import ConnectorAuthError, ConnectorUnavailableError
 
 logger = logging.getLogger(__name__)
 

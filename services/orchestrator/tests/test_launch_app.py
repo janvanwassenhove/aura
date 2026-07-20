@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 from orchestrator.pipeline import _allowed_apps, _launch_app
 
 

@@ -11,10 +11,9 @@ os.environ.setdefault("TTS_PROVIDER", "null")
 
 import tempfile
 
-from fastapi.testclient import TestClient
-
 from aura_brain import skills_api
 from aura_brain.main import create_app
+from fastapi.testclient import TestClient
 from orchestrator.skills import SkillStore
 
 

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import pytest
 from fastapi.testclient import TestClient
-
 from orchestrator.presentation import (
     PresentationError,
     PresentationManager,
@@ -12,8 +11,7 @@ from orchestrator.presentation import (
 )
 from shared_events.bus import AsyncEventBus
 from shared_schemas.events.system import PresentationCueReceived
-from shared_schemas.presentation.models import PresentationScript, SlideScript
-
+from shared_schemas.presentation.models import PresentationScript
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -112,7 +110,7 @@ async def test_activate_slide_emits_presentation_cue(mgr: PresentationManager, b
 
     bus.subscribe(PresentationCueReceived, handler)
     mgr.load_from_yaml(SIMPLE_YAML)
-    slide = await mgr.activate_slide(1)
+    await mgr.activate_slide(1)
     await asyncio.sleep(0)  # yield so create_task dispatches the handler
 
     assert len(received) == 1
@@ -181,7 +179,6 @@ def test_clear_session_resets_script(mgr: PresentationManager):
 def app_client(bus: AsyncEventBus):
     """Create a TestClient wired to a PresentationManager."""
     from fastapi import FastAPI
-
     from orchestrator import routes as r
     from orchestrator.approval_manager import ApprovalManager
     from orchestrator.context_builder import ContextBuilder

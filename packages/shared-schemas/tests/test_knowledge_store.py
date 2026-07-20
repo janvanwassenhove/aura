@@ -4,7 +4,6 @@ reinforcement, and the minors/consent guard (ADR-008 §10)."""
 from __future__ import annotations
 
 import pytest
-
 from shared_schemas.knowledge import (
     ConsentError,
     ConsentRecord,

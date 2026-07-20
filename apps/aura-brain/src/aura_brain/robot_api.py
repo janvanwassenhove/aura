@@ -16,7 +16,6 @@ from typing import Any
 import httpx
 from fastapi import APIRouter, Response
 from fastapi.responses import JSONResponse
-
 from shared_schemas.robot.models import MotionCommand
 
 router = APIRouter(prefix="/robot", tags=["robot"])
@@ -146,6 +145,7 @@ async def get_proactive() -> JSONResponse:
 async def set_proactive(body: dict) -> JSONResponse:
     """U110: toggle proactive speech + set the daily-briefing time (HH:MM)."""
     import os as _os
+
     from aura_brain.setup_api import _write_env
 
     changes: dict = {}

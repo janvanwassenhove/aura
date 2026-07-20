@@ -5,13 +5,11 @@ from __future__ import annotations
 import asyncio
 
 import pytest
-
 from robot_runtime.adapters.fake import FakeRobotAdapter
 from robot_runtime.engine.behavior import BehaviorEngine
 from shared_events.bus import AsyncEventBus
 from shared_personas import Persona
 from shared_schemas.events.audio import AudioInputStarted, UserSpeechDetected
-from shared_schemas.events.conversation import ResponseDrafted
 from shared_schemas.robot.models import BehaviorState, RobotMode
 
 

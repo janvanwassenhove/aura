@@ -13,7 +13,6 @@ from __future__ import annotations
 import os
 
 import pytest
-
 from shared_schemas.robot.models import MotionCommand, RobotMode
 
 pytestmark = pytest.mark.skipif(

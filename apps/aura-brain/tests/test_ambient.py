@@ -6,7 +6,6 @@ import os
 
 os.environ.setdefault("LLM_PROVIDER", "echo")
 
-import pytest
 
 from aura_brain import ambient
 

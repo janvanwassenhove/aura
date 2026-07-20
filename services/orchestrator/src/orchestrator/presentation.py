@@ -4,10 +4,9 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import IO, Protocol
+from typing import Protocol
 
 import yaml
-
 from shared_events.bus import AsyncEventBus
 from shared_schemas.events.system import PresentationCueReceived
 from shared_schemas.presentation.models import PresentationScript, SlideScript
@@ -54,7 +53,7 @@ class PresentationManager:
         self,
         bus: AsyncEventBus,
         session_id: str = "default",
-        robot: "RobotDriver | None" = None,
+        robot: RobotDriver | None = None,
     ) -> None:
         self._bus = bus
         self._session_id = session_id

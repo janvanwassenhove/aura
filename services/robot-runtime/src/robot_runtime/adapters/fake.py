@@ -5,11 +5,8 @@ from __future__ import annotations
 import asyncio
 import io
 import logging
-from collections.abc import AsyncIterator
-from typing import Any
 
 import numpy as np
-
 from shared_schemas.robot.adapter import RobotAdapter
 from shared_schemas.robot.models import (
     BehaviorState,

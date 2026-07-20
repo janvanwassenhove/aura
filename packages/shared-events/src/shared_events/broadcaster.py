@@ -6,8 +6,6 @@ import logging
 
 from fastapi import WebSocket
 from fastapi.websockets import WebSocketState
-from starlette.websockets import WebSocketDisconnect
-
 from shared_schemas.events import (
     ApprovalDenied,
     ApprovalGranted,
@@ -16,11 +14,11 @@ from shared_schemas.events import (
     BackendHeartbeatFailed,
     BackendHeartbeatOk,
     BaseEvent,
-    GestureDetected,
-    MaintenanceReport,
     BehaviorPlanned,
     BehaviorStateChanged,
+    GestureDetected,
     IntentRecognized,
+    MaintenanceReport,
     MotionCompleted,
     MotionFailed,
     MotionStarted,
@@ -32,7 +30,6 @@ from shared_schemas.events import (
     ReminderTriggered,
     ResponseDrafted,
     RobotConnected,
-    TurnLatencyMeasured,
     RobotDisconnected,
     RobotModeChanged,
     SpeechPlaybackCompleted,
@@ -41,8 +38,11 @@ from shared_schemas.events import (
     ToolCallRequested,
     ToolCallSucceeded,
     TranscriptUpdated,
+    TurnLatencyMeasured,
     UserSpeechDetected,
 )
+from starlette.websockets import WebSocketDisconnect
+
 from shared_events.bus import AsyncEventBus
 
 logger = logging.getLogger(__name__)

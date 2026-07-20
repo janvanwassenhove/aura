@@ -9,7 +9,6 @@ from datetime import datetime
 os.environ.setdefault("LLM_PROVIDER", "echo")
 
 import pytest
-
 from aura_brain.proactive import ProactiveEngine, _in_quiet_hours
 from shared_schemas.events.conversation import ResponseDrafted
 

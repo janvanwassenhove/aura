@@ -6,7 +6,6 @@ import asyncio
 from unittest.mock import AsyncMock, patch
 
 import pytest
-
 from orchestrator.heartbeat import HeartbeatMonitor
 from shared_events.bus import AsyncEventBus
 from shared_schemas.events.robot import RobotModeChanged
@@ -243,19 +242,23 @@ async def test_all_signals_down_goes_offline_then_recovers(bus):
         failure_threshold=1,
     )
     fail = AsyncMock(side_effect=Exception("down"))
-    ok_resp = AsyncMock(); ok_resp.is_success = True
+    ok_resp = AsyncMock()
+    ok_resp.is_success = True
     ok = AsyncMock(return_value=ok_resp)
 
     # Both down: ONLINE → DEGRADED (run 1) → OFFLINE (run 2, all_failing)
     with patch("httpx.AsyncClient") as mc:
         mc.return_value = _mk_client(fail)
-        await monitor._run_once(); await asyncio.sleep(0)
+        await monitor._run_once()
+        await asyncio.sleep(0)
         assert monitor.mode == RobotMode.DEGRADED
-        await monitor._run_once(); await asyncio.sleep(0)
+        await monitor._run_once()
+        await asyncio.sleep(0)
         assert monitor.mode == RobotMode.OFFLINE
 
     # Both recover: OFFLINE → RECOVERING
     with patch("httpx.AsyncClient") as mc:
         mc.return_value = _mk_client(ok)
-        await monitor._run_once(); await asyncio.sleep(0)
+        await monitor._run_once()
+        await asyncio.sleep(0)
         assert monitor.mode == RobotMode.RECOVERING

@@ -22,11 +22,11 @@ from datetime import UTC, datetime, timedelta
 from fastapi import APIRouter, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-
-from shared_personas import Persona, get_persona_config
 from shared_config import IdentityServiceSettings
-from identity_service.token_store import TokenStore, build_token_store
+from shared_personas import Persona, get_persona_config
+
 from identity_service import defaults
+from identity_service.token_store import TokenStore, build_token_store
 
 logger = logging.getLogger(__name__)
 

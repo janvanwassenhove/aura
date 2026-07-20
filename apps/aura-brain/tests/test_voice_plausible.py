@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import pytest
-
 from aura_brain.voice_loop import is_plausible_command
 
 

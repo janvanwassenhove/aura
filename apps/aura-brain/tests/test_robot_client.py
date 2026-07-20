@@ -11,7 +11,6 @@ os.environ.setdefault("ROBOT_ADAPTER", "fake")
 
 import httpx
 import pytest
-
 from aura_brain.robot_client import RobotClient
 from shared_schemas.robot.models import MotionCommand
 

@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-from shared_personas import Persona, get_persona_config
-
 from aura_brain.embodiment import embodiment_plan, gesture_for
+from shared_personas import Persona, get_persona_config
 
 
 def _plan(text: str, persona: Persona):

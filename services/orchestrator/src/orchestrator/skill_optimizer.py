@@ -18,7 +18,8 @@ import json
 import logging
 import re
 from collections import Counter
-from typing import Any, Awaitable, Callable
+from collections.abc import Awaitable, Callable
+from typing import Any
 
 logger = logging.getLogger(__name__)
 

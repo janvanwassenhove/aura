@@ -5,9 +5,7 @@ from __future__ import annotations
 import asyncio
 
 import pytest
-
 from aura_brain.stepup_gate import StepUpDeniedError, StepUpGate, StepUpTimeout
-
 
 # ---------------------------------------------------------------------------
 # No-webhook tests (safe defaults)
@@ -114,9 +112,8 @@ def test_knowledge_lock_drops_to_benign() -> None:
     os.environ.setdefault("STT_PROVIDER", "null")
     os.environ.setdefault("TTS_PROVIDER", "null")
 
-    from fastapi.testclient import TestClient
-
     from aura_brain.main import create_app
+    from fastapi.testclient import TestClient
 
     app = create_app()
     with TestClient(app) as client:
@@ -139,10 +136,9 @@ def test_stepup_callbacks_resolve_pending() -> None:
     os.environ.setdefault("STT_PROVIDER", "null")
     os.environ.setdefault("TTS_PROVIDER", "null")
 
-    from fastapi.testclient import TestClient
-
     from aura_brain import knowledge_api
     from aura_brain.main import create_app
+    from fastapi.testclient import TestClient
 
     app = create_app()
     with TestClient(app) as client:

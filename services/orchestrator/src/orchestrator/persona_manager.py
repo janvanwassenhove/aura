@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 
-from shared_personas import PERSONA_CONFIGS, Persona, PersonaConfig, get_persona_config
+from shared_personas import Persona, PersonaConfig, get_persona_config
 from shared_prompts import render_system_prompt
 
 logger = logging.getLogger(__name__)

@@ -552,9 +552,10 @@ class VoiceLoop:
             voice_id = getattr(character, "voice_id", "") or "alloy"
             import base64
 
-            from aura_brain.turn_trace import LOG as _TRACE
             from shared_schemas.events.audio import TranscriptUpdated
             from shared_schemas.events.conversation import ResponseDrafted
+
+            from aura_brain.turn_trace import LOG as _TRACE
             _t = _TRACE.current(self._session_id)
             if _t is not None:
                 _t.mark("llm_request_sent")
@@ -649,9 +650,10 @@ class VoiceLoop:
         the user talks freely (no wake word) until the idle timeout. The
         already-captured first command seeds the session so it's answered
         immediately. Returns True if the session handled ≥1 turn."""
+        from shared_schemas.events.audio import TranscriptUpdated
+
         from aura_brain import realtime_session, realtime_voice
         from aura_brain.turn_trace import LOG as _TRACE
-        from shared_schemas.events.audio import TranscriptUpdated
 
         try:
             character = getattr(self._manager, "character", None) if self._manager else None
@@ -695,6 +697,7 @@ class VoiceLoop:
 
     async def _handle(self, command: str) -> None:
         from shared_schemas.events.audio import TranscriptUpdated
+
         from aura_brain.turn_trace import LOG as _TRACE
 
         await self._bus.publish(TranscriptUpdated(

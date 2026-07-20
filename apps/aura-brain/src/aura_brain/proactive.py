@@ -17,8 +17,8 @@ from __future__ import annotations
 
 import logging
 import os
+from collections.abc import Awaitable, Callable
 from datetime import datetime
-from typing import Awaitable, Callable
 
 from shared_schemas.events.conversation import ResponseDrafted
 

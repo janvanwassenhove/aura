@@ -5,7 +5,6 @@ from __future__ import annotations
 import asyncio
 
 import pytest
-
 from orchestrator.approval_manager import ApprovalManager
 from shared_events.bus import AsyncEventBus
 

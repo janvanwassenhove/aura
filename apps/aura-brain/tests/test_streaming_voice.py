@@ -6,10 +6,8 @@ import asyncio
 import time
 
 import pytest
-
 from aura_brain.streaming import split_speech_chunks, stream_speech
 from aura_brain.voice_loop import VoiceLoop
-
 
 # ── chunker ──────────────────────────────────────────────────────────
 
@@ -357,7 +355,9 @@ async def test_interruption_note_not_prepended_to_command(monkeypatch) -> None:
     command = "richie"
     if note:
         _P().steer("s", note)   # note → steer, NOT into command
-        steered_pipeline = _P(); steered_pipeline.steer("s", note); steered.append("x")
+        steered_pipeline = _P()
+        steered_pipeline.steer("s", note)
+        steered.append("x")
     handled.append(command)     # command stays clean
     assert "interrupted" not in command
     assert any("interrupted" in s for s in steered)

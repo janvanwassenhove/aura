@@ -2,12 +2,10 @@
 
 from __future__ import annotations
 
-import json
 import re
 from pathlib import Path
 
 import httpx
-
 from connector_service.browser import ChromeBrowser
 
 
@@ -58,9 +56,9 @@ async def test_unreachable_chrome_gives_hint() -> None:
 # --------------------------------------------------------------------------- #
 
 async def test_health_reports_music_mock(monkeypatch) -> None:
+    from connector_service import routes
     from fastapi import FastAPI
     from fastapi.testclient import TestClient
-    from connector_service import routes
 
     monkeypatch.delenv("SPOTIFY_ACCESS_TOKEN", raising=False)
     monkeypatch.setattr(routes, "_music", type(routes._music)())
@@ -82,10 +80,10 @@ async def test_registry_marks_mock_connector(monkeypatch) -> None:
 
 
 async def test_probe_endpoint_reports_mock_honestly(monkeypatch) -> None:
-    from fastapi import FastAPI
-    from fastapi.testclient import TestClient
     from connector_service import routes
     from connector_service.registry import ConnectorRegistry
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
     from shared_config import ConnectorServiceSettings
 
     monkeypatch.setenv("ENABLED_CONNECTORS", "m365")

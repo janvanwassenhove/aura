@@ -1,6 +1,6 @@
 """Tests for shared-personas configs."""
 
-from shared_personas import PERSONA_CONFIGS, Persona, get_persona_config
+from shared_personas import Persona, get_persona_config
 
 
 def test_all_personas_have_configs():

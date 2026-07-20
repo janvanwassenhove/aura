@@ -4,7 +4,6 @@ co-pilot advance/previous navigation."""
 from __future__ import annotations
 
 import pytest
-
 from orchestrator.presentation import PresentationManager, SlideOutOfRangeError
 from shared_events.bus import AsyncEventBus
 from shared_schemas.robot.models import MotionCommand

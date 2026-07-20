@@ -20,9 +20,8 @@ from collections.abc import Awaitable, Callable
 from enum import Enum
 
 import httpx
-
-from shared_schemas.m365.connector import M365Connector
 from shared_config import ConnectorServiceSettings
+from shared_schemas.m365.connector import M365Connector
 
 logger = logging.getLogger(__name__)
 

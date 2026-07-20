@@ -7,12 +7,12 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from shared_events.bus import AsyncEventBus
 
 from memory_service import routes
 from memory_service.db.session import init_db
 from memory_service.scheduler import ReminderScheduler
 from memory_service.store import SQLiteMemoryStore
-from shared_events.bus import AsyncEventBus
 
 
 @asynccontextmanager

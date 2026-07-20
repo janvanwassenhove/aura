@@ -64,7 +64,7 @@ class TokenData:
         )
 
     @classmethod
-    def from_json(cls, raw: str) -> "TokenData":
+    def from_json(cls, raw: str) -> TokenData:
         data = json.loads(raw)
         return cls(
             access_token=data["access_token"],

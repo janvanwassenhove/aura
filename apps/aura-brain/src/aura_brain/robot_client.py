@@ -22,7 +22,6 @@ from __future__ import annotations
 import os
 
 import httpx
-
 from shared_schemas.robot.models import MotionCommand
 
 

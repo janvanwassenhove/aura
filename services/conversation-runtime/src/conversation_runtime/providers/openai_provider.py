@@ -7,7 +7,6 @@ import os
 from collections.abc import AsyncIterator
 
 from openai import AsyncOpenAI
-
 from shared_schemas.voice.providers import STTProvider, TTSProvider
 
 logger = logging.getLogger(__name__)

@@ -184,13 +184,6 @@ class GoogleDeviceCodeFlow:
         self._token_store.set(user_id, "google", token)
         logger.debug("Google token refreshed for user=%s", user_id)
         return token.access_token
-                f"Google token refresh failed for user={user_id}. Re-auth required."
-            ) from exc
-
-        refreshed = _credentials_to_token_data(creds)
-        self._token_store.set(user_id, "google", refreshed)
-        logger.debug("Google token silently refreshed for user=%s", user_id)
-        return refreshed.access_token
 
 
 def _credentials_to_token_data(creds: object) -> TokenData:

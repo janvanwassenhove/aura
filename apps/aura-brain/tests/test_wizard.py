@@ -68,7 +68,7 @@ def test_full_run_writes_env(tmp_path) -> None:
     assert "ACTIVE_PERSONA=work" in env
     assert f"KNOWLEDGE_PASSPHRASE={PASSPHRASE}" in env  # user opted in to auto-unlock
     # A fresh random salt was generated (16 hex chars).
-    salt_line = next(l for l in env.splitlines() if l.startswith("KNOWLEDGE_SALT="))
+    salt_line = next(ln for ln in env.splitlines() if ln.startswith("KNOWLEDGE_SALT="))
     assert len(salt_line.split("=", 1)[1]) == 16
 
 

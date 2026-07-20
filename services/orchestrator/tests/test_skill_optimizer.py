@@ -8,7 +8,6 @@ import os
 os.environ.setdefault("LLM_PROVIDER", "echo")
 
 import pytest
-
 from orchestrator.skill_optimizer import propose_optimization, summarize_observations
 from orchestrator.skills import Skill, SkillStore
 
@@ -112,7 +111,8 @@ async def _fake_chat(messages, model=None):
     return {"content": json.dumps({
         "changed": True,
         "rationale": "Merged steps and added a guardrail.",
-        "body": "1. Launch Spotify via API (fall back to the app).\n2. Start the requested playlist; confirm it is playing.",
+        "body": "1. Launch Spotify via API (fall back to the app).\n"
+                "2. Start the requested playlist; confirm it is playing.",
     })}
 
 

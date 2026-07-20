@@ -5,12 +5,12 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime
 
+from shared_schemas.memory.models import Reminder, Todo, Turn
+from shared_schemas.memory.store import MemoryStore
 from sqlalchemy import delete, select, update
 
 from memory_service.db.models import ReminderRow, TodoRow, TurnRow
 from memory_service.db.session import SessionLocal
-from shared_schemas.memory.models import Reminder, Todo, Turn
-from shared_schemas.memory.store import MemoryStore
 
 
 class SQLiteMemoryStore(MemoryStore):

@@ -5,7 +5,6 @@ from __future__ import annotations
 import json
 
 import pytest
-
 from shared_schemas.knowledge import EncryptedKnowledgeStore, crypto
 from shared_schemas.knowledge.models import Person, PersonRole, ProfileFact
 

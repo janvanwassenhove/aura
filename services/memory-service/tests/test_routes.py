@@ -10,12 +10,11 @@ from __future__ import annotations
 import pytest
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
-from sqlalchemy.pool import StaticPool
-
+from memory_service import routes
 from memory_service.db.models import Base
 from memory_service.store import SQLiteMemoryStore
-from memory_service import routes
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.pool import StaticPool
 
 _TEST_ENGINE = create_async_engine(
     "sqlite+aiosqlite:///:memory:",

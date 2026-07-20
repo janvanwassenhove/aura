@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import pytest
-
 from aura_brain.perception import NullEmbedder, PerceptionLoop, build_embedder
 from shared_schemas.events.perception import PersonRecognized
 from shared_schemas.knowledge import crypto
@@ -245,10 +244,9 @@ async def test_matcher_persists_enrollment_to_disk(tmp_path) -> None:
 
 @pytest.fixture()
 def api_client():
+    from aura_brain import recognition_api
     from fastapi import FastAPI
     from fastapi.testclient import TestClient
-
-    from aura_brain import recognition_api
 
     matcher = EmbeddingMatcher(OMK)
     embedder = ScriptedEmbedder([JAN_FACE, JAN_FACE, JAN_FACE])
@@ -275,10 +273,9 @@ def test_enroll_unknown_person_404s(api_client) -> None:
 
 
 def test_enroll_without_face_422s() -> None:
+    from aura_brain import recognition_api
     from fastapi import FastAPI
     from fastapi.testclient import TestClient
-
-    from aura_brain import recognition_api
 
     recognition_api.init(
         EmbeddingMatcher(OMK), ScriptedEmbedder([None, None, None, None]), FakeRobot(),

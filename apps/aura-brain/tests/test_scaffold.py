@@ -9,9 +9,8 @@ import os
 # DATABASE_URL at import time). Mirrors the memory-service unit tests.
 os.environ.setdefault("DATABASE_URL", "sqlite+aiosqlite:///:memory:")
 
-from fastapi.testclient import TestClient
-
 from aura_brain.main import create_app, ctx
+from fastapi.testclient import TestClient
 
 
 def test_health_and_lifespan() -> None:

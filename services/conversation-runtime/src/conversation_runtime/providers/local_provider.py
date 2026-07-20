@@ -34,9 +34,7 @@ class LocalWhisperSTTProvider(STTProvider):
         return self._model
 
     def _transcribe_sync(self, audio_bytes: bytes) -> str:
-        import io
         import tempfile
-        import wave
         model = self._load_model()
         with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
             f.write(audio_bytes)
@@ -84,6 +82,7 @@ class KokoroTTSProvider(TTSProvider):
     def _synthesize_sync(self, text: str) -> bytes:
         pipeline = self._load_pipeline()
         import io
+
         import numpy as np
         import soundfile as sf
         generator = pipeline(text, voice="af_heart", speed=1.0)

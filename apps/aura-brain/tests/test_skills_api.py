@@ -3,10 +3,9 @@
 from __future__ import annotations
 
 import pytest
+from aura_brain import skills_api
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-
-from aura_brain import skills_api
 from orchestrator.skills import SkillStore
 
 

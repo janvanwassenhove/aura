@@ -9,7 +9,6 @@ import wave
 os.environ.setdefault("LLM_PROVIDER", "echo")
 
 import numpy as np
-
 from aura_brain import wakeword
 
 

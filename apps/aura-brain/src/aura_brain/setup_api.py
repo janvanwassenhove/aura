@@ -395,8 +395,9 @@ async def voice_check(body: dict) -> JSONResponse:
 @router.get("/characters")
 async def list_characters() -> JSONResponse:
     """U84: available character personas + which one is active."""
-    from aura_brain.characters import CharacterStore
     from dataclasses import asdict
+
+    from aura_brain.characters import CharacterStore
 
     store = CharacterStore()
     return JSONResponse({

@@ -20,7 +20,7 @@ from __future__ import annotations
 import json
 import logging
 import os
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -93,7 +93,8 @@ _BUILTINS: list[dict] = [
          greeting_message="Goedendag. U wenst?"),
     dict(id="kids_companion", display_name="Kids Companion",
          description="Playful, safe, simple language for children.",
-         character_prompt="You talk to children: simple words, short sentences, always kind, never scary. Never discuss adult topics.",
+         character_prompt="You talk to children: simple words, short sentences, always kind, never scary. "
+                          "Never discuss adult topics.",
          speaking_style="playful, simple, enthusiastic", humor_level="high",
          verbosity="brief", interruptibility="vad", emotional_style="cheerful",
          voice_id="nova", voice_speed=1.05, robot_motion_style="lively",

@@ -61,15 +61,15 @@ jobs:
         run: uv sync --all-packages
       - name: Python suites
         run: |
-          uv run --package shared-schemas pytest packages/shared-schemas/tests -q
-          uv run --package shared-events pytest packages/shared-events/tests -q
-          uv run --package shared-policies pytest packages/shared-policies/tests -q
-          uv run --package shared-personas pytest packages/shared-personas/tests -q
-          uv run --package robot-runtime pytest services/robot-runtime/tests -q
-          uv run --package memory-service pytest services/memory-service/tests -q
-          uv run --package orchestrator pytest services/orchestrator/tests -q
-          uv run --package conversation-runtime pytest services/conversation-runtime/tests -q
-          uv run --package connector-service pytest services/connector-service/tests -q
+          uv run --package shared-schemas --extra dev pytest packages/shared-schemas/tests -q
+          uv run --package shared-events --extra dev pytest packages/shared-events/tests -q
+          uv run --package shared-policies --extra dev pytest packages/shared-policies/tests -q
+          uv run --package shared-personas --extra dev pytest packages/shared-personas/tests -q
+          uv run --package robot-runtime --extra dev pytest services/robot-runtime/tests -q
+          uv run --package memory-service --extra dev pytest services/memory-service/tests -q
+          uv run --package orchestrator --extra dev pytest services/orchestrator/tests -q
+          uv run --package conversation-runtime --extra dev pytest services/conversation-runtime/tests -q
+          uv run --package connector-service --extra dev pytest services/connector-service/tests -q
           uv run --package aura-brain --extra dev pytest apps/aura-brain/tests -q
       - name: Console suite
         working-directory: apps/operator-console

@@ -5,9 +5,10 @@ from __future__ import annotations
 import asyncio
 import logging
 
-from memory_service.store import SQLiteMemoryStore
 from shared_events.bus import AsyncEventBus
 from shared_schemas.events.system import ReminderTriggered
+
+from memory_service.store import SQLiteMemoryStore
 
 logger = logging.getLogger(__name__)
 

@@ -4,12 +4,12 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Response, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse
-
-from robot_runtime.adapters.fake import FakeRobotAdapter
-from robot_runtime.engine.behavior import BehaviorEngine
 from shared_events.broadcaster import WebSocketBroadcaster
 from shared_schemas.events.behavior import MotionCompleted, MotionFailed, MotionStarted
 from shared_schemas.robot.models import BehaviorState, MotionCommand, RobotMode
+
+from robot_runtime.adapters.fake import FakeRobotAdapter
+from robot_runtime.engine.behavior import BehaviorEngine
 
 router = APIRouter()
 

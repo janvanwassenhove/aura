@@ -11,7 +11,6 @@ os.environ.setdefault("LLM_PROVIDER", "echo")
 
 import numpy as np
 import pytest
-
 from aura_brain import realtime_voice
 from aura_brain.realtime_voice import CostMeter, run_realtime_turn, wav_to_pcm24k
 

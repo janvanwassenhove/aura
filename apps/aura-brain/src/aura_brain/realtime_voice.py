@@ -22,8 +22,9 @@ from __future__ import annotations
 import base64
 import logging
 import os
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from typing import Any, Awaitable, Callable
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -178,7 +179,7 @@ async def run_realtime_turn(
                                      conn_factory, meter, on_segment),
             timeout=timeout,
         )
-    except asyncio.TimeoutError as exc:
+    except TimeoutError as exc:
         raise RuntimeError(f"realtime turn timed out after {timeout:.0f}s") from exc
 
 
@@ -259,7 +260,6 @@ async def probe(conn_factory: ConnFactory | None = None) -> dict:
     tiny TEXT-only round-trip against each candidate model; returns the first
     that works (with its name so the owner can pin REALTIME_MODEL), else the
     most informative failure. Never raises."""
-    import asyncio
 
     if not os.environ.get("OPENAI_API_KEY"):
         return {"ok": False, "model": _default_realtime_model(), "reason": "no OPENAI_API_KEY set"}
@@ -314,7 +314,7 @@ async def _probe_model(model: str, factory: ConnFactory) -> dict:
 
     try:
         return await asyncio.wait_for(_run(), timeout=float(os.environ.get("REALTIME_TURN_TIMEOUT_S", "15")))
-    except asyncio.TimeoutError:
+    except TimeoutError:
         return {"ok": False, "model": model, "reason": "timed out — model likely not accessible on this key"}
     except Exception as exc:  # noqa: BLE001
         # U144: surface the RAW server close reason (e.g. a websocket close code
