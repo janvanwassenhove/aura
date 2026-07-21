@@ -22,9 +22,44 @@ _session_id: str = "default"
 _robot: Any = None  # for the listening acknowledgment nod (U36g)
 
 
-def init(pipeline: Any, bus: Any, session_id: str, robot: Any = None) -> None:
-    global _pipeline, _bus, _session_id, _robot
+_voice_loop: Any = None
+
+
+def init(pipeline: Any, bus: Any, session_id: str, robot: Any = None,
+         voice_loop: Any = None) -> None:
+    global _pipeline, _bus, _session_id, _robot, _voice_loop
     _pipeline, _bus, _session_id, _robot = pipeline, bus, session_id, robot
+    _voice_loop = voice_loop
+
+
+def set_voice_loop(loop: Any) -> None:
+    """U184: the loop is built after voice_api.init(), so it lands here."""
+    global _voice_loop
+    _voice_loop = loop
+
+
+@router.post("/panic")
+async def panic_stop() -> JSONResponse:
+    """U184: STOP — cut speech, end the conversation session, mic off.
+
+    Ambient noise can push a Realtime session into a loop where it answers
+    its own echo. One call ends it; turning the mic back on is deliberate.
+    Works even when the voice loop is not running: the robot is silenced and
+    the mic is switched off regardless."""
+    import os
+
+    result = {"stopped": True, "speech": False, "session": False, "voice_mode": "off"}
+    if _voice_loop is not None:
+        result = await _voice_loop.panic()
+    else:
+        os.environ["VOICE_MODE"] = "off"
+        if _robot is not None:
+            try:
+                await _robot.stop_audio()
+                result["speech"] = True
+            except Exception:  # noqa: BLE001 — a panic stop never fails
+                pass
+    return JSONResponse(result)
 
 
 @router.post("/listen")

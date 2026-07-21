@@ -137,6 +137,7 @@ class VoiceLoop:
         self._followup_s_default = followup_s
         self._speech_peak_default = float(speech_peak)
         self._task: asyncio.Task | None = None
+        self._active_session = None   # U184: running RealtimeSession
         self._followup_until = 0.0
         self._speaking_until = 0.0
         # U54: barge-in — while the robot talks, a clearly louder voice (the
@@ -671,7 +672,11 @@ class VoiceLoop:
                 instructions=instructions, voice=voice_id,
                 on_reply=self.note_spoken, trace=_t)
             logger.info("realtime session opening (command=%r)", command[:60])
-            await sess.run(initial_text=command)
+            self._active_session = sess          # U184: panic stop handle
+            try:
+                await sess.run(initial_text=command)
+            finally:
+                self._active_session = None
             if _t is not None:
                 _t.mark("playback_complete")
             if sess.turns == 0:
@@ -694,6 +699,43 @@ class VoiceLoop:
             else:
                 logger.warning("realtime session failed, using pipeline: %s", exc)
             return False
+
+    async def panic(self) -> dict:
+        """U184: STOP EVERYTHING, now.
+
+        Ambient noise can push a Realtime session into talking to itself (the
+        server VAD hears a 'turn', the reply is picked up as the next turn...).
+        The owner needs one button that ends it within a second:
+
+          1. cut whatever the robot is saying mid-word,
+          2. end the open conversation session,
+          3. switch the microphone off so nothing restarts it.
+
+        Turning the mic back on is a deliberate act (the Mic toggle).
+        """
+        import os as _os
+
+        stopped = {"speech": False, "session": False}
+        try:
+            await self._robot.stop_audio()
+            stopped["speech"] = True
+        except Exception as exc:  # noqa: BLE001 — never fail a panic stop
+            logger.warning("panic: could not stop speech: %s", exc)
+
+        sess = getattr(self, "_active_session", None)
+        if sess is not None:
+            try:
+                sess.request_stop()
+                stopped["session"] = True
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("panic: could not stop session: %s", exc)
+
+        _os.environ["VOICE_MODE"] = "off"     # loop idles from the next tick
+        self._followup_until = 0.0            # no follow-up window survives
+        self._speaking_until = 0.0
+        logger.warning("PANIC STOP by owner: speech=%s session=%s, mic off",
+                       stopped["speech"], stopped["session"])
+        return {"stopped": True, **stopped, "voice_mode": "off"}
 
     async def _handle(self, command: str) -> None:
         from shared_schemas.events.audio import TranscriptUpdated

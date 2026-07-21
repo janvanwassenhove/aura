@@ -1,10 +1,45 @@
 # AURA — Adaptive Unified Robotic Assistant
 
-An embodied AI chief-of-staff for the **Reachy Mini Wireless**. AURA greets the
-people it recognises, assists with work and development tasks, runs
-presentations with synced speech and gesture, keeps working when the network
-dies — and treats **security and privacy as the top requirement**: everything
-it learns about people is encrypted on the laptop and never leaves it.
+> **A desk robot that knows who you are, joins your workday, and keeps your
+> life private — on your own laptop.**
+
+AURA turns a **Reachy Mini** into a personal chief-of-staff: it recognises you,
+holds a real spoken conversation, reaches into your mail, calendar, chat and
+tasks, learns how *you* work, and moves like it means it. Everything personal
+is encrypted on your machine and never leaves it.
+
+<!-- screenshots are published with every release: github.com/janvanwassenhove/aura/releases -->
+
+### The name is the promise
+
+| | |
+|---|---|
+| **Adaptive** | Adapts behaviour and interaction to the person, the context and the situation. |
+| **Unified** | Brings conversation, mail, Teams, calendar, todos, memory and agents together in one place. |
+| **Robotic** | Physically embodied through Reachy Mini — it looks at you, reacts, gestures. |
+| **Assistant** | A personal assistant and copilot, not just another chatbot. |
+
+### Why it feels different
+
+- **It looks at you and talks back.** Sub-second spoken replies over a live
+  audio session, head tracking that follows your face, gestures timed to the
+  words. Say "Hey Richie" and just talk.
+- **It knows the room.** Faces are recognised, new visitors become guests, and
+  every person gets their own encrypted profile — greeting, tone and context
+  adapt to who is standing there.
+- **It does the work.** Mail, calendar, Teams, todos, music, screen control
+  and dev tasks behind one conversation, with approval gates on anything
+  sensitive.
+- **It gets better by itself.** Skills are written from real usage and
+  rewritten when the evidence says they should be.
+- **It keeps running when the internet doesn't.** Offline tier, local models,
+  and a robot that behaves gracefully instead of freezing.
+- **Privacy is the product, not a checkbox.** AES-256-GCM per-person
+  encryption, biometrics that never touch disk unencrypted, a step-up gate on
+  destructive actions, and a scanner that blocks personal data from ever
+  reaching git.
+
+### In one picture
 
 ```
 ┌──────────────── LAPTOP ────────────────┐        ┌──── REACHY (Pi 5) ────┐
@@ -15,6 +50,17 @@ it learns about people is encrypted on the laptop and never leaves it.
 │  operator-console (:5173, Vue 3)        │   The Pi never holds keys,
 └─────────────────────────────────────────┘   tokens, or profile data.
 ```
+
+## Install (no build required)
+
+Grab the installer for your platform from the
+[latest release](https://github.com/janvanwassenhove/aura/releases/latest) —
+Windows (`.exe`), macOS (`.dmg`, Apple Silicon + Intel) or Linux
+(`.AppImage`/`.deb`). First launch installs its own Python runtime; the app
+then checks for updates and offers to install them for you.
+
+You need a Reachy Mini for the embodiment, but **the whole stack runs without
+hardware** (FakeRobot) if you just want to try it.
 
 ## Quick start
 
@@ -53,6 +99,9 @@ encrypted knowledge store.
 - **Survives failures**: heartbeat monitoring degrades gracefully — local LLM
   when the internet dies, regex fallback after that, and an on-device loop so
   the robot stays polite even with no brain at all.
+- **Always stoppable**: one **Stop** button cuts speech mid-word, ends the
+  conversation and mutes the microphone — because a voice assistant that can
+  be triggered by ambient noise must be silenceable in one click.
 
 ## Security model (ADR-008)
 
@@ -62,7 +111,7 @@ encrypted knowledge store.
 | Local-only | Knowledge never egresses; prompts get a minimal role-based slice, never the profile |
 | Minors protected | `role=minor` → explicit facts only, no passive learning, ever (consent is owner-granted, explicit) |
 | Right to be forgotten | Deleting a person destroys their key — cryptographic erasure |
-| Destructive ops gated | Phone step-up approval via webhook; auto-denied if unconfigured (fail closed) |
+| Destructive ops gated | Phone step-up approval via webhook when configured; otherwise a typed confirmation from the owner's own console (erasure must never be impossible) |
 | Sensitive actions gated | Approval gate is never bypassed; offline-queued actions never auto-execute on reconnect |
 | The robot is dumb | The Pi holds no keys, tokens, or data — stealing it yields motors |
 | No secrets in logs | Tokens never logged; keyring-backed storage |

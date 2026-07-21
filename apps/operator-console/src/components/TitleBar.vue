@@ -31,6 +31,13 @@
       <button v-if="isElectron" class="titlebar-btn" :title="restarting ? 'Restarting brain…' : 'Restart brain (load new code/settings)'" aria-label="Restart brain" :disabled="restarting" @click="restartBrain">
         <RotateCw :size="15" :class="restarting ? 'spin' : ''" />
       </button>
+      <!-- U184: always-visible panic stop. Ambient noise can push a voice
+           session into answering its own echo; this ends it in one click. -->
+      <button class="titlebar-btn titlebar-btn--stop" :disabled="stopping"
+              :title="stopped ? 'Stopped — mic is off' : 'STOP: cut speech, end the conversation, mic off'"
+              aria-label="Stop talking" @click="panicStop">
+        <CircleStop :size="17" />
+      </button>
       <button class="titlebar-btn" title="Capabilities & permissions" aria-label="Capabilities and permissions" @click="$emit('open-capabilities')">
         <ShieldCheck :size="16" />
       </button>
@@ -59,7 +66,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { onMounted } from 'vue'
-import { Bot, Cpu, Info, Minus, RotateCw, Settings, ShieldCheck, Square, X, PanelBottom, PanelLeft, PanelRight } from 'lucide-vue-next'
+import { Bot, CircleStop, Cpu, Info, Minus, RotateCw, Settings, ShieldCheck, Square, X, PanelBottom, PanelLeft, PanelRight } from 'lucide-vue-next'
 import { useRobotStore } from '../stores/robotStore'
 import { usePrefsStore } from '../stores/prefsStore'
 
@@ -68,6 +75,21 @@ defineEmits<{
   'open-settings': []; 'open-capabilities': []; 'open-about': []
   'toggle-left': []; 'toggle-right': []; 'toggle-bottom': []
 }>()
+
+// U184: panic stop — one click cuts speech, ends the session and mutes the mic.
+const BRAIN_URL = import.meta.env.VITE_BRAIN_URL ?? 'http://localhost:8020'
+const stopping = ref(false)
+const stopped = ref(false)
+async function panicStop() {
+  if (stopping.value) return
+  stopping.value = true
+  try {
+    await fetch(`${BRAIN_URL}/voice/panic`, { method: 'POST' })
+    stopped.value = true
+    setTimeout(() => { stopped.value = false }, 5000)
+  } catch { /* the robot may already be unreachable — nothing more to stop */ }
+  finally { stopping.value = false }
+}
 
 const restarting = ref(false)
 async function restartBrain() {
@@ -142,6 +164,9 @@ function winControl(action: 'minimize' | 'toggleMaximize' | 'close') {
   color: var(--text-muted);
 }
 .titlebar-btn:hover { color: var(--text); background: var(--surface-hover); }
+.titlebar-btn--stop { color: var(--danger, #e5484d); }
+.titlebar-btn--stop:hover:not(:disabled) { color: #fff; background: var(--danger, #e5484d); }
+.titlebar-btn--stop:disabled { opacity: 0.5; }
 .win-btn:hover { background: var(--surface-hover); }
 .win-btn--close:hover { background: var(--danger); color: #fff; }
 

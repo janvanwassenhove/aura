@@ -473,7 +473,8 @@ async function doTeachFace() {
 async function doForget() {
   if (!store.detail) return
   if (!confirm(`Forget ${store.detail.person.display_name}? This erases their profile and face.`)) return
-  await store.forgetPerson(store.detail.person.person_id)
+  const ok = await store.forgetPerson(store.detail.person.person_id)
+  if (!ok) { alert(store.error ?? 'Could not delete this person.'); return }
   selected.value = '_skills'
 }
 async function lockKnowledge() {

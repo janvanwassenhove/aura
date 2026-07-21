@@ -236,9 +236,25 @@ async def snapshot_wrong(
 
 
 @router.delete("/people/{person_id}")
-async def forget_person(person_id: str) -> JSONResponse:
-    """Right-to-be-forgotten: step-up required (destructive, ADR-008 §9)."""
-    await _require_stepup("delete_person", {"person_id": person_id})
+async def forget_person(person_id: str, confirm: str = "") -> JSONResponse:
+    """Right-to-be-forgotten (destructive, ADR-008 §9).
+
+    U185: with STEP_UP_WEBHOOK_URL configured the phone approval still rules.
+    Without one, every delete used to be auto-denied — so erasure was simply
+    impossible, which is untenable now that guest profiles are created
+    automatically (U181) and the owner must be able to remove people. The
+    fallback is a TYPED CONFIRMATION: `?confirm=<person_id>` from the console.
+    That is deliberate intent from the owner's own screen, not a possession
+    factor — a weaker but honest gate, and far better than a dead feature.
+    """
+    if _stepup_gate is not None and getattr(_stepup_gate, "_webhook_url", None):
+        await _require_stepup("delete_person", {"person_id": person_id})
+    elif _omk_loaded and confirm != person_id:
+        return JSONResponse(
+            {"error": "confirmation required",
+             "detail": f"repeat the id as ?confirm={person_id} to delete this person"},
+            status_code=428,   # Precondition Required
+        )
     await _require().delete_person(person_id)
     if _recognition_gallery is not None:  # U127: wipe their snapshots too
         _recognition_gallery.forget(person_id)
