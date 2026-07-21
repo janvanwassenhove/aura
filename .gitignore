@@ -68,3 +68,8 @@ logs/
 # Windows crash dumps
 *.stackdump
 skills/.metrics/
+
+# U183: skills are the owner's PERSONAL routines (playlists, habits, names).
+# The vault lives in userData at runtime; only the explainer stays in git.
+skills/*.md
+!skills/README.md

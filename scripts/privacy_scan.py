@@ -39,6 +39,8 @@ from pathlib import Path
 DENY_PATHS: tuple[tuple[str, str], ...] = (
     (r"(^|/)data/", "runtime data directory (databases, encrypted stores)"),
     (r"(^|/)skills/\.metrics(/|$)", "skill usage logs — contain literal spoken requests"),
+    # U183: a skill file is a personal routine (playlists, habits, names).
+    (r"(^|/)skills/(?!README\.md$)[^/]+\.md$", "personal skill (owner routine)"),
     (r"\.(db|sqlite3?|sqlite)$", "database file"),
     (r"\.enc\.json$", "encrypted personal-data store"),
     (r"\.(wav|pcm|mp3|ogg|flac|m4a)$", "audio recording"),
