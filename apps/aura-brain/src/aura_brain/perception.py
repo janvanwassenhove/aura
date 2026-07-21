@@ -255,7 +255,14 @@ class PerceptionLoop:
 
         # U36f: log unrecognized passers-by (in-memory only) for easy tagging.
         if person_id is None and self._sightings is not None:
-            self._sightings.record(frame, embedding)
+            sighting = self._sightings.record(frame, embedding)
+            # U181: a genuinely NEW face (count==1 — the log merges repeats by
+            # embedding similarity) becomes a guest profile, so the robot can
+            # greet them next time instead of forever seeing "unknown".
+            if sighting is not None and sighting.count == 1:
+                person_id = await self._add_guest(embedding)
+                if person_id is not None:
+                    confidence = 1.0  # we just enrolled this exact embedding
         # U127: snapshot KNOWN people so the owner can review recent sightings
         # per person (throttled + capped in the gallery).
         if person_id is not None and self._gallery is not None:
@@ -264,6 +271,46 @@ class PerceptionLoop:
             self._gallery.record(person_id, frame, confidence, embedding=embedding)
 
         await self._transition(person_id or "", person_id, confidence)
+
+    async def _add_guest(self, embedding: list[float]) -> str | None:
+        """U181: enrol a newly-seen face as a GUEST profile.
+
+        Guests are the minimal role by design (ADR-008): a name to greet by,
+        no facts, no passive learning. The owner can rename them to a real
+        person or forget them in one click from the brain panel.
+
+        Off via AUTO_GUEST=false. Requires the encrypted store — the matcher
+        only exists once recognition is running, and biometrics may never be
+        written unencrypted.
+        """
+        import os
+
+        if os.environ.get("AUTO_GUEST", "true").lower() != "true":
+            return None
+        if self._matcher is None or self._store is None:
+            return None
+        try:
+            from shared_schemas.knowledge.models import Person, PersonRole
+
+            existing = await self._store.list_people()
+            used = {p.person_id for p in existing}
+            n = 1
+            while f"guest-{n}" in used:
+                n += 1
+            person_id = f"guest-{n}"
+            await self._store.upsert_person(Person(
+                person_id=person_id,
+                display_name=f"Guest {n}",
+                role=PersonRole.GUEST,
+                description="Added automatically when this face was first seen. "
+                            "Rename to a real person, or forget them.",
+            ))
+            self._matcher.enroll(person_id, embedding)
+        except Exception as exc:  # noqa: BLE001 — never break the camera loop
+            logger.warning("could not add guest for a new face: %s", exc)
+            return None
+        logger.info("new face enrolled as %s", person_id)
+        return person_id
 
     async def _detect_gesture(self, frame: bytes) -> None:
         import time

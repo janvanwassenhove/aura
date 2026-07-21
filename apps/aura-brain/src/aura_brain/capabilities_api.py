@@ -40,6 +40,10 @@ _CAPS: dict[str, tuple[str, str, str, str, bool]] = {
                  "Wave back to an open palm, celebrate a thumbs-up.", True),
     "recognition": ("RECOGNITION_ENABLED", "true", "Face recognition",
                     "Recognize and greet known people. Needs the knowledge passphrase.", False),
+    "auto_guest": ("AUTO_GUEST", "true", "Remember new faces as guests",
+                   "A face seen for the first time becomes a 'Guest' profile, so the robot "
+                   "can greet them next time. Guests keep no facts; rename or forget them "
+                   "anytime in the brain panel.", True),
     "maintenance": ("MAINTENANCE_ENABLED", "true", "Self-maintenance",
                     "Periodic self-checks and auto-recovery of the robot link.", True),
     "computer_use": ("COMPUTER_USE_ENABLED", "false", "Control the screen",

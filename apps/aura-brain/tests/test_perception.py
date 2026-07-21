@@ -302,3 +302,95 @@ def test_status_reports_enrollment(api_client) -> None:
     body = client.get("/recognition/status").json()
     assert body["enabled"] is True
     assert body["enrolled"] == ["jan"]
+
+
+# ---------------------------------------------------------------------------
+# U181: a new face becomes a guest profile
+# ---------------------------------------------------------------------------
+
+class RecordingStore(FakeStore):
+    """FakeStore that also accepts new people, like the real knowledge store."""
+
+    def __init__(self, people: dict[str, str] | None = None) -> None:
+        super().__init__(people or {})
+        self.created: list = []
+
+    async def list_people(self):
+        from types import SimpleNamespace
+
+        return [SimpleNamespace(person_id=pid) for pid in self._people]
+
+    async def upsert_person(self, person):
+        self.created.append(person)
+        self._people[person.person_id] = person.display_name
+        return person
+
+
+def _guest_loop(store, embedder, matcher):
+    from aura_brain.sightings import SightingLog
+
+    bus = FakeBus()
+    loop = PerceptionLoop(
+        bus, matcher, FakeRobot(), embedder,
+        knowledge_store=store, sighting_log=SightingLog(),
+    )
+    return loop, bus
+
+
+async def test_new_face_becomes_a_guest(monkeypatch) -> None:
+    monkeypatch.setenv("AUTO_GUEST", "true")
+    monkeypatch.setattr("aura_brain.sightings._thumbnail", lambda b, width=320: b"JPG")
+    store = RecordingStore()
+    matcher = EmbeddingMatcher(OMK)
+    loop, bus = _guest_loop(store, ScriptedEmbedder([STRANGER_FACE]), matcher)
+
+    await loop.tick()
+
+    assert len(store.created) == 1
+    guest = store.created[0]
+    assert guest.person_id == "guest-1"
+    assert guest.display_name == "Guest 1"
+    assert guest.role.value == "guest"          # minimal role by design
+    # Enrolled, so the SAME face is recognised from now on instead of "unknown".
+    assert matcher.identify(STRANGER_FACE)[0] == "guest-1"
+    (event,) = bus.published
+    assert event.known is True and event.person_id == "guest-1"
+
+
+async def test_same_face_does_not_spawn_a_second_guest(monkeypatch) -> None:
+    """The sighting log merges repeats; enrolment makes later frames 'known'."""
+    monkeypatch.setenv("AUTO_GUEST", "true")
+    monkeypatch.setattr("aura_brain.sightings._thumbnail", lambda b, width=320: b"JPG")
+    store = RecordingStore()
+    matcher = EmbeddingMatcher(OMK)
+    loop, _ = _guest_loop(store, ScriptedEmbedder([STRANGER_FACE]), matcher)
+
+    await loop.tick()
+    await loop.tick()
+    await loop.tick()
+
+    assert [p.person_id for p in store.created] == ["guest-1"]
+
+
+async def test_guest_ids_do_not_collide(monkeypatch) -> None:
+    monkeypatch.setenv("AUTO_GUEST", "true")
+    monkeypatch.setattr("aura_brain.sightings._thumbnail", lambda b, width=320: b"JPG")
+    store = RecordingStore({"guest-1": "Guest 1"})       # guest-1 already taken
+    loop, _ = _guest_loop(store, ScriptedEmbedder([STRANGER_FACE]), EmbeddingMatcher(OMK))
+
+    await loop.tick()
+
+    assert store.created[0].person_id == "guest-2"
+
+
+async def test_auto_guest_can_be_switched_off(monkeypatch) -> None:
+    monkeypatch.setenv("AUTO_GUEST", "false")
+    monkeypatch.setattr("aura_brain.sightings._thumbnail", lambda b, width=320: b"JPG")
+    store = RecordingStore()
+    loop, bus = _guest_loop(store, ScriptedEmbedder([STRANGER_FACE]), EmbeddingMatcher(OMK))
+
+    await loop.tick()
+
+    assert store.created == []                  # no biometrics captured
+    (event,) = bus.published
+    assert event.known is False                 # still just an unknown sighting
