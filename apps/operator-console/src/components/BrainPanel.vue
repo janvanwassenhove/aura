@@ -54,6 +54,20 @@
             </button>
             <p v-if="unlockErr" class="rail-err">{{ unlockErr }}</p>
           </div>
+          <!-- U179: profiles are stored UNENCRYPTED (no passphrase yet). This
+               was unreachable: the unlock field above only appears once a
+               store IS encrypted, and the wizard only runs on first setup —
+               so after a reset there was no way back to face recognition. -->
+          <div v-else-if="store.omkLoaded === false" class="rail-unlock">
+            <p class="rail-locked">Profiles are not encrypted yet.</p>
+            <p class="rail-hint">A passphrase encrypts them and enables face recognition.</p>
+            <input v-model="securePass" type="password" class="rail-input"
+                   placeholder="New passphrase (min. 8)" @keydown.enter="doSecure" />
+            <button class="rail-btn" :disabled="securePass.length < 8 || securing" @click="doSecure">
+              {{ securing ? 'Securing…' : 'Secure profiles' }}
+            </button>
+            <p v-if="secureErr" class="rail-err">{{ secureErr }}</p>
+          </div>
           <div v-else class="rail-add">
             <!-- U112: the add-person form only unfolds on demand -->
             <button v-if="!showAddPerson" class="rail-btn rail-btn--ghost" @click="showAddPerson = true">
@@ -378,6 +392,27 @@ const teaching = ref(false)
 const unlockPass = ref('')
 const unlocking = ref(false)
 const unlockErr = ref('')
+
+// U179: first-time encryption from the brain panel — /setup/secure migrates
+// existing profiles into the encrypted store, persists the passphrase and
+// STARTS face recognition, which is what brings the "This is me" button back.
+const securePass = ref('')
+const securing = ref(false)
+const secureErr = ref('')
+
+async function doSecure(): Promise<void> {
+  if (securePass.value.length < 8 || securing.value) return
+  securing.value = true
+  secureErr.value = ''
+  try {
+    const ok = await store.secure(securePass.value, true)
+    if (!ok) { secureErr.value = store.error ?? 'could not secure profiles'; return }
+    securePass.value = ''
+    await Promise.all([store.fetchTier(), store.fetchPeople(), store.fetchRecognition()])
+  } finally {
+    securing.value = false
+  }
+}
 const newP = ref({ id: '', name: '', role: 'guest' })
 const addingP = ref(false)
 
@@ -1012,6 +1047,7 @@ onMounted(async () => {
 .rail-role--demo { color: var(--text-faint); border-style: dashed; }
 .rail-sep { font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-faint); margin: 0.6rem 0.4rem 0.15rem; }
 .rail-locked { font-size: 0.72rem; color: var(--warn, #d9a441); padding: 0.3rem 0.4rem; }
+.rail-hint { font-size: 0.68rem; color: var(--text-faint); padding: 0 0.4rem 0.35rem; line-height: 1.35; }
 .rail-unlock, .rail-add { display: flex; flex-direction: column; gap: 0.35rem; padding: 0.3rem 0.4rem; }
 .rail-input { background: var(--surface); border: 1px solid var(--border-strong); border-radius: var(--radius-md); color: var(--text); padding: 0.35rem 0.45rem; font-size: 0.78rem; }
 .rail-btn { background: var(--accent); color: var(--accent-contrast, #fff); border: none; border-radius: var(--radius-md); padding: 0.4rem; font-size: 0.78rem; cursor: pointer; }
