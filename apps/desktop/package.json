@@ -23,6 +23,7 @@
     "files": [
       "main.cjs",
       "preload.cjs",
+      "updater.cjs",
       "build/**"
     ],
     "extraResources": [

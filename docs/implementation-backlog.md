@@ -529,6 +529,9 @@ the human can unblock it.
 - [x] **U175 — "camera werkt niet meer": stille MJPEG-stall + auto-herstel** · `pending`
   Diagnose eerst: de hele keten bleek gezond — Pi levert verse frames (1,2 MB, verspringend), brain proxied ze, de stream pompt 14+ MB/6s. Het "kapotte" beeld is de klassieke MJPEG-kwaal: valt de sérver even weg (brain-herstart, app-update, Pi-reboot), dan stopt de `<img>` **geluidloos** — geen error-event, dus de bestaande retry greep nooit in en het paneel bleef bevroren tot een volledige page-reload. Fix drieledig: (1) de WS-composable meldt elke (her)verbinding via `robotStore.noteWsOpen()` → het camerapaneel remount de stream zodra de brain terug is; (2) idem bij robot-terugkeer (`connected` false→true); (3) een handmatige ↻-knop naast de LIVE-badge voor alle overige gevallen. **Live geverifieerd in de echte app**: knop → `streamKey` bump → verse MJPEG-verbinding → binnen 2,5s weer LIVE. Console 66 groen (+2 store-tests) + build OK.
 
+- [x] **U176 — v2.0.1/2 crashte bij start: updater.cjs zat niet in de package** · `pending`
+  "Cannot find module './updater.cjs'" — het nieuwe updatermodule (U173) stond niet in electron-builders `files`-lijst, dus de app.asar miste het en de main-process-require crashte direct bij launch. Packaging slaagt gewoon mét ontbrekende modules, dus CI zag niets. Fix: bestand toegevoegd aan `files` + **CI-guard** in de buildjob die na het packagen de app.asar op alle drie platformen uitleest en faalt als main/preload/updater ontbreken — lokaal getest tegen een verse build (guard slaat aan bij ontbreken, groen bij aanwezig). Wie v2.0.1/2 installeerde: v2.0.3 eroverheen installeren lost het op.
+
 ## Progress log (append-only; newest last)
 
 - 2026-06-21 — ledger created on `aura-autobuild`; Phase 0/0b complete, Phase 1 scaffold (U-pre) done before this loop started.
