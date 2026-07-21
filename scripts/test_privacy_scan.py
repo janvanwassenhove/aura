@@ -88,3 +88,11 @@ def test_staged_scan_blocks_inside_a_real_repo(tmp_path) -> None:
     r2 = subprocess.run([sys.executable, str(SCRIPT), "--staged"],
                         cwd=tmp_path, capture_output=True, text=True)
     assert r2.returncode == 0
+
+
+def test_personal_skill_files_are_blocked() -> None:
+    """U183: a skill is the owner's routine (playlists, habits, names). These
+    were public in the repo until a history rewrite removed them."""
+    assert check_path("skills/music.md")
+    assert check_path("skills/vrtmax.md")
+    assert not check_path("skills/README.md")   # the explainer stays
