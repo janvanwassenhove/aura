@@ -205,6 +205,26 @@ jobs:
         run: |
           npm ci
           npx electron-builder ${{ matrix.args }} --publish never -c.extraMetadata.version=${{ needs.version.outputs.version }}
+      - name: Verify packaged modules
+        working-directory: apps/desktop
+        # U176: every .cjs the main process requires MUST be inside app.asar.
+        # updater.cjs was missing from the "files" list and v2.0.1/2 crashed
+        # on launch ("Cannot find module './updater.cjs'") — packaging
+        # succeeds regardless, so only an explicit check catches it.
+        shell: bash
+        run: |
+          found=0
+          while IFS= read -r asar; do
+            found=1
+            for f in main.cjs preload.cjs updater.cjs; do
+              if ! npx @electron/asar list "$asar" | grep -q "[/\\]${f}\$"; then
+                echo "FOUT: ${f} ontbreekt in ${asar}"
+                exit 1
+              fi
+            done
+            echo "OK: $asar bevat alle main-process-modules"
+          done < <(find dist -name app.asar)
+          [ "$found" = "1" ] || { echo "FOUT: geen app.asar gevonden"; exit 1; }
       - uses: actions/upload-artifact@v4
         with:
           name: installers-${{ matrix.os }}
