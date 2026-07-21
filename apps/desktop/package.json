@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "AURA desktop app \u2014 brain + operator console in one window",
   "author": "Jan Van Wassenhove",
+  "homepage": "https://github.com/janvanwassenhove/aura",
   "main": "main.cjs",
   "scripts": {
     "start": "electron .",
