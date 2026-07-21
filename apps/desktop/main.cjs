@@ -150,10 +150,18 @@ function hasUv() {
   catch { return false }
 }
 
+// U179: bump when the bootstrap must re-run on EXISTING installs.
+//   2 = sync with the `recognition` extra. Plain `uv sync --all-packages`
+//       actively REMOVES insightface/onnxruntime, so every install ended up
+//       with face recognition inert ("This is me" button gone).
+const BOOTSTRAP_REV = '2'
+
 async function ensureBootstrap(splashWindow) {
   if (!IS_PACKAGED) return
   const marker = path.join(app.getPath('userData'), '.bootstrap-done')
-  if (fs.existsSync(marker) && hasUv()) return
+  let doneRev = ''
+  try { doneRev = (fs.readFileSync(marker, 'utf-8').match(/rev=(\d+)/) || [])[1] || '1' } catch { doneRev = '' }
+  if (doneRev === BOOTSTRAP_REV && hasUv()) return
 
   const say = (msg) => {
     if (splashWindow && !splashWindow.isDestroyed()) {
@@ -182,8 +190,17 @@ async function ensureBootstrap(splashWindow) {
   }
 
   say('Preparing AURA (one-time, a few minutes)…')
-  execSync('uv sync --all-packages', { cwd: REPO_ROOT, stdio: 'ignore', shell: true, timeout: 900_000 })
-  fs.writeFileSync(marker, new Date().toISOString())
+  // The `recognition` extra carries insightface + onnxruntime (face
+  // recognition). Without it `uv sync` PRUNES them. Fall back to a plain sync
+  // so a wheel/network problem never leaves the app unable to start at all.
+  try {
+    execSync('uv sync --all-packages --extra recognition',
+      { cwd: REPO_ROOT, stdio: 'ignore', shell: true, timeout: 1_800_000 })
+  } catch (err) {
+    console.error('sync with recognition extra failed, falling back:', err.message)
+    execSync('uv sync --all-packages', { cwd: REPO_ROOT, stdio: 'ignore', shell: true, timeout: 900_000 })
+  }
+  fs.writeFileSync(marker, `rev=${BOOTSTRAP_REV} ${new Date().toISOString()}`)
 }
 
 // ---------------------------------------------------------------------------

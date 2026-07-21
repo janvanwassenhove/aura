@@ -100,9 +100,13 @@
     <p v-if="modeError" class="aim-note aim-note--err">{{ modeError }}</p>
 
     <!-- Recognition / enrollment -->
+    <!-- U179: the old text pointed at a "Knowledge" panel that is no longer
+         mounted. Point at what actually exists: the brain panel's
+         "Secure profiles" box, which enables recognition. -->
     <div v-if="recognitionEnabled === false" class="hint mt-2">
-      Face recognition is off — open <strong>Knowledge</strong> (brain icon, top right)
-      and secure it with a passphrase to enable.
+      Face recognition is off, so <strong>This is me</strong> is hidden. Open the
+      <strong>brain panel</strong> (top right) and set a passphrase under
+      <strong>Secure profiles</strong> to switch it on.
     </div>
     <form v-else-if="recognitionEnabled" class="enroll-row mt-2" @submit.prevent="enroll">
       <input v-model="enrollId" class="filter-input" placeholder="person id (e.g. jan)" />
