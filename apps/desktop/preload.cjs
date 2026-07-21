@@ -12,4 +12,6 @@ contextBridge.exposeInMainWorld('aura', {
   screenControl: (active) => ipcRenderer.send('aura:screen-control', !!active),
   // U95: restart the brain child process (loads new code / config).
   restartBrain: () => ipcRenderer.invoke('aura:restart-brain'),
+  // U170: real app version for the About dialog (stamped per release build).
+  appVersion: () => ipcRenderer.invoke('aura:app-version'),
 })

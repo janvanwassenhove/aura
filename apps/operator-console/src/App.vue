@@ -4,6 +4,7 @@
       :ws-status="wsStatus"
       @open-settings="showSettings = true"
       @open-capabilities="showCapabilities = true"
+      @open-about="showAbout = true"
       @toggle-left="layoutStore.showLeft = !layoutStore.showLeft"
       @toggle-right="layoutStore.showRight = !layoutStore.showRight"
       @toggle-bottom="layoutStore.showBottom = !layoutStore.showBottom"
@@ -20,6 +21,9 @@
 
     <!-- Capabilities / permissions center (U40) -->
     <CapabilitiesPanel v-if="showCapabilities" @close="showCapabilities = false" />
+
+    <!-- U170: about / credits -->
+    <AboutModal v-if="showAbout" @close="showAbout = false" />
 
     <!-- U76: VS Code-like workspace — toggleable, resizable docks -->
     <main class="workspace">
@@ -60,6 +64,7 @@ import ApprovalPanel from './components/ApprovalPanel.vue'
 import SettingsPanel from './components/SettingsPanel.vue'
 import BrainPanel from './components/BrainPanel.vue'
 import CapabilitiesPanel from './components/CapabilitiesPanel.vue'
+import AboutModal from './components/AboutModal.vue'
 import SetupWizard from './components/SetupWizard.vue'
 import { useEventBusWs } from './composables/useEventBusWs'
 import { useLayoutStore } from './stores/layoutStore'
@@ -69,6 +74,7 @@ import { useThemeStore } from './stores/themeStore'
 
 const { wsStatus, connect } = useEventBusWs()
 const showSettings = ref(false)
+const showAbout = ref(false)
 const layoutStore = useLayoutStore()
 
 // U76: draggable splitters (VS Code-style resize).

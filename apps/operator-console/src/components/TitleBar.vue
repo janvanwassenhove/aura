@@ -34,6 +34,9 @@
       <button class="titlebar-btn" title="Capabilities & permissions" aria-label="Capabilities and permissions" @click="$emit('open-capabilities')">
         <ShieldCheck :size="16" />
       </button>
+      <button class="titlebar-btn" title="About AURA" aria-label="About" @click="$emit('open-about')">
+        <Info :size="16" />
+      </button>
       <button class="titlebar-btn" title="Settings" aria-label="Settings" @click="$emit('open-settings')">
         <Settings :size="16" />
       </button>
@@ -56,13 +59,13 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { onMounted } from 'vue'
-import { Bot, Cpu, Minus, RotateCw, Settings, ShieldCheck, Square, X, PanelBottom, PanelLeft, PanelRight } from 'lucide-vue-next'
+import { Bot, Cpu, Info, Minus, RotateCw, Settings, ShieldCheck, Square, X, PanelBottom, PanelLeft, PanelRight } from 'lucide-vue-next'
 import { useRobotStore } from '../stores/robotStore'
 import { usePrefsStore } from '../stores/prefsStore'
 
 const props = defineProps<{ wsStatus: 'connecting' | 'open' | 'closed' }>()
 defineEmits<{
-  'open-settings': []; 'open-capabilities': []
+  'open-settings': []; 'open-capabilities': []; 'open-about': []
   'toggle-left': []; 'toggle-right': []; 'toggle-bottom': []
 }>()
 
