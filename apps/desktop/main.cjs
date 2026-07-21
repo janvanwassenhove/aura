@@ -331,6 +331,13 @@ function createWindow() {
   mainWindow.loadURL(SPLASH_HTML)
   mainWindow.on('closed', () => { mainWindow = null })
 
+  // U170: links with target=_blank (About dialog → mityjohn.com, GitHub) open
+  // in the SYSTEM browser — never as a second Electron window.
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    if (url.startsWith('http://') || url.startsWith('https://')) shell.openExternal(url)
+    return { action: 'deny' }
+  })
+
   // Window controls for the custom title bar (see preload.cjs).
   ipcMain.on('win:minimize', () => mainWindow?.minimize())
   ipcMain.on('win:toggleMaximize', () => {
@@ -341,6 +348,9 @@ function createWindow() {
 
   // U95: restart the brain child process (loads new code / config) without
   // quitting the whole app. The console calls this via the preload bridge.
+  // U170: version for the About dialog.
+  ipcMain.handle('aura:app-version', () => app.getVersion())
+
   ipcMain.handle('aura:restart-brain', async () => {
     try {
       stopBrain()
