@@ -74,3 +74,20 @@ describe('conversationStore', () => {
     expect(store.turns).toHaveLength(0)
   })
 })
+
+describe('conversationStore — clear (U187)', () => {
+  beforeEach(() => setActivePinia(createPinia()))
+
+  it('clears the visible transcript but keeps the session', () => {
+    const store = useConversationStore()
+    store.applyEvent({ event_type: 'TranscriptUpdated', transcript: 'hoi', is_final: true })
+    store.sessionId = 'sess-1'
+    expect(store.turns.length).toBeGreaterThan(0)
+
+    store.clearTurns()
+
+    expect(store.turns).toEqual([])
+    expect(store.lastLatency).toBeNull()
+    expect(store.sessionId).toBe('sess-1')   // the assistant still remembers
+  })
+})
