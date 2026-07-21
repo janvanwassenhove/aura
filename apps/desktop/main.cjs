@@ -309,9 +309,10 @@ stroke-linecap="round" stroke-linejoin="round"><path d="M12 8V4H8"/><rect width=
 <p style="color:%2394a3b8;font-size:.9rem">brain &middot; connectors &middot; knowledge (encrypted)</p></body>`
 
 function trayIcon() {
-  // 16x16 robot-blue dot; a data-URL keeps the app asset-free.
-  const png = 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAWElEQVR4nGNgGAWMDAwM/xkYGP4TwP+JwXAD/hMLiDIAlwHYNODVjM8AbBpxGoBLIzYD8GnEMICQRnQDiNGIYgCxGlEcTaxGuAHkaCTKAGI0Yhgw8gEAoW9iEVrIZLQAAAAASUVORK5CYII='
-  return nativeImage.createFromBuffer(Buffer.from(png, 'base64'))
+  // U171: the real app icon (Reachy silhouette), scaled for the tray — the
+  // old hardcoded base64 "blue dot" predates having an icon at all.
+  const img = nativeImage.createFromPath(path.join(__dirname, 'build', 'icon.png'))
+  return img.isEmpty() ? img : img.resize({ width: 16, height: 16 })
 }
 
 function createWindow() {
