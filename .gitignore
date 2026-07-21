@@ -11,6 +11,11 @@ venv/
 *.egg-info/
 dist/
 build/
+# U174: maar de desktop-iconen MOETEN mee — dit ontbrak en daardoor had
+# elke CI-build geen icoonbestand en vielen alle releases stil terug op
+# het default Electron-icoon ("application icon is not set").
+!apps/desktop/build/
+!apps/desktop/build/**
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/

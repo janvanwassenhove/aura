@@ -54,7 +54,11 @@ jobs:
               BASE="${PREV#v}"
               MAJ="${BASE%%.*}"; REST="${BASE#*.}"
               MIN="${REST%%.*}"; PAT="${REST#*.}"
-              LOG=$(git log --pretty=%B "$PREV"..HEAD)
+              # U174: SUBJECT lines only — a commit BODY that merely
+              # DESCRIBES the markers set off a major bump (v1.5.0 went
+              # straight to v2.0.0 because the U172 message explained
+              # the convention). Markers belong in the commit title.
+              LOG=$(git log --pretty=%s "$PREV"..HEAD)
               if echo "$LOG" | grep -q '\[major\]'; then
                 MAJ=$((MAJ+1)); MIN=0; PAT=0
               elif echo "$LOG" | grep -q '\[minor\]'; then
