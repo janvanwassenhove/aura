@@ -14,4 +14,6 @@ contextBridge.exposeInMainWorld('aura', {
   restartBrain: () => ipcRenderer.invoke('aura:restart-brain'),
   // U170: real app version for the About dialog (stamped per release build).
   appVersion: () => ipcRenderer.invoke('aura:app-version'),
+  // U178: manual update check that reports WHY nothing happened.
+  checkUpdate: () => ipcRenderer.invoke('aura:check-update'),
 })
