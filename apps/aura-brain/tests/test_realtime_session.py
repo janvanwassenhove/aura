@@ -264,3 +264,20 @@ async def test_session_raises_on_error_event() -> None:
     sess = RealtimeSession(robot=robot, bus=_Bus(), conn_factory=lambda m: conn)
     with pytest.raises(RuntimeError):
         await sess.run()
+
+
+async def test_request_stop_ends_the_session_promptly(monkeypatch) -> None:
+    """U184: the panic stop must end a session that is otherwise idling."""
+    monkeypatch.setenv("REALTIME_SESSION_IDLE_S", "600")   # would never time out
+    conn = _FakeConn([], hang_after=True)
+    robot = _FakeRobot(chunks=200)
+    sess = RealtimeSession(robot=robot, bus=_Bus(), conn_factory=lambda m: conn)
+
+    async def stop_soon():
+        await asyncio.sleep(0.15)
+        sess.request_stop()
+
+    t0 = time.monotonic()
+    await asyncio.gather(asyncio.wait_for(sess.run(), timeout=10.0), stop_soon())
+    assert sess.closed_reason == "stopped by owner"
+    assert time.monotonic() - t0 < 5.0

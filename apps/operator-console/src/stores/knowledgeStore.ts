@@ -218,8 +218,11 @@ export const useKnowledgeStore = defineStore('knowledge', () => {
   }
 
   async function forgetPerson(personId: string): Promise<boolean> {
-    // Right-to-be-forgotten — step-up required when encryption is active (ADR-008 §9).
-    const resp = await _request(`/people/${encodeURIComponent(personId)}`, { method: 'DELETE' })
+    // Right-to-be-forgotten — step-up when a phone webhook is configured,
+    // otherwise a typed confirmation from this console (U185). Sending the id
+    // back IS that confirmation; the UI already asked the owner to confirm.
+    const id = encodeURIComponent(personId)
+    const resp = await _request(`/people/${id}?confirm=${id}`, { method: 'DELETE' })
     if (resp) {
       if (detail.value?.person.person_id === personId) detail.value = null
       await fetchPeople()

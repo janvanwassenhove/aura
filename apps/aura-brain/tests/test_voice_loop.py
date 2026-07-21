@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import time
 
 from aura_brain.voice_loop import VoiceLoop
@@ -234,3 +235,54 @@ async def test_realtime_session_failure_counts_toward_breaker(monkeypatch) -> No
     assert await loop._realtime_turn(b"w", command="mop") is False
     assert await loop._realtime_turn(b"w", command="mop") is False
     assert loop._realtime_broken is True  # two failures trip the breaker
+
+
+# ------------------------------------------------------------------
+# U184: panic stop
+# ------------------------------------------------------------------
+
+class _PanicRobot:
+    def __init__(self) -> None:
+        self.stopped = 0
+
+    async def stop_audio(self) -> dict:
+        self.stopped += 1
+        return {"ok": True}
+
+
+class _FakeSession:
+    def __init__(self) -> None:
+        self.stop_requested = False
+
+    def request_stop(self) -> None:
+        self.stop_requested = True
+
+
+async def test_panic_cuts_speech_ends_session_and_mutes_mic(monkeypatch) -> None:
+    monkeypatch.setenv("VOICE_MODE", "wake_word")
+    robot = _PanicRobot()
+    loop = VoiceLoop(robot=robot, pipeline=None, bus=_NullBus(), default_wake_word="richie")
+    sess = _FakeSession()
+    loop._active_session = sess
+    loop._followup_until = time.monotonic() + 999   # an open follow-up window
+
+    result = await loop.panic()
+
+    assert robot.stopped == 1                       # speech cut mid-word
+    assert sess.stop_requested is True              # conversation ended
+    assert os.environ["VOICE_MODE"] == "off"        # nothing can restart it
+    assert loop._followup_until == 0.0
+    assert result["stopped"] is True
+
+
+async def test_panic_works_without_an_active_session(monkeypatch) -> None:
+    """Noise can also loop the classic pipeline — stop must not depend on one."""
+    monkeypatch.setenv("VOICE_MODE", "wake_word")
+    robot = _PanicRobot()
+    loop = VoiceLoop(robot=robot, pipeline=None, bus=_NullBus(), default_wake_word="richie")
+
+    result = await loop.panic()
+
+    assert robot.stopped == 1
+    assert result["session"] is False
+    assert os.environ["VOICE_MODE"] == "off"

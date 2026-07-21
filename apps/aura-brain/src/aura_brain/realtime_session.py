@@ -111,6 +111,8 @@ class RealtimeSession:
         # U163: mic stays shut until this time (seed-utterance tail, see run()).
         self._mic_open_at = 0.0
         self._first_segment_played = False
+        # U184: panic stop — set from outside to end this session NOW.
+        self._stopping = False
         self.turns = 0
         self.closed_reason = ""
 
@@ -190,6 +192,9 @@ class RealtimeSession:
             try:
                 tick = min(1.0, max(0.05, self._idle_s / 4))
                 while True:
+                    if self._stopping:          # U184: owner pressed Stop
+                        self.closed_reason = "stopped by owner"
+                        return
                     done, _ = await asyncio.wait(
                         {mic, events}, timeout=tick,
                         return_when=asyncio.FIRST_COMPLETED)
@@ -222,6 +227,11 @@ class RealtimeSession:
                     t.cancel()
                 logger.info("realtime session closed (%s): %d turns, ~$%.4f total",
                             self.closed_reason, self.turns, self._meter.spent_usd())
+
+    def request_stop(self) -> None:
+        """U184: end this conversation at the next tick (<=1s). Used by the
+        panic stop when ambient noise has the session talking to itself."""
+        self._stopping = True
 
     # -- mic → server --------------------------------------------------
 

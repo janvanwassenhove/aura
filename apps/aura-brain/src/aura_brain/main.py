@@ -456,6 +456,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     )
     ctx.pipeline.set_cancel_event(session_id, ctx.conversation.llm_cancel)
     ctx._voice_loop.start()
+    voice_api.set_voice_loop(ctx._voice_loop)   # U184: panic stop target
 
     async def _voice_note_spoken(event: ResponseDrafted) -> None:
         if ctx._voice_loop is not None:
