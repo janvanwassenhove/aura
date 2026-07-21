@@ -2,7 +2,10 @@
   "name": "aura-desktop",
   "version": "1.0.0",
   "description": "AURA desktop app \u2014 brain + operator console in one window",
-  "author": "Jan Van Wassenhove",
+  "author": {
+    "name": "Jan Van Wassenhove",
+    "email": "janvanwassenhove@users.noreply.github.com"
+  },
   "homepage": "https://github.com/janvanwassenhove/aura",
   "main": "main.cjs",
   "scripts": {
