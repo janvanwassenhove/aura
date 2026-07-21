@@ -95,6 +95,34 @@ async def enroll(body: dict) -> JSONResponse:
     })
 
 
+@router.post("/merge")
+async def merge_person(body: dict) -> JSONResponse:
+    """U189: assign one person's face to another, then erase the source.
+
+    The case this exists for: a face auto-enrolled as "Guest 1" (U181) turns
+    out to be Piet. Moving the samples keeps recognition working under Piet's
+    id instead of forcing the owner to re-teach the face; the guest profile
+    and its face are then erased.
+    """
+    if _matcher is None:
+        return JSONResponse({"error": "recognition disabled"}, status_code=503)
+    source = str((body or {}).get("from_person_id", "")).strip().lower()
+    target = str((body or {}).get("to_person_id", "")).strip().lower()
+    if not source or not target:
+        return JSONResponse(
+            {"error": "from_person_id and to_person_id are required"}, status_code=422)
+    if source == target:
+        return JSONResponse({"error": "cannot merge a person into themselves"},
+                            status_code=422)
+    if _store is not None and await _store.get_person(target) is None:
+        return JSONResponse({"error": f"unknown person {target!r}"}, status_code=404)
+
+    moved = _matcher.transfer(source, target)
+    if _store is not None:
+        await _store.delete_person(source)      # the guest profile is absorbed
+    return JSONResponse({"merged": source, "into": target, "faces_moved": moved})
+
+
 @router.delete("/people/{person_id}")
 async def forget(person_id: str) -> JSONResponse:
     if _matcher is None:

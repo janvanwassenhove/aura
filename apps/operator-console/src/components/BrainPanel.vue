@@ -231,6 +231,34 @@
               </div>
             </div>
           </div>
+          <!-- U189: an auto-created guest needs three obvious next steps:
+               name them, assign them to someone you already know, or forget. -->
+          <div v-if="store.detail.person.role === 'guest'" class="guest-actions">
+            <p class="guest-hint">This face was added automatically. Who is it?</p>
+            <div class="guest-row">
+              <input v-model="guestName" class="rail-input guest-input"
+                     placeholder="Real name (e.g. Piet)" @keydown.enter="nameGuest" />
+              <select v-model="guestRole" class="rail-input guest-role">
+                <option value="family">family</option>
+                <option value="guest">guest</option>
+                <option value="minor">minor</option>
+                <option value="owner">owner</option>
+              </select>
+              <button class="rail-btn guest-btn" :disabled="!guestName.trim() || guestBusy"
+                      @click="nameGuest">Save as person</button>
+            </div>
+            <div class="guest-row">
+              <select v-model="mergeTarget" class="rail-input guest-input">
+                <option value="">…or assign this face to someone I know</option>
+                <option v-for="p in mergeCandidates" :key="p.person_id" :value="p.person_id">
+                  {{ p.display_name }}
+                </option>
+              </select>
+              <button class="rail-btn guest-btn" :disabled="!mergeTarget || guestBusy"
+                      @click="assignGuest">Assign</button>
+            </div>
+            <p v-if="guestMsg" class="guest-hint guest-hint--msg">{{ guestMsg }}</p>
+          </div>
           <p v-if="teachMsg" class="content-hint teach-line">{{ teachMsg }}</p>
           <p v-if="importNote" class="content-hint teach-line">{{ importNote }}</p>
 
@@ -470,6 +498,45 @@ async function doTeachFace() {
   try { teachMsg.value = await store.teachFace(store.detail.person.person_id) }
   finally { teaching.value = false }
 }
+// U189: turn an auto-created guest into a real person, or fold them into an
+// existing one (their face moves along, so recognition keeps working).
+const guestName = ref('')
+const guestRole = ref('family')
+const mergeTarget = ref('')
+const guestBusy = ref(false)
+const guestMsg = ref('')
+
+const mergeCandidates = computed(() =>
+  store.people.filter(p => p.person_id !== store.detail?.person.person_id
+                        && p.role !== 'guest' && p.role !== 'demo'))
+
+async function nameGuest(): Promise<void> {
+  const person = store.detail?.person
+  if (!person || !guestName.value.trim() || guestBusy.value) return
+  guestBusy.value = true
+  guestMsg.value = ''
+  try {
+    const ok = await store.renamePerson(person.person_id, guestName.value.trim(), guestRole.value)
+    guestMsg.value = ok ? '' : (store.error ?? 'Could not save this person.')
+    if (ok) { guestName.value = ''; await store.fetchPeople() }
+  } finally { guestBusy.value = false }
+}
+
+async function assignGuest(): Promise<void> {
+  const person = store.detail?.person
+  if (!person || !mergeTarget.value || guestBusy.value) return
+  const target = store.people.find(p => p.person_id === mergeTarget.value)
+  if (!confirm(`Assign this face to ${target?.display_name ?? mergeTarget.value}? `
+             + `${person.display_name} is removed.`)) return
+  guestBusy.value = true
+  guestMsg.value = ''
+  try {
+    const ok = await store.mergePerson(person.person_id, mergeTarget.value)
+    if (ok) { mergeTarget.value = ''; selected.value = '_skills' }
+    else guestMsg.value = store.error ?? 'Could not assign this face.'
+  } finally { guestBusy.value = false }
+}
+
 async function doForget() {
   if (!store.detail) return
   if (!confirm(`Forget ${store.detail.person.display_name}? This erases their profile and face.`)) return
@@ -1147,6 +1214,13 @@ onMounted(async () => {
 }
 .hero-menu-item:hover { background: var(--surface-2); }
 .hero-menu-item--danger { color: var(--danger-text, #e5484d); }
+.guest-actions { border: 1px solid var(--border); border-radius: 8px; padding: 0.6rem; margin: 0.5rem 0; }
+.guest-hint { font-size: 0.72rem; color: var(--text-muted); margin: 0 0 0.45rem; }
+.guest-hint--msg { color: var(--danger-text, #e5484d); margin: 0.45rem 0 0; }
+.guest-row { display: flex; gap: 0.4rem; margin-bottom: 0.35rem; }
+.guest-input { flex: 1; min-width: 0; }
+.guest-role { width: 6.5rem; }
+.guest-btn { white-space: nowrap; }
 
 /* U127: recognition snapshot strip */
 .snap-strip { display: flex; gap: 0.4rem; overflow-x: auto; padding-bottom: 0.3rem; margin-bottom: 0.3rem; }

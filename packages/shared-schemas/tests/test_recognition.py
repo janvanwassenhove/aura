@@ -56,3 +56,30 @@ def test_person_recognized_event_shape() -> None:
     stranger = PersonRecognized(session_id="s")
     assert known.known is True and known.person_id == "jan"
     assert stranger.known is False and stranger.person_id is None
+
+
+def test_transfer_moves_faces_to_another_person() -> None:
+    """U189: assigning a guest to a real person must keep the face working."""
+    from shared_schemas.knowledge import crypto
+    from shared_schemas.knowledge.recognition import EmbeddingMatcher
+
+    omk = crypto.derive_omk("pass", b"0123456789abcdef")
+    m = EmbeddingMatcher(omk)
+    face = [1.0, 0.0, 0.0]
+    m.enroll("guest-1", face)
+
+    moved = m.transfer("guest-1", "piet")
+
+    assert moved == 1
+    assert m.identify(face)[0] == "piet"        # recognised as the real person
+    assert "guest-1" not in m.enrolled_ids()    # guest's face is gone
+    assert m.sample_count("piet") == 1
+
+
+def test_transfer_of_unknown_person_is_harmless() -> None:
+    from shared_schemas.knowledge import crypto
+    from shared_schemas.knowledge.recognition import EmbeddingMatcher
+
+    m = EmbeddingMatcher(crypto.derive_omk("pass", b"0123456789abcdef"))
+    assert m.transfer("nobody", "piet") == 0
+    assert m.enrolled_ids() == []
