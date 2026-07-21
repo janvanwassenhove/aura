@@ -388,6 +388,64 @@ function createWindow() {
 }
 
 // ---------------------------------------------------------------------------
+// U173: update check — ask the owner when a newer GitHub release exists
+// ---------------------------------------------------------------------------
+
+const { checkForUpdate, downloadAsset } = require('./updater.cjs')
+let updateDialogOpen = false
+
+function skippedVersionFile() { return path.join(app.getPath('userData'), 'update-skip.json') }
+
+function skippedVersion() {
+  try { return JSON.parse(fs.readFileSync(skippedVersionFile(), 'utf-8')).skip } catch { return null }
+}
+
+async function maybeOfferUpdate() {
+  if (updateDialogOpen || !mainWindow) return
+  const token = loadEnvFile(ENV_FILE).GITHUB_TOKEN || process.env.GITHUB_TOKEN || ''
+  const update = await checkForUpdate({ currentVersion: app.getVersion(), token })
+  if (!update || update.tag === skippedVersion()) return
+
+  updateDialogOpen = true
+  try {
+    const canAutoInstall = process.platform === 'win32' && !!update.asset
+    const { response } = await dialog.showMessageBox(mainWindow, {
+      type: 'info',
+      title: 'Update beschikbaar',
+      message: `AURA ${update.version} is beschikbaar (je gebruikt ${app.getVersion()}).`,
+      detail: canAutoInstall
+        ? 'De installer wordt gedownload en gestart; je instellingen blijven staan.'
+        : 'De releasepagina wordt geopend zodat je de nieuwe versie kunt downloaden.',
+      buttons: canAutoInstall
+        ? ['Download & installeer', 'Later', 'Deze versie overslaan']
+        : ['Open releasepagina', 'Later', 'Deze versie overslaan'],
+      defaultId: 0, cancelId: 1,
+    })
+    if (response === 2) {
+      fs.writeFileSync(skippedVersionFile(), JSON.stringify({ skip: update.tag }))
+      return
+    }
+    if (response !== 0) return
+
+    if (canAutoInstall) {
+      try {
+        const dest = path.join(app.getPath('temp'), update.asset.name)
+        await downloadAsset({ asset: update.asset, token, destPath: dest })
+        await shell.openPath(dest)      // NSIS wizard takes over
+        quitting = true
+        setTimeout(() => app.quit(), 1200)
+        return
+      } catch (err) {
+        console.error('update download failed, opening release page instead:', err.message)
+      }
+    }
+    shell.openExternal(update.htmlUrl)  // fallback: manual download
+  } finally {
+    updateDialogOpen = false
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Lifecycle
 // ---------------------------------------------------------------------------
 
@@ -415,6 +473,12 @@ if (!app.requestSingleInstanceLock()) {
       if (mainWindow) mainWindow.loadURL(`http://localhost:${CONSOLE_PORT}`)
     } catch (err) {
       dialog.showErrorBox('AURA failed to start', `${err.message}${logPath ? `\nBrain log: ${logPath}` : ''}`)
+    }
+    // U173: releases ship continuously — tell the owner when a newer one
+    // exists. First check after startup settles, then every 4 hours.
+    if (IS_PACKAGED) {
+      setTimeout(() => { maybeOfferUpdate() }, 30_000)
+      setInterval(() => { maybeOfferUpdate() }, 4 * 60 * 60 * 1000)
     }
   })
 

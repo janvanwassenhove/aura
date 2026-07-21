@@ -33,15 +33,40 @@ jobs:
       version: ${{ steps.v.outputs.version }}
       tag: ${{ steps.v.outputs.tag }}
     steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0        # U172: semver bump needs tags + commit history
       - id: v
         run: |
           if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            # An explicit tag push always wins.
             TAG="${GITHUB_REF#refs/tags/}"
             VERSION="${TAG#v}"
           else
-            VERSION="1.${{ github.run_number }}.0"
+            # U172: SEMANTIC bump from commit messages since the last release.
+            #   [major] anywhere in a commit → X+1.0.0
+            #   [minor]                      → X.Y+1.0
+            #   otherwise                    → X.Y.Z+1  (most units are fixes)
+            PREV=$(git tag --list 'v*' --sort=-v:refname | head -1)
+            if [ -z "$PREV" ]; then
+              VERSION="1.0.0"
+            else
+              BASE="${PREV#v}"
+              MAJ="${BASE%%.*}"; REST="${BASE#*.}"
+              MIN="${REST%%.*}"; PAT="${REST#*.}"
+              LOG=$(git log --pretty=%B "$PREV"..HEAD)
+              if echo "$LOG" | grep -q '\[major\]'; then
+                MAJ=$((MAJ+1)); MIN=0; PAT=0
+              elif echo "$LOG" | grep -q '\[minor\]'; then
+                MIN=$((MIN+1)); PAT=0
+              else
+                PAT=$((PAT+1))
+              fi
+              VERSION="${MAJ}.${MIN}.${PAT}"
+            fi
             TAG="v${VERSION}"
           fi
+          echo "release version: ${VERSION} (previous: ${PREV:-none})"
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
           echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
 
