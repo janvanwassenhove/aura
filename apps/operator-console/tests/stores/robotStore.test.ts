@@ -154,3 +154,22 @@ describe('robotStore — face visibility (U165)', () => {
     expect(store.faceVisible).toBeNull()
   })
 })
+
+describe('robotStore — WS generation signal (U175)', () => {
+  beforeEach(() => setActivePinia(createPinia()))
+
+  it('counts every (re)connect so stalled streams can remount', () => {
+    const store = useRobotStore()
+    expect(store.wsGeneration).toBe(0)
+    store.noteWsOpen()          // initial connect
+    store.noteWsOpen()          // brain restarted → reconnect
+    expect(store.wsGeneration).toBe(2)
+  })
+
+  it('resets with the rest of the store', () => {
+    const store = useRobotStore()
+    store.noteWsOpen()
+    store.$reset()
+    expect(store.wsGeneration).toBe(0)
+  })
+})

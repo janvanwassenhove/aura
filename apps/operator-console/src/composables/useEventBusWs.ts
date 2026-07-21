@@ -34,6 +34,9 @@ export function useEventBusWs() {
     ws.onopen = () => {
       wsStatus.value = 'open'
       reconnectDelay = RECONNECT_BASE_MS
+      // U175: tell the stores the backend is (back) alive — the camera panel
+      // remounts its silently-stalled MJPEG stream on this signal.
+      useRobotStore().noteWsOpen()
     }
 
     ws.onmessage = (e) => {

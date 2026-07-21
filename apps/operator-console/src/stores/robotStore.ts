@@ -35,6 +35,12 @@ export const useRobotStore = defineStore('robot', () => {
   // same either way, which is what made "follow-me doesn't work" so hard to
   // pin down. null = unknown / not following.
   const faceVisible = ref<boolean | null>(null)
+  // U175: bumped on every WebSocket (re)connect. An MJPEG <img> that loses
+  // its server (brain restart, update) stalls SILENTLY — no error event, no
+  // retry — so the camera looked dead until a full page reload. Watchers on
+  // this counter remount the stream the moment the backend is back.
+  const wsGeneration = ref(0)
+  function noteWsOpen(): void { wsGeneration.value++ }
 
   const statusBadgeClass = computed(() => {
     if (!connected.value) return 'badge-gray'
@@ -148,7 +154,8 @@ export const useRobotStore = defineStore('robot', () => {
     lastRecognized.value = null
     tracking.value = true
     faceVisible.value = null
+    wsGeneration.value = 0
   }
 
-  return { mode, behaviorState, isSpeaking, currentTranscript, uptime, connected, motionLog, lastRecognized, tracking, faceVisible, statusBadgeClass, applyEvent, syncFromStatus, setTracking, $reset }
+  return { mode, behaviorState, isSpeaking, currentTranscript, uptime, connected, motionLog, lastRecognized, tracking, faceVisible, wsGeneration, noteWsOpen, statusBadgeClass, applyEvent, syncFromStatus, setTracking, $reset }
 })

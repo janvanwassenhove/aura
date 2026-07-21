@@ -2,7 +2,13 @@
   <section class="panel video-panel">
     <div class="flex items-center justify-between mb-2">
       <h2 class="panel-title mb-0">Robot Camera</h2>
-      <span v-if="state === 'live'" class="live-badge"><Video :size="11" /> LIVE</span>
+      <span class="cam-header-right">
+        <!-- U175: manual revive for a silently-stalled MJPEG stream -->
+        <button class="cam-refresh" title="Reconnect the camera stream" aria-label="Reconnect camera" @click="bumpStream">
+          <RotateCw :size="12" />
+        </button>
+        <span v-if="state === 'live'" class="live-badge"><Video :size="11" /> LIVE</span>
+      </span>
     </div>
 
     <div class="video-frame">
@@ -109,8 +115,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
-import { Eye, Move, ScanFace, UserCheck, UserX, Video, VideoOff } from 'lucide-vue-next'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { Eye, Move, RotateCw, ScanFace, UserCheck, UserX, Video, VideoOff } from 'lucide-vue-next'
 import { useRobotStore } from '../stores/robotStore'
 
 const BRAIN_URL = import.meta.env.VITE_BRAIN_URL ?? import.meta.env.VITE_ORCHESTRATOR_URL ?? 'http://localhost:8000'
@@ -132,11 +138,26 @@ let retryTimer: ReturnType<typeof setTimeout> | null = null
 function onStreamError() {
   state.value = 'off'
   if (retryTimer) clearTimeout(retryTimer)
-  retryTimer = setTimeout(() => {
-    state.value = 'connecting'
-    streamKey.value++ // remount the <img> → reconnect the stream
-  }, 4000)
+  retryTimer = setTimeout(bumpStream, 4000)
 }
+
+// U175: remount the <img> → fresh MJPEG connection. Needed because a stream
+// whose SERVER goes away stalls silently: no error event fires, the retry
+// above never runs, and the panel froze until a full page reload ("camera
+// lijkt niet meer te werken").
+function bumpStream() {
+  state.value = 'connecting'
+  streamKey.value++
+}
+
+// Brain restarted (WS reconnected) → the stream endpoint is back; remount.
+watch(() => robotStore.wsGeneration, (n, old) => {
+  if (old !== undefined && old > 0 && n > old) bumpStream()
+})
+// Robot came back online (Pi restart) → the brain's proxy source is back.
+watch(() => robotStore.connected, (now, was) => {
+  if (now && was === false) bumpStream()
+})
 
 async function fetchRecognitionStatus() {
   try {
@@ -299,6 +320,13 @@ onUnmounted(() => { if (retryTimer) clearTimeout(retryTimer) })
 
 <style scoped>
 .video-panel { margin-top: 1rem; }
+.cam-header-right { display: inline-flex; align-items: center; gap: 0.4rem; }
+.cam-refresh {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px; border-radius: 5px; cursor: pointer;
+  background: none; border: 1px solid var(--border); color: var(--text-muted);
+}
+.cam-refresh:hover { color: var(--text); border-color: var(--accent); }
 .live-badge {
   display: inline-flex; align-items: center; gap: 0.25rem;
   font-size: 0.65rem; font-weight: 700; letter-spacing: 0.05em;
