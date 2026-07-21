@@ -28,7 +28,52 @@ const REPO_ROOT = IS_PACKAGED
 const CONSOLE_DIST = IS_PACKAGED
   ? path.join(process.resourcesPath, 'console')
   : path.join(REPO_ROOT, 'apps', 'operator-console', 'dist')
-const ENV_FILE = path.join(REPO_ROOT, 'infra', 'dev', '.env')
+// U177: ALL owner state lives OUTSIDE the install directory.
+//
+// It used to sit under resources/aura (.env, data/, skills/) — inside the
+// folder the NSIS installer replaces on every update. Updating therefore
+// wiped the knowledge store, face embeddings, memory DB, learned skills AND
+// the knowledge passphrase. userData (%APPDATA%/aura-desktop) survives
+// updates and uninstall-then-reinstall.
+//
+// Dev checkouts keep the old repo-relative paths — a dev run must not read
+// or clobber the installed app's real data.
+const USER_ROOT = IS_PACKAGED ? app.getPath('userData') : REPO_ROOT
+const DATA_DIR = IS_PACKAGED
+  ? path.join(USER_ROOT, 'data')
+  : path.join(REPO_ROOT, 'data')
+const SKILLS_DIR = path.join(IS_PACKAGED ? USER_ROOT : REPO_ROOT, 'skills')
+const ENV_FILE = IS_PACKAGED
+  ? path.join(USER_ROOT, '.env')
+  : path.join(REPO_ROOT, 'infra', 'dev', '.env')
+// Where those files used to live — migrated once, on the next launch.
+const LEGACY_ENV_FILE = path.join(REPO_ROOT, 'infra', 'dev', '.env')
+const LEGACY_DATA_DIR = path.join(REPO_ROOT, 'data')
+const LEGACY_SKILLS_DIR = path.join(REPO_ROOT, 'skills')
+
+/** Copy pre-U177 owner state out of the install dir, once. Never overwrites. */
+function migrateLegacyState() {
+  if (!IS_PACKAGED) return
+  try {
+    fs.mkdirSync(DATA_DIR, { recursive: true })
+    if (!fs.existsSync(ENV_FILE) && fs.existsSync(LEGACY_ENV_FILE)) {
+      fs.copyFileSync(LEGACY_ENV_FILE, ENV_FILE)
+    }
+    if (fs.existsSync(LEGACY_DATA_DIR)) {
+      for (const name of fs.readdirSync(LEGACY_DATA_DIR)) {
+        const dest = path.join(DATA_DIR, name)
+        const src = path.join(LEGACY_DATA_DIR, name)
+        if (!fs.existsSync(dest) && fs.statSync(src).isFile()) fs.copyFileSync(src, dest)
+      }
+    }
+    if (!fs.existsSync(SKILLS_DIR) && fs.existsSync(LEGACY_SKILLS_DIR)) {
+      fs.cpSync(LEGACY_SKILLS_DIR, SKILLS_DIR, { recursive: true })
+    }
+  } catch (err) {
+    console.error('legacy state migration failed (continuing):', err.message)
+  }
+}
+
 // 8020, not 8000: Pollen's "Reachy Mini Control" desktop app squats on 8000.
 const BRAIN_PORT = 8020
 const BRAIN_URL = `http://localhost:${BRAIN_PORT}`
@@ -60,6 +105,15 @@ function loadEnvFile(file) {
 
 function brainEnv() {
   const env = { ...process.env, ...loadEnvFile(ENV_FILE) }
+  // U177: persist everything under userData, so an update can never wipe it.
+  // Explicit values from .env still win (the || below), but the DEFAULTS are
+  // no longer relative paths that land inside the install directory.
+  const posix = (p) => p.replace(/\\/g, '/')
+  env.AURA_ENV_FILE = ENV_FILE                    // where prefs/wizard write
+  env.KNOWLEDGE_DB_PATH = env.KNOWLEDGE_DB_PATH || path.join(DATA_DIR, 'knowledge.enc.json')
+  env.RECOGNITION_DB_PATH = env.RECOGNITION_DB_PATH || path.join(DATA_DIR, 'recognition.enc.json')
+  env.DATABASE_URL = env.DATABASE_URL || `sqlite+aiosqlite:///${posix(path.join(DATA_DIR, 'aura-memory.db'))}`
+  env.SKILLS_DIR = env.SKILLS_DIR || SKILLS_DIR
   // Desktop defaults (only when the wizard/.env didn't decide already).
   env.ROBOT_RUNTIME_URL = env.ROBOT_RUNTIME_URL || 'http://reachy-mini.local:8001'
   env.HEARTBEAT_ENABLED = env.HEARTBEAT_ENABLED || 'true'
@@ -466,6 +520,7 @@ if (!app.requestSingleInstanceLock()) {
     createWindow()
     let logPath = ''
     try {
+      migrateLegacyState()               // U177: rescue pre-userData state
       await ensureBootstrap(mainWindow)  // packaged first run: uv + sync
       logPath = startBrain()
       await serveConsole()
