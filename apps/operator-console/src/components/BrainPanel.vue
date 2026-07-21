@@ -3,10 +3,15 @@
     <div :class="docked ? 'brain-dock-inner' : 'brain-modal'">
       <header class="brain-header">
         <span class="brain-title"><Brain :size="17" /> {{ prefs.assistantName }}'s brain</span>
-        <span v-if="store.tier" class="brain-tier" :title="`Unlock tier: ${store.tier}`">
-          <ShieldCheck :size="12" /> {{ store.tier }}
+        <!-- U180: say what it MEANS for the owner. This used to print the raw
+             internal tier name ("BENIGN"), which explains nothing about
+             whether personal data is encrypted on this device. -->
+        <span v-if="store.tier" :class="['brain-tier', `brain-tier--${vault.kind}`]" :title="vault.title">
+          <ShieldCheck v-if="vault.kind === 'ok'" :size="12" />
+          <Lock v-else-if="vault.kind === 'locked'" :size="12" />
+          <ShieldAlert v-else :size="12" />
+          {{ vault.label }}
         </span>
-        <span v-if="store.locked" class="brain-locked-badge" title="Encrypted &amp; locked"><Lock :size="12" /> locked</span>
         <button v-if="!docked" class="brain-close" aria-label="Close" @click="$emit('close')"><X :size="15" /></button>
       </header>
 
@@ -368,9 +373,10 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
+import { vaultState } from '../lib/vaultState'
 import {
   BookOpen, Brain, Facebook, Github, Globe, Instagram, Linkedin, Lock, Mail,
-  MoreHorizontal, Pencil, ScanFace, Share2, ShieldCheck, Sparkles, Twitter, X,
+  MoreHorizontal, Pencil, ScanFace, Share2, ShieldAlert, ShieldCheck, Sparkles, Twitter, X,
 } from 'lucide-vue-next'
 import BrainGraph from './BrainGraph.vue'
 import WikiText from './WikiText.vue'
@@ -396,6 +402,10 @@ const unlockErr = ref('')
 // U179: first-time encryption from the brain panel — /setup/secure migrates
 // existing profiles into the encrypted store, persists the passphrase and
 // STARTS face recognition, which is what brings the "This is me" button back.
+// U180: badge state lives in src/lib/vaultState.ts so all three states
+// are unit-tested (a privacy signal must never quietly lie).
+const vault = computed(() => vaultState(store.locked, store.omkLoaded))
+
 const securePass = ref('')
 const securing = ref(false)
 const secureErr = ref('')
@@ -984,7 +994,10 @@ onMounted(async () => {
   padding: 0.9rem 1.1rem; border-bottom: 1px solid var(--border);
 }
 .brain-title { font-weight: 600; font-size: 0.95rem; display: inline-flex; align-items: center; gap: 0.45rem; flex: 1; }
-.brain-tier { font-size: 0.68rem; color: var(--text-faint); display: inline-flex; align-items: center; gap: 0.25rem; text-transform: uppercase; }
+.brain-tier { font-size: 0.68rem; color: var(--text-faint); display: inline-flex; align-items: center; gap: 0.25rem; }
+.brain-tier--ok { color: var(--ok-text, #2f9e6e); }
+.brain-tier--warn { color: var(--warn, #d9a441); }
+.brain-tier--locked { color: var(--danger-text, #e5484d); }
 .brain-locked-badge { font-size: 0.7rem; color: var(--warn, #d9a441); display: inline-flex; align-items: center; gap: 0.25rem; }
 .hero-spacer { flex: 1; }
 .hero-btn { display: inline-flex; align-items: center; gap: 0.3rem; font-size: 0.75rem; background: var(--surface-2); border: 1px solid var(--border-strong); border-radius: var(--radius-md); color: var(--text); padding: 0.3rem 0.55rem; cursor: pointer; }
