@@ -1,6 +1,15 @@
 <template>
   <section class="panel flex flex-col h-full">
-    <h2 class="panel-title">Conversation</h2>
+    <div class="conv-header">
+      <h2 class="panel-title mb-0">Conversation</h2>
+      <!-- U187: clear the transcript. Handy after a runaway session (ambient
+           noise) left a wall of replies nobody asked for. -->
+      <button v-if="conversationStore.turns.length" class="conv-clear"
+              title="Clear this conversation" aria-label="Clear conversation"
+              @click="clearConversation">
+        <Trash2 :size="12" /> Clear
+      </button>
+    </div>
 
     <div ref="scrollEl" class="conversation-scroll flex-1 overflow-y-auto space-y-2 mb-3">
       <div
@@ -141,7 +150,7 @@
 
 <script setup lang="ts">
 import { computed, onUnmounted, ref, watch, nextTick } from 'vue'
-import { Bot, GraduationCap, LoaderCircle, Mic, Sparkles, Square, Wrench } from 'lucide-vue-next'
+import { Bot, GraduationCap, LoaderCircle, Mic, Sparkles, Square, Trash2, Wrench } from 'lucide-vue-next'
 import RichieAvatar from './RichieAvatar.vue'
 import { useConversationStore } from '../stores/conversationStore'
 import { usePrefsStore } from '../stores/prefsStore'
@@ -149,6 +158,13 @@ import { usePrefsStore } from '../stores/prefsStore'
 const BRAIN_URL = import.meta.env.VITE_BRAIN_URL ?? import.meta.env.VITE_ORCHESTRATOR_URL ?? 'http://localhost:8000'
 
 const conversationStore = useConversationStore()
+
+// U187: wipe the visible transcript. The session id stays, so the assistant
+// keeps its memory of the conversation — this clears the SCREEN, which is
+// what you want after noise filled it with nonsense.
+function clearConversation(): void {
+  conversationStore.clearTurns()
+}
 const prefsStore = usePrefsStore()
 const assistantName = computed(() => prefsStore.assistantName || 'AURA')
 const scrollEl = ref<HTMLElement | null>(null)
@@ -374,6 +390,13 @@ onUnmounted(() => { if (recording.value) recorder?.stop(); stopLevelMeter() })
 </script>
 
 <style scoped>
+.conv-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem; }
+.conv-clear {
+  display: inline-flex; align-items: center; gap: 0.25rem;
+  font-size: 0.68rem; padding: 0.15rem 0.45rem; border-radius: 5px;
+  background: none; border: 1px solid var(--border); color: var(--text-muted); cursor: pointer;
+}
+.conv-clear:hover { color: var(--danger, #e5484d); border-color: currentColor; }
 .getting-started {
   border: 1px dashed var(--border); border-radius: var(--radius);
   padding: 0.9rem 1rem; color: var(--text-muted); font-size: 0.82rem;

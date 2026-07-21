@@ -129,6 +129,13 @@ export const useConversationStore = defineStore('conversation', () => {
     }
   }
 
+  /** U187: clear the visible transcript only — the session (and the
+   *  assistant's own memory of it) stays intact. */
+  function clearTurns() {
+    turns.value = []
+    lastLatency.value = null
+  }
+
   function $reset() {
     turns.value = []
     pendingText.value = ''
@@ -177,7 +184,8 @@ export const useConversationStore = defineStore('conversation', () => {
     }
   }
 
-  return { turns, pendingText, isProcessing, sessionId, lastLatency, agentRound,
+  return {
+    clearTurns, turns, pendingText, isProcessing, sessionId, lastLatency, agentRound,
            screenControl, abortScreenControl,
            addTurn, applyEvent, submitTurn, steerAgent, stopAgent, teach, $reset }
 })

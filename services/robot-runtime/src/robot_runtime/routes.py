@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import os
+
 from fastapi import APIRouter, Response, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse
 from shared_events.broadcaster import WebSocketBroadcaster
@@ -365,7 +367,37 @@ async def camera_frame() -> Response:
     return Response(content=png, media_type="image/png")
 
 
-_STREAM_FPS = 8.0
+_STREAM_FPS = float(os.environ.get("CAMERA_STREAM_FPS", "12"))
+# U188: the console shows the camera in a ~300 px panel, but the robot sent
+# full 1280x720 JPEGs (~300 KB each). At 8 fps that is ~2.4 MB/s over WiFi —
+# more than the link comfortably sustains, so frames queue and the picture runs
+# BEHIND reality. Downscaling to roughly the displayed size cuts ~4x the pixels
+# and keeps the stream live. CAMERA_STREAM_WIDTH=0 restores full resolution.
+_STREAM_WIDTH = int(os.environ.get("CAMERA_STREAM_WIDTH", "640"))
+_STREAM_QUALITY = int(os.environ.get("CAMERA_STREAM_QUALITY", "70"))
+
+
+def downscale_jpeg(jpeg: bytes, width: int, quality: int) -> bytes:
+    """Re-encode a JPEG at `width` px wide. Returns the input unchanged on any
+    problem (already smaller, decode error) — video must never break because
+    an optimisation failed."""
+    if width <= 0 or not jpeg:
+        return jpeg
+    try:
+        import io
+
+        from PIL import Image
+
+        img = Image.open(io.BytesIO(jpeg))
+        if img.width <= width:
+            return jpeg
+        height = max(1, round(img.height * width / img.width))
+        img = img.convert("RGB").resize((width, height), Image.BILINEAR)
+        buf = io.BytesIO()
+        img.save(buf, format="JPEG", quality=quality)
+        return buf.getvalue()
+    except Exception:  # noqa: BLE001 — never lose the stream over a resize
+        return jpeg
 
 
 @router.get("/robot/camera/stream")
@@ -388,6 +420,8 @@ async def camera_stream() -> Response:
             except RuntimeError:
                 await asyncio.sleep(1.0)
                 continue
+            jpeg = await asyncio.to_thread(
+                downscale_jpeg, jpeg, _STREAM_WIDTH, _STREAM_QUALITY)
             yield (
                 b"--frame\r\nContent-Type: image/jpeg\r\n"
                 b"Content-Length: " + str(len(jpeg)).encode() + b"\r\n\r\n"
