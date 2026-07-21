@@ -113,3 +113,66 @@ def test_wrong_endpoint_refiles_for_tagging() -> None:
         assert len(log.list()) == 1
 
         assert client.post("/knowledge/people/jappe/snapshots/bogus/wrong").status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# U189: assign a guest to a real person (face moves, guest is absorbed)
+# ---------------------------------------------------------------------------
+
+async def test_merge_moves_face_and_absorbs_the_guest() -> None:
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+
+    from aura_brain import recognition_api
+    from shared_schemas.knowledge import InMemoryKnowledgeStore, crypto
+    from shared_schemas.knowledge.models import Person, PersonRole
+    from shared_schemas.knowledge.recognition import EmbeddingMatcher
+
+    store = InMemoryKnowledgeStore()
+    await store.upsert_person(Person(person_id="piet", display_name="Piet",
+                                     role=PersonRole.FAMILY))
+    await store.upsert_person(Person(person_id="guest-1", display_name="Guest 1",
+                                     role=PersonRole.GUEST))
+    matcher = EmbeddingMatcher(crypto.derive_omk("pw", b"0123456789abcdef"))
+    face = [1.0, 0.0, 0.0]
+    matcher.enroll("guest-1", face)
+    recognition_api.init(matcher, None, None, store)
+
+    app = FastAPI()
+    app.include_router(recognition_api.router)
+    client = TestClient(app)
+
+    r = client.post("/recognition/merge",
+                    json={"from_person_id": "guest-1", "to_person_id": "piet"})
+
+    assert r.status_code == 200 and r.json()["faces_moved"] == 1
+    assert matcher.identify(face)[0] == "piet"        # recognised as Piet now
+    assert await store.get_person("guest-1") is None  # guest absorbed
+    assert await store.get_person("piet") is not None
+
+
+async def test_merge_rejects_unknown_target_and_self_merge() -> None:
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+
+    from aura_brain import recognition_api
+    from shared_schemas.knowledge import InMemoryKnowledgeStore, crypto
+    from shared_schemas.knowledge.models import Person, PersonRole
+    from shared_schemas.knowledge.recognition import EmbeddingMatcher
+
+    store = InMemoryKnowledgeStore()
+    await store.upsert_person(Person(person_id="guest-1", display_name="Guest 1",
+                                     role=PersonRole.GUEST))
+    recognition_api.init(EmbeddingMatcher(crypto.derive_omk("pw", b"0123456789abcdef")),
+                         None, None, store)
+    app = FastAPI()
+    app.include_router(recognition_api.router)
+    client = TestClient(app)
+
+    assert client.post("/recognition/merge",
+                       json={"from_person_id": "guest-1", "to_person_id": "nobody"}
+                       ).status_code == 404
+    assert client.post("/recognition/merge",
+                       json={"from_person_id": "guest-1", "to_person_id": "guest-1"}
+                       ).status_code == 422
+    assert await store.get_person("guest-1") is not None   # nothing destroyed

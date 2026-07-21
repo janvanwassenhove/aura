@@ -210,6 +210,29 @@ export const useKnowledgeStore = defineStore('knowledge', () => {
     return ok
   }
 
+  /** U189: assign an auto-created guest to a real person — their face moves
+   *  across (so recognition keeps working) and the guest profile is absorbed. */
+  async function mergePerson(fromPersonId: string, toPersonId: string): Promise<boolean> {
+    error.value = null
+    try {
+      const resp = await fetch(`${BRAIN_URL}/recognition/merge`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ from_person_id: fromPersonId, to_person_id: toPersonId }),
+      })
+      if (!resp.ok) {
+        error.value = (await resp.json().catch(() => ({}))).error ?? `merge failed (${resp.status})`
+        return false
+      }
+      if (detail.value?.person.person_id === fromPersonId) detail.value = null
+      await fetchPeople()
+      return true
+    } catch {
+      error.value = 'brain unreachable'
+      return false
+    }
+  }
+
   async function deleteFact(factId: string, personId: string): Promise<boolean> {
     // Destructive — the brain requires a phone step-up when encryption is active (ADR-008 §9).
     const resp = await _request(`/facts/${encodeURIComponent(factId)}`, { method: 'DELETE' })
@@ -358,7 +381,7 @@ export const useKnowledgeStore = defineStore('knowledge', () => {
     people, detail, tier, omkLoaded, locked, brainError, loading, error, recognitionEnabled,
     sightings,
     fetchTier, fetchPeople, inspectPerson, upsertPerson, saveDescription,
-    addFact, updateFact, deleteFact, ingestSources, importChats, exportBrain, fetchSnapshots, flagSnapshotWrong, renamePerson, forgetPerson, setConsent, lock,
+    addFact, updateFact, deleteFact, ingestSources, importChats, exportBrain, fetchSnapshots, flagSnapshotWrong, renamePerson, mergePerson, forgetPerson, setConsent, lock,
     fetchRecognition, secure, teachFace,
     fetchSightings, sightingImageUrl, tagSighting, dismissSighting,
     clearDetail, $reset,

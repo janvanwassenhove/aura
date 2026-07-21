@@ -88,6 +88,30 @@ class EmbeddingMatcher:
         self._enrolled.pop(person_id, None)
         self._flush()  # erasure must reach disk too
 
+    def transfer(self, from_person_id: str, to_person_id: str) -> int:
+        """U189: move every enrolled face from one person to another.
+
+        Used when the owner assigns an auto-created guest to a real person:
+        the face must keep working under the target's id. Samples cannot be
+        copied as-is — each blob is AES-GCM bound to its person via AAD — so
+        they are decrypted under the source id and re-encrypted under the
+        target. The source is then forgotten (cryptographic erasure).
+
+        Returns how many samples moved.
+        """
+        blobs = self._enrolled.get(from_person_id, [])
+        moved = 0
+        for blob in blobs:
+            try:
+                embedding = json.loads(
+                    crypto.decrypt(self._omk, blob, aad=from_person_id.encode()))
+            except Exception:  # noqa: BLE001 — skip an unreadable sample
+                continue
+            self.enroll(to_person_id, embedding)   # re-encrypts + flushes
+            moved += 1
+        self.forget(from_person_id)
+        return moved
+
     def sample_count(self, person_id: str) -> int:
         return len(self._enrolled.get(person_id, []))
 
