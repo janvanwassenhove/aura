@@ -406,6 +406,16 @@ function createWindow() {
   // U170: version for the About dialog.
   ipcMain.handle('aura:app-version', () => app.getVersion())
 
+  // U178: manual "check for updates" from the About dialog. Unlike the
+  // background check this REPORTS its outcome — including "can't reach the
+  // private repo", which is why automatic checking looked broken.
+  ipcMain.handle('aura:check-update', async () => {
+    if (!IS_PACKAGED) return { status: 'dev' }
+    const result = await checkForUpdate({ currentVersion: app.getVersion(), token: updateToken() })
+    if (result.status === 'update') setTimeout(() => maybeOfferUpdate(), 300)
+    return result
+  })
+
   ipcMain.handle('aura:restart-brain', async () => {
     try {
       stopBrain()
@@ -454,10 +464,14 @@ function skippedVersion() {
   try { return JSON.parse(fs.readFileSync(skippedVersionFile(), 'utf-8')).skip } catch { return null }
 }
 
+function updateToken() {
+  return loadEnvFile(ENV_FILE).GITHUB_TOKEN || process.env.GITHUB_TOKEN || ''
+}
+
 async function maybeOfferUpdate() {
   if (updateDialogOpen || !mainWindow) return
-  const token = loadEnvFile(ENV_FILE).GITHUB_TOKEN || process.env.GITHUB_TOKEN || ''
-  const update = await checkForUpdate({ currentVersion: app.getVersion(), token })
+  const result = await checkForUpdate({ currentVersion: app.getVersion(), token: updateToken() })
+  const update = result.status === 'update' ? result.update : null
   if (!update || update.tag === skippedVersion()) return
 
   updateDialogOpen = true

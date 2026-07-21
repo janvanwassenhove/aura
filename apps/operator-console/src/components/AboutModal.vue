@@ -13,8 +13,13 @@
             <div class="about-name">AURA</div>
             <div class="about-sub">Adaptive Unified Robotic Assistant</div>
             <div class="about-version">version {{ version }}</div>
+            <button v-if="isElectron" class="about-check" :disabled="checking" @click="checkUpdates">
+              {{ checking ? 'Checking…' : 'Check for updates' }}
+            </button>
           </div>
         </div>
+
+        <p v-if="updateMsg" :class="['about-update', `about-update--${updateKind}`]">{{ updateMsg }}</p>
 
         <p class="about-text">
           An embodied AI assistant living in a Reachy Mini robot — voice
@@ -50,13 +55,51 @@ defineEmits<{ close: [] }>()
 
 // Packaged builds get their real version from Electron (stamped per release);
 // a plain browser/dev run shows "dev" rather than pretending.
+const auraWindow = (window as any).aura
+const isElectron = Boolean(auraWindow?.isElectron)
+
 const version = ref('dev')
 onMounted(async () => {
   try {
-    const v = await (window as any).aura?.appVersion?.()
+    const v = await auraWindow?.appVersion?.()
     if (v) version.value = v
   } catch { /* dev / browser — keep "dev" */ }
 })
+
+// U178: the background check is deliberately silent, which made update
+// checking look broken while this repo is private (GitHub answers 404 without
+// a token). A manual check must always say what happened.
+const checking = ref(false)
+const updateMsg = ref('')
+const updateKind = ref<'ok' | 'new' | 'warn'>('ok')
+
+async function checkUpdates(): Promise<void> {
+  checking.value = true
+  updateMsg.value = ''
+  try {
+    const r = await auraWindow?.checkUpdate?.()
+    if (!r) { updateKind.value = 'warn'; updateMsg.value = 'Update checking is unavailable here.'; return }
+    if (r.status === 'update') {
+      updateKind.value = 'new'
+      updateMsg.value = `Version ${r.update.version} is available — the install prompt opens next.`
+    } else if (r.status === 'current') {
+      updateKind.value = 'ok'
+      updateMsg.value = `You're up to date (${r.latest ?? version.value}).`
+    } else if (r.status === 'unauthorized') {
+      updateKind.value = 'warn'
+      updateMsg.value = 'Could not check: the release repository is private. '
+        + 'Add GITHUB_TOKEN to your settings, or make the repository public.'
+    } else if (r.status === 'dev') {
+      updateKind.value = 'ok'
+      updateMsg.value = 'Development build — updates are not checked.'
+    } else {
+      updateKind.value = 'warn'
+      updateMsg.value = `Could not check for updates (${r.reason ?? 'unknown'}).`
+    }
+  } finally {
+    checking.value = false
+  }
+}
 </script>
 
 <style scoped>
@@ -87,6 +130,22 @@ onMounted(async () => {
 .about-name { font-size: 1.15rem; font-weight: 700; letter-spacing: 0.04em; }
 .about-sub { font-size: 0.72rem; color: var(--text-muted); }
 .about-version { font-size: 0.7rem; color: var(--text-faint); font-family: ui-monospace, monospace; margin-top: 0.15rem; }
+
+.about-check {
+  margin-top: 0.35rem; padding: 0.15rem 0.5rem; cursor: pointer;
+  font-size: 0.68rem; border-radius: 5px;
+  background: none; border: 1px solid var(--border); color: var(--text-muted);
+}
+.about-check:hover:not(:disabled) { color: var(--text); border-color: var(--accent); }
+.about-check:disabled { opacity: 0.6; cursor: default; }
+
+.about-update {
+  font-size: 0.72rem; line-height: 1.45; margin: 0.9rem 0 0;
+  padding: 0.5rem 0.6rem; border-radius: 6px; border: 1px solid var(--border);
+}
+.about-update--ok { color: var(--text-muted); }
+.about-update--new { color: var(--ok-text, #2f9e6e); border-color: currentColor; }
+.about-update--warn { color: var(--warn, #d9a441); border-color: currentColor; }
 
 .about-text { font-size: 0.78rem; color: var(--text-muted); line-height: 1.5; margin: 0.9rem 0; }
 
