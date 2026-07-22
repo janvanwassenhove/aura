@@ -15,6 +15,9 @@ export interface ModelOption {
   id: string
   name: string
   free: boolean
+  /** U191: roles this model can fill — "chat" | "vision" | "realtime".
+   *  Absent when talking to a brain older than U191. */
+  kinds?: string[]
 }
 
 export const useSettingsStore = defineStore('settings', () => {

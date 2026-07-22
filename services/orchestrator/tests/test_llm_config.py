@@ -148,3 +148,36 @@ async def test_openai_chat_uses_runtime_config_echo() -> None:
 def test_patch_rejects_removed_providers(client: TestClient, provider: str) -> None:
     resp = client.patch("/orchestrator/config/llm", json={"provider": provider, "model": ""})
     assert resp.status_code == 422  # not in the allowed Literal
+
+
+# ------------------------------------------------------------------
+# U191: model roles must only be offered models that can fill them
+# ------------------------------------------------------------------
+
+def test_model_kinds_separates_voice_chat_and_vision() -> None:
+    """The provider catalogue mixes endpoints that are not interchangeable.
+
+    Offering a realtime model for tool calling (or an embedding model at all)
+    only failed at request time — the console could not tell them apart.
+    """
+    from orchestrator.routes import _model_kinds
+
+    # Speech-to-speech: the voice loop's business, never a task model.
+    assert _model_kinds("gpt-realtime-2.1") == ["realtime"]
+    assert _model_kinds("gpt-4o-realtime-preview") == ["realtime"]
+    assert _model_kinds("gpt-4o-audio-preview") == ["realtime"]
+
+    # Chat models — and the newest one must be offered for tasks, which is the
+    # regression that started this: gpt-5.4 was pickable as the main model but
+    # not per task.
+    assert _model_kinds("gpt-5.4") == ["chat", "vision"]
+    assert "chat" in _model_kinds("gpt-4.1")
+    assert "chat" in _model_kinds("o3-mini")
+
+    # Text-only: usable for tasks, useless for driving a screen.
+    assert _model_kinds("gpt-3.5-turbo") == ["chat"]
+
+    # Not conversational at all → never offered.
+    for mid in ("text-embedding-3-large", "dall-e-3", "tts-1",
+                "gpt-4o-transcribe", "gpt-image-1", "omni-moderation-latest"):
+        assert _model_kinds(mid) == [], mid

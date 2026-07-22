@@ -55,6 +55,8 @@ class ModelOption(BaseModel):
     id: str
     name: str
     free: bool = False
+    # U191: which roles this model can fill — "chat", "vision", "realtime".
+    kinds: list[str] = []
 
 
 # Simple in-memory cache: {provider: (timestamp, list[ModelOption])}
@@ -211,9 +213,48 @@ async def patch_llm_config(body: LLMConfigUpdate) -> LLMConfigResponse:
     return _llm_config_response(cfg)
 
 
+# U191: the provider's catalogue is not a menu of interchangeable models. It
+# mixes chat models with realtime (voice) endpoints, image/audio/embedding
+# models, and text-only models that cannot see a screenshot. Handing that raw
+# list to every role let the console offer a realtime model for tool calling —
+# which fails at request time, not at pick time. Classify once, here, so each
+# role can be offered only what it can actually run.
+
+# Never usable as a conversational/task model, whatever the provider calls it.
+_NOT_A_CHAT_MODEL = (
+    "embedding", "moderation", "tts", "whisper", "transcribe", "image",
+    "dall-e", "sora", "codex", "guard", "rerank", "-edit", "similarity",
+)
+# Text-only: no image input, so they cannot drive screen control.
+_TEXT_ONLY = ("gpt-3.5", "-instruct", "o1-mini", "o1-preview", "davinci", "babbage")
+
+
+def _model_kinds(mid: str) -> list[str]:
+    """Classify a model id into the roles it can fill: [] means "don't offer".
+
+    Substring matching on the id is crude, but it is the only signal the
+    provider list APIs give us that is stable across providers — none of them
+    expose "can this do tool calls / see images" as a field.
+    """
+    low = mid.lower()
+    if any(bad in low for bad in _NOT_A_CHAT_MODEL):
+        return []
+    if "realtime" in low or "-audio" in low:
+        # Speech-to-speech endpoints: only the voice loop can talk to these.
+        return ["realtime"]
+    kinds = ["chat"]
+    if not any(t in low for t in _TEXT_ONLY):
+        kinds.append("vision")
+    return kinds
+
+
 @router.get("/orchestrator/config/llm/models")
 async def list_models(provider: str = Query(...)) -> JSONResponse:
-    """Return available models for the given provider (cached 5 min)."""
+    """Return available models for the given provider (cached 5 min).
+
+    Each entry carries ``kinds`` (``chat``/``vision``/``realtime``) so the
+    console can offer each model role only the models that can fill it.
+    """
     now = time.monotonic()
     cached = _models_cache.get(provider)
     if cached and (now - cached[0]) < _CACHE_TTL:
@@ -243,7 +284,11 @@ async def list_models(provider: str = Query(...)) -> JSONResponse:
                     mid.endswith(":free")
                     or (str(pricing.get("prompt", "1")) == "0")
                 )
-                models.append({"id": mid, "name": m.get("name", mid), "free": is_free})
+                kinds = _model_kinds(mid)
+                if not kinds:
+                    continue
+                models.append({"id": mid, "name": m.get("name", mid),
+                               "free": is_free, "kinds": kinds})
             models.sort(key=lambda x: (not x["free"], x["id"]))
         except Exception as exc:
             logger.warning("OpenRouter model list failed: %s", exc)
@@ -262,8 +307,13 @@ async def list_models(provider: str = Query(...)) -> JSONResponse:
             page = await client.models.list()
             chat_prefixes = ("gpt-", "o1", "o3", "o4")
             for m in page.data:
-                if any(m.id.startswith(p) for p in chat_prefixes):
-                    models.append({"id": m.id, "name": m.id, "free": False})
+                if not any(m.id.startswith(p) for p in chat_prefixes):
+                    continue
+                kinds = _model_kinds(m.id)
+                if not kinds:
+                    continue
+                models.append({"id": m.id, "name": m.id, "free": False,
+                               "kinds": kinds})
             models.sort(key=lambda x: x["id"])
         except Exception as exc:
             logger.warning("OpenAI model list failed: %s", exc)
@@ -286,14 +336,19 @@ async def list_models(provider: str = Query(...)) -> JSONResponse:
                     mid = mid.split("/", 1)[1]
                 if not mid.startswith("gemini"):
                     continue
-                models.append({"id": mid, "name": m.display_name or mid, "free": False})
+                kinds = _model_kinds(mid)
+                if not kinds:
+                    continue
+                models.append({"id": mid, "name": m.display_name or mid,
+                               "free": False, "kinds": kinds})
             models.sort(key=lambda x: x["id"])
         except Exception as exc:
             logger.warning("Gemini model list failed: %s", exc)
             return JSONResponse({"error": str(exc)}, status_code=502)
 
     elif provider == "echo":
-        models = [{"id": "echo", "name": "Echo (test)", "free": True}]
+        models = [{"id": "echo", "name": "Echo (test)", "free": True,
+                   "kinds": ["chat", "vision", "realtime"]}]
 
     else:
         return JSONResponse({"error": f"Unknown provider: {provider}"}, status_code=422)

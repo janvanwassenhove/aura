@@ -203,9 +203,31 @@
         <section v-else-if="selected !== '_skills' && store.detail" class="brain-content">
           <div class="person-hero">
             <span class="hero-avatar">{{ initials(store.detail.person.display_name) }}</span>
-            <div class="hero-meta">
+            <!-- U191: name and role are owner-owned labels, not fixed facts —
+                 a typo or a guest who turns out to be family must be fixable
+                 here instead of by forgetting and re-teaching the person. -->
+            <div v-if="editingId" class="hero-meta hero-meta--edit">
+              <input ref="editNameEl" v-model="editName" class="rail-input hero-edit-name"
+                     aria-label="Display name" placeholder="Display name"
+                     @keydown.enter="saveIdentity" @keydown.esc="cancelIdentity" />
+              <select v-model="editRole" class="rail-input hero-edit-role" aria-label="Role">
+                <option value="owner">owner</option>
+                <option value="family">family</option>
+                <option value="guest">guest</option>
+                <option value="minor">minor</option>
+                <option value="demo">demo</option>
+              </select>
+              <button class="rail-btn hero-edit-save" :disabled="!editName.trim() || editBusy"
+                      @click="saveIdentity">{{ editBusy ? 'Saving…' : 'Save' }}</button>
+              <button class="hero-btn" @click="cancelIdentity">Cancel</button>
+            </div>
+            <div v-else class="hero-meta">
               <h2 class="hero-name">{{ store.detail.person.display_name }}</h2>
               <span :class="['rail-role', `rail-role--${store.detail.person.role}`]">{{ store.detail.person.role }}</span>
+              <button class="hero-edit-btn" title="Rename or change this person's role"
+                      aria-label="Edit name and role" @click="startIdentity">
+                <Pencil :size="12" />
+              </button>
             </div>
             <span class="hero-spacer" />
             <button v-if="store.recognitionEnabled" class="hero-btn" :disabled="teaching" title="Teach this person's face" @click="doTeachFace">
@@ -231,6 +253,7 @@
               </div>
             </div>
           </div>
+          <p v-if="editMsg" class="hero-edit-msg">{{ editMsg }}</p>
           <!-- U189: an auto-created guest needs three obvious next steps:
                name them, assign them to someone you already know, or forget. -->
           <div v-if="store.detail.person.role === 'guest'" class="guest-actions">
@@ -400,7 +423,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { vaultState } from '../lib/vaultState'
 import {
   BookOpen, Brain, Facebook, Github, Globe, Instagram, Linkedin, Lock, Mail,
@@ -500,6 +523,47 @@ async function doTeachFace() {
 }
 // U189: turn an auto-created guest into a real person, or fold them into an
 // existing one (their face moves along, so recognition keeps working).
+// U191: inline rename/role change for ANY person. Guests get the richer block
+// below (they also need "assign to someone I know"); everyone else only ever
+// needed these two fields, which until now were write-once at creation.
+const editingId = ref('')          // person_id being edited, '' = not editing
+const editName = ref('')
+const editRole = ref('guest')
+const editBusy = ref(false)
+const editMsg = ref('')
+const editNameEl = ref<HTMLInputElement | null>(null)
+
+function startIdentity(): void {
+  const person = store.detail?.person
+  if (!person) return
+  editingId.value = person.person_id
+  editName.value = person.display_name
+  editRole.value = person.role
+  editMsg.value = ''
+  nextTick(() => editNameEl.value?.focus())
+}
+
+function cancelIdentity(): void {
+  editingId.value = ''
+  editMsg.value = ''
+}
+
+async function saveIdentity(): Promise<void> {
+  const pid = editingId.value
+  const name = editName.value.trim()
+  if (!pid || !name || editBusy.value) return
+  editBusy.value = true
+  try {
+    const ok = await store.renamePerson(pid, name, editRole.value)
+    editMsg.value = ok ? '' : 'Could not save — the brain refused the change.'
+    if (ok) editingId.value = ''
+  } finally { editBusy.value = false }
+}
+
+// Editing follows the selection: switching person mid-edit must not silently
+// write the half-typed name onto whoever you clicked next.
+watch(() => store.detail?.person.person_id, () => { editingId.value = ''; editMsg.value = '' })
+
 const guestName = ref('')
 const guestRole = ref('family')
 const mergeTarget = ref('')
@@ -1172,6 +1236,13 @@ onMounted(async () => {
 }
 .hero-name { margin: 0; font-size: 1.05rem; }
 .hero-meta { display: flex; align-items: center; gap: 0.6rem; }
+.hero-meta--edit { flex-wrap: wrap; }
+.hero-edit-btn { background: none; border: none; color: var(--text-faint); cursor: pointer; padding: 0.15rem; display: inline-flex; border-radius: var(--radius-sm); }
+.hero-edit-btn:hover { color: var(--text); background: var(--surface-2, rgba(127,127,127,0.15)); }
+.hero-edit-name { min-width: 9rem; font-size: 0.85rem; }
+.hero-edit-role { font-size: 0.78rem; }
+.hero-edit-save { padding: 0.35rem 0.7rem; }
+.hero-edit-msg { margin: 0.35rem 0 0; font-size: 0.72rem; color: var(--danger, #d9534f); }
 
 .fact-chips { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.6rem; }
 .fact-chip {
