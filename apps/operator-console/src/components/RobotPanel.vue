@@ -50,6 +50,18 @@
         <span class="toggle-lbl">Notify</span>
       </button>
     </div>
+    <!-- U192: the panic stop used to be an unlabelled red circle in the title
+         bar — nobody could tell what it did without pressing it. It belongs
+         here, next to the other things that govern how the robot behaves,
+         with its consequences spelled out. -->
+    <button class="panic-btn" :disabled="panicking"
+            :title="panicked ? 'Stopped — the mic is off until you switch it back on'
+                             : 'Cuts the robot off mid-sentence, ends the conversation and switches the mic off'"
+            @click="panicStop">
+      <CircleStop :size="15" />
+      <span>{{ panicking ? 'Stopping…' : panicked ? 'Stopped — mic is off' : 'Stop talking' }}</span>
+    </button>
+
     <!-- U125: briefing time gets its own labelled row instead of crowding the toggles -->
     <div v-if="proactiveOn" class="briefing-row">
       <Bell :size="13" /> <span>Daily briefing at</span>
@@ -240,7 +252,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import {
-  Bell, Bot, ChevronRight, ChevronsDown, Eye, Hand, Laugh, Moon, MoveHorizontal, MoveVertical,
+  Bell, Bot, ChevronRight, ChevronsDown, CircleStop, Eye, Hand, Laugh, Moon, MoveHorizontal, MoveVertical,
   Mic, MicOff, Music, Pencil, Power, RefreshCw, RotateCw, Sparkles, ThumbsUp,
   Volume1, Volume2, VolumeX,
 } from 'lucide-vue-next'
@@ -249,6 +261,23 @@ import { useRobotStore } from '../stores/robotStore'
 const BRAIN_URL = import.meta.env.VITE_BRAIN_URL ?? import.meta.env.VITE_ORCHESTRATOR_URL ?? 'http://localhost:8000'
 
 const robotStore = useRobotStore()
+
+// U192: moved here from the title bar. One click cuts the robot off, ends the
+// session and mutes the mic — the escape hatch for a conversation that has run
+// away with itself.
+const panicking = ref(false)
+const panicked = ref(false)
+async function panicStop(): Promise<void> {
+  if (panicking.value) return
+  panicking.value = true
+  try {
+    await fetch(`${BRAIN_URL}/voice/panic`, { method: 'POST' })
+    panicked.value = true
+    setTimeout(() => { panicked.value = false }, 5000)
+  } catch { /* the robot may already be unreachable — nothing left to stop */ }
+  finally { panicking.value = false }
+}
+
 const acting = ref(false)
 const actError = ref('')
 const volume = ref(0.8)
@@ -545,6 +574,15 @@ function fmtTime(iso: string): string {
 .toggle-cell:hover { border-color: var(--accent-border, var(--accent)); }
 .toggle-cell--on { color: var(--accent); border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); }
 .toggle-lbl { font-size: 0.62rem; letter-spacing: 0.02em; }
+.panic-btn {
+  display: flex; align-items: center; justify-content: center; gap: 0.4rem;
+  width: 100%; margin: 0 0 0.5rem; padding: 0.45rem 0.5rem;
+  background: transparent; color: var(--danger, #e5484d);
+  border: 1px solid var(--danger, #e5484d); border-radius: var(--radius-md);
+  font-size: 0.76rem; font-weight: 600; cursor: pointer;
+}
+.panic-btn:hover:not(:disabled) { background: var(--danger, #e5484d); color: #fff; }
+.panic-btn:disabled { opacity: 0.55; cursor: default; }
 .briefing-row {
   display: flex; align-items: center; gap: 0.4rem; margin-bottom: 0.5rem;
   font-size: 0.75rem; color: var(--text-faint);
