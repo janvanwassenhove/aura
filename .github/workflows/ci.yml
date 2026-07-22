@@ -87,6 +87,21 @@ jobs:
           npm test
           npm run build
 
+  # U192: the Electron main process is untyped CommonJS that no other job even
+  # parses. An undeclared `token` broke the auto-installer in every release —
+  # it threw inside a try/catch that fell back to opening the release page, so
+  # the failure looked like a design choice. `no-undef` catches that class.
+  desktop-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Lint Electron main process
+        working-directory: apps/desktop
+        run: npx --yes eslint@9 main.cjs preload.cjs updater.cjs
+
   lint:
     runs-on: ubuntu-latest
     steps:

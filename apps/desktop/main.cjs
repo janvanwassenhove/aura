@@ -499,10 +499,11 @@ async function maybeOfferUpdate() {
       title: 'Update beschikbaar',
       message: `AURA ${update.version} is beschikbaar (je gebruikt ${app.getVersion()}).`,
       detail: canAutoInstall
-        ? 'De installer wordt gedownload en gestart; je instellingen blijven staan.'
+        ? 'AURA downloadt en installeert de update zelf en start daarna opnieuw op. '
+          + 'Je instellingen, personen en skills blijven staan.'
         : 'De releasepagina wordt geopend zodat je de nieuwe versie kunt downloaden.',
       buttons: canAutoInstall
-        ? ['Download & installeer', 'Later', 'Deze versie overslaan']
+        ? ['Nu bijwerken', 'Later', 'Deze versie overslaan']
         : ['Open releasepagina', 'Later', 'Deze versie overslaan'],
       defaultId: 0, cancelId: 1,
     })
@@ -515,8 +516,18 @@ async function maybeOfferUpdate() {
     if (canAutoInstall) {
       try {
         const dest = path.join(app.getPath('temp'), update.asset.name)
-        await downloadAsset({ asset: update.asset, token, destPath: dest })
-        await shell.openPath(dest)      // NSIS wizard takes over
+        // U192: this said `token` — an identifier that is declared nowhere in
+        // this file. Every "Download & install" therefore threw a ReferenceError
+        // on the first line of the try, was swallowed by the catch below, and
+        // silently degraded to opening the release page in a browser. The
+        // auto-installer has never run for anyone.
+        await downloadAsset({ asset: update.asset, token: updateToken(), destPath: dest })
+        // U192: "installs automatically" means the owner should not have to
+        // click through a setup wizard they already consented to. NSIS takes
+        // /S for a silent install and relaunches the app when it finishes.
+        // detached + unref so the installer outlives the process it replaces.
+        const child = spawn(dest, ['/S'], { detached: true, stdio: 'ignore' })
+        child.unref()
         quitting = true
         setTimeout(() => app.quit(), 1200)
         return

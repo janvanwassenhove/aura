@@ -31,9 +31,13 @@
       <button v-if="isElectron" class="titlebar-btn" :title="restarting ? 'Restarting brain…' : 'Restart brain (load new code/settings)'" aria-label="Restart brain" :disabled="restarting" @click="restartBrain">
         <RotateCw :size="15" :class="restarting ? 'spin' : ''" />
       </button>
-      <!-- U184: always-visible panic stop. Ambient noise can push a voice
-           session into answering its own echo; this ends it in one click. -->
-      <button class="titlebar-btn titlebar-btn--stop" :disabled="stopping"
+      <!-- U184: panic stop — ambient noise can push a voice session into
+           answering its own echo; this ends it in one click.
+           U192: it now lives labelled in the Robot State panel, because an
+           unlabelled red circle up here told nobody what it did. This stays
+           only as a fallback for when that panel is collapsed — the escape
+           hatch must never be the thing you hid. -->
+      <button v-if="!layout.showLeft" class="titlebar-btn titlebar-btn--stop" :disabled="stopping"
               :title="stopped ? 'Stopped — mic is off' : 'STOP: cut speech, end the conversation, mic off'"
               aria-label="Stop talking" @click="panicStop">
         <CircleStop :size="17" />
@@ -69,6 +73,7 @@ import { onMounted } from 'vue'
 import { Bot, CircleStop, Cpu, Info, Minus, RotateCw, Settings, ShieldCheck, Square, X, PanelBottom, PanelLeft, PanelRight } from 'lucide-vue-next'
 import { useRobotStore } from '../stores/robotStore'
 import { usePrefsStore } from '../stores/prefsStore'
+import { useLayoutStore } from '../stores/layoutStore'
 
 const props = defineProps<{ wsStatus: 'connecting' | 'open' | 'closed' }>()
 defineEmits<{
@@ -104,6 +109,7 @@ async function restartBrain() {
 
 const robotStore = useRobotStore()
 const prefsStore = usePrefsStore()
+const layout = useLayoutStore()
 
 onMounted(prefsStore.fetchPrefs)
 
