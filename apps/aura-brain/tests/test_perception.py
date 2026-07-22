@@ -318,7 +318,9 @@ class RecordingStore(FakeStore):
     async def list_people(self):
         from types import SimpleNamespace
 
-        return [SimpleNamespace(person_id=pid) for pid in self._people]
+        roles = getattr(self, "roles", {})
+        return [SimpleNamespace(person_id=pid, role=roles.get(pid, "guest"))
+                for pid in self._people]
 
     async def upsert_person(self, person):
         self.created.append(person)
@@ -332,13 +334,16 @@ def _guest_loop(store, embedder, matcher):
     bus = FakeBus()
     loop = PerceptionLoop(
         bus, matcher, FakeRobot(), embedder,
-        knowledge_store=store, sighting_log=SightingLog(),
+        knowledge_store=store,
+        # cooldown 0: real life spaces sightings ~15 s apart, tests must not.
+        sighting_log=SightingLog(capture_cooldown_s=0.0),
     )
     return loop, bus
 
 
 async def test_new_face_becomes_a_guest(monkeypatch) -> None:
     monkeypatch.setenv("AUTO_GUEST", "true")
+    monkeypatch.setenv("AUTO_GUEST_AFTER_SIGHTINGS", "1")
     monkeypatch.setattr("aura_brain.sightings._thumbnail", lambda b, width=320: b"JPG")
     store = RecordingStore()
     matcher = EmbeddingMatcher(OMK)
@@ -360,6 +365,7 @@ async def test_new_face_becomes_a_guest(monkeypatch) -> None:
 async def test_same_face_does_not_spawn_a_second_guest(monkeypatch) -> None:
     """The sighting log merges repeats; enrolment makes later frames 'known'."""
     monkeypatch.setenv("AUTO_GUEST", "true")
+    monkeypatch.setenv("AUTO_GUEST_AFTER_SIGHTINGS", "1")
     monkeypatch.setattr("aura_brain.sightings._thumbnail", lambda b, width=320: b"JPG")
     store = RecordingStore()
     matcher = EmbeddingMatcher(OMK)
@@ -374,6 +380,7 @@ async def test_same_face_does_not_spawn_a_second_guest(monkeypatch) -> None:
 
 async def test_guest_ids_do_not_collide(monkeypatch) -> None:
     monkeypatch.setenv("AUTO_GUEST", "true")
+    monkeypatch.setenv("AUTO_GUEST_AFTER_SIGHTINGS", "1")
     monkeypatch.setattr("aura_brain.sightings._thumbnail", lambda b, width=320: b"JPG")
     store = RecordingStore({"guest-1": "Guest 1"})       # guest-1 already taken
     loop, _ = _guest_loop(store, ScriptedEmbedder([STRANGER_FACE]), EmbeddingMatcher(OMK))
@@ -394,3 +401,38 @@ async def test_auto_guest_can_be_switched_off(monkeypatch) -> None:
     assert store.created == []                  # no biometrics captured
     (event,) = bus.published
     assert event.known is False                 # still just an unknown sighting
+
+
+async def test_a_fleeting_face_does_not_earn_a_profile(monkeypatch) -> None:
+    """U190: one frame used to be enough, so a half-matched face spawned a new
+    'Guest N' over and over — seven of them for one household."""
+    monkeypatch.setenv("AUTO_GUEST", "true")
+    monkeypatch.setenv("AUTO_GUEST_AFTER_SIGHTINGS", "3")
+    monkeypatch.setattr("aura_brain.sightings._thumbnail", lambda b, width=320: b"JPG")
+    store = RecordingStore()
+    loop, _ = _guest_loop(store, ScriptedEmbedder([STRANGER_FACE]), EmbeddingMatcher(OMK))
+
+    await loop.tick()                      # 1st sighting — not yet
+    assert store.created == []
+    await loop.tick()                      # 2nd — still not
+    assert store.created == []
+    await loop.tick()                      # 3rd — now it has earned a profile
+    assert [p.person_id for p in store.created] == ["guest-1"]
+
+
+async def test_untriaged_guests_are_capped(monkeypatch) -> None:
+    """U190: past the cap, new faces stay sightings until the owner names the
+    guests already waiting — no more endless Guest 1..7 lists."""
+    monkeypatch.setenv("AUTO_GUEST", "true")
+    monkeypatch.setenv("AUTO_GUEST_AFTER_SIGHTINGS", "1")
+    monkeypatch.setenv("AUTO_GUEST_MAX", "2")
+    monkeypatch.setattr("aura_brain.sightings._thumbnail", lambda b, width=320: b"JPG")
+    store = RecordingStore({"guest-1": "Guest 1", "guest-2": "Guest 2"})
+    store.roles = {"guest-1": "guest", "guest-2": "guest"}
+    loop, bus = _guest_loop(store, ScriptedEmbedder([STRANGER_FACE]), EmbeddingMatcher(OMK))
+
+    await loop.tick()
+
+    assert store.created == []                 # cap respected
+    (event,) = bus.published
+    assert event.known is False                # still logged as an unknown face

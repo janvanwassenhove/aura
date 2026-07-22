@@ -67,8 +67,9 @@ def test_downscale_cuts_the_bytes_that_caused_the_lag() -> None:
     full = _jpeg(1280, 720)          # what the robot used to send
     small = downscale_jpeg(full, 640, 70)
 
-    from PIL import Image
     import io
+
+    from PIL import Image
     assert Image.open(io.BytesIO(small)).size == (640, 360)
     # The whole point: materially fewer bytes over WiFi per frame.
     assert len(small) < len(full) / 2, (
