@@ -3,9 +3,12 @@
  * Single source of truth for every color/radius/shadow in the console.
  * Themes are switched by `data-theme` on <html>; the accent by `data-accent`.
  * Components must use var(--…) — no raw hex values in component styles.
+ *
+ * U193: the bare `:root` is what paints the first frame, before Vue mounts and
+ * applies the stored choice. It must carry the DEFAULT (light + green) or every
+ * fresh install flashes the old dark blue for a beat on startup.
  */
 
-:root,
 :root[data-theme='dark'] {
   /* Surfaces */
   --bg: #0f172a;
@@ -56,6 +59,7 @@
   --radius-xl: 0.75rem;
 }
 
+:root,
 :root[data-theme='light'] {
   --bg: #f1f5f9;
   --surface: #ffffff;
@@ -93,7 +97,6 @@
 }
 
 /* Accent — selectable independent of theme. Blue is the default. */
-:root,
 :root[data-accent='blue'] {
   --accent: #2563eb;
   --accent-hover: #1d4ed8;
@@ -101,6 +104,7 @@
   --accent-border: #60a5fa;
   --on-accent: #ffffff;
 }
+:root,
 :root[data-accent='green'] {
   --accent: #16a34a;
   --accent-hover: #15803d;

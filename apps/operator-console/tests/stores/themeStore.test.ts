@@ -10,26 +10,26 @@ describe('themeStore', () => {
     setActivePinia(createPinia())
   })
 
-  it('defaults to dark theme with blue accent', () => {
+  it('defaults to light theme with green accent', () => {
     const store = useThemeStore()
-    expect(store.theme).toBe('dark')
-    expect(store.accent).toBe('blue')
+    expect(store.theme).toBe('light')
+    expect(store.accent).toBe('green')
   })
 
   it('apply() stamps data attributes on the root element', () => {
     const store = useThemeStore()
     store.apply()
-    expect(document.documentElement.dataset.theme).toBe('dark')
-    expect(document.documentElement.dataset.accent).toBe('blue')
+    expect(document.documentElement.dataset.theme).toBe('light')
+    expect(document.documentElement.dataset.accent).toBe('green')
   })
 
   it('changing theme re-applies and persists', async () => {
     const store = useThemeStore()
     store.apply()
-    store.theme = 'light'
+    store.theme = 'dark'
     await new Promise(r => setTimeout(r))  // watcher flush
-    expect(document.documentElement.dataset.theme).toBe('light')
-    expect(JSON.parse(localStorage.getItem('aura-appearance')!)).toMatchObject({ theme: 'light' })
+    expect(document.documentElement.dataset.theme).toBe('dark')
+    expect(JSON.parse(localStorage.getItem('aura-appearance')!)).toMatchObject({ theme: 'dark' })
   })
 
   it('changing accent re-applies and persists', async () => {
@@ -53,6 +53,16 @@ describe('themeStore', () => {
     localStorage.setItem('aura-appearance', '{not json')
     setActivePinia(createPinia())
     const store = useThemeStore()
+    expect(store.theme).toBe('light')
+    expect(store.accent).toBe('green')
+  })
+
+  // U193 flipped the default to light. Everyone already running the app has
+  // 'dark' in storage — changing a default must never overwrite a choice.
+  it('keeps a previously chosen dark theme', () => {
+    localStorage.setItem('aura-appearance', JSON.stringify({ theme: 'dark', accent: 'blue' }))
+    setActivePinia(createPinia())
+    const store = useThemeStore()
     expect(store.theme).toBe('dark')
     expect(store.accent).toBe('blue')
   })
@@ -60,7 +70,7 @@ describe('themeStore', () => {
   it('rejects unknown accent values from storage', () => {
     localStorage.setItem('aura-appearance', JSON.stringify({ theme: 'dark', accent: 'hotpink' }))
     setActivePinia(createPinia())
-    expect(useThemeStore().accent).toBe('blue')
+    expect(useThemeStore().accent).toBe('green')
   })
 
   it('exposes the four accents for the picker', () => {

@@ -19,12 +19,14 @@ function loadSaved(): { theme: Theme; accent: Accent } {
     if (raw) {
       const parsed = JSON.parse(raw)
       return {
-        theme: parsed.theme === 'light' ? 'light' : 'dark',
-        accent: ACCENTS.some(a => a.id === parsed.accent) ? parsed.accent : 'blue',
+        theme: parsed.theme === 'dark' ? 'dark' : 'light',
+        accent: ACCENTS.some(a => a.id === parsed.accent) ? parsed.accent : 'green',
       }
     }
   } catch { /* corrupted storage → defaults */ }
-  return { theme: 'dark', accent: 'blue' }
+  // U193: light + green is the default appearance. Anyone who already picked
+  // something keeps it — this only decides what a fresh install opens with.
+  return { theme: 'light', accent: 'green' }
 }
 
 export const useThemeStore = defineStore('theme', () => {
@@ -47,8 +49,8 @@ export const useThemeStore = defineStore('theme', () => {
   watch([theme, accent], () => { apply(); persist() })
 
   function $reset() {
-    theme.value = 'dark'
-    accent.value = 'blue'
+    theme.value = 'light'
+    accent.value = 'green'
   }
 
   return { theme, accent, apply, $reset }
