@@ -62,22 +62,31 @@
           <div v-if="localProvider === 'openai'" class="settings-field">
             <label class="field-label">Model per task type <span class="mr-hint">(optional — empty = use the model above)</span></label>
             <div class="model-role">
-              <span class="mr-name">💬 Conversation <em>fast, low-latency voice</em></span>
-              <input v-model="roleChat" list="mr-models" class="field-input mr-input" placeholder="e.g. gpt-4o" />
+              <span class="mr-name">💬 Conversation <em>speech-to-speech voice</em></span>
+              <select v-model="roleChat" class="field-select mr-input">
+                <option value="">— use the model above —</option>
+                <option v-for="m in roleOptions(realtimeModels, roleChat)" :key="m.id" :value="m.id">{{ m.name }}</option>
+              </select>
             </div>
             <div class="model-role">
               <span class="mr-name">🛠️ Tasks &amp; tools <em>multi-step, Spotify/computer use</em></span>
-              <input v-model="roleAgent" list="mr-models" class="field-input mr-input" placeholder="e.g. gpt-5.1" />
+              <select v-model="roleAgent" class="field-select mr-input">
+                <option value="">— use the model above —</option>
+                <option v-for="m in roleOptions(chatModels, roleAgent)" :key="m.id" :value="m.id">{{ m.name }}</option>
+              </select>
             </div>
             <div class="model-role">
               <span class="mr-name">🖥️ Screen control <em>drives the mouse/keyboard</em></span>
-              <input v-model="roleComputer" list="mr-models" class="field-input mr-input" placeholder="gpt-4o" />
+              <select v-model="roleComputer" class="field-select mr-input">
+                <option value="">— use the model above —</option>
+                <option v-for="m in roleOptions(visionModels, roleComputer)" :key="m.id" :value="m.id">{{ m.name }}</option>
+              </select>
             </div>
-            <datalist id="mr-models">
-              <option v-for="m in llmStore.models" :key="m.id" :value="m.id" />
-              <option value="gpt-4o" /><option value="gpt-4o-mini" />
-              <option value="gpt-5.1" /><option value="gpt-5" /><option value="gpt-5-mini" />
-            </datalist>
+            <p class="mr-note">
+              Each role only lists models that can fill it: the voice loop needs a
+              realtime (speech-to-speech) model, and screen control needs one that
+              can see images.
+            </p>
             <button class="btn-apply mr-save" :disabled="rolesSaving" @click="saveModelRoles">
               {{ rolesSaving ? 'Saving…' : 'Save model roles' }}
             </button>
@@ -418,8 +427,30 @@ const modelPlaceholder = computed(() => {
   if (localProvider.value === 'gemini') return 'e.g. gemini-2.5-flash'
   return 'e.g. gpt-4o-mini'
 })
-const freeModels = computed<ModelOption[]>(() => llmStore.models.filter(m => m.free))
-const paidModels = computed<ModelOption[]>(() => llmStore.models.filter(m => !m.free))
+// U191: the brain tags every model with the roles it can fill. Older brains
+// don't send `kinds` at all — fall back to the id, so a console talking to a
+// not-yet-updated brain still separates voice models from chat models.
+function kindsOf(m: ModelOption): string[] {
+  if (m.kinds?.length) return m.kinds
+  const low = m.id.toLowerCase()
+  if (low.includes('realtime') || low.includes('-audio')) return ['realtime']
+  return ['chat', 'vision']
+}
+const chatModels = computed<ModelOption[]>(() => llmStore.models.filter(m => kindsOf(m).includes('chat')))
+const visionModels = computed<ModelOption[]>(() => llmStore.models.filter(m => kindsOf(m).includes('vision')))
+const realtimeModels = computed<ModelOption[]>(() => llmStore.models.filter(m => kindsOf(m).includes('realtime')))
+
+/** Keep a previously saved model visible even when it is no longer offered,
+ *  so opening settings never silently drops a working configuration. */
+function roleOptions(list: ModelOption[], current: string): ModelOption[] {
+  const id = (current || '').trim()
+  if (!id || list.some(m => m.id === id)) return list
+  return [{ id, name: `${id} (not in the provider's list)`, free: false }, ...list]
+}
+
+// The main model drives chat and tasks — a realtime endpoint cannot serve it.
+const freeModels = computed<ModelOption[]>(() => chatModels.value.filter(m => m.free))
+const paidModels = computed<ModelOption[]>(() => chatModels.value.filter(m => !m.free))
 
 onMounted(async () => {
   fetchModelRoles()
@@ -792,7 +823,8 @@ const ConnStatusBadge = defineComponent({
 .model-role { display: flex; align-items: center; gap: 0.5rem; margin: 0.3rem 0; }
 .mr-name { flex: 1; font-size: 0.78rem; display: flex; flex-direction: column; }
 .mr-name em { font-style: normal; color: var(--text-faint); font-size: 0.68rem; }
-.mr-input { max-width: 11rem; }
+.mr-input { max-width: 13rem; }
+.mr-note { color: var(--text-faint); font-size: 0.7rem; margin: 0.35rem 0 0; line-height: 1.35; }
 .mr-save { margin-top: 0.4rem; }
 /* U142: Realtime access self-check */
 .rt-check { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.4rem; flex-wrap: wrap; }

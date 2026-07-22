@@ -27,6 +27,13 @@
           self-optimizing skills library.
         </p>
 
+        <dl class="about-acronym">
+          <div><dt>Adaptive</dt><dd>Adapts behaviour and interaction to the person, the context and the situation.</dd></div>
+          <div><dt>Unified</dt><dd>Brings conversation, mail, Teams, calendar, todos, memory and agents together.</dd></div>
+          <div><dt>Robotic</dt><dd>Physically embodied through Reachy Mini.</dd></div>
+          <div><dt>Assistant</dt><dd>A personal assistant and copilot, not just another chatbot.</dd></div>
+        </dl>
+
         <div class="about-links">
           <a class="about-link" href="https://mityjohn.com/" target="_blank" rel="noopener noreferrer">
             <Globe :size="14" /> mityjohn.com
@@ -148,6 +155,10 @@ async function checkUpdates(): Promise<void> {
 .about-update--warn { color: var(--warn, #d9a441); border-color: currentColor; }
 
 .about-text { font-size: 0.78rem; color: var(--text-muted); line-height: 1.5; margin: 0.9rem 0; }
+.about-acronym { margin: 0 0 0.9rem; display: grid; gap: 0.35rem; }
+.about-acronym > div { display: grid; grid-template-columns: 5.2rem 1fr; gap: 0.5rem; align-items: baseline; }
+.about-acronym dt { font-size: 0.75rem; font-weight: 600; color: var(--text); }
+.about-acronym dd { margin: 0; font-size: 0.72rem; color: var(--text-muted); line-height: 1.4; }
 
 .about-links { display: flex; flex-direction: column; gap: 0.4rem; }
 .about-link {
