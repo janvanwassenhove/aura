@@ -120,10 +120,9 @@ def test_wrong_endpoint_refiles_for_tagging() -> None:
 # ---------------------------------------------------------------------------
 
 async def test_merge_moves_face_and_absorbs_the_guest() -> None:
+    from aura_brain import recognition_api
     from fastapi import FastAPI
     from fastapi.testclient import TestClient
-
-    from aura_brain import recognition_api
     from shared_schemas.knowledge import InMemoryKnowledgeStore, crypto
     from shared_schemas.knowledge.models import Person, PersonRole
     from shared_schemas.knowledge.recognition import EmbeddingMatcher
@@ -152,10 +151,9 @@ async def test_merge_moves_face_and_absorbs_the_guest() -> None:
 
 
 async def test_merge_rejects_unknown_target_and_self_merge() -> None:
+    from aura_brain import recognition_api
     from fastapi import FastAPI
     from fastapi.testclient import TestClient
-
-    from aura_brain import recognition_api
     from shared_schemas.knowledge import InMemoryKnowledgeStore, crypto
     from shared_schemas.knowledge.models import Person, PersonRole
     from shared_schemas.knowledge.recognition import EmbeddingMatcher

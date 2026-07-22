@@ -259,7 +259,12 @@ class PerceptionLoop:
             # U181: a genuinely NEW face (count==1 — the log merges repeats by
             # embedding similarity) becomes a guest profile, so the robot can
             # greet them next time instead of forever seeing "unknown".
-            if sighting is not None and sighting.count == 1:
+            # U190: promote only a face we've now seen a FEW times. One frame
+            # was enough before, and because a half-match (below the 0.4
+            # recognition bar AND below the 0.5 sighting-merge bar) falls
+            # through both nets, the same person kept earning a fresh profile —
+            # seven "Guest N" entries for one household.
+            if sighting is not None and sighting.count == self._guest_after:
                 person_id = await self._add_guest(embedding)
                 if person_id is not None:
                     confidence = 1.0  # we just enrolled this exact embedding
@@ -271,6 +276,20 @@ class PerceptionLoop:
             self._gallery.record(person_id, frame, confidence, embedding=embedding)
 
         await self._transition(person_id or "", person_id, confidence)
+
+    @property
+    def _guest_after(self) -> int:
+        """How many sightings of the same face before it becomes a guest."""
+        import os
+
+        return max(1, int(os.environ.get("AUTO_GUEST_AFTER_SIGHTINGS", "3")))
+
+    @property
+    def _guest_max(self) -> int:
+        """Cap on unnamed guest profiles waiting for the owner to triage."""
+        import os
+
+        return max(1, int(os.environ.get("AUTO_GUEST_MAX", "3")))
 
     async def _add_guest(self, embedding: list[float]) -> str | None:
         """U181: enrol a newly-seen face as a GUEST profile.
@@ -294,6 +313,16 @@ class PerceptionLoop:
 
             existing = await self._store.list_people()
             used = {p.person_id for p in existing}
+            # U190: stop piling up untriaged guests. Past the cap the face is
+            # still logged as a sighting (taggable by hand) — it just doesn't
+            # earn its own profile until the owner has named the ones waiting.
+            pending = sum(1 for p in existing
+                          if str(getattr(p, "role", "")).endswith("guest")
+                          and p.person_id.startswith("guest-"))
+            if pending >= self._guest_max:
+                logger.info("auto-guest paused: %d unnamed guests already waiting",
+                            pending)
+                return None
             n = 1
             while f"guest-{n}" in used:
                 n += 1

@@ -270,7 +270,10 @@ async def test_request_stop_ends_the_session_promptly(monkeypatch) -> None:
     """U184: the panic stop must end a session that is otherwise idling."""
     monkeypatch.setenv("REALTIME_SESSION_IDLE_S", "600")   # would never time out
     conn = _FakeConn([], hang_after=True)
-    robot = _FakeRobot(chunks=200)
+    # The mic must outlive the test: with a short stream CI finished it first
+    # and run() returned "mic stream ended" before the stop was observed —
+    # a race in the TEST, not in the panic stop.
+    robot = _FakeRobot(chunks=100_000)
     sess = RealtimeSession(robot=robot, bus=_Bus(), conn_factory=lambda m: conn)
 
     async def stop_soon():
