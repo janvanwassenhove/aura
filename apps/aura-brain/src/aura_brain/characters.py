@@ -39,6 +39,11 @@ class CharacterPersona:
     humor_level: str = "medium"          # none | low | medium | high
     verbosity: str = "brief"             # brief | normal | detailed
     interruptibility: str = "wake_word"  # wake_word | vad | off
+    # U203: which voice engine this character talks through. Empty → inherit the
+    # global VOICE_ENGINE (pipeline by default). "pipeline" keeps skills, memory
+    # and tools; "realtime" is fluid speech-to-speech but has NO tool access, so
+    # it fits a chat-along presentation persona, not the everyday assistant.
+    voice_engine: str = ""               # "" (inherit) | pipeline | realtime
     emotional_style: str = "warm"
     voice_provider: str = "openai"
     voice_id: str = ""                   # empty → global TTS voice
@@ -104,6 +109,9 @@ _BUILTINS: list[dict] = [
          character_prompt="You are an energetic workshop coach: activate people, give clear next steps, keep momentum.",
          speaking_style="energetic, direct, action-oriented", humor_level="medium",
          verbosity="normal", interruptibility="wake_word", emotional_style="energizing",
+         # U203: a presentation persona is meant to chat along fluidly, and gives
+         # up tools willingly for it — the natural home for the realtime engine.
+         voice_engine="realtime",
          voice_id="verse", voice_speed=1.05, robot_motion_style="lively",
          greeting_message="Oké team, we gaan ervoor. Eerste vraag?"),
     dict(id="quiet_mode", display_name="Quiet Mode",
@@ -152,7 +160,8 @@ class CharacterStore:
                  "speaking_style", "humor_level", "verbosity",
                  "interruptibility", "emotional_style", "voice_id",
                  "voice_speed", "robot_motion_style", "greeting_message",
-                 "fallback_message", "learned_traits", "language"}
+                 "fallback_message", "learned_traits", "language",
+                 "voice_engine"}  # U203
 
     def update(self, character_id: str, fields: dict) -> CharacterPersona | None:
         """U85: owner edits a character (Robot panel). Unknown fields ignored."""
@@ -160,8 +169,14 @@ class CharacterStore:
         if current is None:
             return None
         for k, v in fields.items():
-            if k in self._EDITABLE and v is not None:
-                setattr(current, k, type(getattr(current, k))(v))
+            if k not in self._EDITABLE or v is None:
+                continue
+            # U203: an invalid engine would silently disable tools on every turn
+            # (realtime) or worse. Ignore anything that is not a real choice.
+            if k == "voice_engine" and str(v).strip().lower() not in (
+                    "", "pipeline", "realtime"):
+                continue
+            setattr(current, k, type(getattr(current, k))(v))
         (self._dir / f"{character_id}.json").write_text(
             json.dumps(asdict(current), indent=2, ensure_ascii=False),
             encoding="utf-8")

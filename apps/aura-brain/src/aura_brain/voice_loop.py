@@ -277,7 +277,7 @@ class VoiceLoop:
         # ambient spawn phantom Realtime replies ("Waarover wil je meer horen?"
         # with no user turn). Realtime is conversational enough that re-waking
         # each turn is fine — and it kills the phantom at the source.
-        realtime = os.environ.get("VOICE_ENGINE", "pipeline").lower() == "realtime"
+        realtime = self._engine() == "realtime"
         followup_s = 0.0 if realtime else self._followup_s
         if followup_s <= 0 or now < self._music_until:
             self._followup_until = 0.0  # wake word required
@@ -291,6 +291,25 @@ class VoiceLoop:
     @property
     def _mode(self) -> str:
         return os.environ.get("VOICE_MODE", "off").lower()
+
+    def _engine(self) -> str:
+        """The voice engine for THIS turn: the active character wins.
+
+        U203: the owner wanted voice (with tools) by default and realtime on
+        demand — a presentation persona that chats along. So the engine follows
+        the active character when it declares one, and falls back to the global
+        VOICE_ENGINE (pipeline) otherwise. Read live, so switching persona takes
+        effect on the next turn without a restart.
+        """
+        char = getattr(self._manager, "character", None) if self._manager else None
+        pref = (getattr(char, "voice_engine", "") or "").strip().lower()
+        if pref in ("pipeline", "realtime"):
+            return pref
+        return os.environ.get("VOICE_ENGINE", "pipeline").lower()
+
+    def engine_for_test(self) -> str:
+        """Test seam for the engine resolver (U203)."""
+        return self._engine()
 
     @property
     def _wake(self) -> str:
@@ -485,7 +504,7 @@ class VoiceLoop:
                 # Phase 0 (U140): open the latency trace for this confirmed turn.
                 from aura_brain.turn_trace import LOG as _TRACE
                 trace = _TRACE.start(self._session_id,
-                                     engine=os.environ.get("VOICE_ENGINE", "pipeline"))
+                                     engine=self._engine())
                 for _stage, _ts in _mk.items():
                     trace.mark(_stage, _ts)
                 trace.transcript = command

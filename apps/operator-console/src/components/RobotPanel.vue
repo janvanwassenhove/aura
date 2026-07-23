@@ -156,6 +156,20 @@
           </select>
         </label>
       </div>
+      <!-- U203: per-persona voice engine. Default (pipeline) keeps skills,
+           Spotify and memory; realtime is fluid speech-to-speech for chatting
+           along, but cannot use tools — right for a presentation persona. -->
+      <label class="pe-label">Conversation style
+        <select v-model="currentCharacter.voice_engine" class="pe-mini">
+          <option value="">Default (voice + skills)</option>
+          <option value="pipeline">Voice + skills</option>
+          <option value="realtime">Realtime chat (no skills)</option>
+        </select>
+      </label>
+      <p v-if="currentCharacter.voice_engine === 'realtime'" class="pe-hint pe-hint--warn">
+        Realtime is fluid and natural, but this persona can't open Spotify, use
+        skills or recall memory while talking.
+      </p>
       <label class="pe-label">Learned traits (how it has grown)</label>
       <textarea v-model="currentCharacter.learned_traits" rows="2" class="pe-input"
                 placeholder="e.g. remembers Jan likes skate punk; keeps mornings extra upbeat" />
@@ -452,6 +466,7 @@ async function savePersona() {
         character_prompt: c.character_prompt, verbosity: c.verbosity,
         humor_level: c.humor_level, voice_id: c.voice_id,
         interruptibility: c.interruptibility, learned_traits: c.learned_traits,
+        voice_engine: c.voice_engine ?? '',
       }),
     })
     personaSaved.value = r.ok
@@ -803,5 +818,6 @@ function fmtTime(iso: string): string {
 .pe-save { background: var(--accent); color: var(--accent-contrast, #fff); border: none; border-radius: var(--radius-md); padding: 0.35rem 0.7rem; font-size: 0.78rem; cursor: pointer; }
 .pe-save:disabled { opacity: 0.5; }
 .pe-ok { color: var(--ok-text, #2f9e6e); font-size: 0.75rem; }
+.pe-hint--warn { color: var(--danger, #d9534f); }
 .pe-hint { font-size: 0.68rem; color: var(--text-faint); margin: 0; }
 </style>
