@@ -42,6 +42,17 @@
           {{ store.status.powerpoint_watching ? 'PowerPoint linked' : 'manual slides' }}
         </span>
         <span class="pv-spacer" />
+        <!-- U209: laptop speakers + laptop-mic keyword listening -->
+        <button v-if="audioSupported" :class="['pv-toggle', laptopAudio && 'pv-toggle--on']"
+                :title="laptopAudio ? 'Reading the robot\'s lines through this laptop' : 'Read the robot\'s lines through this laptop'"
+                @click="laptopAudio = !laptopAudio">
+          <Volume2 :size="14" /> Laptop audio
+        </button>
+        <button v-if="micSupported" :class="['pv-toggle', laptopMic && 'pv-toggle--on']"
+                :title="laptopMic ? 'Listening for keywords on this laptop mic' : 'Listen for keywords on this laptop mic (robust — bypasses the robot echo)'"
+                @click="toggleMic">
+          <Mic :size="14" /> Keyword mic
+        </button>
         <button class="pv-btn pv-btn--stop" :disabled="store.busy" @click="stop">End</button>
         <button class="pv-x" aria-label="Close" @click="$emit('close')"><X :size="18" /></button>
       </div>
@@ -85,10 +96,14 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref } from 'vue'
-import { Presentation, VideoOff, X } from 'lucide-vue-next'
+import { onMounted, onUnmounted, ref, watch } from 'vue'
+import { Mic, Presentation, VideoOff, Volume2, X } from 'lucide-vue-next'
 import { usePresentationStore } from '../stores/presentationStore'
 import ScenarioBuilder from './ScenarioBuilder.vue'
+import {
+  cancelLaptopSpeech, createMic, laptopAudioSupported, laptopMicSupported,
+  speakOnLaptop, type MicController,
+} from '../composables/usePresenterAudio'
 
 defineEmits<{ close: [] }>()
 
@@ -101,6 +116,34 @@ const builder = ref<InstanceType<typeof ScenarioBuilder> | null>(null)
 const frameSrc = ref('')
 let statusTimer: ReturnType<typeof setInterval> | null = null
 let camLoop = 0
+
+// U209: laptop audio + laptop-mic keyword recognition.
+const audioSupported = laptopAudioSupported()
+const micSupported = laptopMicSupported()
+const laptopAudio = ref(false)
+const laptopMic = ref(false)
+let mic: MicController | null = null
+
+// Read each new spoken line through the laptop. Mute the keyword mic while we
+// speak so it can never hear the laptop's own voice as a new keyword.
+watch(() => store.subtitle, async (line) => {
+  if (!laptopAudio.value || !line) return
+  mic?.setMuted(true)
+  await speakOnLaptop(line)
+  mic?.setMuted(false)
+})
+
+function toggleMic() {
+  laptopMic.value = !laptopMic.value
+  if (laptopMic.value) {
+    if (!mic) {
+      mic = createMic((text) => { void store.pushSpeech(text) })
+    }
+    mic?.start()
+  } else {
+    mic?.stop()
+  }
+}
 
 async function start() {
   if (await store.start(yamlText.value)) startCamera()
@@ -116,6 +159,8 @@ async function stop() {
   await store.stop()
   camLoop++            // halt the camera loop
   frameSrc.value = ''
+  mic?.stop(); laptopMic.value = false
+  cancelLaptopSpeech()
 }
 
 // U206: the camera runs the same one-frame-per-request loop as VideoPanel
@@ -148,6 +193,8 @@ onUnmounted(() => {
   if (statusTimer) clearInterval(statusTimer)
   camLoop++
   if (frameSrc.value.startsWith('blob:')) URL.revokeObjectURL(frameSrc.value)
+  mic?.stop()
+  cancelLaptopSpeech()
 })
 </script>
 
@@ -187,6 +234,8 @@ onUnmounted(() => {
 .pv-ppt--on { color: var(--ok-text, #2f9e6e); border-color: currentColor; }
 .pv-ppt--off { color: var(--text-faint); }
 .pv-spacer { flex: 1; }
+.pv-toggle { display: inline-flex; align-items: center; gap: 0.3rem; background: transparent; border: 1px solid var(--border-strong); border-radius: var(--radius-md); color: var(--text-muted); padding: 0.3rem 0.6rem; font-size: 0.76rem; cursor: pointer; }
+.pv-toggle--on { background: var(--accent); color: var(--accent-contrast, #fff); border-color: var(--accent); }
 
 .pv-subtitle-wrap { flex: 1; display: flex; align-items: center; justify-content: center; padding: 2rem; }
 .pv-subtitle {
