@@ -84,3 +84,72 @@ def test_downscale_never_upscales_or_breaks_the_stream() -> None:
     assert downscale_jpeg(b"", 640, 70) == b""          # nothing to do
     assert downscale_jpeg(b"not-a-jpeg", 640, 70) == b"not-a-jpeg"   # never raises
     assert downscale_jpeg(small, 0, 70) is small        # width 0 = full resolution
+
+
+# ------------------------------------------------------------------
+# U195: the live view is polled per frame, not streamed
+# ------------------------------------------------------------------
+
+async def test_frame_jpg_returns_a_fresh_jpeg() -> None:
+    """The live-view source. JPEG (not PNG — the camera is already JPEG and
+    PNG re-encoding costs bytes we then have to push over WiFi), and never
+    cached: a cached live view is just a still picture."""
+    adapter = FakeRobotAdapter()
+    await adapter.connect()
+    routes.adapter = adapter
+    try:
+        resp = _client().get("/robot/camera/frame.jpg")
+        assert resp.status_code == 200
+        assert resp.headers["content-type"] == "image/jpeg"
+        assert resp.content.startswith(b"\xff\xd8")       # JPEG magic
+        assert "no-store" in resp.headers.get("cache-control", "")
+    finally:
+        routes.adapter = None
+
+
+async def test_frame_jpg_makes_a_new_frame_per_request() -> None:
+    """The whole point of polling over streaming.
+
+    The MJPEG stream produced frames on a fixed timer whether or not the link
+    could carry them; TCP then delayed rather than dropped, so the picture fell
+    progressively further behind (measured 0.6s -> 2.5s and still climbing).
+    Here each request grabs the camera itself, so N requests cost N grabs and
+    no frame can ever be served from a backlog.
+    """
+    adapter = FakeRobotAdapter()
+    await adapter.connect()
+    routes.adapter = adapter
+    grabs = {"n": 0}
+    original = adapter.get_camera_frame_jpeg
+
+    async def counting_grab() -> bytes:
+        grabs["n"] += 1
+        return await original()
+
+    adapter.get_camera_frame_jpeg = counting_grab   # type: ignore[method-assign]
+    routes.adapter = adapter
+    try:
+        client = _client()
+        for _ in range(5):
+            assert client.get("/robot/camera/frame.jpg").status_code == 200
+        assert grabs["n"] == 5
+    finally:
+        routes.adapter = None
+
+
+async def test_frame_jpg_is_downscaled_like_the_stream() -> None:
+    """A live view sized for a ~300px panel must not ship 1280px frames — that
+    is the bandwidth that made the stream fall behind in the first place."""
+    adapter = FakeRobotAdapter()
+    await adapter.connect()
+    routes.adapter = adapter
+    try:
+        import io
+
+        from PIL import Image
+
+        resp = _client().get("/robot/camera/frame.jpg")
+        width = Image.open(io.BytesIO(resp.content)).width
+        assert width <= routes._STREAM_WIDTH or routes._STREAM_WIDTH == 0
+    finally:
+        routes.adapter = None

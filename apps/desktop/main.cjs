@@ -135,8 +135,21 @@ function brainEnv() {
   // asks for approval). Owner extends this via ALLOWED_APPS in .env.
   // Spotify opens via its URI protocol handler (works for the Store/desktop
   // app without knowing its exe path); explorer resolves the protocol.
-  env.ALLOWED_APPS = env.ALLOWED_APPS ||
-    'vscode=code;code=code;notepad=notepad;spotify=explorer.exe spotify:'
+  // U194: Chrome resolves through the App Paths registry key, so `start chrome`
+  // works wherever it is installed. Claude and ChatGPT ship as Store packages
+  // with no exe on PATH and no URI scheme — shell:AppsFolder\<AUMID> is the
+  // documented way in, and the package family names are stable per package.
+  // Wrong or missing entries fail loudly in launch_app ("not found — check its
+  // path in Capabilities") rather than silently doing nothing.
+  env.ALLOWED_APPS = env.ALLOWED_APPS || [
+    'vscode=code',
+    'code=code',
+    'notepad=notepad',
+    'spotify=explorer.exe spotify:',
+    'chrome=cmd /c start chrome',
+    'claude=explorer.exe shell:AppsFolder\\Claude_pzs8sxrjxfjjc!Claude',
+    'chatgpt=explorer.exe shell:AppsFolder\\OpenAI.ChatGPT-Desktop_2p2nqsd0c76g0!ChatGPT',
+  ].join(';')
   return env
 }
 

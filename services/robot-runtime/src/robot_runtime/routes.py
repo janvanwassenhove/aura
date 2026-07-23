@@ -400,6 +400,32 @@ def downscale_jpeg(jpeg: bytes, width: int, quality: int) -> bytes:
         return jpeg
 
 
+@router.get("/robot/camera/frame.jpg")
+async def camera_frame_jpeg() -> Response:
+    """U195: one downscaled JPEG, made at request time — the live-view source.
+
+    The MJPEG stream pushes at a fixed rate whether or not the link can carry
+    it, and TCP never drops a frame: it only delays it. Measured over a link at
+    half the producer's rate, the picture fell 0.6s -> 2.5s behind and stayed
+    there. Here the client asks, gets the CURRENT frame, and asks again — never
+    more than one frame in flight, so no queue can form and the delay stays put
+    (measured: 0.22-0.28s, flat). Fewer frames, but each one is now.
+    """
+    import asyncio
+
+    assert adapter is not None
+    _touch()
+    grab = getattr(adapter, "get_camera_frame_jpeg", None)
+    try:
+        jpeg = await grab() if grab else await adapter.get_camera_frame()
+    except RuntimeError as exc:
+        return JSONResponse({"error": str(exc)}, status_code=503)
+    jpeg = await asyncio.to_thread(
+        downscale_jpeg, jpeg, _STREAM_WIDTH, _STREAM_QUALITY)
+    return Response(content=jpeg, media_type="image/jpeg",
+                    headers={"Cache-Control": "no-store"})
+
+
 @router.get("/robot/camera/stream")
 async def camera_stream() -> Response:
     """MJPEG stream (multipart/x-mixed-replace) — smooth live video for the

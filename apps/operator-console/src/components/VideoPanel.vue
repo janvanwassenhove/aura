@@ -12,15 +12,14 @@
     </div>
 
     <div class="video-frame">
-      <!-- MJPEG stream: the <img> renders continuous frames natively -->
+      <!-- U195: one frame per request, next one asked only after this one has
+           rendered. Self-paces to whatever the link can carry, and nothing can
+           queue up behind it. -->
       <img
         v-show="state === 'live'"
-        :key="streamKey"
-        :src="streamUrl"
+        :src="frameSrc"
         alt="Robot camera"
         class="video-img"
-        @load="state = 'live'"
-        @error="onStreamError"
       />
       <div v-if="state !== 'live'" class="video-placeholder">
         <VideoOff :size="28" class="mb-2" />
@@ -130,7 +129,7 @@ const recognized = computed(() => robotStore.lastRecognized)
 
 const state = ref<'connecting' | 'live' | 'off'>('connecting')
 const streamKey = ref(0)
-const streamUrl = computed(() => `${BRAIN_URL}/robot/camera/stream?r=${streamKey.value}`)
+const frameSrc = ref('')
 const recognitionEnabled = ref<boolean | null>(null)
 const enrollId = ref('')
 const enrolling = ref(false)
@@ -139,19 +138,65 @@ const enrollOk = ref(false)
 
 let retryTimer: ReturnType<typeof setTimeout> | null = null
 
-function onStreamError() {
-  state.value = 'off'
-  if (retryTimer) clearTimeout(retryTimer)
-  retryTimer = setTimeout(bumpStream, 4000)
-}
-
-// U175: remount the <img> → fresh MJPEG connection. Needed because a stream
-// whose SERVER goes away stalls silently: no error event fires, the retry
-// above never runs, and the panel froze until a full page reload ("camera
-// lijkt niet meer te werken").
+// U175: restart the frame loop. A stream whose SERVER went away used to stall
+// silently — no error event, no retry, frozen panel until a page reload
+// ("camera lijkt niet meer te werken"). The polling loop cannot stall the same
+// way (each frame is its own request), but an explicit restart still gives the
+// owner a way back after a long outage.
 function bumpStream() {
   state.value = 'connecting'
   streamKey.value++
+  startFrameLoop()
+}
+
+// ---------------------------------------------------------------------------
+// U195: the live view, one frame at a time.
+//
+// The MJPEG stream pushed frames at a fixed rate whether or not the link could
+// carry them, and TCP delays rather than drops — so the picture drifted further
+// behind the longer it ran (measured 0.6s -> 2.5s and climbing). Asking for one
+// frame and only requesting the next once it has decoded means at most one
+// frame is ever in flight: no queue can form, and the rate settles at whatever
+// the link actually sustains. Measured flat at ~0.25s.
+// ---------------------------------------------------------------------------
+const MIN_FRAME_MS = 66      // ~15 fps ceiling; the link decides the real rate
+let loopId = 0
+let currentUrl = ''
+
+async function startFrameLoop() {
+  const myLoop = ++loopId   // any older loop sees the mismatch and stops
+  while (myLoop === loopId) {
+    const started = performance.now()
+    try {
+      const resp = await fetch(`${BRAIN_URL}/robot/camera/frame.jpg`, { cache: 'no-store' })
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
+      const blob = await resp.blob()
+      if (myLoop !== loopId) break
+      const next = URL.createObjectURL(blob)
+      // Revoke the PREVIOUS url only after swapping, so the <img> is never
+      // pointed at a blob that has already been freed (that renders blank).
+      const prev = currentUrl
+      currentUrl = next
+      frameSrc.value = next
+      if (prev) URL.revokeObjectURL(prev)
+      state.value = 'live'
+      // On a fast link the loop would otherwise spin as fast as the robot can
+      // encode, pegging the Pi for frames no eye can tell apart. Cap the rate;
+      // on a slow link the request itself already takes longer than this and
+      // the wait is zero.
+      const left = MIN_FRAME_MS - (performance.now() - started)
+      if (left > 0) await new Promise(r => setTimeout(r, left))
+    } catch {
+      if (myLoop !== loopId) break
+      state.value = 'off'
+      await new Promise(r => setTimeout(r, 2000))   // robot down — back off
+    }
+  }
+}
+
+function stopFrameLoop() {
+  loopId++                                   // running loop exits on mismatch
+  if (currentUrl) { URL.revokeObjectURL(currentUrl); currentUrl = '' }
 }
 
 // Brain restarted (WS reconnected) → the stream endpoint is back; remount.
@@ -318,8 +363,12 @@ async function fetchRobotMode(): Promise<void> {
 onMounted(() => {
   void fetchRecognitionStatus()
   void fetchRobotMode()
+  void startFrameLoop()
 })
-onUnmounted(() => { if (retryTimer) clearTimeout(retryTimer) })
+onUnmounted(() => {
+  if (retryTimer) clearTimeout(retryTimer)
+  stopFrameLoop()   // a hidden panel must not keep pulling frames off the robot
+})
 </script>
 
 <style scoped>
