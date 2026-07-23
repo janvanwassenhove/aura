@@ -60,10 +60,20 @@ next-beat button.
 4. Advance your slides as usual — `slide:N` beats fire; say a keyword — chime-in
    beats fire; press **Next beat** for the hand-advanced ones.
 
-**Still experimental:** keyword beats fire from what the robot's mic hears while
-you talk, so they depend on echo cancellation that isn't fully stable — the
-robot may occasionally react to its own voice. `improvise` uses the LLM for a
-spoken line (no tools); a beat needing live data should be a `speak` beat.
+**Robust keyword listening (U209):** turn on **Keyword mic** in the presenter to
+recognise keywords from THIS laptop's microphone instead of the robot's. The
+laptop mic is near you, and recognition is paused whenever the laptop speaks, so
+it can't trigger on its own voice — this sidesteps the robot's echo-cancellation
+problem. (The robot's own mic still feeds keywords too; the laptop mic is the
+dependable path for a real demo.)
+
+**Laptop audio (U209):** turn on **Laptop audio** to have this laptop read the
+robot's lines aloud through its speakers — useful in a room where the robot's
+own speaker is small. It's the laptop's voice, not the robot's exact audio.
+
+**Live data in a beat (U208):** set a beat's engine to **with tools**
+(`engine: pipeline`) and it runs the full agentic loop — calendar, music, a
+lookup — then speaks the result. Fast text beats leave engine on default.
 
 **Not yet verified on the real robot + real PowerPoint end to end** — the API,
 runner, watcher-degradation and presenter view are each tested (fakes / preview
