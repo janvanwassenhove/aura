@@ -86,3 +86,44 @@ def test_identity_prefix_reflects_env(monkeypatch) -> None:
 
     monkeypatch.setenv("ASSISTANT_LANGUAGE", "auto")
     assert "language the user is using" in _identity_prefix()
+
+
+# ------------------------------------------------------------------
+# U202: the model roles must not accept a model the role cannot run
+# ------------------------------------------------------------------
+
+def test_realtime_model_is_its_own_role(client) -> None:
+    """Voice and text need different endpoints, so they need separate settings."""
+    c, _ = client
+    assert c.get("/setup/prefs").json()["realtime_model"] == ""
+
+    assert c.post("/setup/prefs", json={"realtime_model": "gpt-realtime-2.1"}).status_code == 200
+    assert c.get("/setup/prefs").json()["realtime_model"] == "gpt-realtime-2.1"
+    assert os.environ["REALTIME_MODEL"] == "gpt-realtime-2.1"
+
+
+@pytest.mark.parametrize("role", ["chat_model", "agent_model"])
+@pytest.mark.parametrize("model", ["gpt-realtime-2.1", "gpt-4o-realtime-preview",
+                                   "gpt-4o-audio-preview"])
+def test_a_speech_model_is_refused_for_a_text_role(client, role, model) -> None:
+    """The exact failure the owner hit.
+
+    U191's settings offered ONLY realtime models for the Conversation role, but
+    that role feeds round one of every turn through chat-completions — typed
+    messages included. Picking one made OpenAI answer 404 "not a chat model" for
+    every single turn, which the old echo fallback then disguised as the
+    assistant repeating the question back.
+    """
+    c, _ = client
+    resp = c.post("/setup/prefs", json={role: model})
+    assert resp.status_code == 422
+    assert "speech-to-speech" in resp.json()["error"]
+    # Refused means unchanged — a rejected value must not be half-applied.
+    assert os.environ.get(
+        {"chat_model": "CHAT_MODEL", "agent_model": "AGENT_MODEL"}[role], "") != model
+
+
+def test_a_normal_chat_model_still_saves(client) -> None:
+    c, _ = client
+    assert c.post("/setup/prefs", json={"chat_model": "gpt-4o-mini"}).status_code == 200
+    assert os.environ["CHAT_MODEL"] == "gpt-4o-mini"

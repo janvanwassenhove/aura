@@ -43,16 +43,23 @@ def test_text_turn_missing_text(client: TestClient) -> None:
     assert resp.status_code == 422
 
 
-def test_text_turn_echo_fallback(client: TestClient) -> None:
-    """With orchestrator unreachable, the echo fallback is returned."""
+def test_text_turn_says_it_failed_instead_of_echoing(client: TestClient) -> None:
+    """U202: with the orchestrator unreachable, SAY so.
+
+    This used to assert the opposite — that the reply contained the question —
+    because the fallback echoed it back. That looked like a working assistant
+    with a parroting habit, and it hid a real misconfiguration for as long as
+    nobody read the log. The turn still succeeds (the session stays usable),
+    but the reply admits the failure and never repeats the prompt.
+    """
     resp = client.post(
         "/conversation/turn",
         json={"text": "Hello AURA", "session_id": "test-session"},
     )
     assert resp.status_code == 200
     body = resp.json()
-    assert "reply" in body
-    assert "Hello AURA" in body["reply"]
+    assert "Hello AURA" not in body["reply"]
+    assert "can't answer" in body["reply"]
     assert body["session_id"] == "test-session"
 
 
@@ -64,3 +71,41 @@ def test_end_session(client: TestClient) -> None:
     resp = client.delete(f"/conversation/sessions/{session_id}")
     assert resp.status_code == 200
     assert resp.json()["ok"] is True
+
+
+# ------------------------------------------------------------------
+# U202: a failing turn must say so, never imitate a working one
+# ------------------------------------------------------------------
+
+def test_failure_messages_name_the_fix() -> None:
+    """The old fallback echoed the question and logged a warning nobody reads.
+
+    A misconfigured model therefore looked like a parrot: every question came
+    back verbatim, with the real cause ("not a chat model") sitting in a log
+    file. Each failure the owner can actually fix now says what to do.
+    """
+    from conversation_runtime.routes import _explain_failure
+
+    chat = _explain_failure(RuntimeError(
+        "Error code: 404 - {'error': {'message': 'This is not a chat model and "
+        "thus not supported in the v1/chat/completions endpoint.'}}"))
+    assert "speech-to-speech" in chat and "Settings" in chat
+
+    key = _explain_failure(RuntimeError("Error code: 401 - invalid_api_key"))
+    assert "API key" in key
+
+    quota = _explain_failure(RuntimeError("Error code: 429 - rate limit reached"))
+    assert "quota" in quota or "rate-limit" in quota
+
+    # Anything unrecognised still admits failure rather than faking an answer.
+    other = _explain_failure(RuntimeError("something odd"))
+    assert "can't answer" in other
+
+
+def test_a_failed_turn_never_returns_the_question() -> None:
+    """The specific deception: the reply must not be the prompt back."""
+    from conversation_runtime.routes import _explain_failure
+
+    question = "kan je nummer nofx afspelen in spotify"
+    for exc in (RuntimeError("not a chat model"), RuntimeError("boom")):
+        assert question not in _explain_failure(exc)

@@ -61,11 +61,23 @@
 
           <div v-if="localProvider === 'openai'" class="settings-field">
             <label class="field-label">Model per task type <span class="mr-hint">(optional — empty = use the model above)</span></label>
+            <!-- U202: this role feeds the FIRST round of every turn through
+                 chat-completions — typed messages included. U191 restricted it
+                 to realtime models on the assumption it drove the voice loop;
+                 picking one then 404'd every turn into the echo fallback. The
+                 voice model is REALTIME_MODEL, its own row below. -->
             <div class="model-role">
-              <span class="mr-name">💬 Conversation <em>speech-to-speech voice</em></span>
+              <span class="mr-name">💬 Conversation <em>fast replies, typed and spoken</em></span>
               <select v-model="roleChat" class="field-select mr-input">
                 <option value="">— use the model above —</option>
-                <option v-for="m in roleOptions(realtimeModels, roleChat)" :key="m.id" :value="m.id">{{ m.name }}</option>
+                <option v-for="m in roleOptions(chatModels, roleChat)" :key="m.id" :value="m.id">{{ m.name }}</option>
+              </select>
+            </div>
+            <div class="model-role">
+              <span class="mr-name">🎙️ Voice <em>speech-to-speech (realtime)</em></span>
+              <select v-model="roleRealtime" class="field-select mr-input">
+                <option value="">— automatic —</option>
+                <option v-for="m in roleOptions(realtimeModels, roleRealtime)" :key="m.id" :value="m.id">{{ m.name }}</option>
               </select>
             </div>
             <div class="model-role">
@@ -83,9 +95,9 @@
               </select>
             </div>
             <p class="mr-note">
-              Each role only lists models that can fill it: the voice loop needs a
-              realtime (speech-to-speech) model, and screen control needs one that
-              can see images.
+              Each role only lists models that can fill it. Only <em>Voice</em>
+              takes a realtime (speech-to-speech) model — the others go through
+              chat-completions, which a realtime model cannot serve.
             </p>
             <button class="btn-apply mr-save" :disabled="rolesSaving" @click="saveModelRoles">
               {{ rolesSaving ? 'Saving…' : 'Save model roles' }}
@@ -397,6 +409,7 @@ const localModel = ref<string>('')
 const roleChat = ref('')
 const roleAgent = ref('')
 const roleComputer = ref('')
+const roleRealtime = ref('')
 const rolesSaving = ref(false)
 const rolesSaved = ref(false)
 
@@ -407,6 +420,7 @@ async function fetchModelRoles() {
     roleChat.value = d.chat_model ?? ''
     roleAgent.value = d.agent_model ?? ''
     roleComputer.value = d.computer_use_model ?? ''
+    roleRealtime.value = d.realtime_model ?? ''
   } catch { /* keep */ }
 }
 async function saveModelRoles() {
@@ -416,7 +430,8 @@ async function saveModelRoles() {
     const r = await fetch(`${BRAIN_URL_LOGS}/setup/prefs`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ chat_model: roleChat.value.trim(),
-        agent_model: roleAgent.value.trim(), computer_use_model: roleComputer.value.trim() }),
+        agent_model: roleAgent.value.trim(), computer_use_model: roleComputer.value.trim(),
+        realtime_model: roleRealtime.value.trim() }),
     })
     rolesSaved.value = r.ok
   } finally { rolesSaving.value = false }
