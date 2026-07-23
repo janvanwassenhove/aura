@@ -38,6 +38,7 @@ from shared_schemas.events.system import (
     OfflineQueueSyncCompleted,
     OfflineQueueSyncStarted,
     OfflineRequestQueued,
+    PresentationBeatFired,
     PresentationCueReceived,
     ReminderTriggered,
     TurnLatencyMeasured,
@@ -85,5 +86,6 @@ __all__ = [
     "OfflineQueueSyncStarted",
     "OfflineQueueSyncCompleted",
     "ReminderTriggered",
+    "PresentationBeatFired",
     "PresentationCueReceived",
 ]

@@ -286,6 +286,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     _robot = RobotClient()
     robot_api.init(_robot)
 
+    # U206: co-presenter — the runner speaks/gestures through the robot and
+    # publishes beat subtitles onto the bus for the console's presenter view.
+    from aura_brain import presentation_api
+
+    presentation_api.init(_robot, ctx.bus)
+
     # U36d: relay the robot's own event stream (speech/motion/behavior/mode)
     # to the console — it only listens to the brain's WebSocket.
     from aura_brain.robot_events import RobotEventBridge
@@ -898,6 +904,9 @@ def create_app() -> FastAPI:
 
     from aura_brain import robot_api
     app.include_router(robot_api.router)  # U36: console → robot proxy
+
+    from aura_brain import presentation_api
+    app.include_router(presentation_api.router)  # U206: co-presenter
 
     from aura_brain import setup_api
     app.include_router(setup_api.router)  # U34: in-app secure/setup

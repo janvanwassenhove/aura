@@ -43,9 +43,28 @@ the realtime engine has no tool access (U203).
 manual / slide / keyword triggers and executes each mode, this test presentation
 (the deck + scenario), and a PowerPoint slide-watcher for Windows.
 
-**Not yet wired (next unit) — needs on-device verification:** the API endpoints
-to load/drive a scenario, feeding the presenter's live speech into `on_speech`
-for keyword beats, routing the PowerPoint watcher into a running talk, and the
-console **presenter view** (big subtitles, next-beat button, slide + camera).
-The keyword-while-you-talk path also depends on echo cancellation that isn't
-stable yet — treat it as experimental.
+**Wired live (U206):** the API (`POST /presentation/scenario|next|speech`,
+`GET /presentation/status`, `DELETE /presentation/scenario`), the runner speaks
+and gestures through the real robot and improvises via the LLM, the PowerPoint
+watcher feeds `slide:N` beats, the voice loop feeds your speech to keyword
+beats, and the console **presenter view** (the 🖥 icon in the title bar) shows
+big subtitles, the current slide, armed keywords, a camera thumbnail and a
+next-beat button.
+
+## Running it
+
+1. Open your `.pptx` and start the slideshow (F5).
+2. In AURA, click the **presenter** icon in the title bar.
+3. Paste your scenario YAML (e.g. this folder's `robot-junior-dev.scenario.yaml`)
+   and press **Start presentation**.
+4. Advance your slides as usual — `slide:N` beats fire; say a keyword — chime-in
+   beats fire; press **Next beat** for the hand-advanced ones.
+
+**Still experimental:** keyword beats fire from what the robot's mic hears while
+you talk, so they depend on echo cancellation that isn't fully stable — the
+robot may occasionally react to its own voice. `improvise` uses the LLM for a
+spoken line (no tools); a beat needing live data should be a `speak` beat.
+
+**Not yet verified on the real robot + real PowerPoint end to end** — the API,
+runner, watcher-degradation and presenter view are each tested (fakes / preview
+/ dry-run), but the full live chain needs a run on the actual stack.

@@ -426,6 +426,21 @@ class VoiceLoop:
                     if text:
                         logger.debug("voice loop ignored implausible transcript: %r", text)
                     continue
+
+                # U206: while a co-presenter scenario is active, every plausible
+                # thing the presenter says is offered to it for keyword beats —
+                # BEFORE the wake-word gate, since the robot chimes in on topics
+                # you mention, not on being addressed. It never consumes the
+                # turn; the normal wake-word flow below continues unchanged.
+                # NB: reliable only once echo cancellation is solid (the robot
+                # must not hear its own chime-ins as new speech).
+                try:
+                    from aura_brain import presentation_api
+
+                    if presentation_api.is_active():
+                        await presentation_api.feed_speech(text)
+                except Exception as exc:  # noqa: BLE001 — never break the mic loop
+                    logger.debug("presentation speech feed failed: %s", exc)
                 # U91/U148: reject a transcript that is (fuzzily) one of the
                 # robot's OWN recent replies echoing back through the mic.
                 if in_followup and not in_barge and self._is_echo_of_last_reply(text):
