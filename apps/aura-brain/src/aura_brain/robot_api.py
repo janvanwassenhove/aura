@@ -65,6 +65,35 @@ async def camera_stream() -> Response:
     )
 
 
+# U195: one shared, keep-alive client for the live view. A fresh connection per
+# frame would spend a TCP+HTTP handshake on every single frame — the polling
+# model only beats streaming if asking is cheap.
+_frame_client: httpx.AsyncClient | None = None
+
+
+@router.get("/camera/frame.jpg")
+async def camera_frame_jpeg() -> Response:
+    """Proxy ONE current JPEG frame. The console polls this for the live view.
+
+    Streaming queues frames it cannot deliver and the picture drifts further
+    behind the longer it runs; asking per frame cannot queue, so the delay
+    stays flat. See the robot-runtime endpoint for the measurements.
+    """
+    global _frame_client
+    base_url = getattr(_robot, "_base_url", "http://robot-runtime:8001")
+    if _frame_client is None:
+        _frame_client = httpx.AsyncClient(timeout=httpx.Timeout(5.0))
+    try:
+        resp = await _frame_client.get(f"{base_url}/robot/camera/frame.jpg")
+    except (httpx.HTTPError, OSError) as exc:
+        return _unavailable(exc)
+    if resp.status_code != 200:
+        return JSONResponse({"error": "camera unavailable"},
+                            status_code=resp.status_code)
+    return Response(content=resp.content, media_type="image/jpeg",
+                    headers={"Cache-Control": "no-store"})
+
+
 @router.get("/camera/frame")
 async def camera_frame() -> Response:
     try:

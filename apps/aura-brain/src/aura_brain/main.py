@@ -909,11 +909,17 @@ def create_app() -> FastAPI:
 
     # U59: owner-taught skills — CRUD API; the store is shared with the
     # pipeline in the lifespan (pipeline doesn't exist yet at mount time).
+    # U194: ship the desktop skills (VS Code/Copilot, Spotify, Chrome, the AI
+    # desktop apps) with the product. Seeded only when absent, so an owner's
+    # edits and deletions stick.
+    from orchestrator.builtin_skills import seed_builtin_skills
     from orchestrator.skills import SkillStore
 
     from aura_brain import skills_api
 
-    skills_api.init(SkillStore())
+    _skill_store = SkillStore()
+    seed_builtin_skills(_skill_store)
+    skills_api.init(_skill_store)
     app.include_router(skills_api.router)
 
     return app
