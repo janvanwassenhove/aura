@@ -46,6 +46,12 @@ gestures = [
     "pillow>=10.0",
     "numpy>=1.26",
 ]
+# PowerPoint co-presenter (U205): read the live slide number from a running
+# slideshow. Windows only; degrades to "no slides" (manual advance) without it.
+# uv sync --package aura-brain --extra presentation
+presentation = [
+    "pywin32>=306; sys_platform == 'win32'",
+]
 # Gated Computer Use (U50): uv sync --package aura-brain --extra computeruse
 # Anthropic's computer-use tool (screenshots + mouse/keyboard control). OFF by
 # default; needs an ANTHROPIC_API_KEY at runtime.

@@ -1,0 +1,64 @@
+# U205: test co-presenter scenario — exercises every beat type.
+#
+# Talk: "I Hired a Real Robot as My Junior Dev — and Now My Kids Don't Want to
+#        Learn Java Anymore". A stand-up / field report for developers, leads
+#        and architects. Runs alongside robot-junior-dev.pptx.
+#
+# Trigger kinds:
+#   manual        you advance the beat by hand (a button in the console)
+#   slide:N       fires when PowerPoint reaches slide N (1-based, as PowerPoint
+#                 numbers them)
+#   keyword:word  fires when YOU say the word while presenting (chime_in)
+#
+# Modes:
+#   speak      the robot says `text` verbatim
+#   improvise  the robot says a fresh line about `topic` (realtime — no tools)
+#   chime_in   armed by a keyword; the robot may add one remark
+#   silent     the robot stays quiet and hands the floor back to you
+
+title: "I Hired a Real Robot as My Junior Dev"
+pptx: "robot-junior-dev.pptx"
+
+beats:
+  # --- opening: the robot introduces itself (verbatim, so timing is exact) ---
+  - id: intro
+    trigger: slide:1
+    mode: speak
+    text: "Hallo allemaal. Ik ben Reachy Mini — en volgens Jan ben ik zijn nieuwe junior developer. We zullen zien wie hier wie aanstuurt."
+    gesture: wave
+
+  # --- the kids story: robot chimes in ONLY if Jan mentions the kids/Java ---
+  - id: kids-java
+    trigger: keyword:Java
+    mode: chime_in
+    topic: "dat kinderen niet minder leren, maar iets anders — van code naar producten en van typen naar sturen"
+    guardrails: "Maximaal twee zinnen. Luchtig, geen belerende toon."
+    once: true
+
+  # --- the thesis slide: robot improvises on the 'commodity vs expertise' idea ---
+  - id: thesis
+    trigger: slide:4
+    mode: improvise
+    topic: "waarom software schrijven een commodity wordt, maar architectuur, systeemdenken en smaak juist waardevoller"
+    guardrails: "Drie zinnen. Eindig met een lichte grap over dat de robot ook maar doet wat hem gevraagd wordt."
+    gesture: nod
+
+  # --- agents demo: robot chimes in when Jan says 'agents' ---
+  - id: agent-factory
+    trigger: keyword:agents
+    mode: chime_in
+    topic: "hoe een vloot agents parallel werkt terwijl de mens de richting bepaalt"
+    guardrails: "Eén zin. Zelfverzekerd."
+    once: true
+
+  # --- the uncomfortable question: robot stays SILENT so Jan owns the moment ---
+  - id: the-question
+    trigger: slide:6
+    mode: silent
+
+  # --- closing: verbatim, so the last word lands as written ---
+  - id: closing
+    trigger: manual
+    mode: speak
+    text: "Dus: leren jullie kinderen nog Java? Misschien. Maar leer ze vooral wat ze willen bouwen. De rest typ ik wel."
+    gesture: nod
