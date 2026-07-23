@@ -388,11 +388,17 @@ class OrchestratorPipeline:
         memory. Best-effort; never blocks or breaks a turn."""
         self._memory_hook = hook
 
-    async def orchestrate(self, text: str, session_id: str) -> str:
-        """Process one user turn; times it and emits TurnLatencyMeasured (U23)."""
+    async def orchestrate(self, text: str, session_id: str, announce: bool = True) -> str:
+        """Process one user turn; times it and emits TurnLatencyMeasured (U23).
+
+        U208: ``announce=False`` runs the full agentic loop (tools included) but
+        does NOT publish ResponseDrafted, so nothing auto-speaks the reply. The
+        co-presenter uses this to let an ``improvise`` beat pull live data via
+        tools, then speak the result itself (once) through the robot.
+        """
         timing = {"llm_ms": 0.0, "tool_ms": 0.0}
         t0 = time.perf_counter()
-        reply = await self._orchestrate_impl(text, session_id, timing)
+        reply = await self._orchestrate_impl(text, session_id, timing, announce=announce)
         total_ms = (time.perf_counter() - t0) * 1000
         await self._bus.publish(TurnLatencyMeasured(
             session_id=session_id,
@@ -409,13 +415,15 @@ class OrchestratorPipeline:
                 logger.debug("memory hook failed: %s", exc)
         return reply
 
-    async def _orchestrate_impl(self, text: str, session_id: str, timing: dict) -> str:
+    async def _orchestrate_impl(self, text: str, session_id: str, timing: dict,
+                               announce: bool = True) -> str:
         # Offline / DEGRADED mode: try a local model, then the regex FallbackAgent.
         if self._heartbeat and self._heartbeat.mode in (
             RobotMode.DEGRADED, RobotMode.OFFLINE, RobotMode.MAINTENANCE
         ):
             reply = await self._offline_reply(text, session_id)
-            await self._bus.publish(ResponseDrafted(session_id=session_id, response_text=reply))
+            if announce:
+                await self._bus.publish(ResponseDrafted(session_id=session_id, response_text=reply))
             return reply
 
         persona = self._persona.current_persona
@@ -546,7 +554,8 @@ class OrchestratorPipeline:
             return ""
         reply = _strip_speaker_label(reply)  # U88: drop a leading "Richie:" label
         self._remember(session_id, "assistant", reply)
-        await self._bus.publish(ResponseDrafted(session_id=session_id, response_text=reply))
+        if announce:
+            await self._bus.publish(ResponseDrafted(session_id=session_id, response_text=reply))
         return reply
 
     # U61: subagents — a scoped, read-only sub-loop with its own round budget.
