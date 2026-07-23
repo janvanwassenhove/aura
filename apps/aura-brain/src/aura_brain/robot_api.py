@@ -70,27 +70,149 @@ async def camera_stream() -> Response:
 # model only beats streaming if asking is cheap.
 _frame_client: httpx.AsyncClient | None = None
 
+# U196: the robot is deployed SEPARATELY from this app — the owner installs a
+# new AURA release on the laptop while the Pi keeps running whatever was last
+# pulled there. Measured on a live setup: the Pi was still sending unscaled
+# 1280x720 / 487 KB frames, i.e. code from before U188's downscaling, months
+# after that shipped. So a console that simply required the new endpoint would
+# have found a 404 and shown "No camera feed" — a fix that breaks the thing it
+# fixes. `None` = not probed yet, True/False = robot has /camera/frame.jpg.
+_robot_has_frame_jpg: bool | None = None
+
+_LATEST: dict[str, Any] = {"jpeg": b"", "task": None}
+
+_FALLBACK_WIDTH = 640
+_FALLBACK_QUALITY = 70
+
+
+def _shrink(jpeg: bytes) -> bytes:
+    """Downscale a legacy robot's full-size frame. Returns the input on any
+    problem — a failed optimisation must never cost us the picture."""
+    try:
+        import io
+
+        from PIL import Image
+
+        img = Image.open(io.BytesIO(jpeg))
+        if img.width <= _FALLBACK_WIDTH:
+            return jpeg
+        h = max(1, round(img.height * _FALLBACK_WIDTH / img.width))
+        img = img.convert("RGB").resize((_FALLBACK_WIDTH, h), Image.BILINEAR)
+        buf = io.BytesIO()
+        img.save(buf, format="JPEG", quality=_FALLBACK_QUALITY)
+        return buf.getvalue()
+    except Exception:  # noqa: BLE001
+        return jpeg
+
+
+async def shutdown_camera() -> None:
+    """Stop the background reader and close the shared client (app shutdown)."""
+    task = _LATEST.get("task")
+    if task is not None and not task.done():
+        task.cancel()
+    _LATEST["task"] = None
+    global _frame_client
+    if _frame_client is not None:
+        await _frame_client.aclose()
+        _frame_client = None
+
+
+def _base() -> str:
+    return getattr(_robot, "_base_url", "http://robot-runtime:8001")
+
+
+def _client() -> httpx.AsyncClient:
+    global _frame_client
+    if _frame_client is None:
+        _frame_client = httpx.AsyncClient(timeout=httpx.Timeout(5.0))
+    return _frame_client
+
+
+async def _pump_latest_frame() -> None:
+    """Keep ONLY the newest frame from an old robot's MJPEG stream.
+
+    An old Pi has no per-frame endpoint, so the brain reads its stream
+    continuously and throws away everything but the last frame. Draining
+    without buffering is what keeps the picture current: the console then polls
+    for the newest frame we hold, and no queue can build on either hop.
+    """
+    import asyncio
+
+    backoff = 1.0
+    while True:
+        try:
+            async with _client().stream(
+                "GET", f"{_base()}/robot/camera/stream",
+                timeout=httpx.Timeout(10.0, read=None),
+            ) as resp:
+                if resp.status_code != 200:
+                    raise httpx.HTTPError(f"HTTP {resp.status_code}")
+                backoff = 1.0
+                buf = b""
+                async for chunk in resp.aiter_bytes():
+                    buf += chunk
+                    # Keep the last COMPLETE JPEG in the buffer; drop the rest.
+                    end = buf.rfind(b"\xff\xd9")
+                    if end == -1:
+                        if len(buf) > 4_000_000:   # no marker → corrupt, reset
+                            buf = b""
+                        continue
+                    start = buf.rfind(b"\xff\xd8", 0, end)
+                    if start != -1:
+                        # Shrink once per received frame, not once per poll:
+                        # the console asks more often than the robot delivers,
+                        # and an old robot's frames are 1280x720 for a panel a
+                        # few hundred pixels wide.
+                        _LATEST["jpeg"] = await asyncio.to_thread(
+                            _shrink, buf[start:end + 2])
+                    buf = buf[end + 2:]
+        except asyncio.CancelledError:
+            return          # shutdown: expected, not an error worth a traceback
+        except (httpx.HTTPError, OSError):
+            await asyncio.sleep(backoff)
+            backoff = min(backoff * 2, 15.0)       # robot down — stop hammering
+
 
 @router.get("/camera/frame.jpg")
 async def camera_frame_jpeg() -> Response:
-    """Proxy ONE current JPEG frame. The console polls this for the live view.
+    """One current JPEG frame. The console polls this for the live view.
 
-    Streaming queues frames it cannot deliver and the picture drifts further
-    behind the longer it runs; asking per frame cannot queue, so the delay
-    stays flat. See the robot-runtime endpoint for the measurements.
+    Streaming queues frames it cannot deliver, so the picture drifts further
+    behind the longer it runs; asking per frame cannot queue and the delay
+    stays flat. Works against an old robot too — see `_pump_latest_frame`.
     """
-    global _frame_client
-    base_url = getattr(_robot, "_base_url", "http://robot-runtime:8001")
-    if _frame_client is None:
-        _frame_client = httpx.AsyncClient(timeout=httpx.Timeout(5.0))
-    try:
-        resp = await _frame_client.get(f"{base_url}/robot/camera/frame.jpg")
-    except (httpx.HTTPError, OSError) as exc:
-        return _unavailable(exc)
-    if resp.status_code != 200:
-        return JSONResponse({"error": "camera unavailable"},
-                            status_code=resp.status_code)
-    return Response(content=resp.content, media_type="image/jpeg",
+    global _robot_has_frame_jpg
+    import asyncio
+
+    if _robot_has_frame_jpg is not False:
+        try:
+            resp = await _client().get(f"{_base()}/robot/camera/frame.jpg")
+        except (httpx.HTTPError, OSError) as exc:
+            if _robot_has_frame_jpg is None:
+                _robot_has_frame_jpg = False       # can't probe → assume old
+            else:
+                return _unavailable(exc)
+        else:
+            if resp.status_code == 200:
+                _robot_has_frame_jpg = True
+                return Response(content=resp.content, media_type="image/jpeg",
+                                headers={"Cache-Control": "no-store"})
+            if resp.status_code == 404:
+                _robot_has_frame_jpg = False       # older robot — fall through
+            else:
+                return JSONResponse({"error": "camera unavailable"},
+                                    status_code=resp.status_code)
+
+    # Old robot: serve the newest frame the background reader has seen.
+    if _LATEST["task"] is None or _LATEST["task"].done():
+        _LATEST["task"] = asyncio.create_task(_pump_latest_frame())
+    for _ in range(50):                            # first frame: wait up to 5 s
+        if _LATEST["jpeg"]:
+            break
+        await asyncio.sleep(0.1)
+    if not _LATEST["jpeg"]:
+        return JSONResponse({"error": "camera unavailable"}, status_code=503)
+    return Response(content=_LATEST["jpeg"], media_type="image/jpeg",
                     headers={"Cache-Control": "no-store"})
 
 

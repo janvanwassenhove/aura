@@ -112,3 +112,107 @@ def test_unreachable_robot_returns_503() -> None:
         assert client.post("/robot/motion", json={"motion_id": "nod"}).status_code == 503
     finally:
         robot_api.init(None)
+
+
+# ------------------------------------------------------------------
+# U196: the live view must survive a robot older than this app
+# ------------------------------------------------------------------
+
+def _jpeg(width: int = 1280, height: int = 720, seed: int = 0) -> bytes:
+    import io
+
+    import numpy as np
+    from PIL import Image
+
+    rng = np.random.default_rng(seed)
+    arr = rng.integers(0, 255, (height, width, 3), dtype=np.uint8)
+    buf = io.BytesIO()
+    Image.fromarray(arr).save(buf, format="JPEG", quality=85)
+    return buf.getvalue()
+
+
+@pytest.fixture(autouse=True)
+def _reset_camera_probe():
+    """Each test decides for itself what the robot supports."""
+    robot_api._robot_has_frame_jpg = None
+    robot_api._LATEST["jpeg"] = b""
+    robot_api._LATEST["task"] = None
+    yield
+    robot_api._robot_has_frame_jpg = None
+    robot_api._LATEST["jpeg"] = b""
+    robot_api._LATEST["task"] = None
+
+
+async def test_frame_jpg_prefers_the_robots_own_endpoint(monkeypatch) -> None:
+    """A current robot downscales at the source — far less over the WiFi hop."""
+    payload = _jpeg(640, 360)
+
+    class _Resp:
+        status_code = 200
+        content = payload
+
+    class _Client:
+        async def get(self, url, *a, **k):
+            assert url.endswith("/robot/camera/frame.jpg")
+            return _Resp()
+
+    monkeypatch.setattr(robot_api, "_client", lambda: _Client())
+    monkeypatch.setattr(robot_api, "_robot", type("R", (), {"_base_url": "http://r"})())
+
+    resp = _client_for(robot_api).get("/robot/camera/frame.jpg")
+    assert resp.status_code == 200
+    assert resp.content == payload
+    assert robot_api._robot_has_frame_jpg is True
+
+
+async def test_frame_jpg_falls_back_when_the_robot_is_older(monkeypatch) -> None:
+    """The case measured on the owner's own setup.
+
+    The desktop app updates itself; the Pi does not. A live check found it
+    still serving unscaled 1280x720 frames — code from before U188 — so the
+    robot has no /camera/frame.jpg. Requiring it would answer 404 and the panel
+    would read "No camera feed": a fix that breaks the thing it fixes.
+    """
+    class _Resp404:
+        status_code = 404
+        content = b""
+
+    class _Client:
+        async def get(self, url, *a, **k):
+            return _Resp404()
+
+    monkeypatch.setattr(robot_api, "_client", lambda: _Client())
+    monkeypatch.setattr(robot_api, "_robot", type("R", (), {"_base_url": "http://r"})())
+
+    # The background reader stands in for "a frame arrived off the MJPEG stream".
+    async def _fake_pump() -> None:
+        robot_api._LATEST["jpeg"] = _jpeg(640, 360, seed=3)
+
+    monkeypatch.setattr(robot_api, "_pump_latest_frame", _fake_pump)
+
+    resp = _client_for(robot_api).get("/robot/camera/frame.jpg")
+    assert resp.status_code == 200
+    assert resp.content.startswith(b"\xff\xd8")
+    assert robot_api._robot_has_frame_jpg is False   # probed once, remembered
+
+
+def test_shrink_downscales_a_legacy_frame() -> None:
+    """An old robot's 1280px frame renders into a panel a few hundred px wide."""
+    import io
+
+    from PIL import Image
+
+    big = _jpeg(1280, 720, seed=5)
+    small = robot_api._shrink(big)
+    assert Image.open(io.BytesIO(small)).width == robot_api._FALLBACK_WIDTH
+    assert len(small) < len(big)
+
+
+def test_shrink_never_loses_the_picture_on_bad_input() -> None:
+    assert robot_api._shrink(b"not a jpeg") == b"not a jpeg"
+
+
+def _client_for(mod) -> TestClient:
+    app = FastAPI()
+    app.include_router(mod.router)
+    return TestClient(app)

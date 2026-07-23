@@ -804,6 +804,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         await ctx._offline_queue.close()
     if ctx._reminder_scheduler is not None:
         await ctx._reminder_scheduler.stop()
+    # U196: the legacy-camera reader holds an open stream to the robot; without
+    # this, shutdown waits on a connection that never ends on its own.
+    from aura_brain import robot_api as _robot_api
+
+    await _robot_api.shutdown_camera()
     await ctx.bus.stop()
 
 
