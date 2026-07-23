@@ -216,3 +216,50 @@ def _client_for(mod) -> TestClient:
     app = FastAPI()
     app.include_router(mod.router)
     return TestClient(app)
+
+
+# ------------------------------------------------------------------
+# U198: say WHY the robot is unreachable, not just that it is
+# ------------------------------------------------------------------
+
+def test_diagnose_names_the_three_causes(monkeypatch) -> None:
+    """Each cause needs a different action from the owner:
+
+    - the name does not resolve  -> use an IP, mDNS is not working
+    - the connection is refused  -> robot-runtime is not running there
+    - it times out               -> wrong network / WiFi down
+
+    "Robot: offline" pointed at none of them; the exception knew all along.
+    """
+    monkeypatch.setattr(
+        robot_api, "_robot",
+        type("R", (), {"_base_url": "http://reachy-mini.local:8001"})())
+
+    dns = robot_api._diagnose(
+        httpx.ConnectError("[Errno 11001] getaddrinfo failed"))
+    assert "resolve" in dns and "ROBOT_RUNTIME_URL" in dns
+
+    refused = robot_api._diagnose(httpx.ConnectError("Connection refused"))
+    assert "robot-runtime is not running" in refused
+
+    slow = robot_api._diagnose(httpx.ConnectTimeout("timed out"))
+    assert "did not answer in time" in slow
+
+    for text in (dns, refused, slow):
+        assert "reachy-mini.local:8001" in text   # always name the host tried
+
+
+def test_status_failure_carries_the_reason(monkeypatch) -> None:
+    """The console renders this sentence; a bare 503 leaves it guessing."""
+    class _Down:
+        _base_url = "http://reachy-mini.local:8001"
+
+        async def status(self):
+            raise httpx.ConnectError("[Errno 11001] getaddrinfo failed")
+
+    monkeypatch.setattr(robot_api, "_robot", _Down())
+    resp = _client_for(robot_api).get("/robot/status")
+    assert resp.status_code == 503
+    body = resp.json()
+    assert body["reason"]
+    assert body["robot_url"] == "http://reachy-mini.local:8001"

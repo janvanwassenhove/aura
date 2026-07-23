@@ -1,0 +1,42 @@
+# U198: keep robot-runtime running on the Pi across reboots.
+#
+# Without this it is a foreground command someone typed once. The moment the
+# Pi reboots — power blip, battery, a nudge of the cable — the robot is powered
+# on and looks fine, but nothing serves :8001, so the app says "Robot: offline"
+# and the owner has no way to tell those two states apart.
+#
+# Install (on the Pi):
+#   sudo cp infra/robot-runtime.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now robot-runtime
+#   systemctl status robot-runtime          # verify
+#
+# Adjust User/WorkingDirectory if the checkout does not live in /home/pi.
+
+[Unit]
+Description=AURA robot-runtime (Reachy Mini)
+# The camera and audio devices are not there the instant the network is:
+# starting too early fails in a way that looks like a broken install.
+After=network-online.target sound.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/reachy-chief-of-staff
+Environment=ROBOT_ADAPTER=reachy
+Environment=PORT=8001
+# U188: downscale at the source. The laptop can only shrink frames AFTER the
+# slow WiFi hop, so leaving this unset costs ~12x the bandwidth for a picture
+# that is displayed a few hundred pixels wide.
+Environment=CAMERA_STREAM_WIDTH=640
+Environment=CAMERA_STREAM_QUALITY=70
+ExecStart=/home/pi/.local/bin/uv run --package robot-runtime robot-runtime
+Restart=always
+RestartSec=5
+# A crash loop must not fill the SD card with logs.
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

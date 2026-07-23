@@ -50,6 +50,13 @@
         <span class="toggle-lbl">Notify</span>
       </button>
     </div>
+    <!-- U198: when the robot is unreachable, say which of the three causes it
+         is — they need three different fixes, and "offline" points at none. -->
+    <div v-if="offlineReason" class="robot-offline">
+      <TriangleAlert :size="13" />
+      <span>{{ offlineReason }}</span>
+    </div>
+
     <!-- U192: the panic stop used to be an unlabelled red circle in the title
          bar — nobody could tell what it did without pressing it. It belongs
          here, next to the other things that govern how the robot behaves,
@@ -253,6 +260,7 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import {
   Bell, Bot, ChevronRight, ChevronsDown, CircleStop, Eye, Hand, Laugh, Moon, MoveHorizontal, MoveVertical,
+  TriangleAlert,
   Mic, MicOff, Music, Pencil, Power, RefreshCw, RotateCw, Sparkles, ThumbsUp,
   Volume1, Volume2, VolumeX,
 } from 'lucide-vue-next'
@@ -484,10 +492,22 @@ async function applyVolume() {
 
 // U152: poll /robot/status so the title bar reflects reality even if the
 // RobotConnected WS event was missed (camera streams but status said offline).
+// U198: "Robot: offline" was the one thing the owner already knew. The brain
+// can tell mDNS-cannot-resolve from connection-refused from timed-out, and each
+// needs a different action — so carry that sentence into the panel.
+const offlineReason = ref('')
+
 async function syncRobotStatus(): Promise<void> {
   try {
     const r = await fetch(`${BRAIN_URL}/robot/status`)
-    robotStore.syncFromStatus(r.ok ? await r.json() : null)
+    if (r.ok) {
+      offlineReason.value = ''
+      robotStore.syncFromStatus(await r.json())
+      return
+    }
+    const body = await r.json().catch(() => null)
+    offlineReason.value = body?.reason ?? ''
+    robotStore.syncFromStatus(null)
   } catch { /* leave last known state */ }
 }
 
@@ -574,6 +594,14 @@ function fmtTime(iso: string): string {
 .toggle-cell:hover { border-color: var(--accent-border, var(--accent)); }
 .toggle-cell--on { color: var(--accent); border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); }
 .toggle-lbl { font-size: 0.62rem; letter-spacing: 0.02em; }
+.robot-offline {
+  display: flex; align-items: flex-start; gap: 0.4rem;
+  margin: 0 0 0.5rem; padding: 0.45rem 0.55rem;
+  background: var(--surface-2, rgba(127,127,127,0.10));
+  border: 1px solid var(--border-strong); border-left: 3px solid var(--danger, #e5484d);
+  border-radius: var(--radius-md);
+  font-size: 0.72rem; line-height: 1.35; color: var(--text-muted);
+}
 .panic-btn {
   display: flex; align-items: center; justify-content: center; gap: 0.4rem;
   width: 100%; margin: 0 0 0.5rem; padding: 0.45rem 0.5rem;
