@@ -446,6 +446,16 @@ function createWindow() {
     return result
   })
 
+  // U197: the banner's two buttons.
+  ipcMain.handle('aura:install-update', () => installStagedUpdate())
+  ipcMain.handle('aura:dismiss-update', () => {
+    // "Later" means later, not never: it hides the banner for this session and
+    // writes nothing. The installer stays on disk and the next launch offers it
+    // again without downloading twice. Permanently skipping a version is what
+    // the About dialog's flow is for.
+    return { ok: true }
+  })
+
   ipcMain.handle('aura:restart-brain', async () => {
     try {
       stopBrain()
@@ -498,59 +508,79 @@ function updateToken() {
   return loadEnvFile(ENV_FILE).GITHUB_TOKEN || process.env.GITHUB_TOKEN || ''
 }
 
+// U197: the update installs itself; the owner is asked once, at the end.
+//
+// The old flow interrupted with a modal the moment an update existed, and only
+// THEN started downloading — so the owner waited on a progress-less dialog for
+// something they had already agreed to. Now the download runs silently in the
+// background and the console shows a quiet banner once the installer is on
+// disk, where "install" is a single click and takes seconds.
+let stagedUpdate = null   // {tag, version, installerPath}
+
+function skipUpdate(tag) {
+  try { fs.writeFileSync(skippedVersionFile(), JSON.stringify({ skip: tag })) }
+  catch (err) { console.error('could not persist skipped version:', err.message) }
+}
+
 async function maybeOfferUpdate() {
-  if (updateDialogOpen || !mainWindow) return
+  if (updateDialogOpen || stagedUpdate || !mainWindow) return
   const result = await checkForUpdate({ currentVersion: app.getVersion(), token: updateToken() })
   const update = result.status === 'update' ? result.update : null
   if (!update || update.tag === skippedVersion()) return
 
-  updateDialogOpen = true
-  try {
-    const canAutoInstall = process.platform === 'win32' && !!update.asset
-    const { response } = await dialog.showMessageBox(mainWindow, {
-      type: 'info',
-      title: 'Update beschikbaar',
-      message: `AURA ${update.version} is beschikbaar (je gebruikt ${app.getVersion()}).`,
-      detail: canAutoInstall
-        ? 'AURA downloadt en installeert de update zelf en start daarna opnieuw op. '
-          + 'Je instellingen, personen en skills blijven staan.'
-        : 'De releasepagina wordt geopend zodat je de nieuwe versie kunt downloaden.',
-      buttons: canAutoInstall
-        ? ['Nu bijwerken', 'Later', 'Deze versie overslaan']
-        : ['Open releasepagina', 'Later', 'Deze versie overslaan'],
-      defaultId: 0, cancelId: 1,
-    })
-    if (response === 2) {
-      fs.writeFileSync(skippedVersionFile(), JSON.stringify({ skip: update.tag }))
-      return
-    }
-    if (response !== 0) return
+  const canAutoInstall = process.platform === 'win32' && !!update.asset
+  if (!canAutoInstall) {
+    // macOS/Linux have no silent installer here — a .dmg/.AppImage has to be
+    // opened by hand, so asking first is the honest thing to do.
+    updateDialogOpen = true
+    try {
+      const { response } = await dialog.showMessageBox(mainWindow, {
+        type: 'info',
+        title: 'Update beschikbaar',
+        message: `AURA ${update.version} is beschikbaar (je gebruikt ${app.getVersion()}).`,
+        detail: 'De releasepagina wordt geopend zodat je de nieuwe versie kunt downloaden.',
+        buttons: ['Open releasepagina', 'Later', 'Deze versie overslaan'],
+        defaultId: 0, cancelId: 1,
+      })
+      if (response === 2) skipUpdate(update.tag)
+      else if (response === 0) shell.openExternal(update.htmlUrl)
+    } finally { updateDialogOpen = false }
+    return
+  }
 
-    if (canAutoInstall) {
-      try {
-        const dest = path.join(app.getPath('temp'), update.asset.name)
-        // U192: this said `token` — an identifier that is declared nowhere in
-        // this file. Every "Download & install" therefore threw a ReferenceError
-        // on the first line of the try, was swallowed by the catch below, and
-        // silently degraded to opening the release page in a browser. The
-        // auto-installer has never run for anyone.
-        await downloadAsset({ asset: update.asset, token: updateToken(), destPath: dest })
-        // U192: "installs automatically" means the owner should not have to
-        // click through a setup wizard they already consented to. NSIS takes
-        // /S for a silent install and relaunches the app when it finishes.
-        // detached + unref so the installer outlives the process it replaces.
-        const child = spawn(dest, ['/S'], { detached: true, stdio: 'ignore' })
-        child.unref()
-        quitting = true
-        setTimeout(() => app.quit(), 1200)
-        return
-      } catch (err) {
-        console.error('update download failed, opening release page instead:', err.message)
-      }
+  try {
+    const dest = path.join(app.getPath('temp'), update.asset.name)
+    // U192: this argument said `token` — an identifier declared nowhere in this
+    // file. Every download threw a ReferenceError on the first line of the try,
+    // was swallowed, and degraded to opening the release page. It had never run.
+    await downloadAsset({ asset: update.asset, token: updateToken(), destPath: dest })
+    stagedUpdate = { tag: update.tag, version: update.version, installerPath: dest }
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('aura:update-ready', {
+        version: update.version, tag: update.tag,
+      })
     }
-    shell.openExternal(update.htmlUrl)  // fallback: manual download
-  } finally {
-    updateDialogOpen = false
+  } catch (err) {
+    // Silent by design: a failed background download must not interrupt the
+    // owner. The next check (or About > Check for updates) tries again.
+    console.error('background update download failed:', err.message)
+  }
+}
+
+function installStagedUpdate() {
+  if (!stagedUpdate) return { ok: false, error: 'no update staged' }
+  try {
+    // NSIS /S installs without a wizard and relaunches the app. detached +
+    // unref so the installer outlives the process it is replacing.
+    const child = spawn(stagedUpdate.installerPath, ['/S'], {
+      detached: true, stdio: 'ignore',
+    })
+    child.unref()
+    quitting = true
+    setTimeout(() => app.quit(), 1200)
+    return { ok: true }
+  } catch (err) {
+    return { ok: false, error: String(err && err.message || err) }
   }
 }
 
