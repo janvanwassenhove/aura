@@ -63,3 +63,23 @@ async def test_mode_mismatch_returns_gracefully(pipeline: OrchestratorPipeline) 
     reply = await pipeline.orchestrate("What are my tasks?", "session-3")
     assert isinstance(reply, str)
     assert len(reply) > 0
+
+
+async def test_announce_false_runs_but_stays_silent(
+    bus: AsyncEventBus, pipeline: OrchestratorPipeline
+) -> None:
+    """U208: the co-presenter runs improvise beats through the pipeline for
+    tools, then speaks the result itself — so the pipeline must NOT auto-speak.
+    announce=False returns the reply but publishes no ResponseDrafted."""
+    received: list[ResponseDrafted] = []
+
+    async def _capture(event: ResponseDrafted) -> None:
+        received.append(event)
+
+    bus.subscribe(ResponseDrafted, _capture)
+
+    reply = await pipeline.orchestrate("Hello AURA", "s-silent", announce=False)
+    await asyncio.sleep(0)
+
+    assert reply                      # the loop still produced a reply
+    assert received == []             # …but nothing was announced

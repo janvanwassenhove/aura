@@ -34,15 +34,18 @@ router = APIRouter(prefix="/presentation", tags=["presentation"])
 
 _robot: Any = None      # RobotClient
 _bus: Any = None        # AsyncEventBus
-_persona: Any = None    # CharacterStore/persona switch (optional)
+_pipeline: Any = None    # OrchestratorPipeline — for tool-backed improvise (U208)
 _runner: ScenarioRunner | None = None
 _watcher: Any = None    # PowerPointWatcher | None
 
+_SESSION = "presentation"
 
-def init(robot: Any, bus: Any) -> None:
-    global _robot, _bus
+
+def init(robot: Any, bus: Any, pipeline: Any = None) -> None:
+    global _robot, _bus, _pipeline
     _robot = robot
     _bus = bus
+    _pipeline = pipeline
 
 
 def is_active() -> bool:
@@ -81,16 +84,31 @@ async def _gesture(name: str) -> None:
 async def _generate(topic: str, guardrails: str, engine: str) -> str:
     """Improvise a spoken line about `topic`. Text only — the runner speaks it.
 
-    Kept to a single LLM completion (no tools) so a beat can't wander off into
-    tool calls mid-talk. A beat that genuinely needs live data should be a
-    `speak` beat with the data filled in, or a future pipeline-backed beat.
+    U208: `engine: pipeline` runs the FULL agentic loop (tools included) so a
+    beat can pull live data — calendar, music, a lookup — and speak the result.
+    `announce=False` keeps the pipeline from auto-speaking it (the runner speaks
+    it once, so the subtitle and the robot stay in sync). Any other engine is a
+    single LLM completion: faster, no tools, can't wander mid-talk.
     """
+    guard = guardrails or "Keep it to 1-2 sentences."
+    if engine == "pipeline" and _pipeline is not None:
+        prompt = (
+            "You are co-presenting live. In ONE short spoken remark, first "
+            f"person, no markdown, address this — using tools if you need live "
+            f"data: {topic}. {guard}"
+        )
+        try:
+            return (await _pipeline.orchestrate(prompt, _SESSION, announce=False) or "").strip()
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("presentation pipeline improvise failed: %s", exc)
+            return ""
+
     from orchestrator.llm import openai_chat
 
     system = (
         "You are a robot co-presenter on stage. Say ONE short spoken remark "
         "about the topic — natural, out loud, first person, no preamble, no "
-        "markdown. " + (guardrails or "Keep it to 1-2 sentences.")
+        "markdown. " + guard
     )
     try:
         choice = await openai_chat(

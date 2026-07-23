@@ -146,3 +146,48 @@ def test_saving_an_invalid_scenario_is_422(client, tmp_path, monkeypatch) -> Non
     monkeypatch.setenv("SCENARIOS_DIR", str(tmp_path))
     r = c.put("/presentation/scenarios/bad", json={"yaml": "beats: [{id: x, mode: speak}]"})
     assert r.status_code == 422
+
+
+# ------------------------------------------------------------------
+# U208: a pipeline-engine beat can use tools (live data)
+# ------------------------------------------------------------------
+
+async def test_pipeline_beat_routes_through_the_agentic_loop_silently() -> None:
+    """`engine: pipeline` runs the tool loop; announce=False keeps the pipeline
+    from auto-speaking, so the runner speaks the result exactly once."""
+    calls: list[dict] = []
+
+    class _FakePipeline:
+        async def orchestrate(self, text, session_id, announce=True):
+            calls.append({"text": text, "announce": announce})
+            return "Vandaag heb je drie meetings."
+
+    from aura_brain import presentation_api as pa
+    pa.init(_FakeRobot(), _FakeBus(), pipeline=_FakePipeline())
+
+    out = await pa._generate("mijn agenda vandaag", "één zin", "pipeline")
+    assert out == "Vandaag heb je drie meetings."
+    assert calls and calls[0]["announce"] is False    # never double-speaks
+    assert "mijn agenda vandaag" in calls[0]["text"]
+
+
+async def test_non_pipeline_beat_uses_the_plain_llm(monkeypatch) -> None:
+    """Default engine → a single LLM completion, no tools, no pipeline call."""
+    from aura_brain import presentation_api as pa
+
+    called = {"pipeline": False}
+
+    class _Pipe:
+        async def orchestrate(self, *a, **k):
+            called["pipeline"] = True
+            return "should not be used"
+
+    pa.init(_FakeRobot(), _FakeBus(), pipeline=_Pipe())
+
+    async def fake_chat(messages, tools=None, model=None):
+        return {"content": "Een vlotte zin.", "tool_calls": None}
+    monkeypatch.setattr("orchestrator.llm.openai_chat", fake_chat)
+
+    out = await pa._generate("de toekomst", "", "")
+    assert out == "Een vlotte zin."
+    assert called["pipeline"] is False

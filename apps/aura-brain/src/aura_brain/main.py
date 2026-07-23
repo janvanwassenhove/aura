@@ -290,7 +290,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # publishes beat subtitles onto the bus for the console's presenter view.
     from aura_brain import presentation_api
 
-    presentation_api.init(_robot, ctx.bus)
+    presentation_api.init(_robot, ctx.bus, pipeline=ctx.pipeline)
 
     # U36d: relay the robot's own event stream (speech/motion/behavior/mode)
     # to the console — it only listens to the brain's WebSocket.
