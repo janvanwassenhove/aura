@@ -74,3 +74,14 @@ class PresentationCueReceived(BaseEvent):
     event_type: Literal["PresentationCueReceived"] = "PresentationCueReceived"
     slide_number: int
     cue_text: str
+
+
+class PresentationBeatFired(BaseEvent):
+    """U206: a co-presenter beat ran — the presenter view shows `spoken` as the
+    live subtitle. `spoken` is empty for a silent beat."""
+
+    event_type: Literal["PresentationBeatFired"] = "PresentationBeatFired"
+    beat_id: str
+    mode: str
+    spoken: str = ""
+    slide_number: int | None = None

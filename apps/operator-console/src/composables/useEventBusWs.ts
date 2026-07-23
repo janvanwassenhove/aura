@@ -3,6 +3,7 @@ import { useRobotStore } from '../stores/robotStore'
 import { useConversationStore } from '../stores/conversationStore'
 import { useEventStore } from '../stores/eventStore'
 import { useApprovalStore } from '../stores/approvalStore'
+import { usePresentationStore } from '../stores/presentationStore'
 
 const WS_URL = import.meta.env.VITE_ROBOT_RUNTIME_WS ?? 'ws://localhost:8001/ws/events'
 const RECONNECT_BASE_MS = 1_000
@@ -24,6 +25,7 @@ export function useEventBusWs() {
     conversationStore.applyEvent(raw)
     eventStore.addEvent(raw)
     approvalStore.applyEvent(raw)
+    usePresentationStore().applyEvent(raw)
   }
 
   function connect() {

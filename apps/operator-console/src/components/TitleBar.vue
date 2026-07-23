@@ -42,6 +42,9 @@
               aria-label="Stop talking" @click="panicStop">
         <CircleStop :size="17" />
       </button>
+      <button class="titlebar-btn" title="Present with the robot" aria-label="Presenter mode" @click="$emit('open-presenter')">
+        <Presentation :size="16" />
+      </button>
       <button class="titlebar-btn" title="Capabilities & permissions" aria-label="Capabilities and permissions" @click="$emit('open-capabilities')">
         <ShieldCheck :size="16" />
       </button>
@@ -70,14 +73,14 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { onMounted } from 'vue'
-import { Bot, CircleStop, Cpu, Info, Minus, RotateCw, Settings, ShieldCheck, Square, X, PanelBottom, PanelLeft, PanelRight } from 'lucide-vue-next'
+import { Bot, CircleStop, Cpu, Info, Minus, Presentation, RotateCw, Settings, ShieldCheck, Square, X, PanelBottom, PanelLeft, PanelRight } from 'lucide-vue-next'
 import { useRobotStore } from '../stores/robotStore'
 import { usePrefsStore } from '../stores/prefsStore'
 import { useLayoutStore } from '../stores/layoutStore'
 
 const props = defineProps<{ wsStatus: 'connecting' | 'open' | 'closed' }>()
 defineEmits<{
-  'open-settings': []; 'open-capabilities': []; 'open-about': []
+  'open-settings': []; 'open-capabilities': []; 'open-about': []; 'open-presenter': []
   'toggle-left': []; 'toggle-right': []; 'toggle-bottom': []
 }>()
 
