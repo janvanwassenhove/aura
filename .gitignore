@@ -73,3 +73,6 @@ skills/.metrics/
 # The vault lives in userData at runtime; only the explainer stays in git.
 skills/*.md
 !skills/README.md
+
+# U207: saved presentation scenarios are the owner's talk content.
+scenarios/*.yaml

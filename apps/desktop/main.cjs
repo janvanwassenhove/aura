@@ -43,6 +43,7 @@ const DATA_DIR = IS_PACKAGED
   ? path.join(USER_ROOT, 'data')
   : path.join(REPO_ROOT, 'data')
 const SKILLS_DIR = path.join(IS_PACKAGED ? USER_ROOT : REPO_ROOT, 'skills')
+const SCENARIOS_DIR = path.join(IS_PACKAGED ? USER_ROOT : REPO_ROOT, 'scenarios')
 const ENV_FILE = IS_PACKAGED
   ? path.join(USER_ROOT, '.env')
   : path.join(REPO_ROOT, 'infra', 'dev', '.env')
@@ -114,6 +115,7 @@ function brainEnv() {
   env.RECOGNITION_DB_PATH = env.RECOGNITION_DB_PATH || path.join(DATA_DIR, 'recognition.enc.json')
   env.DATABASE_URL = env.DATABASE_URL || `sqlite+aiosqlite:///${posix(path.join(DATA_DIR, 'aura-memory.db'))}`
   env.SKILLS_DIR = env.SKILLS_DIR || SKILLS_DIR
+  env.SCENARIOS_DIR = env.SCENARIOS_DIR || SCENARIOS_DIR  // U207: saved presentations
   // Desktop defaults (only when the wizard/.env didn't decide already).
   env.ROBOT_RUNTIME_URL = env.ROBOT_RUNTIME_URL || 'http://reachy-mini.local:8001'
   env.HEARTBEAT_ENABLED = env.HEARTBEAT_ENABLED || 'true'

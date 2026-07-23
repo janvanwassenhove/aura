@@ -116,3 +116,33 @@ def test_clear_ends_the_session(client) -> None:
     c.post("/presentation/scenario", json={"yaml": SCENARIO_YAML})
     assert c.delete("/presentation/scenario").json() == {"active": False}
     assert c.get("/presentation/status").json() == {"active": False}
+
+
+# ------------------------------------------------------------------
+# U207: saved scenarios through the API
+# ------------------------------------------------------------------
+
+def test_scenario_save_list_load_delete(client, tmp_path, monkeypatch) -> None:
+    c, _, _ = client
+    monkeypatch.setenv("SCENARIOS_DIR", str(tmp_path))
+
+    assert c.get("/presentation/scenarios").json() == {"scenarios": []}
+
+    r = c.put("/presentation/scenarios/demo", json={"yaml": SCENARIO_YAML})
+    assert r.status_code == 200 and r.json()["name"] == "demo"
+
+    listing = c.get("/presentation/scenarios").json()["scenarios"]
+    assert listing[0]["name"] == "demo" and listing[0]["title"] == "Demo"
+
+    got = c.get("/presentation/scenarios/demo").json()
+    assert "agents" in got["yaml"]
+
+    assert c.delete("/presentation/scenarios/demo").json() == {"deleted": True}
+    assert c.get("/presentation/scenarios/demo").status_code == 404
+
+
+def test_saving_an_invalid_scenario_is_422(client, tmp_path, monkeypatch) -> None:
+    c, _, _ = client
+    monkeypatch.setenv("SCENARIOS_DIR", str(tmp_path))
+    r = c.put("/presentation/scenarios/bad", json={"yaml": "beats: [{id: x, mode: speak}]"})
+    assert r.status_code == 422

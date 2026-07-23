@@ -1,23 +1,34 @@
 <template>
   <div class="presenter">
-    <!-- Setup: paste/confirm a scenario before starting -->
+    <!-- Setup: build (or paste) a scenario before starting -->
     <div v-if="!store.status.active" class="pv-setup">
       <div class="pv-setup-head">
         <h2>Present with the robot</h2>
+        <div class="pv-mode-toggle">
+          <button :class="['pv-tab', !rawMode && 'pv-tab--on']" @click="rawMode = false">Build</button>
+          <button :class="['pv-tab', rawMode && 'pv-tab--on']" @click="rawMode = true">YAML</button>
+        </div>
         <button class="pv-x" aria-label="Close" @click="$emit('close')"><X :size="18" /></button>
       </div>
       <p class="pv-hint">
-        Paste a scenario (YAML). Keep PowerPoint open in a slideshow — slide beats
-        fire as you advance it; keyword beats fire when you say the word.
+        Keep PowerPoint open in a slideshow — slide beats fire as you advance it;
+        keyword beats fire when you say the word.
       </p>
-      <textarea v-model="yamlText" class="pv-yaml" spellcheck="false"
-                placeholder="title: …&#10;beats:&#10;  - id: intro&#10;    trigger: slide:1&#10;    mode: speak&#10;    text: …"></textarea>
-      <div class="pv-setup-actions">
-        <button class="pv-btn pv-btn--go" :disabled="!yamlText.trim() || store.busy" @click="start">
-          {{ store.busy ? 'Starting…' : 'Start presentation' }}
-        </button>
-        <span v-if="store.error" class="pv-err">{{ store.error }}</span>
-      </div>
+
+      <!-- Form builder (default) -->
+      <ScenarioBuilder v-if="!rawMode" ref="builder" @start="startFromScenario" />
+
+      <!-- Raw YAML (power users) -->
+      <template v-else>
+        <textarea v-model="yamlText" class="pv-yaml" spellcheck="false"
+                  placeholder="title: …&#10;beats:&#10;  - id: intro&#10;    trigger: slide:1&#10;    mode: speak&#10;    text: …"></textarea>
+        <div class="pv-setup-actions">
+          <button class="pv-btn pv-btn--go" :disabled="!yamlText.trim() || store.busy" @click="start">
+            {{ store.busy ? 'Starting…' : 'Start presentation' }}
+          </button>
+          <span v-if="store.error" class="pv-err">{{ store.error }}</span>
+        </div>
+      </template>
     </div>
 
     <!-- Live: the presenter stage -->
@@ -77,6 +88,7 @@
 import { onMounted, onUnmounted, ref } from 'vue'
 import { Presentation, VideoOff, X } from 'lucide-vue-next'
 import { usePresentationStore } from '../stores/presentationStore'
+import ScenarioBuilder from './ScenarioBuilder.vue'
 
 defineEmits<{ close: [] }>()
 
@@ -84,12 +96,20 @@ const store = usePresentationStore()
 const BRAIN_URL = import.meta.env.VITE_BRAIN_URL ?? import.meta.env.VITE_ORCHESTRATOR_URL ?? 'http://localhost:8020'
 
 const yamlText = ref('')
+const rawMode = ref(false)
+const builder = ref<InstanceType<typeof ScenarioBuilder> | null>(null)
 const frameSrc = ref('')
 let statusTimer: ReturnType<typeof setInterval> | null = null
 let camLoop = 0
 
 async function start() {
   if (await store.start(yamlText.value)) startCamera()
+}
+
+async function startFromScenario(scenario: object) {
+  const ok = await store.startScenario(scenario)
+  if (ok) startCamera()
+  else builder.value?.setError(store.error || 'Could not start.')
 }
 
 async function stop() {
@@ -140,6 +160,11 @@ onUnmounted(() => {
 .pv-setup { max-width: 640px; margin: auto; width: 100%; padding: 1.5rem; }
 .pv-setup-head { display: flex; align-items: center; justify-content: space-between; }
 .pv-setup-head h2 { margin: 0; font-size: 1.15rem; }
+.pv-mode-toggle { display: flex; gap: 2px; margin-left: auto; margin-right: 0.6rem; }
+.pv-tab { background: var(--surface); border: 1px solid var(--border-strong); color: var(--text-muted); padding: 0.25rem 0.7rem; font-size: 0.78rem; cursor: pointer; }
+.pv-tab:first-child { border-radius: var(--radius-md) 0 0 var(--radius-md); }
+.pv-tab:last-child { border-radius: 0 var(--radius-md) var(--radius-md) 0; border-left: none; }
+.pv-tab--on { background: var(--accent); color: var(--accent-contrast, #fff); border-color: var(--accent); }
 .pv-hint { color: var(--text-muted); font-size: 0.85rem; line-height: 1.5; }
 .pv-yaml {
   width: 100%; min-height: 220px; margin-top: 0.5rem; resize: vertical;
