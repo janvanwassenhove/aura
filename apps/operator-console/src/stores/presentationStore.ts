@@ -47,11 +47,19 @@ export const usePresentationStore = defineStore('presentation', () => {
   }
 
   async function start(yamlText: string): Promise<boolean> {
+    return _load({ yaml: yamlText })
+  }
+
+  async function startScenario(scenario: object): Promise<boolean> {
+    return _load({ scenario })
+  }
+
+  async function _load(payload: Record<string, unknown>): Promise<boolean> {
     busy.value = true; error.value = ''
     try {
       const r = await fetch(`${BRAIN_URL}/presentation/scenario`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ yaml: yamlText }),
+        body: JSON.stringify(payload),
       })
       const body = await r.json().catch(() => null)
       if (!r.ok) { error.value = body?.error ?? 'Could not load the scenario.'; return false }
@@ -95,5 +103,5 @@ export const usePresentationStore = defineStore('presentation', () => {
   }
 
   return { status, subtitle, lastBeat, lastMode, busy, error,
-           applyEvent, fetchStatus, start, next, pushSpeech, stop }
+           applyEvent, fetchStatus, start, startScenario, next, pushSpeech, stop }
 })

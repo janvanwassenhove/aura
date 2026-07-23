@@ -118,14 +118,22 @@ async def _on_event(event: dict) -> None:
 # Endpoints
 # ------------------------------------------------------------------
 
+def _scenario_from_body(body: dict) -> tuple[Scenario, str | None]:
+    """Accept either {yaml} (power users) or {scenario:{...}} (the builder).
+    Returns (validated scenario, raw_yaml-or-None). Raises ValueError."""
+    if body.get("scenario") is not None:
+        return Scenario.model_validate(body["scenario"]), None
+    raw = body.get("yaml", "")
+    if not raw:
+        raise ValueError("give a scenario or yaml")
+    return Scenario.model_validate(yaml.safe_load(raw)), raw
+
+
 @router.post("/scenario")
 async def load_scenario(body: dict) -> JSONResponse:
     global _runner, _watcher
-    raw = (body or {}).get("yaml", "")
-    if not raw:
-        return JSONResponse({"error": "yaml field is required"}, status_code=422)
     try:
-        scenario = Scenario.model_validate(yaml.safe_load(raw))
+        scenario, _ = _scenario_from_body(body or {})
     except Exception as exc:  # noqa: BLE001 — bad YAML / failed validation
         return JSONResponse({"error": f"invalid scenario: {exc}"}, status_code=422)
 
@@ -204,3 +212,47 @@ async def _stop_watcher() -> None:
         except Exception as exc:  # noqa: BLE001
             logger.debug("stopping PowerPoint watcher failed: %s", exc)
         _watcher = None
+
+
+# ------------------------------------------------------------------
+# U207: saved scenarios — build once in the app, reuse (no re-pasting)
+# ------------------------------------------------------------------
+
+def _store() -> Any:
+    from aura_brain.scenario_store import ScenarioStore
+
+    return ScenarioStore()
+
+
+@router.get("/scenarios")
+async def list_scenarios() -> JSONResponse:
+    return JSONResponse({"scenarios": _store().list()})
+
+
+@router.get("/scenarios/{name}")
+async def get_scenario(name: str) -> JSONResponse:
+    raw = _store().get_yaml(name)
+    if raw is None:
+        return JSONResponse({"error": f"unknown scenario {name!r}"}, status_code=404)
+    structured = None
+    try:
+        structured = Scenario.model_validate(yaml.safe_load(raw)).model_dump(exclude_none=True)
+    except Exception:  # noqa: BLE001 — hand-edited file; still hand back the raw text
+        pass
+    return JSONResponse({"name": name, "yaml": raw, "scenario": structured})
+
+
+@router.put("/scenarios/{name}")
+async def save_scenario(name: str, body: dict) -> JSONResponse:
+    try:
+        scenario, raw = _scenario_from_body(body or {})
+        saved_name, scenario = _store().save(name, raw_yaml=raw, scenario=scenario)
+    except Exception as exc:  # noqa: BLE001 — validation / bad name
+        return JSONResponse({"error": str(exc)}, status_code=422)
+    return JSONResponse({"name": saved_name, "title": scenario.title,
+                         "beats": len(scenario.beats)})
+
+
+@router.delete("/scenarios/{name}")
+async def delete_scenario(name: str) -> JSONResponse:
+    return JSONResponse({"deleted": _store().delete(name)})
