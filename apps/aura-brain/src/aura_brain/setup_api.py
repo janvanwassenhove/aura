@@ -259,7 +259,24 @@ def _prefs_snapshot() -> dict:
         "chat_model": os.environ.get("CHAT_MODEL", ""),
         "agent_model": os.environ.get("AGENT_MODEL", ""),
         "computer_use_model": os.environ.get("COMPUTER_USE_OPENAI_MODEL", "gpt-4o"),
+        # U202: the speech-to-speech model is its own setting. Conflating it
+        # with the chat role sent a realtime model to chat-completions, which
+        # 404s every turn into the echo fallback.
+        "realtime_model": os.environ.get("REALTIME_MODEL", ""),
     }
+
+
+def _is_realtime_model(model: str) -> bool:
+    """Is this a speech-to-speech endpoint rather than a chat model?
+
+    U202: the owner picked `gpt-realtime-2.1` for the Conversation role because
+    U191's UI offered only realtime models there — and every turn afterwards
+    404'd ("not a chat model") into the echo fallback, so the assistant simply
+    repeated the question back. Same substring test the orchestrator uses to
+    classify models; no provider exposes this as a field.
+    """
+    low = (model or "").lower()
+    return "realtime" in low or "-audio" in low
 
 
 @router.get("/prefs")
@@ -335,10 +352,21 @@ async def set_prefs(body: dict) -> JSONResponse:
                                 status_code=422)
     for role_key, env_key in (("chat_model", "CHAT_MODEL"),
                               ("agent_model", "AGENT_MODEL"),
-                              ("computer_use_model", "COMPUTER_USE_OPENAI_MODEL")):
+                              ("computer_use_model", "COMPUTER_USE_OPENAI_MODEL"),
+                              ("realtime_model", "REALTIME_MODEL")):
         val = (body or {}).get(role_key)
-        if val is not None:
-            updates[env_key] = str(val).strip()
+        if val is None:
+            continue
+        val = str(val).strip()
+        # U202: a realtime endpoint cannot serve chat-completions. Accepting one
+        # here breaks EVERY turn — typed included — and the only visible symptom
+        # was the assistant parroting the question back.
+        if env_key in ("CHAT_MODEL", "AGENT_MODEL") and _is_realtime_model(val):
+            return JSONResponse(
+                {"error": f"{val!r} is a speech-to-speech model. Use it under "
+                          f"'Voice'; this role goes through chat-completions."},
+                status_code=422)
+        updates[env_key] = val
     mic_sensitivity = (body or {}).get("mic_sensitivity")
     if mic_sensitivity is not None:
         try:

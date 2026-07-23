@@ -48,8 +48,35 @@ def init(
     _inproc_client = inproc_client
 
 
+def _explain_failure(exc: Exception) -> str:
+    """Turn an orchestrator failure into something the owner can act on.
+
+    U202: this used to echo the question back and log a warning nobody reads.
+    A misconfigured model then looked like a parrot: the assistant repeated
+    every question verbatim with no hint that anything was wrong, and the real
+    cause ("not a chat model") sat in a log file. An assistant that cannot
+    answer should say why, not imitate one that can.
+    """
+    detail = str(exc)
+    low = detail.lower()
+    if "not a chat model" in low:
+        return ("I can't answer: the model set for conversation is a "
+                "speech-to-speech model, which can't handle text. "
+                "Pick a chat model under Settings → Model per task type.")
+    if "api key" in low or "401" in low or "invalid_api_key" in low:
+        return ("I can't answer: the API key was rejected. "
+                "Check it under Settings → LLM.")
+    if "429" in low or "quota" in low or "rate limit" in low:
+        return ("I can't answer: the model provider is rate-limiting or the "
+                "quota is used up. Try again shortly.")
+    if "model_not_found" in low or "does not exist" in low or "404" in low:
+        return ("I can't answer: the configured model doesn't exist for this "
+                "account. Pick another under Settings → LLM.")
+    return f"I can't answer right now — the assistant hit an error: {detail[:200]}"
+
+
 async def _call_orchestrator(text: str, session_id: str) -> str:
-    """Forward turn to orchestrator; fall back to echo on connection error."""
+    """Forward turn to orchestrator. On failure, SAY so — never fake a reply."""
     payload = {"text": text, "session_id": session_id}
     try:
         if _inproc_client is not None:
@@ -61,8 +88,8 @@ async def _call_orchestrator(text: str, session_id: str) -> str:
             resp.raise_for_status()
             return resp.json().get("reply", text)
     except Exception as exc:
-        logger.warning("Orchestrator unavailable (%s); using echo fallback", exc)
-        return f"[echo] {text}"
+        logger.warning("Orchestrator turn failed: %s", exc)
+        return _explain_failure(exc)
 
 
 async def _persist_turn(session_id: str, role: str, content: str) -> None:
