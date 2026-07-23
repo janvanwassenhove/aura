@@ -328,3 +328,107 @@ def test_set_address_reports_an_unreachable_robot(monkeypatch, tmp_path) -> None
     assert resp.status_code == 200          # it IS saved
     assert body["reachable"] is False       # but honestly reported
     assert body["detail"]
+
+
+# ------------------------------------------------------------------
+# U200: find the robot, because you cannot type an address you don't know
+# ------------------------------------------------------------------
+
+def test_discover_finds_a_robot_on_the_lan(monkeypatch) -> None:
+    """Proven on the owner's own network: the robot sat at 192.168.0.178 while
+    its .local name refused to resolve AND ping sweeps missed it entirely (a Pi
+    need not answer ICMP). Knocking on the port finds what naming and pinging
+    both missed.
+
+    A plain threaded HTTP server, not uvicorn: TestClient drives the endpoint on
+    its own event loop, so a stub living in the test's loop would sit frozen for
+    the whole call and the test would fail for a reason that is not the code.
+    """
+    import json
+    import threading
+    from http.server import BaseHTTPRequestHandler, HTTPServer
+
+    class _Health(BaseHTTPRequestHandler):
+        def do_GET(self):  # noqa: N802 — stdlib's name
+            body = json.dumps({
+                "status": "ok",
+                "robot": {"mode": "online", "adapter_name": "reachy"},
+            }).encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, *a):  # keep pytest output readable
+            return
+
+    srv = HTTPServer(("127.0.0.1", 8001), _Health)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    try:
+        monkeypatch.setattr(robot_api, "_robot", type("R", (), {"_base_url": ""})())
+        # Aim the sweep at loopback — a test must never scan a real LAN. The
+        # target list is the seam; interface filtering has its own test below.
+        monkeypatch.setattr(robot_api, "_scan_targets", lambda: ["127.0.0.1"])
+
+        body = _client_for(robot_api).get("/robot/discover").json()
+        assert body["found"] == [
+            {"url": "http://127.0.0.1:8001", "adapter": "reachy", "mode": "online"}
+        ]
+    finally:
+        srv.shutdown()
+        srv.server_close()
+
+
+def test_discover_ignores_something_else_on_port_8001(monkeypatch) -> None:
+    """An open port is not a robot. Offering a printer as a robot would send
+    the owner chasing a setting that can never work."""
+    import threading
+    from http.server import BaseHTTPRequestHandler, HTTPServer
+
+    class _NotARobot(BaseHTTPRequestHandler):
+        def do_GET(self):  # noqa: N802
+            body = b'{"status": "ok"}'          # no "robot" key
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, *a):
+            return
+
+    srv = HTTPServer(("127.0.0.1", 8001), _NotARobot)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    try:
+        monkeypatch.setattr(robot_api, "_robot", type("R", (), {"_base_url": ""})())
+        monkeypatch.setattr(robot_api, "_scan_targets", lambda: ["127.0.0.1"])
+        assert _client_for(robot_api).get("/robot/discover").json()["found"] == []
+    finally:
+        srv.shutdown()
+        srv.server_close()
+
+
+def test_local_ipv4s_skips_loopback_and_leaseless_adapters(monkeypatch) -> None:
+    """169.254.x means an adapter with no DHCP lease — the owner's WiFi was in
+    exactly that state. Scanning it (or loopback) finds nothing and burns the
+    seconds someone is watching a spinner for."""
+    import socket as _socket
+
+    monkeypatch.setattr(
+        _socket, "getaddrinfo",
+        lambda *a, **k: [(None, None, None, None, ("169.254.244.48", 0)),
+                         (None, None, None, None, ("127.0.0.1", 0)),
+                         (None, None, None, None, ("192.168.0.214", 0))])
+
+    assert robot_api._local_ipv4s() == ["192.168.0.214"]
+
+
+def test_discover_reports_when_there_is_nothing_to_scan(monkeypatch) -> None:
+    monkeypatch.setattr(robot_api, "_robot", type("R", (), {"_base_url": ""})())
+    monkeypatch.setattr(robot_api, "_scan_targets", lambda: [])
+
+    body = _client_for(robot_api).get("/robot/discover").json()
+    assert body["scanned"] == 0
+    assert body["found"] == []
+    assert body["note"]

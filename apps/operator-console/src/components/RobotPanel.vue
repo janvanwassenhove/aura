@@ -65,6 +65,19 @@
             {{ savingAddr ? 'Testen…' : 'Gebruik dit adres' }}
           </button>
         </div>
+        <!-- U200: you cannot type an address you do not know. The brain is on
+             the same network, so let it look. -->
+        <div class="ro-row">
+          <button class="ro-btn ro-btn--ghost" :disabled="scanning" @click="discoverRobot">
+            {{ scanning ? 'Zoeken op het netwerk…' : 'Zoek de robot' }}
+          </button>
+        </div>
+        <div v-if="discovered.length" class="ro-found">
+          <button v-for="d in discovered" :key="d.url" class="ro-hit"
+                  @click="robotAddr = d.url; saveRobotAddr()">
+            {{ d.url }} <span class="ro-hit-sub">{{ d.adapter }}</span>
+          </button>
+        </div>
         <span v-if="addrResult" class="ro-result">{{ addrResult }}</span>
       </div>
     </div>
@@ -523,6 +536,27 @@ async function loadRobotAddr(): Promise<void> {
   } catch { /* the field starts empty; the owner can still type one */ }
 }
 
+const scanning = ref(false)
+const discovered = ref<{ url: string; adapter: string }[]>([])
+
+async function discoverRobot(): Promise<void> {
+  if (scanning.value) return
+  scanning.value = true
+  discovered.value = []
+  addrResult.value = ''
+  try {
+    const r = await fetch(`${BRAIN_URL}/robot/discover`)
+    const body = await r.json()
+    discovered.value = body.found ?? []
+    if (!discovered.value.length) {
+      addrResult.value = `Niets gevonden op ${body.scanned} adressen. `
+        + 'Staat de robot op hetzelfde netwerk als deze computer?'
+    }
+  } catch {
+    addrResult.value = 'Zoeken is niet gelukt.'
+  } finally { scanning.value = false }
+}
+
 async function saveRobotAddr(): Promise<void> {
   if (savingAddr.value || !robotAddr.value.trim()) return
   savingAddr.value = true
@@ -656,6 +690,16 @@ function fmtTime(iso: string): string {
 }
 .ro-btn:disabled { opacity: 0.6; cursor: default; }
 .ro-result { font-size: 0.7rem; color: var(--text); }
+.ro-btn--ghost { background: transparent; color: var(--text-muted); border: 1px solid var(--border-strong); }
+.ro-btn--ghost:hover:not(:disabled) { color: var(--text); }
+.ro-found { display: flex; flex-direction: column; gap: 0.25rem; }
+.ro-hit {
+  text-align: left; background: var(--surface); color: var(--text);
+  border: 1px solid var(--border-strong); border-radius: var(--radius-md);
+  padding: 0.28rem 0.45rem; font-size: 0.72rem; cursor: pointer;
+}
+.ro-hit:hover { border-color: var(--accent); }
+.ro-hit-sub { color: var(--text-faint); margin-left: 0.35rem; }
 .robot-offline {
   display: flex; align-items: flex-start; gap: 0.4rem;
   margin: 0 0 0.5rem; padding: 0.45rem 0.55rem;

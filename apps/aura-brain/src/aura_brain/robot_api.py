@@ -64,6 +64,108 @@ def _unavailable(exc: Exception) -> JSONResponse:
     )
 
 
+def _local_ipv4s() -> list[str]:
+    """This machine's usable LAN addresses.
+
+    Loopback is not a network anyone's robot is on, and 169.254.x means an
+    adapter with no DHCP lease — the owner's WiFi was in exactly that state
+    while the robot sat on the wired subnet. Sweeping either finds nothing and
+    costs seconds.
+    """
+    import socket
+
+    out: list[str] = []
+    try:
+        for info in socket.getaddrinfo(socket.gethostname(), None,
+                                       family=socket.AF_INET):
+            ip = info[4][0]
+            if not ip.startswith(("127.", "169.254.")):
+                out.append(ip)
+    except OSError:
+        pass
+    return sorted(set(out))
+
+
+def _scan_targets() -> list[str]:
+    """Every host on our own /24s — never wider than the owner's subnet."""
+    import ipaddress
+
+    hosts: list[str] = []
+    for ip in _local_ipv4s():
+        net = ipaddress.ip_network(f"{ip}/24", strict=False)
+        hosts.extend(str(h) for h in net.hosts())
+    return hosts
+
+
+@router.get("/discover")
+async def discover_robot() -> JSONResponse:
+    """U200: sweep the local network for a robot-runtime.
+
+    U199 gave the owner a field to type the robot's address into — and then
+    left them to find that address themselves, which on a home network means
+    a router page or a port scanner. The brain sits on the same LAN and can
+    simply look: every host on our /24, port 8001, /health. What answers is
+    a robot.
+
+    Bounded on purpose: /24 only, 1 s per host, 64 at a time — a few seconds,
+    not a background service, and never beyond the owner's own subnet.
+    """
+    import asyncio
+
+    hosts = _scan_targets()
+    if not hosts:
+        return JSONResponse({"found": [], "scanned": 0,
+                             "note": "no usable network interface"})
+
+    # Two passes. A bare TCP connect settles almost every host in milliseconds,
+    # where building an HTTP client per address took 48 s for a /24 — far too
+    # long for a button someone presses while staring at an error. Only the
+    # handful with the port open are then asked what they are.
+    sem = asyncio.Semaphore(256)
+    open_hosts: list[str] = []
+
+    async def port_open(host: str) -> None:
+        async with sem:
+            try:
+                fut = asyncio.open_connection(host, 8001)
+                _reader, writer = await asyncio.wait_for(fut, timeout=1.0)
+            except (OSError, TimeoutError):
+                return
+            writer.close()
+            try:
+                await writer.wait_closed()
+            except OSError:
+                pass
+            open_hosts.append(host)
+
+    await asyncio.gather(*(port_open(h) for h in hosts))
+
+    found: list[dict] = []
+
+    async def identify(host: str) -> None:
+        url = f"http://{host}:8001"
+        try:
+            async with httpx.AsyncClient(timeout=3.0) as c:
+                r = await c.get(f"{url}/health")
+                if r.status_code != 200:
+                    return
+                body = r.json()
+        except (httpx.HTTPError, OSError, ValueError):
+            return
+        robot = body.get("robot") or {}
+        if not robot:
+            return                      # something else lives on 8001
+        found.append({
+            "url": url,
+            "adapter": robot.get("adapter_name", "unknown"),
+            "mode": robot.get("mode", ""),
+        })
+
+    await asyncio.gather(*(identify(h) for h in open_hosts))
+    found.sort(key=lambda f: f["url"])
+    return JSONResponse({"found": found, "scanned": len(hosts)})
+
+
 @router.get("/address")
 async def get_address() -> JSONResponse:
     """U199: where the brain thinks the robot lives."""
