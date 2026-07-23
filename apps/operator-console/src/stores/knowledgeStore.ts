@@ -12,6 +12,7 @@ export interface KnowledgePerson {
   display_name: string
   role: string
   description?: string
+  avatar?: string          // U204: data:image/... URI, empty → initials fallback
   created_at?: string
 }
 
