@@ -34,6 +34,44 @@ ROBOT_ADAPTER=reachy \           # 'fake' until U16 lands
 
 Verify: `curl http://<pi-ip>:8001/health` → `{"status":"ok", ...}`.
 
+### Keep it running across reboots (U198)
+
+The command above dies with the shell that started it, so a Pi reboot leaves
+the robot powered on with nothing serving `:8001` — the app then says
+"Robot: offline" and there is no way to tell that apart from a robot that is
+switched off. Install the unit instead:
+
+```bash
+sudo cp infra/robot-runtime.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now robot-runtime
+systemctl status robot-runtime
+```
+
+### Prefer an IP over the .local name
+
+`reachy-mini.local` resolves through mDNS, which drops out on Windows often
+enough to look like a dead robot (observed: the same host resolved and then
+stopped resolving within one session). Pin the address on the laptop side:
+
+```
+ROBOT_RUNTIME_URL=http://192.168.0.x:8001
+```
+
+Give the Pi a DHCP reservation so that address stays put.
+
+### Updating the robot
+
+The desktop app updates itself; **the Pi does not**. Camera downscaling (U188)
+and the per-frame endpoint (U195) only reach the robot when you pull there:
+
+```bash
+cd reachy-chief-of-staff && git pull
+uv sync --package robot-runtime --no-dev
+sudo systemctl restart robot-runtime
+```
+
+
 ## 2. Brain side (laptop)
 
 ```bash

@@ -28,9 +28,39 @@ def init(robot: Any) -> None:
     _robot = robot
 
 
+def _diagnose(exc: Exception) -> str:
+    """Say WHY the robot cannot be reached, in words the owner can act on.
+
+    U198: the console only ever showed "Robot: offline", which is the one thing
+    the owner already knew. The three causes need three different actions and
+    the exception distinguishes them perfectly — it was simply thrown away.
+    """
+    url = getattr(_robot, "_base_url", "the robot")
+    host = url.split("//", 1)[-1].split("/", 1)[0]
+    name = type(exc).__name__
+    text = str(exc).lower()
+
+    if isinstance(exc, httpx.ConnectTimeout | httpx.ReadTimeout) or "timed out" in text:
+        return (f"{host} did not answer in time — the robot is on a different "
+                f"network, or its WiFi link is down.")
+    if "getaddrinfo" in text or "name or service" in text or "unknown host" in text \
+            or "nodename nor servname" in text or "11001" in text:
+        # .local names need mDNS, which drops out on Windows more often than
+        # anything else here — and it looks identical to "robot is off".
+        return (f"the name {host!r} could not be resolved. Its .local name needs "
+                f"mDNS; set ROBOT_RUNTIME_URL to the robot's IP address instead.")
+    if isinstance(exc, httpx.ConnectError) or "refused" in text:
+        return (f"{host} refused the connection — the robot is reachable but "
+                f"robot-runtime is not running on it. Start it there.")
+    return f"{host} is unreachable ({name})."
+
+
 def _unavailable(exc: Exception) -> JSONResponse:
     return JSONResponse(
-        {"error": f"robot unreachable: {type(exc).__name__}"}, status_code=503,
+        {"error": f"robot unreachable: {type(exc).__name__}",
+         "reason": _diagnose(exc),
+         "robot_url": getattr(_robot, "_base_url", "")},
+        status_code=503,
     )
 
 
