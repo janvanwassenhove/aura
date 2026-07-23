@@ -569,15 +569,49 @@ async function maybeOfferUpdate() {
 
 function installStagedUpdate() {
   if (!stagedUpdate) return { ok: false, error: 'no update staged' }
+  // U201: a staged file can be gone — temp gets cleaned, disks fill up. Saying
+  // so beats spawning nothing and quitting, which reads as "did nothing".
+  if (!fs.existsSync(stagedUpdate.installerPath)) {
+    stagedUpdate = null
+    return { ok: false, error: 'De gedownloade installer is verdwenen. Probeer opnieuw.' }
+  }
   try {
-    // NSIS /S installs without a wizard and relaunches the app. detached +
-    // unref so the installer outlives the process it is replacing.
-    const child = spawn(stagedUpdate.installerPath, ['/S'], {
-      detached: true, stdio: 'ignore',
+    // U201: the app used to spawn the installer and quit, and it DID install —
+    // but it never came back, so from the owner's side "nothing happened". The
+    // old comment claimed NSIS /S relaunches the app; it does not.
+    //
+    // A tiny script owns the whole sequence instead, because each step needs
+    // the previous one to have finished: wait for this process to be gone (the
+    // installer cannot replace files it is using), install silently, then start
+    // the new build. It also leaves a log, so a failed update can be read back
+    // instead of guessed at.
+    const exePath = app.getPath('exe')
+    const logPath = path.join(app.getPath('userData'), 'update-install.log')
+    const script = path.join(app.getPath('temp'), 'aura-apply-update.cmd')
+    const log = (msg) => `echo [%date% %time%] ${msg}>> "${logPath}"`
+    fs.writeFileSync(script, [
+      '@echo off',
+      `echo [%date% %time%] applying ${stagedUpdate.version}> "${logPath}"`,
+      'ping -n 4 127.0.0.1 >nul',   // let the quitting app release its files
+      // `call`, not a bare invocation and not `start /wait`. A bare call to a
+      // script target hands over control for good (the app would install and
+      // never come back), and `start /wait` opens a console window and blocks.
+      // `call` returns control for any target, silently.
+      `call "${stagedUpdate.installerPath}" /S`,
+      // Brackets are not decoration: `exit=0>>` makes cmd read the 0 as a
+      // stream number and redirect instead of echo, so the line vanishes.
+      log('installer exit=[%errorlevel%]'),
+      'ping -n 3 127.0.0.1 >nul',
+      `start "" "${exePath}"`,
+      log('relaunched'),
+    ].join('\r\n'), 'utf-8')
+
+    const child = spawn('cmd.exe', ['/c', script], {
+      detached: true, stdio: 'ignore', windowsHide: true,
     })
     child.unref()
     quitting = true
-    setTimeout(() => app.quit(), 1200)
+    setTimeout(() => app.quit(), 800)
     return { ok: true }
   } catch (err) {
     return { ok: false, error: String(err && err.message || err) }
