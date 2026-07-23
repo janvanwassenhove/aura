@@ -5,7 +5,7 @@
   <div v-if="ready" class="upd-bar" role="status">
     <span class="upd-text">Versie {{ ready.version }} staat klaar om te installeren.</span>
     <button class="upd-btn upd-btn--go" :disabled="installing" @click="install">
-      {{ installing ? 'Bezig…' : 'Herstarten &amp; installeren' }}
+      {{ installing ? 'AURA sluit af en komt terug…' : 'Herstarten &amp; installeren' }}
     </button>
     <button class="upd-btn" :disabled="installing" @click="later">Later</button>
     <span v-if="error" class="upd-err">{{ error }}</span>
