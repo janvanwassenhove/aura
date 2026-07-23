@@ -45,7 +45,10 @@
               :class="['rail-item', selected === p.person_id && 'rail-item--active']"
               @click="select(p.person_id)"
             >
-              <span class="rail-avatar">{{ initials(p.display_name) }}</span>
+              <span class="rail-avatar">
+                <img v-if="p.avatar" :src="p.avatar" class="rail-avatar-img" alt="" />
+                <template v-else>{{ initials(p.display_name) }}</template>
+              </span>
               <span class="rail-label">{{ p.display_name }}</span>
               <span :class="['rail-role', `rail-role--${p.role}`]">{{ p.role }}</span>
             </button>
@@ -202,7 +205,29 @@
         <!-- ── Right: one person's brain ── -->
         <section v-else-if="selected !== '_skills' && store.detail" class="brain-content">
           <div class="person-hero">
-            <span class="hero-avatar">{{ initials(store.detail.person.display_name) }}</span>
+            <!-- U204: avatar with a hover control to change it (photo or upload). -->
+            <div class="hero-avatar-wrap">
+              <span class="hero-avatar">
+                <img v-if="store.detail.person.avatar" :src="store.detail.person.avatar" class="hero-avatar-img" alt="" />
+                <template v-else>{{ initials(store.detail.person.display_name) }}</template>
+              </span>
+              <button class="hero-avatar-edit" :disabled="avatarBusy"
+                      title="Change avatar" aria-label="Change avatar"
+                      @click="avatarMenuOpen = !avatarMenuOpen">
+                <Camera :size="12" />
+              </button>
+              <div v-if="avatarMenuOpen" class="hero-avatar-menu" @click="avatarMenuOpen = false">
+                <button class="hero-menu-item" :disabled="avatarBusy || !store.recognitionEnabled"
+                        @click="captureAvatar">Take a photo</button>
+                <button class="hero-menu-item" :disabled="avatarBusy" @click="avatarFileInput?.click()">
+                  Upload image…
+                </button>
+                <button v-if="store.detail.person.avatar" class="hero-menu-item hero-menu-item--danger"
+                        :disabled="avatarBusy" @click="clearAvatar">Remove</button>
+              </div>
+              <input ref="avatarFileInput" type="file" accept="image/*" class="hidden-file"
+                     @change="uploadAvatar" />
+            </div>
             <!-- U191: name and role are owner-owned labels, not fixed facts —
                  a typo or a guest who turns out to be family must be fixable
                  here instead of by forgetting and re-teaching the person. -->
@@ -426,7 +451,7 @@
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { vaultState } from '../lib/vaultState'
 import {
-  BookOpen, Brain, Facebook, Github, Globe, Instagram, Linkedin, Lock, Mail,
+  BookOpen, Brain, Camera, Facebook, Github, Globe, Instagram, Linkedin, Lock, Mail,
   MoreHorizontal, Pencil, ScanFace, Share2, ShieldAlert, ShieldCheck, Sparkles, Twitter, X,
 } from 'lucide-vue-next'
 import BrainGraph from './BrainGraph.vue'
@@ -532,6 +557,57 @@ const editRole = ref('guest')
 const editBusy = ref(false)
 const editMsg = ref('')
 const editNameEl = ref<HTMLInputElement | null>(null)
+
+// U204: per-person avatar — capture from the camera, upload an image, or clear.
+const avatarMenuOpen = ref(false)
+const avatarBusy = ref(false)
+const avatarFileInput = ref<HTMLInputElement | null>(null)
+
+async function captureAvatar(): Promise<void> {
+  const pid = store.detail?.person.person_id
+  if (!pid || avatarBusy.value) return
+  avatarBusy.value = true
+  try {
+    const r = await fetch(`${BRAIN_URL}/recognition/people/${pid}/avatar/capture`, { method: 'POST' })
+    if (r.ok) { await store.inspectPerson(pid); await store.fetchPeople() }
+  } finally { avatarBusy.value = false }
+}
+
+async function uploadAvatar(ev: Event): Promise<void> {
+  const pid = store.detail?.person.person_id
+  const file = (ev.target as HTMLInputElement).files?.[0]
+  if (!pid || !file) return
+  avatarBusy.value = true
+  try {
+    const dataUri = await new Promise<string>((resolve, reject) => {
+      const fr = new FileReader()
+      fr.onload = () => resolve(String(fr.result))
+      fr.onerror = () => reject(fr.error)
+      fr.readAsDataURL(file)
+    })
+    const r = await fetch(`${BRAIN_URL}/knowledge/people/${pid}/avatar`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ image: dataUri }),
+    })
+    if (r.ok) { await store.inspectPerson(pid); await store.fetchPeople() }
+  } finally {
+    avatarBusy.value = false
+    if (avatarFileInput.value) avatarFileInput.value.value = ''   // allow re-picking the same file
+  }
+}
+
+async function clearAvatar(): Promise<void> {
+  const pid = store.detail?.person.person_id
+  if (!pid || avatarBusy.value) return
+  avatarBusy.value = true
+  try {
+    const r = await fetch(`${BRAIN_URL}/knowledge/people/${pid}/avatar`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ clear: true }),
+    })
+    if (r.ok) { await store.inspectPerson(pid); await store.fetchPeople() }
+  } finally { avatarBusy.value = false }
+}
 
 function startIdentity(): void {
   const person = store.detail?.person
@@ -1181,6 +1257,7 @@ onMounted(async () => {
   font-size: 0.7rem; font-weight: 700;
 }
 .rail-avatar--skills { background: var(--surface); color: var(--accent); border: 1px solid var(--accent); }
+.rail-avatar-img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
 .rail-label { flex: 1; font-size: 0.83rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rail-count { font-size: 0.7rem; color: var(--text-faint); }
 .rail-role { font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.04em; padding: 0.1rem 0.4rem; border-radius: 999px; border: 1px solid var(--border-strong); color: var(--text-faint); }
@@ -1232,8 +1309,25 @@ onMounted(async () => {
   width: 46px; height: 46px; border-radius: 50%;
   display: inline-flex; align-items: center; justify-content: center;
   background: var(--accent); color: var(--accent-contrast, #fff);
-  font-size: 1rem; font-weight: 700;
+  font-size: 1rem; font-weight: 700; overflow: hidden;
 }
+.hero-avatar-img { width: 100%; height: 100%; object-fit: cover; }
+.hero-avatar-wrap { position: relative; flex-shrink: 0; }
+.hero-avatar-edit {
+  position: absolute; right: -2px; bottom: -2px;
+  width: 20px; height: 20px; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--surface); color: var(--text-muted);
+  border: 1px solid var(--border-strong); cursor: pointer; padding: 0;
+}
+.hero-avatar-edit:hover:not(:disabled) { color: var(--text); }
+.hero-avatar-menu {
+  position: absolute; top: 52px; left: 0; z-index: 20; min-width: 140px;
+  background: var(--surface); border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md); box-shadow: 0 6px 20px rgba(0,0,0,0.18);
+  padding: 0.25rem; display: flex; flex-direction: column;
+}
+.hidden-file { display: none; }
 .hero-name { margin: 0; font-size: 1.05rem; }
 .hero-meta { display: flex; align-items: center; gap: 0.6rem; }
 .hero-meta--edit { flex-wrap: wrap; }

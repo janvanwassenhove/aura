@@ -137,3 +137,49 @@ def test_lock_then_unlock_with_passphrase(monkeypatch) -> None:
         # right passphrase unlocks
         assert client.post("/knowledge/unlock", json={"passphrase": "super-secret-pass"}).json()["unlocked"] is True
         assert client.get("/knowledge/people").status_code == 200
+
+
+# ------------------------------------------------------------------
+# U204: person avatar — upload and clear via the knowledge API
+# ------------------------------------------------------------------
+
+def _png_data_uri() -> str:
+    import base64
+    import io
+
+    from PIL import Image
+
+    buf = io.BytesIO()
+    Image.new("RGB", (200, 200), (10, 180, 90)).save(buf, format="PNG")
+    return "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()
+
+
+def test_upload_and_clear_avatar() -> None:
+    app = create_app()
+    with TestClient(app) as client:
+        client.put("/knowledge/people/mila", json={"display_name": "Mila", "role": "family"})
+
+        # New people have no avatar → console falls back to initials.
+        assert client.get("/knowledge/people/mila").json()["person"].get("avatar", "") == ""
+
+        # Upload → stored as a small JPEG data URI, whatever the source format.
+        r = client.put("/knowledge/people/mila/avatar", json={"image": _png_data_uri()})
+        assert r.status_code == 200
+        avatar = r.json()["avatar"]
+        assert avatar.startswith("data:image/jpeg;base64,")
+        assert client.get("/knowledge/people/mila").json()["person"]["avatar"] == avatar
+
+        # Clear → back to initials.
+        assert client.put("/knowledge/people/mila/avatar", json={"clear": True}).status_code == 200
+        assert client.get("/knowledge/people/mila").json()["person"]["avatar"] == ""
+
+
+def test_avatar_rejects_junk_and_unknown_person() -> None:
+    app = create_app()
+    with TestClient(app) as client:
+        client.put("/knowledge/people/piet", json={"display_name": "Piet", "role": "guest"})
+
+        assert client.put("/knowledge/people/piet/avatar",
+                          json={"image": "data:text/plain;base64,aGk="}).status_code == 422
+        assert client.put("/knowledge/people/ghost/avatar",
+                          json={"image": _png_data_uri()}).status_code == 404

@@ -199,6 +199,40 @@ async def upsert_person(
     return JSONResponse(person.model_dump(mode="json"))
 
 
+@router.put("/people/{person_id}/avatar")
+async def set_avatar(
+    person_id: str,
+    body: dict,
+    _: None = Depends(_require_sensitive),
+) -> JSONResponse:
+    """U204: set or clear a person's avatar from an uploaded image.
+
+    `{"image": "data:image/png;base64,..."}` sets it (re-encoded to a small
+    square JPEG); `{"clear": true}` removes it so the console falls back to
+    initials. Capture-from-camera lives in recognition_api, which has the robot.
+    """
+    store = _require()
+    person = await store.get_person(person_id)
+    if person is None:
+        raise HTTPException(status_code=404, detail=f"unknown person {person_id!r}")
+
+    if (body or {}).get("clear"):
+        person.avatar = ""
+        await store.upsert_person(person)
+        return JSONResponse({"person_id": person_id, "avatar": ""})
+
+    from aura_brain.avatar import avatar_from_data_uri
+
+    avatar = avatar_from_data_uri((body or {}).get("image", ""))
+    if avatar is None:
+        raise HTTPException(
+            status_code=422,
+            detail="image must be a data:image/...;base64 URI of a real image")
+    person.avatar = avatar
+    await store.upsert_person(person)
+    return JSONResponse({"person_id": person_id, "avatar": avatar})
+
+
 @router.get("/people/{person_id}/snapshots")
 async def person_snapshots(person_id: str, _: None = Depends(_require_sensitive)) -> JSONResponse:
     """U127: recent recognition snapshots of this person (in-memory, newest

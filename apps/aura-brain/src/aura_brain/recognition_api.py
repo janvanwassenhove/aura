@@ -72,6 +72,7 @@ async def enroll(body: dict) -> JSONResponse:
     # Grab a few frames over ~1.5s so we enroll several angles → robust matching.
     captured = 0
     last_embedding = None
+    avatar_frame = None
     for i in range(4):
         frame = await _robot.camera_frame()
         embedding = await asyncio.to_thread(_embedder.embed, frame)
@@ -79,6 +80,8 @@ async def enroll(body: dict) -> JSONResponse:
             _matcher.enroll(person_id, embedding)
             last_embedding = embedding
             captured += 1
+            if avatar_frame is None:      # U204: first frame WITH a face → avatar
+                avatar_frame = frame
         if i < 3:
             await asyncio.sleep(0.4)
     if captured == 0:
@@ -86,6 +89,23 @@ async def enroll(body: dict) -> JSONResponse:
             {"error": "no face in frame — look straight at the robot and try again"},
             status_code=422,
         )
+
+    # U204: give a freshly-taught person a face icon — but never clobber one the
+    # owner deliberately chose. Best-effort: a failed avatar must not fail teach.
+    if avatar_frame is not None and _store is not None:
+        try:
+            person = await _store.get_person(person_id)
+            if person is not None and not person.avatar:
+                from aura_brain.avatar import avatar_from_image_bytes
+
+                avatar = await asyncio.to_thread(avatar_from_image_bytes, avatar_frame)
+                if avatar:
+                    person.avatar = avatar
+                    await _store.upsert_person(person)
+        except Exception as exc:  # noqa: BLE001
+            import logging
+
+            logging.getLogger(__name__).warning("avatar set on teach failed: %s", exc)
     check_id, confidence = _matcher.identify(last_embedding)
     return JSONResponse({
         "enrolled": person_id,
@@ -93,6 +113,37 @@ async def enroll(body: dict) -> JSONResponse:
         "confidence_check": round(confidence, 3),
         "ok": check_id == person_id,
     })
+
+
+@router.post("/people/{person_id}/avatar/capture")
+async def capture_avatar(person_id: str) -> JSONResponse:
+    """U204: grab a fresh camera frame and use it as this person's avatar.
+
+    The 'change avatar → take a new photo' path. Unlike teach, this OVERWRITES:
+    the owner asked for a new picture, so give them one.
+    """
+    if _robot is None:
+        return JSONResponse({"error": "recognition disabled"}, status_code=503)
+    if _store is None:
+        return JSONResponse({"error": "knowledge store unavailable"}, status_code=503)
+    person = await _store.get_person(person_id)
+    if person is None:
+        return JSONResponse({"error": f"unknown person {person_id!r}"}, status_code=404)
+
+    try:
+        frame = await _robot.camera_frame()
+    except Exception as exc:  # noqa: BLE001
+        return JSONResponse({"error": f"camera unavailable: {exc}"}, status_code=503)
+
+    from aura_brain.avatar import avatar_from_image_bytes
+
+    avatar = await asyncio.to_thread(avatar_from_image_bytes, frame)
+    if not avatar:
+        return JSONResponse(
+            {"error": "could not read a picture from the camera"}, status_code=422)
+    person.avatar = avatar
+    await _store.upsert_person(person)
+    return JSONResponse({"person_id": person_id, "avatar": avatar})
 
 
 @router.post("/merge")

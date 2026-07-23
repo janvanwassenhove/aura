@@ -43,6 +43,11 @@ class Person(BaseModel):
     # prefers short answers"). Part of the digital twin; encrypted at rest
     # like everything else. Optional -> old persisted data loads unchanged.
     description: str = ""
+    # U204: a small avatar icon — a `data:image/...;base64,` URI, set from the
+    # face-teach frame or chosen by the owner. Part of the person's encrypted
+    # bundle like everything else; empty -> the console falls back to initials,
+    # so old persisted data loads unchanged.
+    avatar: str = ""
     created_at: datetime = Field(default_factory=_now)
 
 
