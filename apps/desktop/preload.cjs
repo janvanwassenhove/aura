@@ -16,4 +16,13 @@ contextBridge.exposeInMainWorld('aura', {
   appVersion: () => ipcRenderer.invoke('aura:app-version'),
   // U178: manual update check that reports WHY nothing happened.
   checkUpdate: () => ipcRenderer.invoke('aura:check-update'),
+  // U197: the update downloads itself in the background; the console only
+  // hears about it once it is staged and installing is instant.
+  onUpdateReady: (cb) => {
+    const handler = (_e, info) => cb(info)
+    ipcRenderer.on('aura:update-ready', handler)
+    return () => ipcRenderer.removeListener('aura:update-ready', handler)
+  },
+  installUpdate: () => ipcRenderer.invoke('aura:install-update'),
+  dismissUpdate: (tag) => ipcRenderer.invoke('aura:dismiss-update', tag),
 })

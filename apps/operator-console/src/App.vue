@@ -10,6 +10,10 @@
       @toggle-bottom="layoutStore.showBottom = !layoutStore.showBottom"
     />
 
+    <!-- U197: sits directly under the title bar so it is impossible to miss,
+         but blocks nothing the owner was doing. -->
+    <UpdateBanner />
+
     <!-- Approval overlay (rendered on top of everything) -->
     <ApprovalPanel />
 
@@ -56,6 +60,7 @@
 <script setup lang="ts">
 import { onMounted, ref, watch } from 'vue'
 import TitleBar from './components/TitleBar.vue'
+import UpdateBanner from './components/UpdateBanner.vue'
 import RobotPanel from './components/RobotPanel.vue'
 import VideoPanel from './components/VideoPanel.vue'
 import ConversationPanel from './components/ConversationPanel.vue'
