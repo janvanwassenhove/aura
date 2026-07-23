@@ -263,3 +263,68 @@ def test_status_failure_carries_the_reason(monkeypatch) -> None:
     body = resp.json()
     assert body["reason"]
     assert body["robot_url"] == "http://reachy-mini.local:8001"
+
+
+# ------------------------------------------------------------------
+# U199: the owner can point the brain at a different robot
+# ------------------------------------------------------------------
+
+def test_set_address_persists_and_applies_live(monkeypatch, tmp_path) -> None:
+    """U198 told the owner to set ROBOT_RUNTIME_URL; that meant editing a file
+    inside the app's data directory. Advice with nowhere to act on it is worse
+    than none, so the address is settable — and takes effect without a restart.
+    """
+    import os
+
+    monkeypatch.setenv("AURA_ENV_FILE", str(tmp_path / ".env"))
+
+    class _R:
+        _base_url = "http://reachy-mini.local:8001"
+        async def status(self): return {}
+
+    robot = _R()
+    monkeypatch.setattr(robot_api, "_robot", robot)
+
+    resp = _client_for(robot_api).post(
+        "/robot/address", json={"url": "http://192.168.0.42:8001"})
+    assert resp.status_code == 200
+    assert resp.json()["url"] == "http://192.168.0.42:8001"
+    assert robot._base_url == "http://192.168.0.42:8001"      # live, no restart
+    assert os.environ["ROBOT_RUNTIME_URL"] == "http://192.168.0.42:8001"
+    assert "192.168.0.42" in (tmp_path / ".env").read_text(encoding="utf-8")
+
+
+def test_set_address_adds_a_missing_scheme(monkeypatch, tmp_path) -> None:
+    """Owners type '192.168.0.42:8001'. Refusing that on a technicality, while
+    the panel is already telling them something is broken, is unkind."""
+    monkeypatch.setenv("AURA_ENV_FILE", str(tmp_path / ".env"))
+    monkeypatch.setattr(robot_api, "_robot", type("R", (), {"_base_url": ""})())
+
+    resp = _client_for(robot_api).post(
+        "/robot/address", json={"url": "192.168.0.42:8001"})
+    assert resp.json()["url"] == "http://192.168.0.42:8001"
+
+
+def test_set_address_rejects_empty_and_paths(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("AURA_ENV_FILE", str(tmp_path / ".env"))
+    monkeypatch.setattr(robot_api, "_robot", type("R", (), {"_base_url": ""})())
+    client = _client_for(robot_api)
+
+    assert client.post("/robot/address", json={"url": "  "}).status_code == 422
+    # A path here silently breaks every route built on top of it.
+    assert client.post(
+        "/robot/address",
+        json={"url": "http://192.168.0.42:8001/robot"}).status_code == 422
+
+
+def test_set_address_reports_an_unreachable_robot(monkeypatch, tmp_path) -> None:
+    """Saving must not imply it worked — the whole point is to find out."""
+    monkeypatch.setenv("AURA_ENV_FILE", str(tmp_path / ".env"))
+    monkeypatch.setattr(robot_api, "_robot", type("R", (), {"_base_url": ""})())
+
+    resp = _client_for(robot_api).post(
+        "/robot/address", json={"url": "http://127.0.0.1:9"})   # nothing listens
+    body = resp.json()
+    assert resp.status_code == 200          # it IS saved
+    assert body["reachable"] is False       # but honestly reported
+    assert body["detail"]

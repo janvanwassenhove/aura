@@ -54,7 +54,19 @@
          is — they need three different fixes, and "offline" points at none. -->
     <div v-if="offlineReason" class="robot-offline">
       <TriangleAlert :size="13" />
-      <span>{{ offlineReason }}</span>
+      <div class="ro-body">
+        <span>{{ offlineReason }}</span>
+        <!-- U199: the advice above says "set the robot's address", so put the
+             field right here rather than sending the owner to a config file. -->
+        <div class="ro-row">
+          <input v-model="robotAddr" class="ro-input" placeholder="http://192.168.0.42:8001"
+                 aria-label="Robot address" @keydown.enter="saveRobotAddr" />
+          <button class="ro-btn" :disabled="!robotAddr.trim() || savingAddr" @click="saveRobotAddr">
+            {{ savingAddr ? 'Testen…' : 'Gebruik dit adres' }}
+          </button>
+        </div>
+        <span v-if="addrResult" class="ro-result">{{ addrResult }}</span>
+      </div>
     </div>
 
     <!-- U192: the panic stop used to be an unlabelled red circle in the title
@@ -497,6 +509,40 @@ async function applyVolume() {
 // needs a different action — so carry that sentence into the panel.
 const offlineReason = ref('')
 
+// U199: the diagnosis says "set the robot's address" — so let the owner do it
+// here. Loaded lazily: only needed once something is actually wrong.
+const robotAddr = ref('')
+const savingAddr = ref(false)
+const addrResult = ref('')
+
+async function loadRobotAddr(): Promise<void> {
+  if (robotAddr.value) return
+  try {
+    const r = await fetch(`${BRAIN_URL}/robot/address`)
+    if (r.ok) robotAddr.value = (await r.json()).url ?? ''
+  } catch { /* the field starts empty; the owner can still type one */ }
+}
+
+async function saveRobotAddr(): Promise<void> {
+  if (savingAddr.value || !robotAddr.value.trim()) return
+  savingAddr.value = true
+  addrResult.value = ''
+  try {
+    const r = await fetch(`${BRAIN_URL}/robot/address`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url: robotAddr.value.trim() }),
+    })
+    const body = await r.json().catch(() => null)
+    if (!r.ok) { addrResult.value = body?.error ?? 'Opslaan mislukt.'; return }
+    robotAddr.value = body.url
+    addrResult.value = body.reachable ? 'Verbonden.' : body.detail
+    if (body.reachable) await syncRobotStatus()
+  } catch {
+    addrResult.value = 'De brain reageerde niet.'
+  } finally { savingAddr.value = false }
+}
+
 async function syncRobotStatus(): Promise<void> {
   try {
     const r = await fetch(`${BRAIN_URL}/robot/status`)
@@ -508,6 +554,7 @@ async function syncRobotStatus(): Promise<void> {
     const body = await r.json().catch(() => null)
     offlineReason.value = body?.reason ?? ''
     robotStore.syncFromStatus(null)
+    if (offlineReason.value) void loadRobotAddr()
   } catch { /* leave last known state */ }
 }
 
@@ -594,6 +641,21 @@ function fmtTime(iso: string): string {
 .toggle-cell:hover { border-color: var(--accent-border, var(--accent)); }
 .toggle-cell--on { color: var(--accent); border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); }
 .toggle-lbl { font-size: 0.62rem; letter-spacing: 0.02em; }
+.ro-body { display: flex; flex-direction: column; gap: 0.4rem; flex: 1 1 auto; min-width: 0; }
+.ro-row { display: flex; gap: 0.35rem; }
+.ro-input {
+  flex: 1 1 auto; min-width: 0;
+  background: var(--surface); border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md); color: var(--text);
+  padding: 0.25rem 0.4rem; font-size: 0.72rem;
+}
+.ro-btn {
+  background: var(--accent); color: var(--accent-contrast, #fff); border: none;
+  border-radius: var(--radius-md); padding: 0.25rem 0.55rem;
+  font-size: 0.72rem; cursor: pointer; white-space: nowrap;
+}
+.ro-btn:disabled { opacity: 0.6; cursor: default; }
+.ro-result { font-size: 0.7rem; color: var(--text); }
 .robot-offline {
   display: flex; align-items: flex-start; gap: 0.4rem;
   margin: 0 0 0.5rem; padding: 0.45rem 0.55rem;

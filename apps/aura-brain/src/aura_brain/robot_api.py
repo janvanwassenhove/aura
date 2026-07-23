@@ -64,6 +64,56 @@ def _unavailable(exc: Exception) -> JSONResponse:
     )
 
 
+@router.get("/address")
+async def get_address() -> JSONResponse:
+    """U199: where the brain thinks the robot lives."""
+    return JSONResponse({"url": getattr(_robot, "_base_url", "")})
+
+
+@router.post("/address")
+async def set_address(body: dict) -> JSONResponse:
+    """Point the brain at a different robot, and remember it.
+
+    U198's diagnosis tells the owner to "set ROBOT_RUNTIME_URL to the robot's
+    IP address" — advice with nowhere to act on it, since that meant editing a
+    file inside the app's data directory. Telling someone to do something they
+    have no way to do is worse than saying nothing.
+    """
+    import os
+
+    from aura_brain.setup_api import _write_env
+
+    url = str((body or {}).get("url", "")).strip().rstrip("/")
+    if not url:
+        return JSONResponse({"error": "url is required"}, status_code=422)
+    if not url.startswith(("http://", "https://")):
+        url = f"http://{url}"
+    if url.count("/") > 2:          # scheme + host only; a path is a mistake
+        return JSONResponse(
+            {"error": "give host and port only, e.g. http://192.168.0.42:8001"},
+            status_code=422)
+
+    os.environ["ROBOT_RUNTIME_URL"] = url
+    _write_env({"ROBOT_RUNTIME_URL": url})
+    if _robot is not None:
+        _robot._base_url = url      # live: no restart to try a new address
+    # A new robot may well be a different version from the last one.
+    global _robot_has_frame_jpg
+    _robot_has_frame_jpg = None
+    await shutdown_camera()
+
+    reachable, detail = True, "saved"
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as c:
+            r = await c.get(f"{url}/health")
+            reachable = r.status_code == 200
+            if not reachable:
+                detail = f"saved, but {url} answered HTTP {r.status_code}"
+    except (httpx.HTTPError, OSError) as exc:
+        reachable, detail = False, _diagnose(exc)
+    return JSONResponse({"url": url, "reachable": reachable, "detail": detail})
+
+
 @router.get("/status")
 async def status() -> JSONResponse:
     try:
