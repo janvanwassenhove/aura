@@ -663,6 +663,9 @@ the human can unblock it.
 - [x] **U211 — versie op het splash-scherm bij opstarten** · `pending`
   Het opstartscherm ("AURA is starting…") toont nu ook `version <x.y.z>` onder de subtitel, uit `app.getVersion()` (dezelfde bron als het About-venster). Handig om in één oogopslag te zien welke build draait — juist na de vorige verwarring over "welke versie heb ik nu?". Desktop-only stringwijziging in de bestaande `SPLASH_HTML`; syntax + eslint schoon. **NB: niet in een echte Electron-run gezien** (geen GUI hier), maar het is een triviale interpolatie in de al werkende splash-data-URI.
 
+- [x] **U212 — camera hikte op één gemist frame; nu tolerant aan beide kanten** · `pending`
+  Melding "camerabeeld valt soms uit, hervat na 1-2s". Oorzaak was tweeledig. **Console** (`VideoPanel`): bij **één** mislukte of trage frame-fetch zette de lus meteen `state='off'` (paneel toont "No camera feed") én wachtte 2 seconden — dus één hikje = 2s zwart, precies het symptoom. Nu houdt hij het **laatste frame** vast, probeert elke 400ms opnieuw, en toont pas "off" wanneer het beeld écht >2,5s weg is; plus een 4s abort per verzoek zodat een vastgelopen frame de lus niet tientallen seconden ophoudt. **Robot** (`reachy`-adapter): `get_camera_frame_jpeg` was single-shot, dus een `None` die de media-pijplijn **tussen** frames teruggeeft werd een 503 → zichtbare hik; nu pollt hij tot 1s (zoals `get_camera_frame` al deed), zodat een momentane leemte oplost i.p.v. te blippen. **Direct op de Pi gedeployed** (git pull + service-herstart): frames komen nu stabiel binnen — 200, ~32 KB, ~0,16s, 0 herstarts, geen 503's in de logs. De robot-fix helpt je huidige app meteen; de console-fix komt mee in de volgende release. Robot-runtime 85 groen, console 82 groen, lint schoon.
+
 ## Progress log (append-only; newest last)
 
 - 2026-06-21 — ledger created on `aura-autobuild`; Phase 0/0b complete, Phase 1 scaffold (U-pre) done before this loop started.
