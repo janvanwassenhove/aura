@@ -200,7 +200,14 @@ class PerceptionLoop:
         self._gesture_cooldown = gesture_cooldown_s
         self._sightings = sighting_log
         self._gallery = gallery
-        self._last_gesture_at = 0.0
+        # U210: NOT 0.0 — the cooldown check is `monotonic() - last < cooldown`,
+        # and monotonic() is seconds since boot (usually large), so 0.0 made the
+        # VERY FIRST gesture look "within cooldown" and get suppressed whenever
+        # the box had been up longer than the cooldown. On the robot that means
+        # the first palm after startup is silently eaten; in CI it was flaky
+        # (only a just-booted runner had monotonic() < cooldown). -inf → the
+        # first gesture always fires; the cooldown only ever gates the SECOND.
+        self._last_gesture_at = float("-inf")
         self._task: asyncio.Task | None = None
         self._last_seen: str | None = None  # person_id | _ABSENT | None(=never)
 
