@@ -160,15 +160,23 @@ function bumpStream() {
 // the link actually sustains. Measured flat at ~0.25s.
 // ---------------------------------------------------------------------------
 const MIN_FRAME_MS = 66      // ~15 fps ceiling; the link decides the real rate
+const STALE_OFF_MS = 2500   // keep the last frame this long before showing 'off'
 let loopId = 0
 let currentUrl = ''
 
 async function startFrameLoop() {
   const myLoop = ++loopId   // any older loop sees the mismatch and stops
+  let lastGoodAt = performance.now()
   while (myLoop === loopId) {
     const started = performance.now()
     try {
-      const resp = await fetch(`${BRAIN_URL}/robot/camera/frame.jpg`, { cache: 'no-store' })
+      // U212: cap a single request so a stalled frame can't hang the loop for
+      // the browser's default (tens of seconds).
+      const ctrl = new AbortController()
+      const to = setTimeout(() => ctrl.abort(), 4000)
+      const resp = await fetch(`${BRAIN_URL}/robot/camera/frame.jpg`,
+                               { cache: 'no-store', signal: ctrl.signal })
+      clearTimeout(to)
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
       const blob = await resp.blob()
       if (myLoop !== loopId) break
@@ -180,6 +188,7 @@ async function startFrameLoop() {
       frameSrc.value = next
       if (prev) URL.revokeObjectURL(prev)
       state.value = 'live'
+      lastGoodAt = performance.now()
       // On a fast link the loop would otherwise spin as fast as the robot can
       // encode, pegging the Pi for frames no eye can tell apart. Cap the rate;
       // on a slow link the request itself already takes longer than this and
@@ -188,8 +197,12 @@ async function startFrameLoop() {
       if (left > 0) await new Promise(r => setTimeout(r, left))
     } catch {
       if (myLoop !== loopId) break
-      state.value = 'off'
-      await new Promise(r => setTimeout(r, 2000))   // robot down — back off
+      // U212: a single blip must NOT blank the feed. Keep showing the last frame
+      // and retry fast; only declare the camera 'off' after it has genuinely
+      // been gone for a while. Before this, one slow/failed frame flipped the
+      // panel to "No camera feed" for a full 2s — the reported dropout.
+      if (performance.now() - lastGoodAt > STALE_OFF_MS) state.value = 'off'
+      await new Promise(r => setTimeout(r, state.value === 'off' ? 1500 : 400))
     }
   }
 }

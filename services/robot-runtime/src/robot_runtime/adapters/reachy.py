@@ -995,10 +995,21 @@ class ReachyRobotAdapter(RobotAdapter):
             raise RuntimeError("camera unavailable: media backend disabled")
 
         def _grab_jpeg() -> bytes:
-            jpeg = media.get_frame_jpeg()
-            if jpeg is None:
-                raise RuntimeError("no camera frame available")
-            return bytes(jpeg)
+            # U212: the media pipeline returns None BETWEEN frames, not only when
+            # the camera is down. A single-shot grab turned every such gap into a
+            # 503, which the console showed as a dropout. Poll briefly (like
+            # get_camera_frame does) so a momentary gap resolves instead of
+            # blipping the feed; 1s cap keeps a truly dead camera from hanging.
+            import time
+
+            deadline = time.monotonic() + 1.0
+            while True:
+                jpeg = media.get_frame_jpeg()
+                if jpeg is not None:
+                    return bytes(jpeg)
+                if time.monotonic() >= deadline:
+                    raise RuntimeError("no camera frame available")
+                time.sleep(0.05)
 
         return await asyncio.to_thread(_grab_jpeg)
 
