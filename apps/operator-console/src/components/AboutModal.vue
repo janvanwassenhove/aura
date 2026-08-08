@@ -1,6 +1,6 @@
 <template>
   <div class="about-overlay" @click.self="$emit('close')">
-    <div class="about-modal">
+    <div ref="modalRoot" class="about-modal" role="dialog" aria-modal="true" aria-label="About AURA" tabindex="-1">
       <div class="about-header">
         <span class="about-title"><Info :size="16" /> About</span>
         <button class="btn-close" aria-label="Close" @click="$emit('close')"><X :size="15" /></button>
@@ -56,9 +56,13 @@
 
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
+import { useModal } from '../composables/useModal'
 import { Bot, Github, Globe, Info, X } from 'lucide-vue-next'
 
-defineEmits<{ close: [] }>()
+const emit = defineEmits<{ close: [] }>()
+
+const modalRoot = ref<HTMLElement | null>(null)
+useModal({ onClose: () => emit('close'), root: modalRoot })
 
 // Packaged builds get their real version from Electron (stamped per release);
 // a plain browser/dev run shows "dev" rather than pretending.

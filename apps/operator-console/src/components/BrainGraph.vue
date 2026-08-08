@@ -2,16 +2,28 @@
   <div class="graph-wrap">
     <canvas
       ref="canvas" class="graph-canvas"
+      role="img" :aria-label="graphSummary"
       @mousemove="onMove" @mousedown="onDown" @mouseup="onUp" @mouseleave="onLeave"
       @wheel.prevent="onWheel"
     />
+    <!-- U222 (1.1.1 / 2.1.1): the canvas is unreachable without a mouse, and a
+         screen reader sees a blank box. This list holds the SAME nodes and the
+         same open action, visually hidden but focusable — so the graph has a
+         keyboard path and a text alternative without changing how it looks. -->
+    <ul class="graph-a11y-list">
+      <li v-for="n in openableNodes" :key="`${n.kind}:${n.id}`">
+        <button type="button" @click="emit('open', n.kind, n.id)">
+          {{ n.label }} ({{ n.kind }})
+        </button>
+      </li>
+    </ul>
     <div v-if="hover" class="graph-tip" :style="{ left: hover.x + 14 + 'px', top: hover.y + 8 + 'px' }">
       <strong>{{ hover.label }}</strong><span class="tip-kind">{{ hover.kind }}</span>
     </div>
     <div class="graph-zoom">
-      <button class="gz-btn" title="Zoom in" @click="zoomBy(1.2)">+</button>
-      <button class="gz-btn" title="Zoom out" @click="zoomBy(1 / 1.2)">−</button>
-      <button class="gz-btn" title="Reset zoom &amp; position" @click="resetView">⤢</button>
+      <button class="gz-btn" title="Zoom in" aria-label="Zoom in" @click="zoomBy(1.2)">+</button>
+      <button class="gz-btn" title="Zoom out" aria-label="Zoom out" @click="zoomBy(1 / 1.2)">−</button>
+      <button class="gz-btn" title="Reset zoom &amp; position" aria-label="Reset zoom and position" @click="resetView">⤢</button>
     </div>
     <p class="graph-legend">
       <span class="lg lg-person" /> person · <span class="lg lg-skill" /> skill ·
@@ -42,6 +54,9 @@ const props = defineProps<{
 const emit = defineEmits<{ (e: 'open', kind: string, id: string): void }>()
 
 const canvas = ref<HTMLCanvasElement | null>(null)
+// Mirrors of the canvas contents for assistive tech (kept in sync by buildGraph).
+const graphSummary = ref('Knowledge graph')
+const openableNodes = ref<{ id: string; label: string; kind: string }[]>([])
 const hover = ref<{ x: number; y: number; label: string; kind: string } | null>(null)
 
 let nodes: GNode[] = []
@@ -114,6 +129,15 @@ function buildGraph(w: number, h: number): void {
       link(`fact:${f.person_id}:${f.key}`.toLowerCase(), `topic:${key}`)
     }
   }
+  // U222: publish a text view of what was just drawn.
+  const counts: Record<string, number> = {}
+  for (const n of nodes) counts[n.kind] = (counts[n.kind] ?? 0) + 1
+  graphSummary.value = 'Knowledge graph: ' + (Object.entries(counts)
+    .map(([k, v]) => `${v} ${k}${v === 1 ? '' : 's'}`).join(', ') || 'empty')
+  openableNodes.value = nodes
+    .filter(n => n.kind === 'person' || n.kind === 'skill')
+    .map(n => ({ id: n.id, label: n.label, kind: n.kind }))
+
   ticks = 0
 }
 
@@ -308,6 +332,15 @@ onBeforeUnmount(() => { cancelAnimationFrame(raf); window.removeEventListener('r
 
 <style scoped>
 .graph-wrap { position: relative; width: 100%; height: 100%; min-height: 380px; }
+.graph-a11y-list {
+  position: absolute; width: 1px; height: 1px; margin: -1px;
+  padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+.graph-a11y-list:focus-within {
+  position: static; width: auto; height: auto; margin: 0; clip: auto;
+  white-space: normal; background: var(--surface); padding: 0.4rem;
+  border-radius: var(--radius-md); max-height: 40%; overflow: auto;
+}
 .graph-canvas {
   width: 100%; height: calc(100% - 26px); display: block;
   background: radial-gradient(ellipse at center, #23272e 0%, #1a1d22 100%);

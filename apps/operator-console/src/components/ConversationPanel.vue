@@ -11,7 +11,8 @@
       </button>
     </div>
 
-    <div ref="scrollEl" class="conversation-scroll flex-1 overflow-y-auto space-y-2 mb-3">
+    <div ref="scrollEl" class="conversation-scroll flex-1 overflow-y-auto space-y-2 mb-3"
+         role="log" aria-live="polite" aria-relevant="additions" aria-label="Conversation">
       <div
         v-for="turn in conversationStore.turns"
         :key="turn.id"
@@ -96,7 +97,7 @@
         ref="inputEl"
         v-model="conversationStore.pendingText"
         rows="1"
-        placeholder="Type a message… or use the mic"
+        aria-label="Message to the assistant" placeholder="Type a message… or use the mic"
         :disabled="conversationStore.isProcessing"
         class="chat-input chat-textarea"
         @input="autoGrow"

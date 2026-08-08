@@ -1,9 +1,9 @@
 <template>
   <div class="settings-overlay" @click.self="$emit('close')">
-    <div class="settings-modal" :class="{ 'settings-modal--wide': activeTab === 'connections' }">
+    <div ref="modalRoot" class="settings-modal" role="dialog" aria-modal="true" aria-label="Settings" tabindex="-1" :class="{ 'settings-modal--wide': activeTab === 'connections' }">
       <div class="settings-header">
         <span class="settings-title"><Settings :size="15" /> Settings</span>
-        <button class="btn-close" @click="$emit('close')"><X :size="15" /></button>
+        <button class="btn-close" aria-label="Close settings" @click="$emit('close')"><X :size="15" /></button>
       </div>
 
       <!-- Tab bar -->
@@ -390,6 +390,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch, defineComponent, h } from 'vue'
+import { useModal } from '../composables/useModal'
 import {
   Building2, Circle, CircleCheck, ExternalLink, Github, Globe, LoaderCircle,
   MessageSquare, Moon, Music, RefreshCw, Settings, Sun, X,
@@ -399,7 +400,10 @@ import { useConnectionsStore, type ConnectorStatus } from '../stores/connections
 import { ACCENTS, useThemeStore } from '../stores/themeStore'
 import { LANGUAGES, usePrefsStore } from '../stores/prefsStore'
 
-defineEmits<{ (e: 'close'): void }>()
+const emit = defineEmits<{ (e: 'close'): void }>()
+
+const modalRoot = ref<HTMLElement | null>(null)
+useModal({ onClose: () => emit('close'), root: modalRoot })
 
 // ── LLM store ──
 const llmStore = useSettingsStore()

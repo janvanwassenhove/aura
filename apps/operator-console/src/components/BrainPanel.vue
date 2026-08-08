@@ -83,8 +83,8 @@
             </button>
             <template v-else>
               <div class="rail-sep">Add person</div>
-              <input v-model="newP.id" class="rail-input" placeholder="id (e.g. jan)" />
-              <input v-model="newP.name" class="rail-input" placeholder="Display name" />
+              <input v-model="newP.id" class="rail-input" aria-label="Person id" placeholder="id (e.g. jan)" />
+              <input v-model="newP.name" class="rail-input" aria-label="Display name" placeholder="Display name" />
               <select v-model="newP.role" class="rail-input">
                 <option value="owner">owner</option><option value="family">family</option>
                 <option value="guest">guest</option><option value="minor">minor</option>
@@ -198,11 +198,12 @@
                everyone shown at once the graph gets crowded fast; picking a
                person shows only their skills, facts and topics. -->
           <div class="gf-bar">
-            <button :class="['gf-chip', !graphFilter.size && 'gf-chip--on']"
+            <button :aria-pressed="!graphFilter.size" :class="['gf-chip', !graphFilter.size && 'gf-chip--on']"
                     title="Show everyone" @click="graphFilter = new Set()">
               Everyone
             </button>
             <button v-for="p in store.people" :key="p.person_id"
+                    :aria-pressed="graphFilter.has(p.person_id)"
                     :class="['gf-chip', graphFilter.has(p.person_id) && 'gf-chip--on']"
                     :title="`Show only ${p.display_name}`"
                     @click="toggleGraphPerson(p.person_id)">
@@ -276,7 +277,9 @@
             </button>
             <!-- U112: rare actions live behind ⋯ instead of permanent sections -->
             <div class="hero-menu-wrap">
-              <button class="hero-btn" title="More actions" @click="heroMenuOpen = !heroMenuOpen">
+              <button class="hero-btn" title="More actions" aria-label="More actions"
+                      :aria-expanded="heroMenuOpen" aria-haspopup="true"
+                      @click="heroMenuOpen = !heroMenuOpen">
                 <MoreHorizontal :size="14" />
               </button>
               <div v-if="heroMenuOpen" class="hero-menu" @click="heroMenuOpen = false">

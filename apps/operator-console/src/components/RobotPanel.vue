@@ -26,24 +26,28 @@
     <!-- U125: labelled toggle tiles — even 4-up grid, self-explanatory -->
     <div class="toggle-grid">
       <button :class="['toggle-cell', !asleep && 'toggle-cell--on']"
+              :aria-pressed="!asleep"
               :title="asleep ? 'Asleep — click to wake up' : 'Awake — click for sleep mode (take no action)'"
               @click="toggleSleep">
         <Moon v-if="asleep" :size="16" /><Power v-else :size="16" />
         <span class="toggle-lbl">{{ asleep ? 'Asleep' : 'Awake' }}</span>
       </button>
       <button :class="['toggle-cell', micOn && 'toggle-cell--on']"
+              :aria-pressed="micOn"
               :title="micOn ? 'Listening for “Richie …” — click to stop' : 'Microphone off — click to listen'"
               @click="toggleMicListening">
         <Mic v-if="micOn" :size="16" /><MicOff v-else :size="16" />
         <span class="toggle-lbl">Mic</span>
       </button>
       <button :class="['toggle-cell', tracking && 'toggle-cell--on']"
+              :aria-pressed="tracking"
               :title="tracking ? 'Following faces — click to stop' : 'Click to follow the nearest face'"
               @click="toggleTracking">
         <Eye :size="16" />
         <span class="toggle-lbl">Follow</span>
       </button>
       <button :class="['toggle-cell', proactiveOn && 'toggle-cell--on']"
+              :aria-pressed="proactiveOn"
               :title="proactiveOn ? 'Proactive: speaks up for reminders & daily briefing' : 'Proactive off — only speaks when addressed'"
               @click="toggleProactive">
         <Bell :size="16" />
@@ -52,7 +56,7 @@
     </div>
     <!-- U198: when the robot is unreachable, say which of the three causes it
          is — they need three different fixes, and "offline" points at none. -->
-    <div v-if="offlineReason" class="robot-offline">
+    <div v-if="offlineReason" class="robot-offline" role="alert">
       <TriangleAlert :size="13" />
       <div class="ro-body">
         <span>{{ offlineReason }}</span>
@@ -78,7 +82,7 @@
             {{ d.url }} <span class="ro-hit-sub">{{ d.adapter }}</span>
           </button>
         </div>
-        <span v-if="addrResult" class="ro-result">{{ addrResult }}</span>
+        <span v-if="addrResult" class="ro-result" role="status">{{ addrResult }}</span>
       </div>
     </div>
 
@@ -110,7 +114,7 @@
       <input
         v-model.number="volume"
         type="range" min="0" max="1" step="0.05"
-        class="volume-slider"
+        class="volume-slider" aria-label="Speaker volume"
         @change="applyVolume"
       />
       <span class="volume-pct">{{ Math.round(volume * 100) }}%</span>
@@ -120,7 +124,7 @@
     <div class="persona-block">
       <span class="ctl-label"><Bot :size="14" /> Persona</span>
       <div class="persona-row">
-        <select v-model="activeCharacter" class="persona-select" @change="applyCharacter">
+        <select v-model="activeCharacter" class="persona-select" aria-label="Persona" @change="applyCharacter">
           <option value="">Default (no character)</option>
           <option v-for="c in characters" :key="c.id" :value="c.id">{{ c.display_name }}</option>
         </select>

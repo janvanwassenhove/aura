@@ -3,11 +3,12 @@
     <div
       v-for="request in approvalStore.pending"
       :key="request.approvalId"
-      class="approval-modal"
+      class="approval-modal" role="alertdialog" aria-modal="true"
+      aria-labelledby="approval-h"
     >
       <div class="approval-header">
         <span class="approval-icon"><TriangleAlert :size="20" /></span>
-        <h3>Approval Required</h3>
+        <h3 id="approval-h">Approval Required</h3>
       </div>
       <div class="approval-body">
         <div class="approval-field">

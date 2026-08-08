@@ -1,9 +1,9 @@
 <template>
   <div class="cap-overlay" @click.self="$emit('close')">
-    <div class="cap-modal">
+    <div ref="modalRoot" class="cap-modal" role="dialog" aria-modal="true" aria-label="Capabilities and permissions" tabindex="-1">
       <div class="cap-header">
         <span class="cap-title"><ShieldCheck :size="16" /> Capabilities &amp; permissions</span>
-        <button class="btn-close" @click="$emit('close')"><X :size="15" /></button>
+        <button class="btn-close" aria-label="Close capabilities" @click="$emit('close')"><X :size="15" /></button>
       </div>
 
       <p class="cap-intro">
@@ -24,9 +24,8 @@
             </div>
             <div class="cap-desc">{{ cap.description }}</div>
           </div>
-          <button
-            :class="['toggle', cap.enabled && 'toggle--on']"
-            :title="cap.enabled ? 'Enabled' : 'Disabled'"
+          <button role="switch" :aria-checked="cap.enabled" :aria-label="cap.label"
+                  :class="['toggle', cap.enabled && 'toggle--on']" :title="cap.enabled ? 'Enabled' : 'Disabled'"
             @click="store.toggle(cap.key, !cap.enabled)"
           ><span class="toggle-knob" /></button>
         </div>
@@ -64,12 +63,16 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { onMounted , ref} from 'vue'
+import { useModal } from '../composables/useModal'
 import { ShieldCheck, X } from 'lucide-vue-next'
 import { useCapabilitiesStore } from '../stores/capabilitiesStore'
 import { usePrefsStore } from '../stores/prefsStore'
 
-defineEmits<{ close: [] }>()
+const emit = defineEmits<{ close: [] }>()
+
+const modalRoot = ref<HTMLElement | null>(null)
+useModal({ onClose: () => emit('close'), root: modalRoot })
 
 const store = useCapabilitiesStore()
 const prefsStore = usePrefsStore()

@@ -1,12 +1,13 @@
 <template>
-  <div class="presenter">
+  <div ref="modalRoot" class="presenter" role="dialog" aria-modal="true"
+       aria-label="Present with the robot" tabindex="-1">
     <!-- Setup: build (or paste) a scenario before starting -->
     <div v-if="!store.status.active" class="pv-setup">
       <div class="pv-setup-head">
         <h2>Present with the robot</h2>
-        <div class="pv-mode-toggle">
-          <button :class="['pv-tab', !rawMode && 'pv-tab--on']" @click="rawMode = false">Build</button>
-          <button :class="['pv-tab', rawMode && 'pv-tab--on']" @click="rawMode = true">YAML</button>
+        <div class="pv-mode-toggle" role="tablist" aria-label="Scenario input mode">
+          <button role="tab" :aria-selected="!rawMode" :class="['pv-tab', !rawMode && 'pv-tab--on']" @click="rawMode = false">Build</button>
+          <button role="tab" :aria-selected="rawMode" :class="['pv-tab', rawMode && 'pv-tab--on']" @click="rawMode = true">YAML</button>
         </div>
         <button class="pv-x" aria-label="Close" @click="$emit('close')"><X :size="18" /></button>
       </div>
@@ -44,11 +45,13 @@
         <span class="pv-spacer" />
         <!-- U209: laptop speakers + laptop-mic keyword listening -->
         <button v-if="audioSupported" :class="['pv-toggle', laptopAudio && 'pv-toggle--on']"
+                :aria-pressed="laptopAudio"
                 :title="laptopAudio ? 'Reading the robot\'s lines through this laptop' : 'Read the robot\'s lines through this laptop'"
                 @click="laptopAudio = !laptopAudio">
           <Volume2 :size="14" /> Laptop audio
         </button>
         <button v-if="micSupported" :class="['pv-toggle', laptopMic && 'pv-toggle--on']"
+                :aria-pressed="laptopMic"
                 :title="laptopMic ? 'Listening for keywords on this laptop mic' : 'Listen for keywords on this laptop mic (robust — bypasses the robot echo)'"
                 @click="toggleMic">
           <Mic :size="14" /> Keyword mic
@@ -58,7 +61,7 @@
       </div>
 
       <!-- The big subtitle: what the robot just said -->
-      <div class="pv-subtitle-wrap">
+      <div class="pv-subtitle-wrap" role="status" aria-live="polite" aria-atomic="true">
         <p v-if="store.subtitle" class="pv-subtitle">{{ store.subtitle }}</p>
         <p v-else class="pv-subtitle pv-subtitle--idle">
           {{ store.lastMode === 'silent' ? '(the robot holds the floor for you)' : 'Waiting for a cue…' }}
@@ -100,12 +103,16 @@ import { onMounted, onUnmounted, ref, watch } from 'vue'
 import { Mic, Presentation, VideoOff, Volume2, X } from 'lucide-vue-next'
 import { usePresentationStore } from '../stores/presentationStore'
 import ScenarioBuilder from './ScenarioBuilder.vue'
+import { useModal } from '../composables/useModal'
 import {
   cancelLaptopSpeech, createMic, laptopAudioSupported, laptopMicSupported,
   speakOnLaptop, type MicController,
 } from '../composables/usePresenterAudio'
 
-defineEmits<{ close: [] }>()
+const emit = defineEmits<{ close: [] }>()
+
+const modalRoot = ref<HTMLElement | null>(null)
+useModal({ onClose: () => emit('close'), root: modalRoot })
 
 const store = usePresentationStore()
 const BRAIN_URL = import.meta.env.VITE_BRAIN_URL ?? import.meta.env.VITE_ORCHESTRATOR_URL ?? 'http://localhost:8020'
