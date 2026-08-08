@@ -24,7 +24,7 @@
   /* Text */
   --text: #e2e8f0;
   --text-muted: #94a3b8;
-  --text-faint: #64748b;
+  --text-faint: #94a3b8;  /* U215: was #64748b (3.1:1, fails AA) */
 
   /* Status: success */
   --ok: #22c55e;
@@ -55,6 +55,12 @@
   /* Shape */
   --radius-sm: 0.25rem;
   --radius: 0.375rem;
+  /* U215: newer components (presenter, scenario builder, rail/hero, banner) use
+     --radius-md and --accent-contrast, which were never defined — so those
+     border-radius declarations were invalid and rendered SQUARE, and the accent
+     text silently fell back to #fff. Define both (44 + 15 call sites fixed). */
+  --radius-md: 0.5rem;
+  --accent-contrast: var(--on-accent);
   --radius-lg: 0.5rem;
   --radius-xl: 0.75rem;
 }
@@ -72,7 +78,7 @@
 
   --text: #0f172a;
   --text-muted: #475569;
-  --text-faint: #94a3b8;
+  --text-faint: #64748b;  /* U215: was #94a3b8 (2.4:1, fails AA) */
 
   --ok: #16a34a;
   --ok-text: #166534;
