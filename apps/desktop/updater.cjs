@@ -33,6 +33,58 @@ function pickWindowsAsset(assets) {
   return (assets || []).find((a) => /windows-setup\.exe$/i.test(a.name)) || null
 }
 
+/** U224: the release's SHA256SUMS.txt, when the build published one. */
+function pickChecksums(assets) {
+  return (assets || []).find((a) => /^SHA256SUMS\.txt$/i.test(a.name)) || null
+}
+
+/** Reject anything that isn't a plain file name — the staged path is later
+ *  interpolated into a .cmd, where a quote or space would break out of the
+ *  quoting and inject commands. */
+function safeAssetName(name) {
+  return /^[A-Za-z0-9._-]+$/.test(String(name || '')) ? String(name) : null
+}
+
+/** SHA-256 of a file on disk, lowercase hex. */
+async function fileSha256(filePath, fsImpl = require('fs')) {
+  const crypto = require('crypto')
+  const hash = crypto.createHash('sha256')
+  await new Promise((resolve, reject) => {
+    fsImpl.createReadStream(filePath)
+      .on('data', (d) => hash.update(d))
+      .on('error', reject)
+      .on('end', resolve)
+  })
+  return hash.digest('hex')
+}
+
+/** Verify a staged file against the release's SHA256SUMS.txt.
+ *  Returns {ok, reason}. A MISSING checksum list is reported, not silently
+ *  accepted — the caller decides, but it can never look like a pass. */
+async function verifyAsset({ asset, checksumsAsset, filePath, token,
+                             fetchImpl = fetch, fsImpl = require('fs') }) {
+  if (!checksumsAsset) return { ok: false, reason: 'no-checksums' }
+  const headers = { Accept: 'application/octet-stream', 'User-Agent': 'aura-desktop' }
+  if (token) headers.Authorization = `Bearer ${token}`
+  let text
+  try {
+    const res = await fetchImpl(checksumsAsset.url, { headers })
+    if (!res.ok) return { ok: false, reason: `checksums HTTP ${res.status}` }
+    text = await res.text()
+  } catch (err) {
+    return { ok: false, reason: `checksums unreachable: ${err.message}` }
+  }
+  // Lines are "<sha256>  <name>" (sha256sum prefixes binary names with '*').
+  const wanted = text.split(/\r?\n/)
+    .map((line) => line.trim().split(/\s+/))
+    .find(([, name]) => name && name.replace(/^\*/, '') === asset.name)
+  if (!wanted) return { ok: false, reason: 'asset not listed in checksums' }
+  const actual = await fileSha256(filePath, fsImpl)
+  return actual.toLowerCase() === wanted[0].toLowerCase()
+    ? { ok: true }
+    : { ok: false, reason: 'checksum mismatch' }
+}
+
 /**
  * U178: returns a STATUS, not just null.
  *
@@ -66,6 +118,7 @@ async function checkForUpdate({ currentVersion, token, fetchImpl = fetch }) {
         version: String(rel.tag_name).replace(/^v/, ''),
         htmlUrl: rel.html_url,
         asset: pickWindowsAsset(rel.assets),
+        checksums: pickChecksums(rel.assets),   // U224
       },
     }
   } catch (err) {
@@ -89,4 +142,5 @@ async function downloadAsset({ asset, token, destPath, fetchImpl = fetch, fsImpl
   return destPath
 }
 
-module.exports = { REPO, parseVersion, isNewer, pickWindowsAsset, checkForUpdate, downloadAsset }
+module.exports = { REPO, parseVersion, isNewer, pickWindowsAsset, pickChecksums,
+                   safeAssetName, fileSha256, verifyAsset, checkForUpdate, downloadAsset }

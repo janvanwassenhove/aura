@@ -101,6 +101,9 @@ jobs:
       - name: Lint Electron main process
         working-directory: apps/desktop
         run: npx --yes eslint@9 main.cjs preload.cjs updater.cjs
+      - name: Updater verification tests
+        working-directory: apps/desktop
+        run: node test-updater-verify.cjs
 
   lint:
     runs-on: ubuntu-latest

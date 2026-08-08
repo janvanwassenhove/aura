@@ -563,7 +563,7 @@ function createWindow() {
 // U173: update check — ask the owner when a newer GitHub release exists
 // ---------------------------------------------------------------------------
 
-const { checkForUpdate, downloadAsset } = require('./updater.cjs')
+const { checkForUpdate, downloadAsset, safeAssetName, verifyAsset } = require('./updater.cjs')
 let updateDialogOpen = false
 
 function skippedVersionFile() { return path.join(app.getPath('userData'), 'update-skip.json') }
@@ -617,11 +617,37 @@ async function maybeOfferUpdate() {
   }
 
   try {
-    const dest = path.join(app.getPath('temp'), update.asset.name)
+    // U224 (S11): the asset NAME comes from the release and is later
+    // interpolated into a .cmd — a quote or space there breaks out of the
+    // quoting. Refuse anything that isn't a plain filename.
+    const safeName = safeAssetName(update.asset.name)
+    if (!safeName) throw new Error(`refusing odd asset name: ${update.asset.name}`)
+    // Stage in userData, not %TEMP%: the staged installer sits there for up to
+    // four hours before the owner clicks install, and %TEMP% is writable by
+    // every process on the machine.
+    const stageDir = path.join(app.getPath('userData'), 'updates')
+    fs.mkdirSync(stageDir, { recursive: true })
+    const dest = path.join(stageDir, safeName)
     // U192: this argument said `token` — an identifier declared nowhere in this
     // file. Every download threw a ReferenceError on the first line of the try,
     // was swallowed, and degraded to opening the release page. It had never run.
     await downloadAsset({ asset: update.asset, token: updateToken(), destPath: dest })
+
+    // U224: verify what we downloaded before we ever run it. A missing or
+    // mismatching checksum is logged and the update is NOT staged — the owner
+    // keeps a working app instead of running an unverified installer.
+    const verdict = await verifyAsset({
+      asset: update.asset, checksumsAsset: update.checksums,
+      filePath: dest, token: updateToken(),
+    })
+    if (!verdict.ok) {
+      console.error(`update not staged — ${verdict.reason}`)
+      try { fs.unlinkSync(dest) } catch { /* already gone */ }
+      // 'no-checksums' means an older release that predates SHA256SUMS; fall
+      // back to the release page so the owner can still update deliberately.
+      if (verdict.reason === 'no-checksums') shell.openExternal(update.htmlUrl)
+      return
+    }
     stagedUpdate = { tag: update.tag, version: update.version, installerPath: dest }
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send('aura:update-ready', {

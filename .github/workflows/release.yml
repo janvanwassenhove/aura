@@ -253,6 +253,16 @@ jobs:
         with:
           name: screenshots
           path: shots
+      # U224 (S11): publish a checksum for every installer. The app verifies the
+      # file it downloaded before running it, so a corrupted download or a file
+      # swapped on disk between staging and install is caught rather than
+      # executed.
+      - name: Checksums
+        run: |
+          cd installers
+          sha256sum * > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
       - name: Compose release notes
         env:
           TAG: ${{ needs.version.outputs.tag }}
