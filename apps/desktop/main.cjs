@@ -175,12 +175,30 @@ function hasUv() {
 //       sync still lands Pillow even when the heavy extra can't build.
 const BOOTSTRAP_REV = '3'
 
+/** U218: is face recognition actually usable in the packaged environment?
+ *
+ *  Trusting the marker was the bug: an NSIS update REPLACES the install
+ *  directory (and its .venv) while the marker lives in userData and survives —
+ *  and the bootstrap's own try/catch silently falls back to a plain sync when
+ *  the recognition extra can't install. Either way the marker then claims
+ *  "done" forever and the owner is left with `embedder: null` and a face that
+ *  can never be taught. Verify the capability instead of a bookkeeping flag.
+ */
+function recognitionInstalled() {
+  const sitePackages = path.join(REPO_ROOT, '.venv', 'Lib', 'site-packages')
+  // Cheap: a directory check, no subprocess on the startup path.
+  return fs.existsSync(path.join(sitePackages, 'insightface'))
+      && fs.existsSync(path.join(sitePackages, 'onnxruntime'))
+}
+
 async function ensureBootstrap(splashWindow) {
   if (!IS_PACKAGED) return
   const marker = path.join(app.getPath('userData'), '.bootstrap-done')
   let doneRev = ''
   try { doneRev = (fs.readFileSync(marker, 'utf-8').match(/rev=(\d+)/) || [])[1] || '1' } catch { doneRev = '' }
-  if (doneRev === BOOTSTRAP_REV && hasUv()) return
+  // Re-run when the revision changed OR when the environment lost the
+  // recognition stack (post-update venv rebuild, or a failed earlier attempt).
+  if (doneRev === BOOTSTRAP_REV && hasUv() && recognitionInstalled()) return
 
   const say = (msg) => {
     if (splashWindow && !splashWindow.isDestroyed()) {
@@ -212,14 +230,28 @@ async function ensureBootstrap(splashWindow) {
   // The `recognition` extra carries insightface + onnxruntime (face
   // recognition). Without it `uv sync` PRUNES them. Fall back to a plain sync
   // so a wheel/network problem never leaves the app unable to start at all.
+  // U218: bounded retries. recognitionInstalled() makes the bootstrap re-run
+  // whenever the stack is missing, which is what heals a post-update venv — but
+  // on a machine that genuinely can't build these wheels that would mean a slow
+  // sync on EVERY launch. Give up after 2 attempts and let the console's honest
+  // "recognition isn't installed" message (U213) explain it instead.
+  let fails = 0
+  try { fails = Number((fs.readFileSync(marker, 'utf-8').match(/recogFail=(\d+)/) || [])[1] || 0) } catch { fails = 0 }
   try {
-    execSync('uv sync --all-packages --extra recognition',
-      { cwd: REPO_ROOT, stdio: 'ignore', shell: true, timeout: 1_800_000 })
+    if (fails < 2) {
+      execSync('uv sync --all-packages --extra recognition',
+        { cwd: REPO_ROOT, stdio: 'ignore', shell: true, timeout: 1_800_000 })
+    } else {
+      execSync('uv sync --all-packages', { cwd: REPO_ROOT, stdio: 'ignore', shell: true, timeout: 900_000 })
+    }
   } catch (err) {
     console.error('sync with recognition extra failed, falling back:', err.message)
     execSync('uv sync --all-packages', { cwd: REPO_ROOT, stdio: 'ignore', shell: true, timeout: 900_000 })
   }
-  fs.writeFileSync(marker, `rev=${BOOTSTRAP_REV} ${new Date().toISOString()}`)
+  if (!recognitionInstalled()) fails += 1
+  else fails = 0
+  fs.writeFileSync(marker,
+    `rev=${BOOTSTRAP_REV} recogFail=${fails} ${new Date().toISOString()}`)
 }
 
 // ---------------------------------------------------------------------------
