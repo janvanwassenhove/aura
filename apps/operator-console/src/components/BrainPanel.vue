@@ -194,10 +194,26 @@
 
         <!-- ── Right: the graph (U75) ── -->
         <section v-else-if="selected === '_graph'" class="brain-content brain-content--graph">
+          <!-- U214: filter the constellation down to one or more people. With
+               everyone shown at once the graph gets crowded fast; picking a
+               person shows only their skills, facts and topics. -->
+          <div class="gf-bar">
+            <button :class="['gf-chip', !graphFilter.size && 'gf-chip--on']"
+                    title="Show everyone" @click="graphFilter = new Set()">
+              Everyone
+            </button>
+            <button v-for="p in store.people" :key="p.person_id"
+                    :class="['gf-chip', graphFilter.has(p.person_id) && 'gf-chip--on']"
+                    :title="`Show only ${p.display_name}`"
+                    @click="toggleGraphPerson(p.person_id)">
+              {{ p.display_name }}
+            </button>
+          </div>
           <BrainGraph
             :people="store.people"
             :skills="skills"
             :facts="graphFacts"
+            :only-people="graphFilterList"
             @open="onGraphOpen"
           />
         </section>
@@ -1040,6 +1056,22 @@ async function applySkillProposal(): Promise<void> {
 interface GraphFact { person_id: string; key: string; value: string }
 const graphFacts = ref<GraphFact[]>([])
 
+// U214: which people the graph is narrowed to. Empty = everyone. A Set (not a
+// single id) so you can compare two people side by side — the interesting view
+// is usually "these two", not "only this one".
+const graphFilter = ref<Set<string>>(new Set())
+
+// A stable array identity: `[...graphFilter]` inline would be a NEW array on
+// every re-render of this panel, retriggering the graph's watcher and resetting
+// the force layout — the constellation would visibly jump for unrelated reasons.
+const graphFilterList = computed(() => [...graphFilter.value])
+
+function toggleGraphPerson(personId: string): void {
+  const next = new Set(graphFilter.value)
+  next.has(personId) ? next.delete(personId) : next.add(personId)
+  graphFilter.value = next          // replace, so the template re-renders
+}
+
 async function selectGraph(): Promise<void> {
   selected.value = '_graph'
   // Collect facts across people for the constellation (small N — fine).
@@ -1312,6 +1344,14 @@ onMounted(async () => {
   font-size: 1rem; font-weight: 700; overflow: hidden;
 }
 .hero-avatar-img { width: 100%; height: 100%; object-fit: cover; }
+.gf-bar { display: flex; flex-wrap: wrap; gap: 0.3rem; padding: 0 0 0.5rem; }
+.gf-chip {
+  background: var(--surface); color: var(--text-muted);
+  border: 1px solid var(--border-strong); border-radius: 999px;
+  padding: 0.18rem 0.6rem; font-size: 0.74rem; cursor: pointer;
+}
+.gf-chip:hover { color: var(--text); border-color: var(--accent); }
+.gf-chip--on { background: var(--accent); color: var(--accent-contrast, #fff); border-color: var(--accent); }
 .hero-avatar-wrap { position: relative; flex-shrink: 0; }
 .hero-avatar-edit {
   position: absolute; right: -2px; bottom: -2px;

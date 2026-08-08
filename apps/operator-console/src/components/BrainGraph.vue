@@ -24,6 +24,7 @@
 /** U75: Obsidian-style graph over the brain — people, skills and facts as a
  *  force-directed constellation. Pure canvas, no dependencies. */
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { filterGraph } from '../lib/graphFilter'
 
 interface GNode {
   id: string; label: string; kind: 'person' | 'skill' | 'fact' | 'topic'
@@ -35,6 +36,8 @@ const props = defineProps<{
   people: { person_id: string; display_name: string }[]
   skills: { name: string; description: string; person: string; body: string }[]
   facts: { person_id: string; key: string; value: string }[]
+  // U214: narrow the constellation to these person ids. Empty = everyone.
+  onlyPeople?: string[]
 }>()
 const emit = defineEmits<{ (e: 'open', kind: string, id: string): void }>()
 
@@ -71,15 +74,22 @@ function buildGraph(w: number, h: number): void {
     idx.set(`${kind}:${id.toLowerCase()}`, i)
     return i
   }
-  for (const p of props.people) add(p.person_id, p.display_name, 'person', 16)
-  for (const sk of props.skills) add(sk.name, sk.name, 'skill', 9)
-  for (const f of props.facts) add(`${f.person_id}:${f.key}`, `${f.key}: ${f.value}`, 'fact', 4)
+  // U214: narrow to the selected people (see lib/graphFilter). Topics are added
+  // below only when a surviving fact links to them, so they filter themselves.
+  const { people, skills, facts } = filterGraph(
+    { people: props.people, skills: props.skills, facts: props.facts },
+    props.onlyPeople ?? [],
+  )
+
+  for (const p of people) add(p.person_id, p.display_name, 'person', 16)
+  for (const sk of skills) add(sk.name, sk.name, 'skill', 9)
+  for (const f of facts) add(`${f.person_id}:${f.key}`, `${f.key}: ${f.value}`, 'fact', 4)
 
   const link = (ka: string, kb: string) => {
     const a = idx.get(ka), b = idx.get(kb)
     if (a !== undefined && b !== undefined) edges.push({ a, b })
   }
-  for (const sk of props.skills) {
+  for (const sk of skills) {
     if (sk.person) link(`skill:${sk.name}`, `person:${sk.person.toLowerCase()}`)
     // [[wikilinks]] in the body connect to people or other skills.
     for (const m of sk.body.matchAll(/\[\[([^\]]+)\]\]/g)) {
@@ -88,12 +98,12 @@ function buildGraph(w: number, h: number): void {
       link(`skill:${sk.name}`, `skill:${t}`)
     }
   }
-  for (const f of props.facts) link(`fact:${f.person_id}:${f.key}`.toLowerCase(), `person:${f.person_id.toLowerCase()}`)
+  for (const f of facts) link(`fact:${f.person_id}:${f.key}`.toLowerCase(), `person:${f.person_id.toLowerCase()}`)
 
   // U105: [[topics]] inside fact values become SHARED nodes — the same topic
   // (or source host, via provenance) across people/facts is one node, so the
   // mined information builds up visibly around each persona.
-  for (const f of props.facts) {
+  for (const f of facts) {
     for (const m of f.value.matchAll(/\[\[([^\]]+)\]\]/g)) {
       const t = m[1].trim()
       const key = t.toLowerCase()
@@ -268,7 +278,7 @@ function resize(): void {
   buildGraph(c.width, c.height)
 }
 
-watch(() => [props.people, props.skills, props.facts], resize, { deep: true })
+watch(() => [props.people, props.skills, props.facts, props.onlyPeople], resize, { deep: true })
 onMounted(() => { resize(); loop(); window.addEventListener('resize', resize) })
 onBeforeUnmount(() => { cancelAnimationFrame(raf); window.removeEventListener('resize', resize) })
 </script>
