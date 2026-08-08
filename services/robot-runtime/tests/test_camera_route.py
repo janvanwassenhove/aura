@@ -107,18 +107,23 @@ async def test_frame_jpg_returns_a_fresh_jpeg() -> None:
         routes.adapter = None
 
 
-async def test_frame_jpg_makes_a_new_frame_per_request() -> None:
-    """The whole point of polling over streaming.
+async def test_frame_jpg_never_serves_from_a_backlog() -> None:
+    """The whole point of polling over streaming — with U219's cache on top.
 
     The MJPEG stream produced frames on a fixed timer whether or not the link
     could carry them; TCP then delayed rather than dropped, so the picture fell
     progressively further behind (measured 0.6s -> 2.5s and still climbing).
-    Here each request grabs the camera itself, so N requests cost N grabs and
-    no frame can ever be served from a backlog.
+
+    U219 adds a cache with a TTL SHORTER than one camera frame period, so
+    concurrent clients (video panel + presenter) share one grab+encode instead
+    of making the Pi do the work twice. The anti-backlog guarantee is unchanged:
+    a cached frame is never older than the next frame the camera would produce.
+    Beyond the TTL, every request grabs fresh.
     """
     adapter = FakeRobotAdapter()
     await adapter.connect()
     routes.adapter = adapter
+    routes._ENCODE_CACHE.clear()
     grabs = {"n": 0}
     original = adapter.get_camera_frame_jpeg
 
@@ -127,14 +132,22 @@ async def test_frame_jpg_makes_a_new_frame_per_request() -> None:
         return await original()
 
     adapter.get_camera_frame_jpeg = counting_grab   # type: ignore[method-assign]
-    routes.adapter = adapter
     try:
         client = _client()
+        # Five requests inside the TTL: one grab, four served from the cache.
         for _ in range(5):
             assert client.get("/robot/camera/frame.jpg").status_code == 200
-        assert grabs["n"] == 5
+        assert grabs["n"] == 1
+
+        # Past the TTL, the camera is asked again — no stale frame lingers.
+        import time as _t
+        _t.sleep(routes._CACHE_TTL_S + 0.02)
+        assert client.get("/robot/camera/frame.jpg").status_code == 200
+        assert grabs["n"] == 2
     finally:
         routes.adapter = None
+        routes._ENCODE_CACHE.clear()
+
 
 
 async def test_frame_jpg_is_downscaled_like_the_stream() -> None:

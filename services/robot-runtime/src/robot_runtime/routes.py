@@ -400,21 +400,15 @@ def downscale_jpeg(jpeg: bytes, width: int, quality: int) -> bytes:
         return jpeg
 
 
-_ENCODE_CACHE: dict[int, tuple[bytes, bytes]] = {}   # width -> (src_key, encoded)
-
-
-def _src_key(jpeg: bytes) -> bytes:
-    """Cheap identity for a source frame: its length + head/tail bytes.
-
-    U219 (P2): downscale_jpeg ran per REQUEST. With the video panel and the
-    presenter open (~20 req/s) the Pi re-encoded the same frame many times —
-    roughly a whole core spent redoing work, since the camera only produces
-    CAMERA_STREAM_FPS distinct frames. Hashing the whole frame would cost what
-    we're trying to save, so key on length + edges: different frames virtually
-    never collide, and a repeat of the SAME frame always hits.
-    """
-    return bytes([len(jpeg) & 0xFF, (len(jpeg) >> 8) & 0xFF, (len(jpeg) >> 16) & 0xFF]) \
-        + jpeg[:32] + jpeg[-32:]
+# U219 (P2): width -> (encoded_bytes, produced_at). A TIME cache, not a
+# content cache. The first attempt keyed on the source frame's identity, but
+# every request grabs its own frame BEFORE the lookup — so the key always
+# differed and it never hit once (measured: 0/14 sequential, 0/3 concurrent).
+# Short-circuiting on age skips the grab AND the re-encode, which is where the
+# cost actually is. The TTL stays under one frame period (~83 ms at 12 fps), so
+# a cached frame is never older than the next one the camera would have given.
+_ENCODE_CACHE: dict[int, tuple[bytes, float]] = {}
+_CACHE_TTL_S = float(os.environ.get("CAMERA_CACHE_TTL_S", "0.06"))
 
 
 @router.get("/robot/camera/frame.jpg")
@@ -429,27 +423,32 @@ async def camera_frame_jpeg(width: int = 0) -> Response:
     (measured: 0.22-0.28s, flat). Fewer frames, but each one is now.
     """
     import asyncio
+    import time
 
     assert adapter is not None
     _touch()
+
+    # U219 (P1): `width` lets perception ask for a sharper frame than the live
+    # view without a second endpoint — the live view stays at CAMERA_STREAM_WIDTH.
+    target = width if width > 0 else _STREAM_WIDTH
+
+    # P2: answer from the recent-frame cache BEFORE touching the camera, so
+    # concurrent clients (video panel + presenter) cost one grab+encode, not two.
+    cached = _ENCODE_CACHE.get(target)
+    if cached is not None and (time.monotonic() - cached[1]) < _CACHE_TTL_S:
+        return Response(content=cached[0], media_type="image/jpeg",
+                        headers={"Cache-Control": "no-store"})
+
     grab = getattr(adapter, "get_camera_frame_jpeg", None)
     try:
         jpeg = await grab() if grab else await adapter.get_camera_frame()
     except RuntimeError as exc:
         return JSONResponse({"error": str(exc)}, status_code=503)
 
-    # U219 (P1): `width` lets perception ask for a sharper frame than the live
-    # view without a second endpoint — the live view stays at CAMERA_STREAM_WIDTH.
-    target = width if width > 0 else _STREAM_WIDTH
-    key = _src_key(jpeg)
-    cached = _ENCODE_CACHE.get(target)
-    if cached is not None and cached[0] == key:
-        jpeg = cached[1]                       # same source frame → reuse (P2)
-    else:
-        jpeg = await asyncio.to_thread(downscale_jpeg, jpeg, target, _STREAM_QUALITY)
-        _ENCODE_CACHE[target] = (key, jpeg)
-        if len(_ENCODE_CACHE) > 4:             # a handful of widths at most
-            _ENCODE_CACHE.pop(next(iter(_ENCODE_CACHE)))
+    jpeg = await asyncio.to_thread(downscale_jpeg, jpeg, target, _STREAM_QUALITY)
+    _ENCODE_CACHE[target] = (jpeg, time.monotonic())
+    if len(_ENCODE_CACHE) > 4:                  # a handful of widths at most
+        _ENCODE_CACHE.pop(next(iter(_ENCODE_CACHE)))
     return Response(content=jpeg, media_type="image/jpeg",
                     headers={"Cache-Control": "no-store"})
 
