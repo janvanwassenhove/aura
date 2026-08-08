@@ -98,8 +98,23 @@ class RobotClient:
         return (await self._request("POST", "/robot/mode", {"mode": mode})).json().get("mode", "")
 
     async def camera_frame(self) -> bytes:
-        """One PNG frame from the robot's camera (U18 perception loop)."""
-        return (await self._request("GET", "/robot/camera/frame")).content
+        """One camera frame for perception — JPEG bytes.
+
+        U219 (P1): this used /robot/camera/frame, which made the robot transcode
+        its JPEG to PNG purely because an old docstring said "contract says PNG".
+        Measured on the real robot: **1637 ms and 1.2 MB per frame**, on a 2 s
+        perception interval — so the Pi spent most of every cycle producing a
+        format nothing wanted. Every consumer (the embedder's PIL.Image.open,
+        the gesture detector, the avatar encoder) reads JPEG identically.
+
+        Perception asks for a WIDER frame than the live view: a face across the
+        room survives 960 px where it can be lost at 640.
+        """
+        import os
+
+        width = int(os.environ.get("PERCEPTION_WIDTH", "960"))
+        return (await self._request(
+            "GET", f"/robot/camera/frame.jpg?width={width}")).content
 
     async def aim(self, yaw: float = 0.0, pitch: float = 0.0,
                   body_yaw: float | None = None) -> dict:

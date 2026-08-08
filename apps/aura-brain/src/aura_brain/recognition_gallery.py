@@ -73,8 +73,17 @@ class RecognitionGallery:
             return None
         self._last_capture[person_id] = now
         ring = self._by_person.setdefault(person_id, deque(maxlen=self._per_person))
+        # U219 (P4): keep a 640 px copy, not the full frame. Six full frames per
+        # person used to sit in RAM for the process lifetime (~12 MB/person with
+        # the old 2 MB PNGs); the only consumer, mark_wrong, never needed full
+        # resolution. Falls back to the original if the resize fails — a smaller
+        # picture is an optimisation, never a reason to lose the snapshot.
+        try:
+            frame_small = _thumbnail(frame_png, width=640)
+        except Exception:  # noqa: BLE001
+            frame_small = frame_png
         snap = Snapshot(thumbnail=thumb, confidence=round(confidence, 3),
-                        embedding=embedding, frame=frame_png)
+                        embedding=embedding, frame=frame_small)
         ring.appendleft(snap)
         return snap
 

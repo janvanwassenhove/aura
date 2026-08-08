@@ -11,6 +11,7 @@ CORS single-origin and the robot URL a server-side concern.
 
 from __future__ import annotations
 
+import os
 from typing import Any
 
 import httpx
@@ -261,7 +262,12 @@ _frame_client: httpx.AsyncClient | None = None
 # fixes. `None` = not probed yet, True/False = robot has /camera/frame.jpg.
 _robot_has_frame_jpg: bool | None = None
 
-_LATEST: dict[str, Any] = {"jpeg": b"", "task": None}
+_LATEST: dict[str, Any] = {"jpeg": b"", "task": None, "jpg": b"", "at": 0.0}
+
+# U219: how long a fetched frame may be reused by a concurrent caller. Kept well
+# under the robot's frame interval (~83 ms at 12 fps) so this never shows an
+# older picture than a direct fetch would have.
+_FRESH_S = float(os.environ.get("CAMERA_SHARE_TTL_S", "0.08"))
 
 _FALLBACK_WIDTH = 640
 _FALLBACK_QUALITY = 70
@@ -365,6 +371,17 @@ async def camera_frame_jpeg() -> Response:
     """
     global _robot_has_frame_jpg
     import asyncio
+    import time
+
+    # U219: a very short shared cache. The video panel and the presenter view
+    # poll this independently, so every displayed frame cost TWO robot hops over
+    # WiFi (~130 ms each). Within one frame period they now share the same fetch:
+    # no extra staleness (the TTL is shorter than the robot's frame interval),
+    # half the WiFi traffic, and the second caller is served instantly.
+    now = time.monotonic()
+    if _LATEST["jpg"] and (now - _LATEST["at"]) < _FRESH_S:
+        return Response(content=_LATEST["jpg"], media_type="image/jpeg",
+                        headers={"Cache-Control": "no-store"})
 
     if _robot_has_frame_jpg is not False:
         try:
@@ -377,6 +394,8 @@ async def camera_frame_jpeg() -> Response:
         else:
             if resp.status_code == 200:
                 _robot_has_frame_jpg = True
+                _LATEST["jpg"] = resp.content
+                _LATEST["at"] = time.monotonic()
                 return Response(content=resp.content, media_type="image/jpeg",
                                 headers={"Cache-Control": "no-store"})
             if resp.status_code == 404:

@@ -400,8 +400,25 @@ def downscale_jpeg(jpeg: bytes, width: int, quality: int) -> bytes:
         return jpeg
 
 
+_ENCODE_CACHE: dict[int, tuple[bytes, bytes]] = {}   # width -> (src_key, encoded)
+
+
+def _src_key(jpeg: bytes) -> bytes:
+    """Cheap identity for a source frame: its length + head/tail bytes.
+
+    U219 (P2): downscale_jpeg ran per REQUEST. With the video panel and the
+    presenter open (~20 req/s) the Pi re-encoded the same frame many times —
+    roughly a whole core spent redoing work, since the camera only produces
+    CAMERA_STREAM_FPS distinct frames. Hashing the whole frame would cost what
+    we're trying to save, so key on length + edges: different frames virtually
+    never collide, and a repeat of the SAME frame always hits.
+    """
+    return bytes([len(jpeg) & 0xFF, (len(jpeg) >> 8) & 0xFF, (len(jpeg) >> 16) & 0xFF]) \
+        + jpeg[:32] + jpeg[-32:]
+
+
 @router.get("/robot/camera/frame.jpg")
-async def camera_frame_jpeg() -> Response:
+async def camera_frame_jpeg(width: int = 0) -> Response:
     """U195: one downscaled JPEG, made at request time — the live-view source.
 
     The MJPEG stream pushes at a fixed rate whether or not the link can carry
@@ -420,8 +437,19 @@ async def camera_frame_jpeg() -> Response:
         jpeg = await grab() if grab else await adapter.get_camera_frame()
     except RuntimeError as exc:
         return JSONResponse({"error": str(exc)}, status_code=503)
-    jpeg = await asyncio.to_thread(
-        downscale_jpeg, jpeg, _STREAM_WIDTH, _STREAM_QUALITY)
+
+    # U219 (P1): `width` lets perception ask for a sharper frame than the live
+    # view without a second endpoint — the live view stays at CAMERA_STREAM_WIDTH.
+    target = width if width > 0 else _STREAM_WIDTH
+    key = _src_key(jpeg)
+    cached = _ENCODE_CACHE.get(target)
+    if cached is not None and cached[0] == key:
+        jpeg = cached[1]                       # same source frame → reuse (P2)
+    else:
+        jpeg = await asyncio.to_thread(downscale_jpeg, jpeg, target, _STREAM_QUALITY)
+        _ENCODE_CACHE[target] = (key, jpeg)
+        if len(_ENCODE_CACHE) > 4:             # a handful of widths at most
+            _ENCODE_CACHE.pop(next(iter(_ENCODE_CACHE)))
     return Response(content=jpeg, media_type="image/jpeg",
                     headers={"Cache-Control": "no-store"})
 

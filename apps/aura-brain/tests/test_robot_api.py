@@ -137,10 +137,16 @@ def _reset_camera_probe():
     robot_api._robot_has_frame_jpg = None
     robot_api._LATEST["jpeg"] = b""
     robot_api._LATEST["task"] = None
+    # U219: the shared short-TTL frame cache is module state too — leaving it
+    # populated would let one test's frame answer the next test's request.
+    robot_api._LATEST["jpg"] = b""
+    robot_api._LATEST["at"] = 0.0
     yield
     robot_api._robot_has_frame_jpg = None
     robot_api._LATEST["jpeg"] = b""
     robot_api._LATEST["task"] = None
+    robot_api._LATEST["jpg"] = b""
+    robot_api._LATEST["at"] = 0.0
 
 
 async def test_frame_jpg_prefers_the_robots_own_endpoint(monkeypatch) -> None:
