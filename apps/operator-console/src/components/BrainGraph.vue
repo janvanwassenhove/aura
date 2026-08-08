@@ -191,12 +191,30 @@ function draw(): void {
   }
 }
 
+// U217: once the force sim has settled (ticks >= 260) the old loop kept
+// repainting at 60 fps forever — and draw() sets shadowBlur per node, the most
+// expensive canvas-2D primitive, so a docked graph left on-screen burned ~30-100%
+// of a core doing nothing. Now the loop stops rescheduling once settled; any
+// interaction (pan/zoom/hover/rebuild) calls redraw() to resume.
 function loop(): void {
   const c = canvas.value
   if (!c) return
-  if (ticks < 260) { step(c.width, c.height); ticks++ }
-  draw()
-  raf = requestAnimationFrame(loop)
+  if (ticks < 260) {
+    step(c.width, c.height); ticks++
+    draw()
+    raf = requestAnimationFrame(loop)
+  } else {
+    draw()            // final frame, then idle
+    raf = 0
+  }
+}
+
+/** Repaint once (interaction), restarting the loop only if the sim is still
+ *  running. Cheap when settled: a single draw(), no rAF churn. */
+function redraw(): void {
+  if (raf) return                       // a loop is already scheduling frames
+  if (ticks < 260) { raf = requestAnimationFrame(loop) }
+  else draw()
 }
 
 function nodeAt(sx: number, sy: number): GNode | null {
@@ -224,11 +242,13 @@ function onMove(ev: MouseEvent): void {
     view.oy = drag.oy + dy
     hover.value = null
     canvas.value!.style.cursor = 'grabbing'
+    redraw()
     return
   }
   const n = nodeAt(mx, my)
   hover.value = n ? { x: mx, y: my, label: n.label, kind: n.kind } : null
   canvas.value!.style.cursor = n ? 'pointer' : 'grab'
+  redraw()
 }
 
 function onUp(ev: MouseEvent): void {
@@ -252,6 +272,7 @@ function zoomAt(sx: number, sy: number, factor: number): void {
   view.ox = sx - (sx - view.ox) * (newScale / view.scale)
   view.oy = sy - (sy - view.oy) * (newScale / view.scale)
   view.scale = newScale
+  redraw()
 }
 
 function onWheel(ev: WheelEvent): void {
@@ -268,6 +289,7 @@ function resetView(): void {
   view.scale = 1
   view.ox = 0
   view.oy = 0
+  redraw()
 }
 
 function resize(): void {
@@ -275,11 +297,12 @@ function resize(): void {
   if (!c || !c.parentElement) return
   c.width = c.parentElement.clientWidth
   c.height = Math.max(360, c.parentElement.clientHeight - 30)
-  buildGraph(c.width, c.height)
+  buildGraph(c.width, c.height)   // resets ticks → 0
+  redraw()                        // restart the sim loop for the fresh layout
 }
 
 watch(() => [props.people, props.skills, props.facts, props.onlyPeople], resize, { deep: true })
-onMounted(() => { resize(); loop(); window.addEventListener('resize', resize) })
+onMounted(() => { resize(); window.addEventListener('resize', resize) })
 onBeforeUnmount(() => { cancelAnimationFrame(raf); window.removeEventListener('resize', resize) })
 </script>
 

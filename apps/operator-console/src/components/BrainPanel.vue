@@ -1074,16 +1074,19 @@ function toggleGraphPerson(personId: string): void {
 
 async function selectGraph(): Promise<void> {
   selected.value = '_graph'
-  // Collect facts across people for the constellation (small N — fine).
+  // U217: one /knowledge/export call for all facts, instead of N sequential
+  // inspectPerson round-trips that ALSO clobbered store.detail (which fired the
+  // three person watchers N times and left the person panel pointing at whoever
+  // was last in the list). One request, zero side effects.
   const all: GraphFact[] = []
-  for (const p of store.people) {
-    try {
-      await store.inspectPerson(p.person_id)
-      for (const f of store.detail?.facts ?? []) {
-        all.push({ person_id: p.person_id, key: f.key, value: f.value })
-      }
-    } catch { /* locked or gone */ }
-  }
+  try {
+    const dump = await store.exportBrain() as { people?: { person?: { person_id?: string }; facts?: { key: string; value: string }[] }[] } | null
+    for (const entry of dump?.people ?? []) {
+      const pid = entry.person?.person_id
+      if (!pid) continue
+      for (const f of entry.facts ?? []) all.push({ person_id: pid, key: f.key, value: f.value })
+    }
+  } catch { /* locked or brain down — show people/skills without facts */ }
   graphFacts.value = all
 }
 
