@@ -839,6 +839,30 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
+    # U215: CORS only stops BROWSERS; it does nothing against a rebinding attack
+    # (which becomes same-origin) or a non-browser client. Two server-side guards:
+    #   - TrustedHost: reject any Host header that isn't loopback, so a DNS
+    #     rebind (evil.com → 127.0.0.1) is refused at the door.
+    #   - Origin guard: reject state-changing methods carrying a cross-origin
+    #     Origin. Requests with no Origin (curl, server-to-server) pass — they
+    #     are not browser-CSRF vectors — and the console's own Origin is allowed.
+    from starlette.middleware.trustedhost import TrustedHostMiddleware
+
+    allowed_hosts = [h.strip() for h in os.environ.get(
+        "ALLOWED_HOSTS", "localhost,127.0.0.1,testserver").split(",") if h.strip()]
+    app.add_middleware(TrustedHostMiddleware, allowed_hosts=allowed_hosts)
+
+    _origin_ok = set(origins)
+
+    @app.middleware("http")
+    async def _origin_guard(request, call_next):
+        if request.method in ("POST", "PUT", "DELETE", "PATCH"):
+            origin = request.headers.get("origin")
+            if origin and "*" not in _origin_ok and origin not in _origin_ok:
+                from fastapi.responses import JSONResponse as _JR
+                return _JR({"error": "cross-origin request refused"}, status_code=403)
+        return await call_next(request)
+
     @app.get("/health")
     async def health() -> JSONResponse:
         return JSONResponse({"status": "ok", "service": "aura-brain", "phase": "1-scaffold"})
@@ -947,7 +971,12 @@ def run() -> None:
 
     uvicorn.run(
         "aura_brain.main:app",
-        host="0.0.0.0",
+        # U215: loopback by default — the brain has NO auth on any endpoint, and
+        # binding 0.0.0.0 exposed the owner's knowledge, OAuth tokens and a
+        # remote-code-execution chain to anyone on the same WiFi. The console
+        # runs on the same machine (localhost), so loopback loses nothing. Only
+        # a deliberate HOST=0.0.0.0 (with auth added first) reopens it.
+        host=os.environ.get("HOST", "127.0.0.1"),
         port=int(os.environ.get("PORT", 8000)),
         reload=os.environ.get("RELOAD", "false").lower() == "true",
     )

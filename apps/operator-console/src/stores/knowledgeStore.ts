@@ -219,7 +219,11 @@ export const useKnowledgeStore = defineStore('knowledge', () => {
       const resp = await fetch(`${BRAIN_URL}/recognition/merge`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ from_person_id: fromPersonId, to_person_id: toPersonId }),
+        // U215: merge erases the source profile, so the brain now requires the
+        // source id echoed back as confirmation. The console already puts an
+        // explicit confirm() in front of this (assignGuest), so send it.
+        body: JSON.stringify({ from_person_id: fromPersonId, to_person_id: toPersonId,
+                               confirm: fromPersonId }),
       })
       if (!resp.ok) {
         error.value = (await resp.json().catch(() => ({}))).error ?? `merge failed (${resp.status})`

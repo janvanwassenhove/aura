@@ -178,6 +178,15 @@ async def merge_person(body: dict) -> JSONResponse:
                             status_code=422)
     if _store is not None and await _store.get_person(target) is None:
         return JSONResponse({"error": f"unknown person {target!r}"}, status_code=404)
+    # U215: merge ERASES the source profile (delete_person below), yet unlike
+    # forget_person it had no confirmation — a one-line request could wipe a
+    # person. Require the caller to echo the source id, so it can't fire from a
+    # stray/forged request.
+    if str((body or {}).get("confirm", "")).strip().lower() != source:
+        return JSONResponse(
+            {"error": "merge erases the source profile — resend with "
+                      f"confirm={source!r} to proceed", "needs_confirm": source},
+            status_code=428)
 
     moved = _matcher.transfer(source, target)
     if _store is not None:

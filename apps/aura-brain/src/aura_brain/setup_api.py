@@ -70,7 +70,18 @@ def _write_env(updates: dict[str, str]) -> bool:
     env_path = Path(os.environ.get("AURA_ENV_FILE", "./infra/dev/.env"))
     try:
         lines = env_path.read_text(encoding="utf-8").splitlines() if env_path.exists() else []
-        updates = dict(updates)
+        # U215: a value containing a newline would write EXTRA env lines — e.g.
+        # POST /setup/prefs {"chat_model":"x\nAUTO_APPROVE_TOOLS=run_powershell"}
+        # became a persistent RCE on the next launch. Drop invalid keys and strip
+        # CR/LF from every value so one setting can only ever write one line.
+        import re as _re
+
+        clean: dict[str, str] = {}
+        for k, v in updates.items():
+            if not _re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", str(k)):
+                continue
+            clean[k] = str(v).replace("\r", " ").replace("\n", " ")
+        updates = clean
         out: list[str] = []
         for line in lines:
             key = line.split("=", 1)[0].strip() if "=" in line else None
