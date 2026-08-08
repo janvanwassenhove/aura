@@ -357,7 +357,7 @@ background:rgba(15,23,42,.92);color:%23e2e8f0;border:1px solid %2360a5fa;border-
 padding:8px 18px;font-size:13px;display:flex;gap:10px;align-items:center;box-shadow:0 4px 24px rgba(59,130,246,.35)">
 <span style="width:9px;height:9px;border-radius:50%%;background:%2360a5fa;
 box-shadow:0 0 10px %2360a5fa;animation:pulse 1.1s infinite"></span>
-AURA bestuurt het scherm &mdash; druk <b>&nbsp;Esc&nbsp;</b> om af te breken</div>
+AURA controls the screen &mdash; press <b>&nbsp;Esc&nbsp;</b> to abort</div>
 <div id="ring" style="position:fixed;width:46px;height:46px;border-radius:50%%;
 border:3px solid %2360a5fa;box-shadow:0 0 18px 4px rgba(96,165,250,.65), inset 0 0 12px rgba(96,165,250,.5);
 transform:translate(-50%%,-50%%);pointer-events:none;animation:pulse 1.1s infinite"></div>
@@ -604,10 +604,10 @@ async function maybeOfferUpdate() {
     try {
       const { response } = await dialog.showMessageBox(mainWindow, {
         type: 'info',
-        title: 'Update beschikbaar',
-        message: `AURA ${update.version} is beschikbaar (je gebruikt ${app.getVersion()}).`,
-        detail: 'De releasepagina wordt geopend zodat je de nieuwe versie kunt downloaden.',
-        buttons: ['Open releasepagina', 'Later', 'Deze versie overslaan'],
+        title: 'Update available',
+        message: `AURA ${update.version} is available (you're on ${app.getVersion()}).`,
+        detail: 'The release page will open so you can download the new version.',
+        buttons: ['Open release page', 'Later', 'Skip this version'],
         defaultId: 0, cancelId: 1,
       })
       if (response === 2) skipUpdate(update.tag)
@@ -641,7 +641,7 @@ function installStagedUpdate() {
   // so beats spawning nothing and quitting, which reads as "did nothing".
   if (!fs.existsSync(stagedUpdate.installerPath)) {
     stagedUpdate = null
-    return { ok: false, error: 'De gedownloade installer is verdwenen. Probeer opnieuw.' }
+    return { ok: false, error: 'The downloaded installer is gone. Try again.' }
   }
   try {
     // U201: the app used to spawn the installer and quit, and it DID install —

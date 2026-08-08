@@ -66,14 +66,14 @@
           <input v-model="robotAddr" class="ro-input" placeholder="http://192.168.0.42:8001"
                  aria-label="Robot address" @keydown.enter="saveRobotAddr" />
           <button class="ro-btn" :disabled="!robotAddr.trim() || savingAddr" @click="saveRobotAddr">
-            {{ savingAddr ? 'Testen…' : 'Gebruik dit adres' }}
+            {{ savingAddr ? 'Testing…' : 'Use this address' }}
           </button>
         </div>
         <!-- U200: you cannot type an address you do not know. The brain is on
              the same network, so let it look. -->
         <div class="ro-row">
           <button class="ro-btn ro-btn--ghost" :disabled="scanning" @click="discoverRobot">
-            {{ scanning ? 'Zoeken op het netwerk…' : 'Zoek de robot' }}
+            {{ scanning ? 'Scanning the network…' : 'Find the robot' }}
           </button>
         </div>
         <div v-if="discovered.length" class="ro-found">
@@ -568,11 +568,11 @@ async function discoverRobot(): Promise<void> {
     const body = await r.json()
     discovered.value = body.found ?? []
     if (!discovered.value.length) {
-      addrResult.value = `Niets gevonden op ${body.scanned} adressen. `
-        + 'Staat de robot op hetzelfde netwerk als deze computer?'
+      addrResult.value = `Nothing found across ${body.scanned} addresses. `
+        + 'Is the robot on the same network as this computer?'
     }
   } catch {
-    addrResult.value = 'Zoeken is niet gelukt.'
+    addrResult.value = 'Scan failed.'
   } finally { scanning.value = false }
 }
 
@@ -587,12 +587,12 @@ async function saveRobotAddr(): Promise<void> {
       body: JSON.stringify({ url: robotAddr.value.trim() }),
     })
     const body = await r.json().catch(() => null)
-    if (!r.ok) { addrResult.value = body?.error ?? 'Opslaan mislukt.'; return }
+    if (!r.ok) { addrResult.value = body?.error ?? 'Could not save.'; return }
     robotAddr.value = body.url
-    addrResult.value = body.reachable ? 'Verbonden.' : body.detail
+    addrResult.value = body.reachable ? 'Connected.' : body.detail
     if (body.reachable) await syncRobotStatus()
   } catch {
-    addrResult.value = 'De brain reageerde niet.'
+    addrResult.value = 'The brain did not respond.'
   } finally { savingAddr.value = false }
 }
 

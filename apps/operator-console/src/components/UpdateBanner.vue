@@ -3,9 +3,9 @@
        owner is interrupted once and installing costs one click and a few
        seconds — not a modal that shows up first and downloads afterwards. -->
   <div v-if="ready" class="upd-bar" role="status">
-    <span class="upd-text">Versie {{ ready.version }} staat klaar om te installeren.</span>
+    <span class="upd-text">Version {{ ready.version }} is ready to install.</span>
     <button class="upd-btn upd-btn--go" :disabled="installing" @click="install">
-      {{ installing ? 'AURA sluit af en komt terug…' : 'Herstarten &amp; installeren' }}
+      {{ installing ? 'AURA will close and come back…' : 'Restart &amp; install' }}
     </button>
     <button class="upd-btn" :disabled="installing" @click="later">Later</button>
     <span v-if="error" class="upd-err">{{ error }}</span>
@@ -37,7 +37,7 @@ async function install() {
   const r = await aura.installUpdate()
   // On success the app is replaced and quits; only a failure gets this far.
   if (!r?.ok) {
-    error.value = r?.error || 'Installeren is niet gelukt.'
+    error.value = r?.error || 'Install failed.'
     installing.value = false
   }
 }

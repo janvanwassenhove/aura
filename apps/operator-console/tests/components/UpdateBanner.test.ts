@@ -35,7 +35,7 @@ describe('UpdateBanner', () => {
     announce({ version: '2.1.0', tag: 'v2.1.0' })
     await w.vm.$nextTick()
     expect(w.text()).toContain('2.1.0')
-    expect(w.text()).toContain('staat klaar om te installeren')
+    expect(w.text()).toContain('is ready to install')   // U223: one language
   })
 
   it('installs on click', async () => {
@@ -49,14 +49,14 @@ describe('UpdateBanner', () => {
 
   it('shows why it failed instead of quietly doing nothing', async () => {
     const { announce } = stubBridge({
-      installUpdate: vi.fn(async () => ({ ok: false, error: 'installer ontbreekt' })),
+      installUpdate: vi.fn(async () => ({ ok: false, error: 'installer missing' })),
     })
     const w = mount(UpdateBanner)
     announce({ version: '2.1.0', tag: 'v2.1.0' })
     await w.vm.$nextTick()
     await w.find('.upd-btn--go').trigger('click')
     await new Promise(r => setTimeout(r))
-    expect(w.text()).toContain('installer ontbreekt')
+    expect(w.text()).toContain('installer missing')
     // Still usable: a failed install must not leave the button dead.
     expect((w.find('.upd-btn--go').element as HTMLButtonElement).disabled).toBe(false)
   })

@@ -52,6 +52,8 @@
               <span class="rail-label">{{ p.display_name }}</span>
               <span :class="['rail-role', `rail-role--${p.role}`]">{{ p.role }}</span>
             </button>
+            <p v-if="store.loading && !store.people.length" class="rail-hint">Loading people…</p>
+            <p v-else-if="!store.people.length" class="rail-hint">No people yet — add one below.</p>
           </div>
           <!-- U119: fixed footer — add person / unlock -->
           <div v-if="store.locked" class="rail-unlock">
@@ -298,6 +300,14 @@
             </div>
           </div>
           <p v-if="editMsg" class="hero-edit-msg">{{ editMsg }}</p>
+          <p v-if="forgetError" class="hero-edit-msg" role="alert">{{ forgetError }}</p>
+          <ConfirmDialog
+            v-if="confirmForget"
+            :title="`Forget ${store.detail.person.display_name}?`"
+            body="This erases their profile and their face. It cannot be undone."
+            confirm-label="Forget" danger
+            @confirm="reallyForget" @cancel="confirmForget = false"
+          />
           <!-- U189: an auto-created guest needs three obvious next steps:
                name them, assign them to someone you already know, or forget. -->
           <div v-if="store.detail.person.role === 'guest'" class="guest-actions">
@@ -474,6 +484,7 @@ import {
   MoreHorizontal, Pencil, ScanFace, Share2, ShieldAlert, ShieldCheck, Sparkles, Twitter, X,
 } from 'lucide-vue-next'
 import BrainGraph from './BrainGraph.vue'
+import ConfirmDialog from './ConfirmDialog.vue'
 import WikiText from './WikiText.vue'
 import { useKnowledgeStore } from '../stores/knowledgeStore'
 import { useNavStore } from '../stores/navStore'
@@ -696,11 +707,23 @@ async function assignGuest(): Promise<void> {
   } finally { guestBusy.value = false }
 }
 
-async function doForget() {
+// U223: the most destructive action in the app (erases a profile AND their
+// face) used to sit behind a native confirm() — unthemed and inconsistent with
+// the styled approval prompt this app already has.
+const confirmForget = ref(false)
+const forgetError = ref('')
+
+function doForget() {
   if (!store.detail) return
-  if (!confirm(`Forget ${store.detail.person.display_name}? This erases their profile and face.`)) return
+  forgetError.value = ''
+  confirmForget.value = true
+}
+
+async function reallyForget() {
+  confirmForget.value = false
+  if (!store.detail) return
   const ok = await store.forgetPerson(store.detail.person.person_id)
-  if (!ok) { alert(store.error ?? 'Could not delete this person.'); return }
+  if (!ok) { forgetError.value = store.error ?? 'Could not delete this person.'; return }
   selected.value = '_skills'
 }
 async function lockKnowledge() {

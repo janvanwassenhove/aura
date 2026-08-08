@@ -112,8 +112,8 @@
 }
 :root,
 :root[data-accent='green'] {
-  --accent: #16a34a;
-  --accent-hover: #15803d;
+  --accent: #15803d;  /* U223: was #16a34a (3.34:1 on white, fails AA) */
+  --accent-hover: #166534;
   --accent-soft: #86efac;
   --accent-border: #4ade80;
   --on-accent: #ffffff;
@@ -126,8 +126,8 @@
   --on-accent: #ffffff;
 }
 :root[data-accent='amber'] {
-  --accent: #d97706;
-  --accent-hover: #b45309;
+  --accent: #b45309;  /* U223: was #d97706 (3.19:1 on white, fails AA) */
+  --accent-hover: #92400e;
   --accent-soft: #fcd34d;
   --accent-border: #fbbf24;
   --on-accent: #ffffff;
