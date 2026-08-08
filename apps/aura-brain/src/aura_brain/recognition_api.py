@@ -60,6 +60,17 @@ async def status() -> JSONResponse:
 async def enroll(body: dict) -> JSONResponse:
     if _matcher is None or _embedder is None or _robot is None:
         return JSONResponse({"error": "recognition disabled"}, status_code=503)
+    # U213: a NullEmbedder means the recognition model isn't installed on this
+    # machine. Without this check the loop below captures 0 faces and reports
+    # "no face in frame — look straight at the robot", which sends the owner
+    # chasing a positioning problem that doesn't exist. Say the real thing.
+    if getattr(_embedder, "name", "") == "null":
+        return JSONResponse(
+            {"error": "Face recognition isn't installed on this machine, so a "
+                      "face can't be learned. Reinstall/repair AURA with the "
+                      "recognition components, then try again.",
+             "reason": "embedder_unavailable"},
+            status_code=503)
     person_id = (body or {}).get("person_id", "")
     if not person_id:
         return JSONResponse({"error": "person_id is required"}, status_code=422)

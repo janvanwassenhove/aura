@@ -356,9 +356,12 @@ export const useKnowledgeStore = defineStore('knowledge', () => {
         body: JSON.stringify({ person_id: personId }),
       })
       const body = await resp.json().catch(() => ({}))
-      return resp.ok
-        ? `Face learned — the robot now recognizes ${body.enrolled}.`
-        : (body.error ?? `Enrollment failed (${resp.status})`)
+      if (!resp.ok) return body.error ?? `Enrollment failed (${resp.status})`
+      // U213: confirm detection concretely — how many angles were captured and
+      // whether a re-check recognised the person — instead of a bare "learned".
+      const n = body.samples ?? 0
+      const check = body.ok ? ' Re-check confirmed.' : ''
+      return `✓ Face detected — learned ${body.enrolled} (${n} sample${n === 1 ? '' : 's'}).${check}`
     } catch {
       return 'Could not reach the brain.'
     }

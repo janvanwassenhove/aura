@@ -169,7 +169,11 @@ function hasUv() {
 //   2 = sync with the `recognition` extra. Plain `uv sync --all-packages`
 //       actively REMOVES insightface/onnxruntime, so every install ended up
 //       with face recognition inert ("This is me" button gone).
-const BOOTSTRAP_REV = '2'
+//   3 = U213: Pillow is now a CORE aura-brain dep. On installs where the
+//       recognition extra failed to build (no insightface AND no Pillow), the
+//       person avatar / "Take a photo" broke too. Re-sync so the fallback plain
+//       sync still lands Pillow even when the heavy extra can't build.
+const BOOTSTRAP_REV = '3'
 
 async function ensureBootstrap(splashWindow) {
   if (!IS_PACKAGED) return

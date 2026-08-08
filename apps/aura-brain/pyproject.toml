@@ -22,6 +22,12 @@ dependencies = [
     "uvicorn[standard]>=0.29",
     # U36e: multipart uploads for the voice-turn endpoint
     "python-multipart>=0.0.9",
+    # U213: Pillow is CORE, not an extra. Person avatars (U204) and the brain-
+    # side camera downscale (U196) need it, and neither has anything to do with
+    # face recognition — hiding it in the `recognition` extra meant that when
+    # that heavy extra failed to install (insightface/onnxruntime wheels), the
+    # avatar broke too. Small, pure-wheel dependency; always install it.
+    "pillow>=10.0",
 ]
 
 [project.optional-dependencies]
