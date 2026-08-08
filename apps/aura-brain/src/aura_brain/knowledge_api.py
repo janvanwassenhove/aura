@@ -56,6 +56,8 @@ _tier: UnlockTier = UnlockTier.BENIGN
 # fresh start the owner's own profiles are always readable (no confusing
 # "everything vanished" benign wall). Unlock / restart clears this.
 _explicitly_locked: bool = False
+_unlock_fails: int = 0          # U221 (S14): failed unlock attempts
+_unlock_blocked_until: float = 0.0
 
 
 # ------------------------------------------------------------------
@@ -442,11 +444,33 @@ async def unlock_knowledge(body: dict) -> JSONResponse:
     store_omk = getattr(_store, "_omk", None)
     if store_omk is None:
         return JSONResponse({"error": "store has no key"}, status_code=500)
+    # U221 (S14): back off after repeated failures. scrypt costs ~50 ms, which
+    # is no obstacle to an online dictionary attack against an 8-character
+    # minimum — and success hands over every profile and face embedding.
+    import time as _time
+
     from shared_schemas.knowledge import crypto
 
+    global _unlock_fails, _unlock_blocked_until
+    now = _time.monotonic()
+    if now < _unlock_blocked_until:
+        return JSONResponse(
+            {"error": "too many attempts — wait a moment and try again",
+             "retry_after_s": round(_unlock_blocked_until - now, 1)},
+            status_code=429)
+
     salt = os.environ.get("KNOWLEDGE_SALT", "aura-knowledge").encode().ljust(16, b"0")[:16]
-    if crypto.derive_omk(passphrase, salt) != store_omk:
+    # compare_digest, not `!=`: a byte-wise comparison leaks how much of the
+    # derived key was right through its timing.
+    import hmac
+
+    if not hmac.compare_digest(crypto.derive_omk(passphrase, salt), store_omk):
+        _unlock_fails += 1
+        if _unlock_fails >= 5:
+            _unlock_blocked_until = now + min(60.0, 2.0 ** (_unlock_fails - 4))
         return JSONResponse({"error": "wrong passphrase"}, status_code=403)
+    _unlock_fails = 0
+    _unlock_blocked_until = 0.0
     _tier = UnlockTier.SENSITIVE
     _explicitly_locked = False
     return JSONResponse({"tier": _tier, "unlocked": True})

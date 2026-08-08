@@ -196,9 +196,32 @@ async def set_persona(body: dict) -> JSONResponse:
 # Token endpoint (for connector-service)
 # ---------------------------------------------------------------------------
 
+@router.get("/identity/status/{user_id}/{provider}")
+async def get_token_status(user_id: str, provider: str) -> JSONResponse:
+    """U221 (S3): is this provider connected? A boolean — never the token.
+
+    The console only ever checked `resp.ok` on GET /identity/token to colour a
+    connection badge; it never read the body. Shipping a live Microsoft/Google/
+    GitHub access token to the browser to answer "is this connected?" is a
+    needless blast radius (any page or extension in that renderer could take
+    it). This answers the actual question and hands out nothing.
+    """
+    try:
+        token = await get_valid_token(user_id, provider)
+    except HTTPException:
+        raise
+    except Exception:  # noqa: BLE001 — a refresh failure means "not connected"
+        token = None
+    return JSONResponse({"provider": provider, "connected": bool(token)})
+
+
 @router.get("/identity/token/{user_id}/{provider}")
 async def get_token(user_id: str, provider: str) -> JSONResponse:
     """Return a valid access token for (user_id, provider).
+
+    SERVER-SIDE ONLY. The console must use /identity/status instead (U221) —
+    this exists for connector-service, which needs the real token to call the
+    provider's API.
 
     Performs silent refresh if the stored token is near expiry.
     Returns 401 if no token exists or refresh fails (caller should trigger re-auth).

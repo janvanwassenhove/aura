@@ -457,8 +457,31 @@ function createWindow() {
 
   // U170: links with target=_blank (About dialog → mityjohn.com, GitHub) open
   // in the SYSTEM browser — never as a second Electron window.
+  // U221 (S15): the console renders owner- AND agent-supplied content (ingested
+  // source URLs, [[wiki links]]), so "any http(s) URL" meant a link whose href
+  // came from a third-party page could open in the system browser unprompted.
+  // Allow the handful of destinations the app actually links to; anything else
+  // is shown to the owner to approve, rather than silently opened.
+  const EXTERNAL_ALLOW = ['mityjohn.com', 'github.com', 'login.microsoftonline.com',
+                          'accounts.google.com', 'slack.com']
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    if (url.startsWith('http://') || url.startsWith('https://')) shell.openExternal(url)
+    try {
+      const u = new URL(url)
+      if (u.protocol === 'https:' || u.protocol === 'http:') {
+        const host = u.hostname.replace(/^www\./, '')
+        const ok = EXTERNAL_ALLOW.some((d) => host === d || host.endsWith(`.${d}`))
+        if (ok) shell.openExternal(url)
+        else {
+          dialog.showMessageBox(mainWindow, {
+            type: 'question',
+            title: 'Open this link?',
+            message: `Open ${u.hostname} in your browser?`,
+            detail: url.slice(0, 300),
+            buttons: ['Open', 'Cancel'], defaultId: 1, cancelId: 1,
+          }).then(({ response }) => { if (response === 0) shell.openExternal(url) })
+        }
+      }
+    } catch { /* not a URL — never open it */ }
     return { action: 'deny' }
   })
 
@@ -518,7 +541,13 @@ function createWindow() {
         { role: 'quit' },
       ],
     },
-    { label: 'View', submenu: [{ role: 'reload' }, { role: 'toggleDevTools' }, { type: 'separator' }, { role: 'resetZoom' }, { role: 'zoomIn' }, { role: 'zoomOut' }] },
+    // U221 (S15): DevTools is a debugging tool, not a feature — in a packaged
+    // build it mostly serves someone trying to talk the owner into opening it.
+    { label: 'View', submenu: [
+      { role: 'reload' },
+      ...(IS_PACKAGED ? [] : [{ role: 'toggleDevTools' }]),
+      { type: 'separator' }, { role: 'resetZoom' }, { role: 'zoomIn' }, { role: 'zoomOut' },
+    ] },
   ])
   Menu.setApplicationMenu(menu)
 

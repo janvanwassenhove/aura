@@ -86,10 +86,14 @@ export const useConnectionsStore = defineStore('connections', () => {
       if (ps.status !== 'unknown') continue // already known from connector-service
       if (ps.provider === 'music') continue // music status comes from connector health only
       try {
+        // U221: ask whether it's connected, don't fetch the live access token.
+        // This only ever read resp.ok — pulling a real Microsoft/Google/GitHub
+        // token into the browser to colour a badge was gratuitous exposure.
         const resp = await fetch(
-          `${IDENTITY_URL}/identity/token/${userId.value}/${connectorKey[ps.provider]}`,
+          `${IDENTITY_URL}/identity/status/${userId.value}/${connectorKey[ps.provider]}`,
         )
-        ps.status = resp.ok ? 'ok' : 'unauthenticated'
+        const body = resp.ok ? await resp.json().catch(() => null) : null
+        ps.status = body?.connected ? 'ok' : 'unauthenticated'
       } catch {
         ps.status = 'unknown'
       }

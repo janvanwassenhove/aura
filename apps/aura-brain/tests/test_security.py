@@ -126,3 +126,41 @@ def test_merge_requires_confirmation() -> None:
         recognition_api._store = None
 
 
+
+
+# ------------------------------------------------------------------
+# U221: no raw tokens to the browser; unlock is not a free oracle
+# ------------------------------------------------------------------
+
+def test_identity_status_reports_connection_without_the_token() -> None:
+    """S3: the console coloured a badge by fetching a LIVE OAuth token. The
+    status route answers the same question and hands out nothing."""
+    from identity_service import main as ident
+
+    app = FastAPI_app_with(ident)
+    with TestClient(app) as c:
+        r = c.get("/identity/status/default/github")
+        assert r.status_code == 200
+        body = r.json()
+        assert set(body) == {"provider", "connected"}      # no access_token
+        assert body["connected"] is False                  # nothing stored here
+
+
+def test_unlock_backs_off_after_repeated_wrong_passphrases(monkeypatch) -> None:
+    """S14: scrypt's ~50 ms is no obstacle to an online dictionary attack, and
+    success hands over every profile and face embedding."""
+    from aura_brain import knowledge_api as ka
+
+    monkeypatch.setattr(ka, "_omk_loaded", True)
+    monkeypatch.setattr(ka, "_store", type("S", (), {"_omk": b"x" * 32})())
+    monkeypatch.setattr(ka, "_unlock_fails", 0)
+    monkeypatch.setattr(ka, "_unlock_blocked_until", 0.0)
+
+    app = FastAPI_app_with(ka)
+    with TestClient(app) as c:
+        for _ in range(5):
+            assert c.post("/knowledge/unlock", json={"passphrase": "guess"}).status_code == 403
+        # The sixth attempt is refused outright, not merely wrong.
+        r = c.post("/knowledge/unlock", json={"passphrase": "guess"})
+        assert r.status_code == 429
+        assert "retry_after_s" in r.json()
