@@ -25,6 +25,21 @@ import httpx
 from shared_schemas.robot.models import MotionCommand
 
 
+def robot_auth_headers() -> dict[str, str]:
+    """U220 (S5): the shared secret the robot expects, if one is configured.
+
+    One helper rather than a header literal at each call site — the brain talks
+    to the robot from several places (commands, camera proxy, audio stream,
+    address probe) and a forgotten one would look exactly like "the robot is
+    down". Empty dict when no secret is set, so nothing changes until both sides
+    have one.
+    """
+    import os
+
+    secret = os.environ.get("ROBOT_SHARED_SECRET", "").strip()
+    return {"X-AURA-Secret": secret} if secret else {}
+
+
 class RobotClient:
     def __init__(
         self,
@@ -39,11 +54,13 @@ class RobotClient:
         self._timeout = timeout
 
     async def _request(self, method: str, path: str, json: dict | None = None) -> httpx.Response:
+        headers = robot_auth_headers()
         if self._client is not None:
-            resp = await self._client.request(method, path, json=json)
+            resp = await self._client.request(method, path, json=json, headers=headers)
         else:
             async with httpx.AsyncClient(timeout=self._timeout) as client:
-                resp = await client.request(method, f"{self._base_url}{path}", json=json)
+                resp = await client.request(method, f"{self._base_url}{path}",
+                                            json=json, headers=headers)
         resp.raise_for_status()
         return resp
 
@@ -76,7 +93,8 @@ class RobotClient:
                     yield chunk
             return
         timeout = httpx.Timeout(10.0, read=None)  # connect fast, read forever
-        async with httpx.AsyncClient(timeout=timeout) as client:
+        async with httpx.AsyncClient(timeout=timeout,
+                                     headers=robot_auth_headers()) as client:
             async with client.stream("GET", f"{self._base_url}/robot/audio/stream") as resp:
                 resp.raise_for_status()
                 async for chunk in resp.aiter_bytes():

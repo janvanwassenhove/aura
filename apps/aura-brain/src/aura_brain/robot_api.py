@@ -19,6 +19,8 @@ from fastapi import APIRouter, Response
 from fastapi.responses import JSONResponse
 from shared_schemas.robot.models import MotionCommand
 
+from aura_brain.robot_client import robot_auth_headers
+
 router = APIRouter(prefix="/robot", tags=["robot"])
 
 _robot: Any = None  # RobotClient — set by init()
@@ -207,7 +209,7 @@ async def set_address(body: dict) -> JSONResponse:
 
     reachable, detail = True, "saved"
     try:
-        async with httpx.AsyncClient(timeout=5.0) as c:
+        async with httpx.AsyncClient(timeout=5.0, headers=robot_auth_headers()) as c:
             r = await c.get(f"{url}/health")
             reachable = r.status_code == 200
             if not reachable:
@@ -231,7 +233,8 @@ async def camera_stream() -> Response:
     from fastapi.responses import StreamingResponse
 
     base_url = getattr(_robot, "_base_url", "http://robot-runtime:8001")
-    client = httpx.AsyncClient(timeout=httpx.Timeout(10.0, read=None))
+    client = httpx.AsyncClient(timeout=httpx.Timeout(10.0, read=None),
+                               headers=robot_auth_headers())
 
     async def _relay():
         try:
@@ -312,7 +315,8 @@ def _base() -> str:
 def _client() -> httpx.AsyncClient:
     global _frame_client
     if _frame_client is None:
-        _frame_client = httpx.AsyncClient(timeout=httpx.Timeout(5.0))
+        _frame_client = httpx.AsyncClient(timeout=httpx.Timeout(5.0),
+                                          headers=robot_auth_headers())
     return _frame_client
 
 

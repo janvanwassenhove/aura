@@ -97,6 +97,31 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+    # U220 (S5): the Pi listens on 0.0.0.0 — it must, because the brain reaches
+    # it over the LAN — so anyone on the same WiFi could stream the camera and
+    # microphone, and drive the motors. A shared secret closes that without
+    # changing the topology.
+    #
+    # OPT-IN by design: with ROBOT_SHARED_SECRET unset nothing is enforced, so
+    # deploying this can never strand a robot whose brain doesn't know the
+    # secret yet. /health stays open — the brain's discovery scan uses it, and
+    # it reveals only mode/battery, not the camera or mic.
+    secret = os.environ.get("ROBOT_SHARED_SECRET", "").strip()
+    if secret:
+        import hmac
+
+        from fastapi.responses import JSONResponse
+
+        @app.middleware("http")
+        async def _require_secret(request, call_next):
+            if request.url.path not in ("/health", "/docs", "/openapi.json"):
+                given = request.headers.get("x-aura-secret", "")
+                # compare_digest: a plain != leaks the secret one byte at a time
+                # to anyone who can time the response.
+                if not hmac.compare_digest(given, secret):
+                    return JSONResponse({"error": "unauthorized"}, status_code=401)
+            return await call_next(request)
+
     app.include_router(routes.router)
     return app
 
