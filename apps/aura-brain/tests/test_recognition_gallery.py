@@ -141,8 +141,14 @@ async def test_merge_moves_face_and_absorbs_the_guest() -> None:
     app.include_router(recognition_api.router)
     client = TestClient(app)
 
+    # U215: merge erases the source, so it now requires the source id echoed
+    # back as confirmation (guards against a stray/forged one-line call).
+    assert client.post("/recognition/merge",
+                       json={"from_person_id": "guest-1", "to_person_id": "piet"}
+                       ).status_code == 428
     r = client.post("/recognition/merge",
-                    json={"from_person_id": "guest-1", "to_person_id": "piet"})
+                    json={"from_person_id": "guest-1", "to_person_id": "piet",
+                          "confirm": "guest-1"})
 
     assert r.status_code == 200 and r.json()["faces_moved"] == 1
     assert matcher.identify(face)[0] == "piet"        # recognised as Piet now

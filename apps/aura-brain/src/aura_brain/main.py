@@ -848,8 +848,12 @@ def create_app() -> FastAPI:
     #     are not browser-CSRF vectors — and the console's own Origin is allowed.
     from starlette.middleware.trustedhost import TrustedHostMiddleware
 
+    # "aura-brain" is the in-process ASGI base_url the brain uses to call its own
+    # mounted routers (connector/identity seams) — not a network host, but it
+    # still passes through this middleware, so it must be trusted or the brain
+    # 400s its own internal calls. "testserver" is the TestClient default.
     allowed_hosts = [h.strip() for h in os.environ.get(
-        "ALLOWED_HOSTS", "localhost,127.0.0.1,testserver").split(",") if h.strip()]
+        "ALLOWED_HOSTS", "localhost,127.0.0.1,aura-brain,testserver").split(",") if h.strip()]
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=allowed_hosts)
 
     _origin_ok = set(origins)
