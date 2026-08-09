@@ -8,7 +8,11 @@ holds a real spoken conversation, reaches into your mail, calendar, chat and
 tasks, learns how *you* work, and moves like it means it. Everything personal
 is encrypted on your machine and never leaves it.
 
-<!-- screenshots are published with every release: github.com/janvanwassenhove/aura/releases -->
+**[Download the app](https://github.com/janvanwassenhove/aura/releases/latest)** ·
+[Screenshots](https://github.com/janvanwassenhove/aura/releases/latest) (captured
+fresh in CI with every release) ·
+[How it was built](docs/implementation-backlog.md) ·
+[Architecture decisions](docs/adr/)
 
 ### The name is the promise
 
@@ -43,7 +47,7 @@ is encrypted on your machine and never leaves it.
 
 ```
 ┌──────────────── LAPTOP ────────────────┐        ┌──── REACHY (Pi 5) ────┐
-│  aura-brain (:8000)                     │  LAN   │  robot-runtime (:8001) │
+│  aura-brain (:8020, loopback)           │  LAN   │  robot-runtime (:8001) │
 │  orchestrator · conversation · memory · │ ◄────► │  motion · audio I/O ·  │
 │  identity · connectors · knowledge 🔐   │ REST+WS│  offline behavior loop │
 │                                         │        └────────────────────────┘
@@ -181,11 +185,37 @@ Key rules (see [.specify/memory/constitution.md](.specify/memory/constitution.md
 
 ## Status
 
-All software-buildable units are complete and tested (see
-[docs/implementation-backlog.md](docs/implementation-backlog.md)). Remaining
-work needs the physical device: the Reachy SDK adapter (U16), on-Pi camera
-recognition (U18), live Realtime voice (U22/U24), and the on-Pi budget guard
-(U26) — the tested seams for each are in place.
+Running on real hardware. The Reachy adapter, on-Pi camera recognition, live
+voice and the encrypted knowledge layer are all built and verified on the
+physical robot — see [docs/implementation-backlog.md](docs/implementation-backlog.md),
+the build ledger, which records every unit with what was measured, not just
+what was intended.
+
+Honest open items, because a status section that only lists wins is not a
+status section:
+
+- **Full-duplex barge-in is not stable.** Interrupting works; acoustic echo
+  cancellation while the robot is speaking still misfires in a live room.
+- **Screen control is coarse.** It works, but it is closer to scripted UI
+  automation than to something you would trust unattended.
+
+Recent security work is tracked in [docs/audit-2026-08.md](docs/audit-2026-08.md)
+— a full UI/UX, accessibility, performance and security audit, including the
+findings that were wrong on the first attempt.
+
+## Licence
+
+[Apache License 2.0](LICENSE) — use it, fork it, build on it, commercially or
+not; it also grants you a patent licence from the contributors.
+
+Two caveats worth knowing before you build on this:
+
+- **Optional dependencies carry their own terms.** The face-recognition extra
+  pulls in insightface, whose *pretrained models* are published for
+  non-commercial research use. AURA runs fine without that extra (recognition
+  degrades to inert). Check the licence of any model you ship.
+- **The name and the robot are not mine to license.** Reachy Mini is Pollen
+  Robotics' hardware; this project is an independent piece of software for it.
 
 ## Natural voice conversation (U84)
 
