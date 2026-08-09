@@ -81,7 +81,12 @@ export const useSetupStore = defineStore('setup', () => {
     discovering.value = true
     found.value = []
     try {
-      const resp = await fetch(`${BRAIN_URL}/setup/discover`)
+      // U226 (S12): POST — a LAN port-scan must not be triggerable by a plain
+      // cross-origin GET. The JSON content type forces a preflight.
+      const resp = await fetch(`${BRAIN_URL}/setup/discover`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      })
       const data = await resp.json()
       found.value = (data.found ?? []) as RobotProbe[]
     } catch {

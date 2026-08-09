@@ -100,7 +100,51 @@ def _scan_targets() -> list[str]:
     return hosts
 
 
-@router.get("/discover")
+def _blocked_target(url: str) -> str | None:
+    """U226 (audit S7): refuse link-local targets for the robot address.
+
+    This endpoint persists a URL that the brain then fetches on a timer, which
+    makes it an SSRF primitive. The private LAN must stay allowed — the robot
+    genuinely lives at 192.168.x.x — so the block is narrow and specific:
+    169.254.0.0/16 and fe80::/10, which is where every cloud provider parks its
+    unauthenticated metadata service (169.254.169.254). Loopback stays allowed;
+    a fake robot on localhost is a supported dev setup.
+
+    Host names are resolved and checked too. That is not airtight — a name can
+    resolve differently when the request is actually made (DNS rebinding) — but
+    it stops the obvious literal and the careless copy-paste, and the Origin
+    guard (U215) already blocks the drive-by path to this endpoint.
+    """
+    import ipaddress
+    import socket
+    from urllib.parse import urlparse
+
+    host = urlparse(url).hostname or ""
+    if not host:
+        return "could not read a host from that address"
+
+    candidates: list[str] = []
+    try:  # literal IP?
+        ipaddress.ip_address(host)
+        candidates.append(host)
+    except ValueError:  # a name — check where it points
+        try:
+            candidates = [info[4][0] for info in socket.getaddrinfo(host, None)]
+        except OSError:
+            return None  # unresolvable: the health check below reports it properly
+
+    for raw in candidates:
+        try:
+            ip = ipaddress.ip_address(raw.split("%")[0])  # strip zone id
+        except ValueError:
+            continue
+        if ip.is_link_local:
+            return (f"{host} is a link-local address ({raw}). That range holds "
+                    "cloud metadata services, not robots — refusing.")
+    return None
+
+
+@router.post("/discover")
 async def discover_robot() -> JSONResponse:
     """U200: sweep the local network for a robot-runtime.
 
@@ -197,6 +241,9 @@ async def set_address(body: dict) -> JSONResponse:
         return JSONResponse(
             {"error": "give host and port only, e.g. http://192.168.0.42:8001"},
             status_code=422)
+    blocked = _blocked_target(url)  # U226 (S7)
+    if blocked is not None:
+        return JSONResponse({"error": blocked}, status_code=422)
 
     os.environ["ROBOT_RUNTIME_URL"] = url
     _write_env({"ROBOT_RUNTIME_URL": url})

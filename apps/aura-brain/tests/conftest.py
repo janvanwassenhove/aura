@@ -13,6 +13,14 @@ import pytest
 
 os.environ.setdefault("LLM_PROVIDER", "echo")
 
+# U226: GESTURES_ENABLED defaults to true, so every create_app() in this suite
+# built a real mediapipe hand landmarker — an 8 MB model and native threads,
+# hundreds of times over. Besides being slow, the objects were only released by
+# the garbage collector, whose finaliser blocks on a mediapipe worker future;
+# firing mid-test it hung the whole run (reproduced: stalled at test 22 of 343).
+# Gesture behaviour has its own tests that construct a detector explicitly.
+os.environ.setdefault("GESTURES_ENABLED", "false")
+
 
 @pytest.fixture(autouse=True)
 def fake_keyring(monkeypatch):

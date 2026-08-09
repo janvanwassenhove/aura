@@ -837,6 +837,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         await ctx._robot_bridge.stop()
     if ctx._perception is not None:
         await ctx._perception.stop()
+        # U226: the mediapipe hand landmarker holds native threads. Left to the
+        # garbage collector its finaliser blocks on a worker future at an
+        # unpredictable moment; released here it cannot.
+        _gestures = getattr(ctx._perception, "_gestures", None)
+        if _gestures is not None and hasattr(_gestures, "close"):
+            _gestures.close()
     if ctx._heartbeat is not None:
         await ctx._heartbeat.stop()
     if ctx._inproc_client is not None:

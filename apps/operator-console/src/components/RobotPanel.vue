@@ -564,7 +564,11 @@ async function discoverRobot(): Promise<void> {
   discovered.value = []
   addrResult.value = ''
   try {
-    const r = await fetch(`${BRAIN_URL}/robot/discover`)
+    // U226 (S12): POST — see setupStore.discover().
+    const r = await fetch(`${BRAIN_URL}/robot/discover`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    })
     const body = await r.json()
     discovered.value = body.found ?? []
     if (!discovered.value.length) {

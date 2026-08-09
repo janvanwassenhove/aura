@@ -216,10 +216,17 @@ async def test_robot(body: dict) -> JSONResponse:
     return JSONResponse(await _probe_robot(url))
 
 
-@router.get("/discover")
+@router.post("/discover")
 async def discover() -> JSONResponse:
     """Find robot-runtime candidates: configured URL, mDNS name, then a quick
-    /24 subnet sweep on :8001 (sub-second timeouts, bounded concurrency)."""
+    /24 subnet sweep on :8001 (sub-second timeouts, bounded concurrency).
+
+    U226 (audit S12): POST, not GET. A GET that port-scans the owner's LAN is
+    reachable from any page the browser loads — an <img> or a fetch with no
+    preflight — and the result leaks through timing even when the response is
+    opaque. POST with a JSON content type forces a CORS preflight, so the
+    Origin guard (U215) gets to refuse it before the scan ever starts.
+    """
     import asyncio
     import socket
 

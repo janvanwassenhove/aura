@@ -215,54 +215,18 @@ async def get_token_status(user_id: str, provider: str) -> JSONResponse:
     return JSONResponse({"provider": provider, "connected": bool(token)})
 
 
-@router.get("/identity/token/{user_id}/{provider}")
-async def get_token(user_id: str, provider: str) -> JSONResponse:
-    """Return a valid access token for (user_id, provider).
-
-    SERVER-SIDE ONLY. The console must use /identity/status instead (U221) —
-    this exists for connector-service, which needs the real token to call the
-    provider's API.
-
-    Performs silent refresh if the stored token is near expiry.
-    Returns 401 if no token exists or refresh fails (caller should trigger re-auth).
-
-    SECURITY: only the access_token is returned; refresh_token is never exposed.
-    """
-    if provider == "m365":
-        try:
-            flow = _ms_flow()
-            token = flow.get_valid_token(user_id)  # type: ignore[union-attr]
-            return JSONResponse({"access_token": token, "provider": provider})
-        except HTTPException:
-            raise
-        except RuntimeError as exc:
-            raise HTTPException(status_code=401, detail=str(exc)) from exc
-
-    if provider == "google":
-        try:
-            flow = _google_flow()
-            token = flow.get_valid_token(user_id)  # type: ignore[union-attr]
-            return JSONResponse({"access_token": token, "provider": provider})
-        except HTTPException:
-            raise
-        except RuntimeError as exc:
-            raise HTTPException(status_code=401, detail=str(exc)) from exc
-
-    if provider == "github":
-        try:
-            flow = _github_flow()
-            token = flow.get_valid_token(user_id)  # type: ignore[union-attr]
-            return JSONResponse({"access_token": token, "provider": provider})
-        except HTTPException:
-            raise
-        except RuntimeError as exc:
-            raise HTTPException(status_code=401, detail=str(exc)) from exc
-
-    # For simple API-key providers (slack) — return raw stored token
-    token_data = _token_store.get(user_id, provider)
-    if token_data is None:
-        raise HTTPException(status_code=401, detail=f"No token for provider={provider!r}. Auth required.")
-    return JSONResponse({"access_token": token_data.access_token, "provider": provider})
+# U226 (audit S3): `GET /identity/token/{user_id}/{provider}` is DELETED.
+#
+# It handed out a live Microsoft/Google/GitHub access token over HTTP with no
+# authentication of any kind. It survived this long as "the connector seam",
+# but by the time of the audit it had no callers left: the brain and
+# connector-service take tokens in-process via `get_valid_token` below (U7's
+# token_fetcher seam), and the console uses `/identity/status` for the
+# connection badge (U221) plus PUT/DELETE on this path to store and revoke.
+#
+# A route that hands out bearer tokens to anyone who can reach the port is not
+# worth keeping for a hypothetical future caller — that caller can use the
+# in-process function, or reintroduce an endpoint WITH authentication.
 
 
 # ---------------------------------------------------------------------------

@@ -377,7 +377,7 @@ def test_discover_finds_a_robot_on_the_lan(monkeypatch) -> None:
         # target list is the seam; interface filtering has its own test below.
         monkeypatch.setattr(robot_api, "_scan_targets", lambda: ["127.0.0.1"])
 
-        body = _client_for(robot_api).get("/robot/discover").json()
+        body = _client_for(robot_api).post("/robot/discover").json()
         assert body["found"] == [
             {"url": "http://127.0.0.1:8001", "adapter": "reachy", "mode": "online"}
         ]
@@ -409,7 +409,7 @@ def test_discover_ignores_something_else_on_port_8001(monkeypatch) -> None:
     try:
         monkeypatch.setattr(robot_api, "_robot", type("R", (), {"_base_url": ""})())
         monkeypatch.setattr(robot_api, "_scan_targets", lambda: ["127.0.0.1"])
-        assert _client_for(robot_api).get("/robot/discover").json()["found"] == []
+        assert _client_for(robot_api).post("/robot/discover").json()["found"] == []
     finally:
         srv.shutdown()
         srv.server_close()
@@ -434,7 +434,37 @@ def test_discover_reports_when_there_is_nothing_to_scan(monkeypatch) -> None:
     monkeypatch.setattr(robot_api, "_robot", type("R", (), {"_base_url": ""})())
     monkeypatch.setattr(robot_api, "_scan_targets", lambda: [])
 
-    body = _client_for(robot_api).get("/robot/discover").json()
+    body = _client_for(robot_api).post("/robot/discover").json()
     assert body["scanned"] == 0
     assert body["found"] == []
     assert body["note"]
+
+
+# --- U226 (audit S7): the robot address is an SSRF primitive ---------------
+
+def test_address_refuses_a_link_local_target(monkeypatch, tmp_path) -> None:
+    """169.254.169.254 is the cloud metadata service, not a robot. The brain
+    fetches this URL on a timer, so persisting it is the whole attack."""
+    monkeypatch.setenv("AURA_ENV_FILE", str(tmp_path / ".env"))
+    monkeypatch.setattr(robot_api, "_robot", type("R", (), {"_base_url": ""})())
+    client = _client_for(robot_api)
+
+    resp = client.post("/robot/address", json={"url": "http://169.254.169.254"})
+    assert resp.status_code == 422
+    assert "link-local" in resp.json()["error"]
+    # Nothing was persisted — the point of refusing before the write.
+    assert "169.254" not in (tmp_path / ".env").read_text(encoding="utf-8") \
+        if (tmp_path / ".env").exists() else True
+
+
+def test_address_still_allows_the_private_lan(monkeypatch, tmp_path) -> None:
+    """The robot really does live on 192.168.x.x — the block must be narrow."""
+    monkeypatch.setenv("AURA_ENV_FILE", str(tmp_path / ".env"))
+    monkeypatch.setattr(robot_api, "_robot", type("R", (), {"_base_url": ""})())
+    assert robot_api._blocked_target("http://192.168.0.42:8001") is None
+    assert robot_api._blocked_target("http://10.0.0.5:8001") is None
+    assert robot_api._blocked_target("http://127.0.0.1:8001") is None  # fake robot
+
+
+def test_blocked_target_catches_ipv6_link_local() -> None:
+    assert robot_api._blocked_target("http://[fe80::1]:8001") is not None

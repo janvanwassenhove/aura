@@ -55,17 +55,16 @@ class GitHubConnector(M365Connector):
                     f"GitHub token not found for user={self._user_id!r}."
                 )
             return token
-        async with httpx.AsyncClient(timeout=5.0) as client:
-            resp = await client.get(
-                f"{self._identity_url}/identity/token/{self._user_id}/github"
-            )
-        if resp.status_code == 401:
-            raise ConnectorAuthError(
-                f"GitHub token not found for user={self._user_id!r}. "
-                "Store via PUT /identity/token/{user_id}/github."
-            )
-        resp.raise_for_status()
-        return resp.json()["access_token"]
+        # U226 (audit S3): the HTTP fallback is gone with the route it called.
+        # GET /identity/token handed out a live bearer token to anyone who
+        # could reach the port. identity-service has not been deployed
+        # separately since U2 (it is mounted inside aura-brain), so this branch
+        # pointed at a service that no longer exists in any topology we ship.
+        raise ConnectorAuthError(
+            "No token_fetcher was injected. identity-service runs in-process "
+            "inside aura-brain; connectors must be constructed with "
+            "token_fetcher=identity_service.main.get_valid_token."
+        )
 
     def _headers(self, token: str) -> dict[str, str]:
         return {

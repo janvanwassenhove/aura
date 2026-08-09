@@ -18,7 +18,6 @@ import uuid
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
 
-import httpx
 from shared_config import ConnectorServiceSettings
 from shared_schemas.m365.connector import M365Connector
 from shared_schemas.m365.models import CalendarEvent, MailItem, Task, TeamsMessage
@@ -54,18 +53,16 @@ class GoogleConnector(M365Connector):
                     f"Google token unavailable for user={self._user_id!r}."
                 )
             return token
-        async with httpx.AsyncClient(timeout=5.0) as client:
-            resp = await client.get(
-                f"{self._identity_url}/identity/token/{self._user_id}/google"
-            )
-        if resp.status_code == 401:
-            raise ConnectorAuthError(
-                f"Google token unavailable for user={self._user_id!r}: "
-                f"{resp.json().get('detail', 'token missing')}. "
-                "Authenticate via POST /identity/auth/google/start."
-            )
-        resp.raise_for_status()
-        return resp.json()["access_token"]
+        # U226 (audit S3): the HTTP fallback is gone with the route it called.
+        # GET /identity/token handed out a live bearer token to anyone who
+        # could reach the port. identity-service has not been deployed
+        # separately since U2 (it is mounted inside aura-brain), so this branch
+        # pointed at a service that no longer exists in any topology we ship.
+        raise ConnectorAuthError(
+            "No token_fetcher was injected. identity-service runs in-process "
+            "inside aura-brain; connectors must be constructed with "
+            "token_fetcher=identity_service.main.get_valid_token."
+        )
 
     def _api_client(self, token: str, service: str, version: str):  # type: ignore[no-untyped-def]
         from google.oauth2.credentials import Credentials  # type: ignore[import]

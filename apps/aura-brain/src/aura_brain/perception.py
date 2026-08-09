@@ -120,6 +120,23 @@ class HandGestureDetector:
             )
         )
 
+    def close(self) -> None:
+        """Release the mediapipe landmarker deterministically (U226).
+
+        Without this the object is only ever finalised by the garbage
+        collector, and mediapipe's ``__del__`` shuts its dispatcher down by
+        blocking on a worker future — which deadlocks when it happens to fire
+        at an arbitrary moment (observed: mid-way through FastAPI building a
+        route, hanging the whole process). Closing here makes that finaliser a
+        no-op. Idempotent, and never raises: this runs during shutdown.
+        """
+        landmarker, self._landmarker = getattr(self, "_landmarker", None), None
+        if landmarker is not None:
+            try:
+                landmarker.close()
+            except Exception:  # noqa: BLE001 — teardown must not raise
+                logger.debug("gesture landmarker close failed", exc_info=True)
+
     def detect(self, png_bytes: bytes) -> str | None:
         """Return a gesture name ('open_palm') or None."""
         import io
