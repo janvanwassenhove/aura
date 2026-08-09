@@ -449,8 +449,6 @@ async def unlock_knowledge(body: dict) -> JSONResponse:
     # minimum — and success hands over every profile and face embedding.
     import time as _time
 
-    from shared_schemas.knowledge import crypto
-
     global _unlock_fails, _unlock_blocked_until
     now = _time.monotonic()
     if now < _unlock_blocked_until:
@@ -459,12 +457,30 @@ async def unlock_knowledge(body: dict) -> JSONResponse:
              "retry_after_s": round(_unlock_blocked_until - now, 1)},
             status_code=429)
 
-    salt = os.environ.get("KNOWLEDGE_SALT", "aura-knowledge").encode().ljust(16, b"0")[:16]
+    # U225 (S9): derive with the parameters this store was actually written
+    # under — reading them from key-params.json rather than assuming, so a
+    # rotated work factor does not silently reject the right passphrase.
+    from pathlib import Path
+
+    from shared_schemas.knowledge import crypto
+    from shared_schemas.knowledge import omk as _omk_mod
+
+    _kpath = Path(os.environ.get("KNOWLEDGE_DB_PATH", "./data/knowledge.enc.json"))
+    _params = _kpath.parent / _omk_mod.PARAMS_FILENAME
+    if _params.exists():
+        import json as _json
+
+        candidate = _omk_mod.KdfParams.from_dict(
+            _json.loads(_params.read_text(encoding="utf-8"))["current"]).derive(passphrase)
+    else:  # never migrated (in-memory/test store) — legacy derivation
+        candidate = crypto.derive_omk(
+            passphrase, _omk_mod.legacy_salt(os.environ.get("KNOWLEDGE_SALT")),
+            n=crypto.LEGACY_SCRYPT_N)
     # compare_digest, not `!=`: a byte-wise comparison leaks how much of the
     # derived key was right through its timing.
     import hmac
 
-    if not hmac.compare_digest(crypto.derive_omk(passphrase, salt), store_omk):
+    if not hmac.compare_digest(candidate, store_omk):
         _unlock_fails += 1
         if _unlock_fails >= 5:
             _unlock_blocked_until = now + min(60.0, 2.0 ** (_unlock_fails - 4))

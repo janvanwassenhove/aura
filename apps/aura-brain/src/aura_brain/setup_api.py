@@ -18,7 +18,6 @@ from __future__ import annotations
 
 import logging
 import os
-import secrets
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -61,9 +60,19 @@ async def _migrate(old: Any, new: Any) -> int:
     return len(people)
 
 
-def _persist_env(passphrase: str, salt: str) -> bool:
-    """Update KNOWLEDGE_PASSPHRASE/SALT in the env file (create keys if absent)."""
-    return _write_env({"KNOWLEDGE_PASSPHRASE": passphrase, "KNOWLEDGE_SALT": salt})
+def _persist_passphrase(passphrase: str) -> tuple[bool, str]:
+    """Remember the passphrase for the next boot. Returns ``(ok, where)``.
+
+    U225 (S10): the OS keyring first. Writing it to the env file — next to the
+    ciphertext, same ACL — is the fallback for machines without a keyring, and
+    it is reported as such rather than presented as equivalent.
+    """
+    from aura_brain import secret_store
+
+    if secret_store.put_passphrase(passphrase):
+        return True, "keyring"
+    logger.warning("no usable OS keyring — falling back to the env file")
+    return _write_env({"KNOWLEDGE_PASSPHRASE": passphrase}), "env-file"
 
 
 def _write_env(updates: dict[str, str]) -> bool:
@@ -466,20 +475,24 @@ async def secure(body: dict) -> JSONResponse:
     if _already_encrypted and _already_encrypted():
         return JSONResponse({"error": "knowledge is already encrypted"}, status_code=409)
 
+    from shared_schemas.knowledge import EncryptedKnowledgeStore
+    from shared_schemas.knowledge import omk as omk_mod
+
     passphrase = (body or {}).get("passphrase", "")
-    if len(passphrase) < 8:
+    if len(passphrase) < omk_mod.MIN_PASSPHRASE_LEN:
         return JSONResponse(
-            {"error": "passphrase must be at least 8 characters"}, status_code=422,
+            {"error": f"passphrase must be at least "
+                      f"{omk_mod.MIN_PASSPHRASE_LEN} characters"}, status_code=422,
         )
     remember = bool((body or {}).get("remember", True))
 
-    from shared_schemas.knowledge import EncryptedKnowledgeStore, crypto
-
-    salt = os.environ.get("KNOWLEDGE_SALT") or secrets.token_hex(8)
-    omk = crypto.derive_omk(passphrase, salt.encode().ljust(16, b"0")[:16])
-    new_store = EncryptedKnowledgeStore(
-        omk, path=os.environ.get("KNOWLEDGE_DB_PATH", "./data/knowledge.enc.json"),
-    )
+    # U225 (S9): a fresh random salt at the current work factor, recorded next
+    # to the ciphertext. Nothing exists yet to migrate — this store is new.
+    kpath = Path(os.environ.get("KNOWLEDGE_DB_PATH", "./data/knowledge.enc.json"))
+    params = omk_mod.KdfParams.fresh()
+    omk_mod.save_current(kpath.parent / omk_mod.PARAMS_FILENAME, params)
+    omk = params.derive(passphrase)
+    new_store = EncryptedKnowledgeStore(omk, path=str(kpath))
 
     migrated = await _migrate(_get_store(), new_store)
     _swap_store(new_store)
@@ -492,9 +505,7 @@ async def secure(body: dict) -> JSONResponse:
         except Exception as exc:  # noqa: BLE001 — recognition is optional
             logger.warning("recognition start failed: %s", exc)
 
-    # Keep the env vars for THIS process consistent (salt reuse on /setup calls).
-    os.environ["KNOWLEDGE_SALT"] = salt
-    persisted = _persist_env(passphrase, salt) if remember else False
+    persisted, where = _persist_passphrase(passphrase) if remember else (False, "")
 
     logger.info("knowledge secured in-app: %d people migrated", migrated)
     return JSONResponse({
@@ -502,4 +513,5 @@ async def secure(body: dict) -> JSONResponse:
         "migrated_people": migrated,
         "recognition_started": recognition_started,
         "remembered": persisted,
+        "remembered_in": where,   # U225: "keyring" or "env-file" — say which
     })

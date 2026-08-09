@@ -15,18 +15,20 @@ Security notes (ADR-008):
   - Secrets are read without echo (getpass) and are never printed back.
   - People are stored encrypted (AES-256-GCM under the OMK) — the wizard
     refuses to seed people without a passphrase rather than write plaintext.
-  - A random KNOWLEDGE_SALT is generated per install.
+  - U225: a random salt and the scrypt work factor are generated per install
+    and recorded in ``key-params.json`` beside the ciphertext — not in .env.
+  - U225: the passphrase goes to the OS keyring, falling back to .env only on
+    machines without one (and saying so).
 """
 
 from __future__ import annotations
 
 import asyncio
 import getpass
-import secrets
 from collections.abc import Callable
 from pathlib import Path
 
-from shared_schemas.knowledge import EncryptedKnowledgeStore, crypto
+from shared_schemas.knowledge import EncryptedKnowledgeStore
 from shared_schemas.knowledge.models import Person, PersonRole, ProfileFact
 
 _LLM_PROVIDERS: dict[str, tuple[str, str, str]] = {
@@ -149,15 +151,29 @@ class SetupWizard:
             if not p1:
                 self._print("  ⚠ skipping encryption — people will NOT persist across restarts.")
                 break
+            from shared_schemas.knowledge import omk as omk_mod
+
+            if len(p1) < omk_mod.MIN_PASSPHRASE_LEN:
+                self._print(f"  Too short — at least {omk_mod.MIN_PASSPHRASE_LEN} "
+                            "characters. A passphrase of a few words works well.")
+                continue
             p2 = self._secret("Confirm passphrase: ")
             if p1 == p2:
                 self._passphrase = p1
-                self.env["KNOWLEDGE_SALT"] = secrets.token_hex(8)  # 16 hex chars
                 if self.ask_yes_no(
-                    "Store the passphrase in .env for auto-unlock at boot? "
-                    "(convenient; anyone with laptop access can read it)"
+                    "Store the passphrase for auto-unlock at boot?"
                 ):
-                    self.env["KNOWLEDGE_PASSPHRASE"] = p1
+                    # U225 (S10): the OS keyring, not .env — the env file sits
+                    # beside the ciphertext with the same permissions, so a copy
+                    # of the data folder would carry its own key.
+                    from aura_brain import secret_store
+
+                    if secret_store.put_passphrase(p1):
+                        self._print("  ✓ stored in the OS keyring.")
+                    else:
+                        self.env["KNOWLEDGE_PASSPHRASE"] = p1
+                        self._print("  ⚠ no OS keyring here — written to .env instead. "
+                                    "Anyone who can read that file can read the data.")
                 else:
                     self._print("  → set KNOWLEDGE_PASSPHRASE in the environment at each start.")
                 break
@@ -238,10 +254,16 @@ class SetupWizard:
     def seed_people(self, data_dir: Path) -> Path | None:
         if self._passphrase is None or not self.people:
             return None
-        # Same derivation as aura_brain.main: the salt STRING's bytes, padded to 16.
-        salt = self.env["KNOWLEDGE_SALT"].encode().ljust(16, b"0")[:16]
+        # U225: record the KDF parameters next to the ciphertext, exactly as the
+        # brain will read them at boot. Seeding without this file would leave a
+        # store the brain then tries to open with the legacy parameters — and
+        # cannot. The salt lives here now; KNOWLEDGE_SALT is no longer consulted.
+        from shared_schemas.knowledge import omk as omk_mod
+
         db_path = data_dir / "knowledge.enc.json"
-        store = EncryptedKnowledgeStore(crypto.derive_omk(self._passphrase, salt), path=db_path)
+        params = omk_mod.KdfParams.fresh()
+        omk_mod.save_current(data_dir / omk_mod.PARAMS_FILENAME, params)
+        store = EncryptedKnowledgeStore(params.derive(self._passphrase), path=db_path)
 
         async def _seed() -> None:
             for person, facts in self.people:

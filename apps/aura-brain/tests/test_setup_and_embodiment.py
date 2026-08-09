@@ -69,22 +69,33 @@ async def test_secure_migrates_people_and_starts_recognition(setup_client) -> No
     assert body["migrated_people"] == 1
     assert body["recognition_started"] is True
     assert body["remembered"] is True
+    assert body["remembered_in"] == "keyring"   # U225 (S10), not the env file
 
     # The swapped store is encrypted and holds the migrated data.
     person = await state["store"].get_person("jan")
     assert person is not None and person.display_name == "Jan"
     facts = await state["store"].get_facts("jan")
     assert [f.value for f in facts] == ["cycling"]
-    # Ciphertext on disk, passphrase persisted to the env file, never in the response.
+    # Ciphertext on disk; the passphrase went to the keyring, so the env file
+    # beside it stays clean — and it is never echoed back in the response.
     assert (tmp_path / "knowledge.enc.json").exists()
-    env_text = (tmp_path / ".env").read_text(encoding="utf-8")
-    assert "KNOWLEDGE_PASSPHRASE=correct-horse-battery" in env_text
+    assert not (tmp_path / ".env").exists()
     assert "correct-horse-battery" not in resp.text
+    # U225 (S9): the KDF parameters are recorded next to the ciphertext.
+    from shared_schemas.knowledge import omk as omk_mod
+
+    assert (tmp_path / omk_mod.PARAMS_FILENAME).exists()
 
 
 def test_secure_rejects_short_passphrase(setup_client) -> None:
     client, *_ = setup_client
     assert client.post("/setup/secure", json={"passphrase": "kort"}).status_code == 422
+    # U225 (S9): the floor moved from 8 to 12. An 8-character passphrase used
+    # to be accepted, and scrypt alone is not enough to carry one.
+    assert client.post("/setup/secure",
+                       json={"passphrase": "8charact"}).status_code == 422
+    assert client.post("/setup/secure",
+                       json={"passphrase": "elevenchars"}).status_code == 422
 
 
 def test_secure_conflicts_when_already_encrypted(setup_client) -> None:

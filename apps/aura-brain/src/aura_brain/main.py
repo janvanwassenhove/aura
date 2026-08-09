@@ -96,21 +96,58 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     from shared_schemas.knowledge import (
         EncryptedKnowledgeStore,
         InMemoryKnowledgeStore,
-        crypto,
     )
 
     # --- U19d: knowledge store (ADR-008). Encrypted at rest if a passphrase is
     # set (OMK via scrypt), else in-memory for dev. ---
-    from aura_brain import knowledge_api
+    # U225 (S10): the passphrase comes from the OS keyring unless the
+    # environment overrides it (docker/CI/headless have no keyring).
+    from aura_brain import knowledge_api, secret_store
 
-    _kpass = os.environ.get("KNOWLEDGE_PASSPHRASE")
+    _kpass, _kpass_source = secret_store.get_passphrase(
+        os.environ.get("KNOWLEDGE_PASSPHRASE"))
+    _omk: bytes | None = None
     if _kpass:
-        _salt = os.environ.get("KNOWLEDGE_SALT", "aura-knowledge").encode().ljust(16, b"0")[:16]
+        from pathlib import Path as _Path
+
+        from shared_schemas.knowledge import omk as _omk_mod
+
         # U29: ciphertext bundles persist across restarts (ciphertext-only file).
         _kpath = os.environ.get("KNOWLEDGE_DB_PATH", "./data/knowledge.enc.json")
-        ctx.knowledge_store = EncryptedKnowledgeStore(
-            crypto.derive_omk(_kpass, _salt), path=_kpath,
-        )
+        _rpath = os.environ.get("RECOGNITION_DB_PATH", "./data/recognition.enc.json")
+        # U225 (S9): the KDF parameters live beside the ciphertext, and a store
+        # still on the old ones is rotated here — before anything reads it.
+        _params_path = _Path(_kpath).parent / _omk_mod.PARAMS_FILENAME
+        try:
+            _omk, _report = _omk_mod.open_omk(
+                passphrase=_kpass, params_path=_params_path,
+                knowledge_paths=[_kpath], recognition_paths=[_rpath],
+                env_salt=os.environ.get("KNOWLEDGE_SALT"),
+            )
+            if _report["migrated"]:
+                logging.getLogger(__name__).warning(
+                    "U225: rotated the owner key to scrypt n=%d — %s",
+                    _report["kdf_n"],
+                    ", ".join(f"{os.path.basename(p)}: {n} entries"
+                              for p, n in _report["migrated"].items()))
+            for _skipped in _report["unreadable"]:
+                # Not fatal, but never silent: this is usually a file left
+                # behind by an earlier install with a different passphrase.
+                logging.getLogger(__name__).warning(
+                    "U225: %s does not open with this passphrase — left "
+                    "untouched, its contents are not in use",
+                    os.path.basename(_skipped))
+        except _omk_mod.OmkError as exc:
+            # Wrong passphrase. Do NOT fall back to a derived-anyway key: that
+            # would present an empty store and invite the owner to start over
+            # on top of data that is still perfectly intact.
+            logging.getLogger(__name__).error("U225: %s", exc)
+            _kpass, _omk = None, None
+
+    if _omk is not None:
+        ctx.knowledge_store = EncryptedKnowledgeStore(_omk, path=_kpath)
+        logging.getLogger(__name__).info(
+            "knowledge encrypted at rest (passphrase from %s)", _kpass_source)
     else:
         ctx.knowledge_store = InMemoryKnowledgeStore()
     knowledge_api.set_store(ctx.knowledge_store)
@@ -692,8 +729,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         knowledge_api.set_omk_loaded(True)
         ctx.pipeline.set_judgment_layer(_JL(new_store))
 
-    if os.environ.get("RECOGNITION_ENABLED", "false").lower() == "true" and _kpass:
-        _start_recognition(crypto.derive_omk(_kpass, _salt))
+    if os.environ.get("RECOGNITION_ENABLED", "false").lower() == "true" and _omk:
+        _start_recognition(_omk)  # U225: same rotated key, derived once at boot
 
     setup_api.init(
         get_store=lambda: ctx.knowledge_store,

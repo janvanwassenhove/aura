@@ -66,10 +66,19 @@ def test_full_run_writes_env(tmp_path) -> None:
     assert "HEARTBEAT_ENABLED=true" in env
     assert "DEV_AGENT_ENABLED=false" in env
     assert "ACTIVE_PERSONA=work" in env
-    assert f"KNOWLEDGE_PASSPHRASE={PASSPHRASE}" in env  # user opted in to auto-unlock
-    # A fresh random salt was generated (16 hex chars).
-    salt_line = next(ln for ln in env.splitlines() if ln.startswith("KNOWLEDGE_SALT="))
-    assert len(salt_line.split("=", 1)[1]) == 16
+    # U225 (S10): the passphrase goes to the OS keyring, never to .env — which
+    # lives beside the ciphertext with the same permissions. Same for the salt,
+    # which now lives in key-params.json next to the data it describes.
+    assert "KNOWLEDGE_PASSPHRASE" not in env
+    assert "KNOWLEDGE_SALT" not in env
+
+
+def test_full_run_stores_the_passphrase_in_the_keyring(tmp_path, fake_keyring) -> None:
+    _run_full(tmp_path)
+    from aura_brain import secret_store
+
+    assert fake_keyring.get_password(secret_store.SERVICE,
+                                     secret_store.ACCOUNT) == PASSPHRASE
 
 
 def test_full_run_seeds_encrypted_people(tmp_path) -> None:
@@ -77,10 +86,16 @@ def test_full_run_seeds_encrypted_people(tmp_path) -> None:
     db = tmp_path / "data" / "knowledge.enc.json"
     assert db.exists()
 
-    # Decrypt with the same passphrase + generated salt: Alice is there.
-    # Same salt derivation as aura_brain.main (string bytes, not hex-decoded).
-    salt = wizard.env["KNOWLEDGE_SALT"].encode().ljust(16, b"0")[:16]
-    store = EncryptedKnowledgeStore(crypto.derive_omk(PASSPHRASE, salt), path=db)
+    # U225: the parameters the wizard used are recorded beside the ciphertext,
+    # which is exactly how the brain will find them at boot.
+    import json
+
+    from shared_schemas.knowledge import omk as omk_mod
+
+    doc = json.loads((tmp_path / "data" / omk_mod.PARAMS_FILENAME).read_text())
+    assert doc["current"]["n"] == crypto.SCRYPT_N
+    params = omk_mod.KdfParams.from_dict(doc["current"])
+    store = EncryptedKnowledgeStore(params.derive(PASSPHRASE), path=db)
     import asyncio
 
     async def _check():
