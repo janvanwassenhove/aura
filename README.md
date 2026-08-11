@@ -99,7 +99,7 @@ because no model is attached, which is enough to walk the whole system.
 
 | | |
 |---|---|
-| A **Reachy Mini Wireless** | The wireless model, please: it has the Raspberry Pi 5, the battery and the radio *inside* the robot, so it is a host on your network rather than a peripheral on a cable. The two-machine split in this repository assumes exactly that. |
+| A **[Reachy Mini](https://pollen-robotics.com/reachy-mini/) Wireless** | The wireless model, please: it has the Raspberry Pi 5, the battery and the radio *inside* the robot, so it is a host on your network rather than a peripheral on a cable. The two-machine split in this repository assumes exactly that. Robot by [Pollen Robotics](https://pollen-robotics.com/) / [Hugging Face](https://huggingface.co/blog/reachy-mini); the vendor SDK this project's adapter talks to is [pollen-robotics/reachy_mini](https://github.com/pollen-robotics/reachy_mini). |
 | The same Wi-Fi | Laptop and robot on one network; the robot is reached at `reachy-mini.local:8001`, or by address |
 | Optional: the face-recognition extra | Face recognition needs the `[recognition]` extra (insightface). Without it the system runs fine and recognition stays inert. Note that insightface's pretrained models are published for non-commercial research use — check the licence of any model you ship. |
 
@@ -313,5 +313,7 @@ Two caveats worth knowing before you build on this:
   pulls in insightface, whose *pretrained models* are published for
   non-commercial research use. AURA runs fine without that extra (recognition
   degrades to inert). Check the licence of any model you ship.
-- **The name and the robot are not mine to license.** Reachy Mini is Pollen
-  Robotics' hardware; this project is an independent piece of software for it.
+- **The name and the robot are not mine to license.** Reachy Mini is
+  [Pollen Robotics](https://pollen-robotics.com/reachy-mini/)' hardware — Pollen
+  is part of [Hugging Face](https://huggingface.co/pollen-robotics) — and this
+  project is an independent, unaffiliated piece of software for it.
