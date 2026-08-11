@@ -29,7 +29,10 @@ export const useLayoutStore = defineStore('layout', () => {
   const showRight = ref(saved.showRight ?? true)
   const rightTab = ref<RightTab>(saved.rightTab ?? 'events')
   const leftWidth = ref(saved.leftWidth ?? 300)
-  const rightWidth = ref(saved.rightWidth ?? 340)
+  // U227: the brain dock holds a rail of people PLUS the selected profile
+  // beside it. At 340 the profile column was clipped on every default install,
+  // which is how it appeared in every screenshot ever taken of this app.
+  const rightWidth = ref(saved.rightWidth ?? 520)
   // U113: the Event Log is a debug surface — closed by default, one click away.
   const showBottom = ref((saved as any).showBottom ?? false)
   const bottomHeight = ref((saved as any).bottomHeight ?? 200)
@@ -47,7 +50,9 @@ export const useLayoutStore = defineStore('layout', () => {
   function openRight(tab: RightTab): void {
     rightTab.value = tab
     showRight.value = true
-    if (tab === 'brain' && rightWidth.value < 420) rightWidth.value = 480
+    // Opening the brain deliberately widens it further: two columns need room,
+    // and the centre column is elastic so it simply gives some back.
+    if (tab === 'brain' && rightWidth.value < 560) rightWidth.value = 600
   }
 
   return { showLeft, showRight, rightTab, leftWidth, rightWidth,
