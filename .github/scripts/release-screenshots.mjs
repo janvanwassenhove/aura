@@ -30,7 +30,11 @@ const page = await browser.newPage({ viewport: { width: 1600, height: 900 } })
 
 try {
   log(`opening ${CONSOLE_URL}`)
-  await page.goto(CONSOLE_URL, { waitUntil: 'networkidle', timeout: 60_000 })
+  // NOT networkidle: the console holds a WebSocket open for the event stream,
+  // so the network is never idle and this waited the full timeout, every time.
+  // Every release since then shipped with no screenshots at all — silently,
+  // because this job is allowed to fail. Wait for content instead.
+  await page.goto(CONSOLE_URL, { waitUntil: 'domcontentloaded', timeout: 60_000 })
 
   // The console is up once the conversation panel renders.
   await page.getByText(/conversation/i).first().waitFor({ timeout: 30_000 })

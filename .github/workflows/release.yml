@@ -120,6 +120,12 @@ jobs:
 
   # Boot a throwaway demo stack and photograph the app. Optional: a release
   # without screenshots beats no release, so failures here never block.
+  #
+  # U235: "never block" turned out to mean "never noticed". This job failed on
+  # every release for weeks — a `networkidle` wait against a console that holds
+  # a WebSocket open — and the releases went out screenshot-less without a word.
+  # It still cannot block a release; it now says so in the release notes, so a
+  # silent failure at least leaves a mark where somebody reads it.
   screenshots:
     if: "!contains(github.event.head_commit.message, '[skip release]')"
     runs-on: ubuntu-latest
@@ -316,6 +322,12 @@ jobs:
                 echo "![${name}](https://github.com/${REPO}/releases/download/${TAG}/${name})"
                 echo
               done
+            else
+              # U235: say it. This job is allowed to fail, and for weeks it did
+              # — quietly, on every release. An absence nobody can see is not a
+              # degradation, it is a blind spot.
+              echo "> _No screenshots in this release: the demo-stack capture did not complete._"
+              echo
             fi
             echo "### Installatie"
             echo "| Platform | Bestand |"
