@@ -32,7 +32,13 @@ export const useLayoutStore = defineStore('layout', () => {
   // U227: the brain dock holds a rail of people PLUS the selected profile
   // beside it. At 340 the profile column was clipped on every default install,
   // which is how it appeared in every screenshot ever taken of this app.
-  const rightWidth = ref(saved.rightWidth ?? 520)
+  // U228: 520 stopped the clipping but still left the profile column narrower
+  // than the chat next to it, which reads as "the chat is the app". The brain
+  // is the app; the chat is one way into it. The rail costs 12rem before the
+  // profile gets a pixel, and the skill cards only reach two columns past ~560
+  // of content — so the default has to clear both. App.vue clamps this back
+  // down on narrow windows, which is why a wide default is safe here.
+  const rightWidth = ref(saved.rightWidth ?? 780)
   // U113: the Event Log is a debug surface — closed by default, one click away.
   const showBottom = ref((saved as any).showBottom ?? false)
   const bottomHeight = ref((saved as any).bottomHeight ?? 200)
@@ -50,9 +56,11 @@ export const useLayoutStore = defineStore('layout', () => {
   function openRight(tab: RightTab): void {
     rightTab.value = tab
     showRight.value = true
-    // Opening the brain deliberately widens it further: two columns need room,
-    // and the centre column is elastic so it simply gives some back.
-    if (tab === 'brain' && rightWidth.value < 560) rightWidth.value = 600
+    // Opening the brain deliberately widens it further: the rail costs 12rem
+    // before the profile gets a single pixel, and the skill cards only reach
+    // two columns past ~560 of content. The centre column is elastic, so this
+    // takes the space from the chat, which needs it least.
+    if (tab === 'brain' && rightWidth.value < 720) rightWidth.value = 780
   }
 
   return { showLeft, showRight, rightTab, leftWidth, rightWidth,

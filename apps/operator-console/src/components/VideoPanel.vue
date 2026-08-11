@@ -102,10 +102,21 @@
     <!-- U179: the old text pointed at a "Knowledge" panel that is no longer
          mounted. Point at what actually exists: the brain panel's
          "Secure profiles" box, which enables recognition. -->
+    <!-- U228: recognition being off has two quite different causes, and the
+         advice for one is nonsense under the other. Telling an owner whose
+         store is already encrypted to go and set a passphrase sends them to a
+         box that will not help them. -->
     <div v-if="recognitionEnabled === false" class="hint mt-2">
-      Face recognition is off, so <strong>This is me</strong> is hidden. Open the
-      <strong>brain panel</strong> (top right) and set a passphrase under
-      <strong>Secure profiles</strong> to switch it on.
+      <template v-if="knowledgeStore.omkLoaded">
+        Face recognition is off, so <strong>This is me</strong> is hidden. The
+        profiles are encrypted — what is missing is the face embedder, which
+        this machine has not loaded.
+      </template>
+      <template v-else>
+        Face recognition is off, so <strong>This is me</strong> is hidden. Open the
+        <strong>brain panel</strong> (top right) and set a passphrase under
+        <strong>Secure profiles</strong> to switch it on.
+      </template>
     </div>
     <form v-else-if="recognitionEnabled" class="enroll-row mt-2" @submit.prevent="enroll">
       <input v-model="enrollId" class="filter-input" placeholder="person id (e.g. jan)" />
@@ -121,10 +132,12 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { Eye, Move, RotateCw, ScanFace, UserCheck, UserX, Video, VideoOff } from 'lucide-vue-next'
 import { useRobotStore } from '../stores/robotStore'
+import { useKnowledgeStore } from '../stores/knowledgeStore'
 
 const BRAIN_URL = import.meta.env.VITE_BRAIN_URL ?? import.meta.env.VITE_ORCHESTRATOR_URL ?? 'http://localhost:8000'
 
 const robotStore = useRobotStore()
+const knowledgeStore = useKnowledgeStore()
 const recognized = computed(() => robotStore.lastRecognized)
 
 const state = ref<'connecting' | 'live' | 'off'>('connecting')
@@ -375,6 +388,9 @@ async function fetchRobotMode(): Promise<void> {
 
 onMounted(() => {
   void fetchRecognitionStatus()
+  // U228: the hint above needs to know whether the store is encrypted, and this
+  // panel may well be on screen before the brain panel has ever been opened.
+  void knowledgeStore.fetchTier()
   void fetchRobotMode()
   void startFrameLoop()
 })

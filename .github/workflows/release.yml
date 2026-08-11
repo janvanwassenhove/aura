@@ -141,13 +141,26 @@ jobs:
           # Fully isolated state: an empty skills vault and a throwaway DB, so
           # nothing that happens to sit in the checkout or runner can leak
           # into the screenshots. The only profile is the fictional demo one.
+          #
+          # KNOWLEDGE_DB_PATH and RECOGNITION_DB_PATH matter more than they
+          # look: both default to ./data, which on a developer's machine is a
+          # real knowledge store sitting in the checkout. Pointing them at the
+          # throwaway directory is what makes this stack safe to run locally as
+          # well as in CI.
           mkdir -p "$RUNNER_TEMP/demo-skills" "$RUNNER_TEMP/demo-data"
+          # Encrypts the throwaway store so the shots show the encrypted state
+          # instead of a "set a passphrase" nag. It guards one fictional demo
+          # persona and dies with the runner.
+          DEMO_PASSPHRASE='demo-stack-passphrase'   # privacy-ok: fictional demo data only
           ROBOT_ADAPTER=fake PORT=8001 \
             nohup uv run --package robot-runtime robot-runtime > robot.log 2>&1 &
           LLM_PROVIDER=echo PORT=8020 ROBOT_RUNTIME_URL=http://localhost:8001 \
             CORS_ORIGINS='*' DEMO_PERSONA=true VOICE_MODE=off \
             SKILLS_DIR="$RUNNER_TEMP/demo-skills" \
             DATABASE_URL="sqlite+aiosqlite:///$RUNNER_TEMP/demo-data/memory.db" \
+            KNOWLEDGE_DB_PATH="$RUNNER_TEMP/demo-data/knowledge.enc.json" \
+            RECOGNITION_DB_PATH="$RUNNER_TEMP/demo-data/recognition.enc.json" \
+            KNOWLEDGE_PASSPHRASE="$DEMO_PASSPHRASE" \
             nohup uv run --package aura-brain aura-brain > brain.log 2>&1 &
           for url in http://localhost:8001/health http://localhost:8020/health; do
             for i in $(seq 1 60); do
