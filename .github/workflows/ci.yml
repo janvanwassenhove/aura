@@ -107,6 +107,9 @@ jobs:
       - name: Console origin tests
         working-directory: apps/desktop
         run: node test-console-origin.cjs
+      - name: Packaging manifest tests
+        working-directory: apps/desktop
+        run: node test-packaging.cjs
 
   lint:
     runs-on: ubuntu-latest

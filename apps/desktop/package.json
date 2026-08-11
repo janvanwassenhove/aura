@@ -21,9 +21,8 @@
     "appId": "dev.aura.desktop",
     "productName": "AURA",
     "files": [
-      "main.cjs",
-      "preload.cjs",
-      "updater.cjs",
+      "*.cjs",
+      "!test-*.cjs",
       "build/**"
     ],
     "extraResources": [

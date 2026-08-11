@@ -108,6 +108,15 @@ jobs:
           npm ci
           npm test
           npm run build
+      # U235: the shell is the one thing the release BUILDS and nothing here
+      # checked. A module left out of build.files packages cleanly and dies on
+      # the owner's first launch — which is how v2.0.58 shipped.
+      - name: Desktop shell checks
+        working-directory: apps/desktop
+        run: |
+          node test-packaging.cjs
+          node test-console-origin.cjs
+          node test-updater-verify.cjs
 
   # Boot a throwaway demo stack and photograph the app. Optional: a release
   # without screenshots beats no release, so failures here never block.
