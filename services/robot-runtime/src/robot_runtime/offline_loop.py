@@ -23,6 +23,8 @@ from shared_events.bus import AsyncEventBus
 from shared_schemas.events.robot import RobotModeChanged
 from shared_schemas.robot.models import RobotMode
 
+from robot_runtime import sleep_state
+
 logger = logging.getLogger(__name__)
 
 _OFFLINE_NOTICE = "I've lost connection to my brain. I'll keep things steady until it's back."
@@ -65,6 +67,12 @@ class OfflineBehaviorLoop:
 
     async def check(self) -> None:
         """Evaluate the brain link once and act. Deterministic — used by tests."""
+        # U237: asleep means take no action of our own. This loop exists so the
+        # robot never looks frozen when it is cut off — but a robot the owner
+        # sent to sleep is SUPPOSED to look still, and standing back up four
+        # seconds later is the bug, not the reassurance.
+        if sleep_state.is_asleep():
+            return
         if self._elapsed() >= self._timeout_s:
             if not self._offline:
                 self._offline = True

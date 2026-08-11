@@ -42,6 +42,8 @@ from shared_schemas.robot.models import (
     RobotState,
 )
 
+from robot_runtime import sleep_state
+
 logger = logging.getLogger(__name__)
 
 _NEUTRAL = np.eye(4)
@@ -328,11 +330,26 @@ class ReachyRobotAdapter(RobotAdapter):
             # After a daemon (re)start the motors are compliant — every motion
             # command would silently do nothing. Wake the robot so commands
             # always have a visible effect.
+            #
+            # U237: unless the owner asked for sleep. The maintenance loop
+            # reconnects whenever the link looks down, and this used to stand
+            # the robot straight back up — the owner presses Asleep, the robot
+            # droops, and something invisible wakes it again.
             try:
-                mini.enable_motors()
-                mini.wake_up()
-                # The wake emote can end slightly off-pose — settle upright.
-                mini.goto_target(head=_NEUTRAL, antennas=[0.0, 0.0], duration=0.8)
+                mini.enable_motors()   # needed either way: sleep is a POSE
+                if sleep_state.is_asleep():
+                    # Back into the sleep pose rather than upright: a reconnect
+                    # is invisible to the owner and must not undo what they asked
+                    # for. goto_sleep() is the same emote /robot/motion uses.
+                    logger.info("connected while the robot is asleep — staying down")
+                    try:
+                        mini.goto_sleep()
+                    except Exception as exc:  # noqa: BLE001
+                        logger.warning("could not resume the sleep pose: %s", exc)
+                else:
+                    mini.wake_up()
+                    # The wake emote can end slightly off-pose — settle upright.
+                    mini.goto_target(head=_NEUTRAL, antennas=[0.0, 0.0], duration=0.8)
             except Exception as exc:  # noqa: BLE001 — wake is best-effort
                 logger.warning("wake-up on connect failed: %s", exc)
             # U82: the SDK/daemon resets the speaker's ALSA PCM volume to ~62%
@@ -342,7 +359,7 @@ class ReachyRobotAdapter(RobotAdapter):
             self._set_hardware_volume_max()
             # U36g: follow the person — the daemon tracks the nearest face and
             # keeps looking at them (looks up when you stand in front of it).
-            if os.environ.get("HEAD_TRACKING", "true").lower() == "true":
+            if os.environ.get("HEAD_TRACKING", "true").lower() == "true" and not sleep_state.is_asleep():
                 try:
                     mini.start_head_tracking()
                     self._tracking_on = True

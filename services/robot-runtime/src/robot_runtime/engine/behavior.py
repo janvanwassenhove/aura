@@ -28,6 +28,7 @@ from shared_schemas.robot.models import (
     RobotMode,
 )
 
+from robot_runtime import sleep_state
 from robot_runtime.behavior.states import TransitionBlockedError, is_valid_transition
 from robot_runtime.behavior.timeline_builder import (
     create_idle_timeline,
@@ -260,6 +261,8 @@ class BehaviorEngine:
             jitter = random.uniform(0, _IDLE_FIDGET_JITTER_S)
             await asyncio.sleep(_IDLE_FIDGET_INTERVAL_S + jitter)
             if self._state != BehaviorState.IDLE:
+                continue
+            if sleep_state.is_asleep():   # U237: no fidgeting a sleeping robot
                 continue
             timeline = create_idle_timeline(self._persona_cfg)
             for cue in timeline.cues:

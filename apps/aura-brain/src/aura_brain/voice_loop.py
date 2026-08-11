@@ -226,6 +226,16 @@ class VoiceLoop:
         parts = rest.split(None, 1)
         return (parts[1] if len(parts) > 1 else "").strip(" ,.!?-").strip()
 
+    async def _wake_from_sleep(self) -> None:
+        """U237: the same path the Awake button takes, called in-process.
+
+        Not over HTTP to ourselves: that needs to guess our own port, which is
+        exactly the assumption U234 removed. One function, two callers.
+        """
+        from aura_brain.robot_api import wake
+
+        await wake()
+
     def _is_echo_of_last_reply(self, text: str) -> bool:
         """U148 (brief §6.1): True when the transcript is largely one of the
         robot's OWN recent replies bouncing back through the mic — checked
@@ -491,6 +501,17 @@ class VoiceLoop:
                 if len(command.strip()) < 2:
                     logger.debug("voice loop ignored bare/echoed wake word")
                     continue
+
+                # U237: the owner said the wake word while the robot is asleep.
+                # That IS the wake gesture — "Richie, ..." means the same thing
+                # to a person as pressing the button, so honour it and then run
+                # the command they actually gave.
+                if os.environ.get("ROBOT_ASLEEP", "false").lower() == "true":
+                    logger.info("wake word heard while asleep — waking up")
+                    try:
+                        await self._wake_from_sleep()
+                    except Exception as exc:  # noqa: BLE001 — never lose the turn
+                        logger.warning("waking on the wake word failed: %s", exc)
 
                 # NOW this is a real user turn: re-arm cancel tokens and inject
                 # the interruption note as OWNER GUIDANCE (a system message,

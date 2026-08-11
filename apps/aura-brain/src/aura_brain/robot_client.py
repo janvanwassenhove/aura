@@ -146,6 +146,12 @@ class RobotClient:
     async def set_tracking(self, enabled: bool) -> dict:
         return (await self._request("POST", "/robot/tracking", {"enabled": enabled})).json()
 
+    async def set_asleep(self, asleep: bool) -> dict:
+        """U237: tell the RUNTIME the robot is asleep, so the loops that move it
+        on their own initiative stop doing that. Without this the robot droops
+        and stands back up within seconds."""
+        return (await self._request("POST", "/robot/sleep", {"asleep": asleep})).json()
+
     async def stop_audio(self) -> dict:
         """U84 barge-in: cut the robot's current speech immediately."""
         return (await self._request("POST", "/robot/audio/stop", {})).json()

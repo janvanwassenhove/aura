@@ -10,6 +10,7 @@ from shared_events.broadcaster import WebSocketBroadcaster
 from shared_schemas.events.behavior import MotionCompleted, MotionFailed, MotionStarted
 from shared_schemas.robot.models import BehaviorState, MotionCommand, RobotMode
 
+from robot_runtime import sleep_state
 from robot_runtime.adapters.fake import FakeRobotAdapter
 from robot_runtime.engine.behavior import BehaviorEngine
 
@@ -288,6 +289,28 @@ async def set_tracking(body: dict) -> JSONResponse:
     except Exception as exc:  # noqa: BLE001
         return JSONResponse({"error": f"tracking failed: {exc}"}, status_code=500)
     return JSONResponse({"tracking": enabled})
+
+
+@router.post("/robot/sleep")
+async def set_sleep(body: dict) -> JSONResponse:
+    """U237: sleep is a state of the ROBOT.
+
+    It used to live only as an env var on the brain, so the on-device loops —
+    which exist so the robot never looks frozen — kept moving a robot the owner
+    had just sent to sleep, and it stood back up within seconds. Telling the
+    runtime means everything that moves on its own initiative can ask.
+
+    This does not silence commands: an explicit motion still runs, which is what
+    lets the wake button work.
+    """
+    _touch()
+    asleep = sleep_state.set_asleep(bool(body.get("asleep", True)))
+    return JSONResponse({"asleep": asleep})
+
+
+@router.get("/robot/sleep")
+async def get_sleep() -> JSONResponse:
+    return JSONResponse({"asleep": sleep_state.is_asleep()})
 
 
 @router.post("/robot/audio/stop")

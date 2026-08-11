@@ -493,15 +493,30 @@ async def motion(command: MotionCommand) -> JSONResponse:
 @router.post("/sleep")
 async def sleep() -> JSONResponse:
     """U100: sleep MODE — take no action. Suppresses greetings + spoken replies
-    (ROBOT_ASLEEP), stops mic listening (VOICE_MODE=off), stops idle head
-    tracking, and puts the robot in a sleep pose."""
+    (ROBOT_ASLEEP), stops idle head tracking, tells the runtime to stop moving
+    on its own, and puts the robot in a sleep pose.
+
+    U237: the mic keeps listening for the wake word, because "Richie" is how a
+    person wakes something up. Set SLEEP_KEEPS_EARS=false to cut the microphone
+    entirely instead — a sleeping robot that still hears is a real preference,
+    in either direction, so it is a choice rather than an assumption.
+    """
     import os as _os
 
     _os.environ["ROBOT_ASLEEP"] = "true"
-    _os.environ["VOICE_MODE"] = "off"
+    keep_ears = _os.environ.get("SLEEP_KEEPS_EARS", "true").lower() == "true"
     from aura_brain.setup_api import _write_env
-    _write_env({"ROBOT_ASLEEP": "true", "VOICE_MODE": "off"})
+    if keep_ears:
+        _write_env({"ROBOT_ASLEEP": "true"})
+    else:
+        _os.environ["VOICE_MODE"] = "off"
+        _write_env({"ROBOT_ASLEEP": "true", "VOICE_MODE": "off"})
     try:
+        # U237: the runtime first. Its offline loop moves the robot every four
+        # seconds so it never looks frozen, and it knew nothing about sleep —
+        # so the robot lay down and stood straight back up. Order matters: tell
+        # it to stop moving before asking it to lie down.
+        await _robot.set_asleep(True)
         await _robot.set_tracking(False)
         from shared_schemas.robot.models import MotionCommand
         await _robot.execute_motion(MotionCommand(motion_id="sleep", speed=1.0, amplitude=0.6, direction=None))
@@ -520,6 +535,9 @@ async def wake() -> JSONResponse:
     from aura_brain.setup_api import _write_env
     _write_env({"ROBOT_ASLEEP": "false", "VOICE_MODE": "wake_word"})
     try:
+        # Clear the runtime's state first: while it is set, the adapter refuses
+        # to start head tracking and a reconnect keeps the sleep pose.
+        await _robot.set_asleep(False)
         from shared_schemas.robot.models import MotionCommand
         await _robot.execute_motion(MotionCommand(motion_id="wake_up", speed=1.0, amplitude=0.7, direction=None))
         await _robot.set_tracking(True)
