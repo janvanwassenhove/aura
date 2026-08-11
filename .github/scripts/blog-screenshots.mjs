@@ -24,7 +24,13 @@ const log = (m) => console.log(`[blogshots] ${m}`)
 const taken = []
 
 const browser = await chromium.launch()
-const page = await browser.newPage({ viewport: { width: 1600, height: 1000 } })
+// deviceScaleFactor 2: the full-window shots get downscaled to 1600 wide for the
+// post anyway, but the cropped panel shots are only ~590 CSS pixels wide and are
+// displayed at ~690 — at 1x they arrive already blurred.
+const page = await browser.newPage({
+  viewport: { width: 1600, height: 1000 },
+  deviceScaleFactor: 2,
+})
 
 async function capture(name, fn) {
   try {
@@ -99,12 +105,16 @@ try {
     await page.waitForTimeout(1_200)
   })
 
-  // --- 05: the app log, where the loops report what they did --------------
+  // --- 05: the event log, where the loops report what they did ------------
+  // NOT the robot panel's "App logs" section: that is a ring buffer on the
+  // Python logger, and a healthy run writes nothing to it, so the shot was an
+  // empty box under a caption about loops reporting themselves. The event log
+  // is the dock the loops actually publish to.
   await capture('05-app-logs.png', async () => {
     await page.keyboard.press('Escape').catch(() => {})
     await page.waitForTimeout(400)
-    await page.getByText(/app logs/i).first().click({ timeout: 5_000 })
-    await page.waitForTimeout(1_200)
+    await page.getByTitle(/toggle bottom panel/i).click({ timeout: 5_000 })
+    await page.waitForTimeout(1_500)
   })
 
   // --- 06d: the brain panel on its own, cropped, for the learning post -----
@@ -120,6 +130,23 @@ try {
     const panel = page.locator('aside, [class*="brain"]').last()
     await panel.screenshot({ path: shot('06d-brain-panel-only.png') })
     throw new Error('__captured__')  // element shot already written
+  })
+
+  // --- 06e: the same crop, on the skills library ---------------------------
+  // The full-window skills shot is nearly identical to the opening console
+  // shot — same layout, same dock, different tab — so the post that is about
+  // skills gets the panel on its own instead.
+  await capture('06e-skills-panel-only.png', async () => {
+    const header = page.getByText(/'s brain/i).first()
+    if (!(await header.isVisible().catch(() => false))) {
+      await page.getByTitle(/brain panel/i).click()
+      await header.waitFor({ timeout: 10_000 })
+    }
+    await page.getByText(/skills library/i).first().click({ timeout: 5_000 })
+    await page.waitForTimeout(1_200)
+    const panel = page.locator('aside, [class*="brain"]').last()
+    await panel.screenshot({ path: shot('06e-skills-panel-only.png') })
+    throw new Error('__captured__')
   })
 } finally {
   await browser.close()

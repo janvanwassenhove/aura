@@ -15,7 +15,12 @@ const OUT_DIR = process.env.OUT_DIR ?? 'blogshots'
 mkdirSync(OUT_DIR, { recursive: true })
 
 const browser = await chromium.launch()
-const page = await browser.newPage({ viewport: { width: 1600, height: 1000 } })
+// Same 2x capture as the main blog set, so this shot is not the one soft
+// screenshot in the series.
+const page = await browser.newPage({
+  viewport: { width: 1600, height: 1000 },
+  deviceScaleFactor: 2,
+})
 try {
   await page.goto(CONSOLE_URL, { waitUntil: 'domcontentloaded', timeout: 60_000 })
   await page.getByText(/conversation/i).first().waitFor({ timeout: 30_000 })
