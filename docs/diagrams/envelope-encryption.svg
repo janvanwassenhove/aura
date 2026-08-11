@@ -1,0 +1,79 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 800" role="img"
+     aria-label="Envelope encryption in three layers. A passphrase, held in the operating system's keyring, derives an owner key that is never stored. The owner key wraps one key per person. Each person's key encrypts only that person's records — facts, signals and face embeddings. Destroy one person's key and their records stay on disk as ciphertext nobody can read. Rotating the owner key re-wraps the handful of small keys and never touches the records at all.">
+  <defs>
+    <pattern id="g6" width="24" height="24" patternUnits="userSpaceOnUse">
+      <path d="M24 0H0V24" fill="none" stroke="#c9b998" stroke-width="0.5" opacity="0.35"/>
+    </pattern>
+    <marker id="a6" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0 0 L10 5 L0 10 z" fill="#34302b"/>
+    </marker>
+    <marker id="a6r" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0 0 L10 5 L0 10 z" fill="#c0522d"/>
+    </marker>
+  </defs>
+
+  <rect width="1000" height="800" fill="#f4efe3"/>
+  <rect width="1000" height="800" fill="url(#g6)"/>
+  <rect x="12" y="12" width="976" height="776" fill="none" stroke="#b8933f" stroke-width="1.4"/>
+  <rect x="21" y="21" width="958" height="758" fill="none" stroke="#b8933f" stroke-width="0.7" opacity="0.6"/>
+
+  <text x="48" y="70" font-family="Consolas, ui-monospace, monospace" font-size="20" letter-spacing="3" fill="#8a7a55">FIG. 1 — THE ENVELOPE</text>
+
+  <!-- passphrase -->
+  <rect x="48" y="104" width="330" height="80" fill="#efe7d6" stroke="#34302b" stroke-width="2.5"/>
+  <text x="72" y="140" font-family="Consolas, ui-monospace, monospace" font-size="21" fill="#34302b">A PASSPHRASE</text>
+  <text x="72" y="168" font-family="Consolas, ui-monospace, monospace" font-size="17" fill="#6f6659">held in the OS keyring</text>
+
+  <line x1="378" y1="144" x2="446" y2="144" stroke="#34302b" stroke-width="2.5" marker-end="url(#a6)"/>
+  <text x="412" y="128" text-anchor="middle" font-family="Consolas, ui-monospace, monospace" font-size="17" fill="#8a7a55">derives</text>
+
+  <!-- owner key -->
+  <rect x="448" y="104" width="330" height="80" fill="#34302b"/>
+  <text x="472" y="140" font-family="Consolas, ui-monospace, monospace" font-size="21" fill="#f4efe3">THE OWNER KEY</text>
+  <text x="472" y="168" font-family="Consolas, ui-monospace, monospace" font-size="17" fill="#e0a58c">never stored, anywhere</text>
+
+  <!-- wraps -->
+  <path d="M613 184 L613 224 L164 224 L164 258" fill="none" stroke="#34302b" stroke-width="2.5" marker-end="url(#a6)"/>
+  <path d="M613 184 L613 224 L500 224 L500 258" fill="none" stroke="#34302b" stroke-width="2.5" marker-end="url(#a6)"/>
+  <path d="M613 184 L613 224 L836 224 L836 258" fill="none" stroke="#34302b" stroke-width="2.5" marker-end="url(#a6)"/>
+  <rect x="640" y="192" width="300" height="24" fill="#f4efe3"/>
+  <text x="646" y="212" font-family="Consolas, ui-monospace, monospace" font-size="17" fill="#8a7a55">wraps one key per person</text>
+
+  <!-- per-person keys -->
+  <g font-family="Consolas, ui-monospace, monospace" font-size="18">
+    <rect x="48" y="260" width="232" height="58" fill="#efe7d6" stroke="#34302b" stroke-width="2.5"/>
+    <text x="164" y="296" text-anchor="middle" fill="#34302b">KEY &#183; person A</text>
+    <rect x="384" y="260" width="232" height="58" fill="#efe7d6" stroke="#34302b" stroke-width="2.5"/>
+    <text x="500" y="296" text-anchor="middle" fill="#34302b">KEY &#183; person B</text>
+    <rect x="720" y="260" width="232" height="58" fill="#f6e5dc" stroke="#c0522d" stroke-width="2.5" stroke-dasharray="8 5"/>
+    <text x="836" y="296" text-anchor="middle" fill="#c0522d">KEY &#183; destroyed</text>
+  </g>
+
+  <line x1="164" y1="318" x2="164" y2="362" stroke="#34302b" stroke-width="2.5" marker-end="url(#a6)"/>
+  <line x1="500" y1="318" x2="500" y2="362" stroke="#34302b" stroke-width="2.5" marker-end="url(#a6)"/>
+  <line x1="836" y1="318" x2="836" y2="362" stroke="#c0522d" stroke-width="2.5" stroke-dasharray="7 5" marker-end="url(#a6r)"/>
+
+  <!-- records -->
+  <g font-family="Consolas, ui-monospace, monospace">
+    <rect x="48" y="364" width="232" height="126" fill="#efe7d6" stroke="#34302b" stroke-width="2.5"/>
+    <text x="164" y="402" text-anchor="middle" font-size="18" fill="#34302b">A's records</text>
+    <text x="164" y="434" text-anchor="middle" font-size="17" fill="#6f6659">facts &#183; signals</text>
+    <text x="164" y="462" text-anchor="middle" font-size="17" fill="#6f6659">face embeddings</text>
+
+    <rect x="384" y="364" width="232" height="126" fill="#efe7d6" stroke="#34302b" stroke-width="2.5"/>
+    <text x="500" y="402" text-anchor="middle" font-size="18" fill="#34302b">B's records</text>
+    <text x="500" y="434" text-anchor="middle" font-size="17" fill="#6f6659">facts &#183; signals</text>
+    <text x="500" y="462" text-anchor="middle" font-size="17" fill="#6f6659">face embeddings</text>
+
+    <rect x="720" y="364" width="232" height="126" fill="#e6e0d4" stroke="#8a7a55" stroke-width="2"/>
+    <text x="836" y="412" text-anchor="middle" font-size="18" fill="#8a7a55">ciphertext</text>
+    <text x="836" y="444" text-anchor="middle" font-size="18" fill="#8a7a55">nobody can read</text>
+  </g>
+
+  <line x1="48" y1="544" x2="952" y2="544" stroke="#b8933f" stroke-width="1"/>
+  <text x="48" y="586" font-family="Consolas, ui-monospace, monospace" font-size="19" fill="#34302b">Deleting a person destroys their key. Their records stay on disk as</text>
+  <text x="48" y="616" font-family="Consolas, ui-monospace, monospace" font-size="19" fill="#34302b">ciphertext that nothing can open — which makes erasure a statement</text>
+  <text x="48" y="646" font-family="Consolas, ui-monospace, monospace" font-size="19" fill="#34302b">about physics rather than a promise about behaviour.</text>
+  <text x="48" y="700" font-family="Consolas, ui-monospace, monospace" font-size="19" fill="#c0522d">Rotating the owner key re-wraps three small keys. The bulk of the data</text>
+  <text x="48" y="730" font-family="Consolas, ui-monospace, monospace" font-size="19" fill="#c0522d">is never touched at all.</text>
+</svg>

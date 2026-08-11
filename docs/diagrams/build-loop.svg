@@ -1,0 +1,82 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 900" role="img"
+     aria-label="One unit through the loop. A backlog of numbered units hands over a unit. The loop picks and builds it, tests it, commits it, releases it, and finally writes a ledger entry — which returns to the backlog for the next unit. Committing and releasing both divert through an approval gate that stops and asks the owner every time, on round one and on round twenty, because the gate is code in the tool path rather than a line in the prompt. The one way out is a checkbox that silences a single named tool by writing it into the settings file. A panel at the bottom contrasts a vague ledger entry with a measured one.">
+  <defs>
+    <pattern id="g7" width="24" height="24" patternUnits="userSpaceOnUse">
+      <path d="M24 0H0V24" fill="none" stroke="#c9b998" stroke-width="0.5" opacity="0.35"/>
+    </pattern>
+    <marker id="a7" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0 0 L10 5 L0 10 z" fill="#34302b"/>
+    </marker>
+    <marker id="a7r" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0 0 L10 5 L0 10 z" fill="#c0522d"/>
+    </marker>
+  </defs>
+
+  <rect width="1000" height="900" fill="#f4efe3"/>
+  <rect width="1000" height="900" fill="url(#g7)"/>
+  <rect x="12" y="12" width="976" height="876" fill="none" stroke="#b8933f" stroke-width="1.4"/>
+  <rect x="21" y="21" width="958" height="858" fill="none" stroke="#b8933f" stroke-width="0.7" opacity="0.6"/>
+
+  <text x="48" y="70" font-family="Consolas, ui-monospace, monospace" font-size="20" letter-spacing="3" fill="#8a7a55">FIG. 1 — ONE UNIT THROUGH THE LOOP</text>
+
+  <!-- backlog -->
+  <rect x="128" y="100" width="372" height="88" fill="#34302b"/>
+  <text x="152" y="136" font-family="Consolas, ui-monospace, monospace" font-size="22" letter-spacing="1" fill="#f4efe3">THE BACKLOG</text>
+  <text x="152" y="168" font-family="Consolas, ui-monospace, monospace" font-size="18" fill="#c9b998">U1 . . . U226, in order</text>
+
+  <line x1="314" y1="188" x2="314" y2="222" stroke="#34302b" stroke-width="2.5" marker-end="url(#a7)"/>
+
+  <!-- the spine -->
+  <g font-family="Consolas, ui-monospace, monospace">
+    <rect x="128" y="224" width="372" height="66" fill="#efe7d6" stroke="#34302b" stroke-width="2.5"/>
+    <text x="152" y="252" font-size="15" letter-spacing="2" fill="#8a7a55">STEP 1-2</text>
+    <text x="152" y="278" font-size="21" fill="#34302b">pick it, build it</text>
+
+    <rect x="128" y="316" width="372" height="66" fill="#efe7d6" stroke="#34302b" stroke-width="2.5"/>
+    <text x="152" y="344" font-size="15" letter-spacing="2" fill="#8a7a55">STEP 3</text>
+    <text x="152" y="370" font-size="21" fill="#34302b">test it</text>
+
+    <rect x="128" y="408" width="372" height="66" fill="#efe7d6" stroke="#34302b" stroke-width="2.5"/>
+    <text x="152" y="436" font-size="15" letter-spacing="2" fill="#8a7a55">STEP 4</text>
+    <text x="152" y="462" font-size="21" fill="#34302b">commit it</text>
+
+    <rect x="128" y="500" width="372" height="66" fill="#efe7d6" stroke="#34302b" stroke-width="2.5"/>
+    <text x="152" y="528" font-size="15" letter-spacing="2" fill="#8a7a55">STEP 5</text>
+    <text x="152" y="554" font-size="21" fill="#34302b">release it</text>
+
+    <rect x="128" y="592" width="372" height="66" fill="#efe7d6" stroke="#34302b" stroke-width="3"/>
+    <text x="152" y="620" font-size="15" letter-spacing="2" fill="#8a7a55">STEP 6</text>
+    <text x="152" y="646" font-size="21" fill="#34302b">write down what was measured</text>
+  </g>
+
+  <line x1="314" y1="290" x2="314" y2="314" stroke="#34302b" stroke-width="2.5" marker-end="url(#a7)"/>
+  <line x1="314" y1="382" x2="314" y2="406" stroke="#34302b" stroke-width="2.5" marker-end="url(#a7)"/>
+  <line x1="314" y1="474" x2="314" y2="498" stroke="#34302b" stroke-width="2.5" marker-end="url(#a7)"/>
+  <line x1="314" y1="566" x2="314" y2="590" stroke="#34302b" stroke-width="2.5" marker-end="url(#a7)"/>
+
+  <!-- return to the backlog -->
+  <path d="M128 625 L64 625 L64 144 L126 144" fill="none" stroke="#34302b" stroke-width="2.5" marker-end="url(#a7)"/>
+  <text x="84" y="392" font-family="Consolas, ui-monospace, monospace" font-size="17" fill="#8a7a55" transform="rotate(-90 84 392)">the next unit</text>
+
+  <!-- approval gate -->
+  <path d="M500 441 L560 441" fill="none" stroke="#c0522d" stroke-width="2.5" marker-end="url(#a7r)"/>
+  <path d="M500 533 L530 533 L530 470 L560 470" fill="none" stroke="#c0522d" stroke-width="2.5" marker-end="url(#a7r)"/>
+
+  <rect x="562" y="384" width="390" height="164" fill="#f6e5dc" stroke="#c0522d" stroke-width="3"/>
+  <text x="584" y="422" font-family="Consolas, ui-monospace, monospace" font-size="20" letter-spacing="2" fill="#c0522d">APPROVAL GATE</text>
+  <text x="584" y="456" font-family="Consolas, ui-monospace, monospace" font-size="18" fill="#34302b">everything that touches</text>
+  <text x="584" y="482" font-family="Consolas, ui-monospace, monospace" font-size="18" fill="#34302b">the outside world stops</text>
+  <text x="584" y="508" font-family="Consolas, ui-monospace, monospace" font-size="18" fill="#34302b">here and asks the owner</text>
+  <text x="584" y="534" font-family="Consolas, ui-monospace, monospace" font-size="18" fill="#c0522d">on round 1 and on round 20</text>
+  <text x="584" y="588" font-family="Consolas, ui-monospace, monospace" font-size="17" fill="#8a7a55">it is code in the path, not a line</text>
+  <text x="584" y="612" font-family="Consolas, ui-monospace, monospace" font-size="17" fill="#8a7a55">in the prompt — a prompt argues back</text>
+  <text x="584" y="650" font-family="Consolas, ui-monospace, monospace" font-size="17" fill="#c0522d">one door out: a checkbox that silences</text>
+  <text x="584" y="674" font-family="Consolas, ui-monospace, monospace" font-size="17" fill="#c0522d">one named tool, in your settings file</text>
+
+  <!-- what step 6 must contain -->
+  <line x1="48" y1="700" x2="952" y2="700" stroke="#b8933f" stroke-width="1"/>
+  <text x="48" y="736" font-family="Consolas, ui-monospace, monospace" font-size="17" letter-spacing="2" fill="#8a7a55">WHAT STEP 6 HAS TO CONTAIN</text>
+  <text x="48" y="778" font-family="Consolas, ui-monospace, monospace" font-size="19" fill="#6f6659">not &#8220;improved latency&#8221;</text>
+  <text x="48" y="812" font-family="Consolas, ui-monospace, monospace" font-size="19" fill="#c0522d">but &#8220;1554 ms to 131 ms, 1366 KB to 69 KB, measured</text>
+  <text x="48" y="840" font-family="Consolas, ui-monospace, monospace" font-size="19" fill="#c0522d">against the robot on my desk&#8221;</text>
+</svg>

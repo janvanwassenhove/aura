@@ -54,6 +54,12 @@ Avoid over-engineering: one service per bounded context, one ABC per interface.
 Unit tests cover: schema serialization, behavior state transitions, approval gate logic.  
 Integration tests cover: full text turn → intent → tool → fake motion → transcript.
 
+### IX. The Drawings Are Part of the Contract
+`docs/diagrams/` holds the canonical drawings of this system: the trust boundary, one turn, the loops, the knowledge model, envelope encryption, the bounds on a delegated agent, hook ordering, and the build loop.  
+A change to the **shape** of the system is not done until the drawing matches it — a unit that moves data across the trust boundary, changes what the approval gate covers, alters a loop's cadence, adds a node or edge type, changes the key hierarchy, or moves a sub-agent's bounds must update the corresponding SVG in the same unit.  
+A diagram that used to be true is worse than no diagram, because it is believed.  
+`docs/diagrams/README.md` lists which file covers what, and the house style for adding one.
+
 ---
 
 ## Architecture Constraints
@@ -97,4 +103,4 @@ Amendments require: documented rationale, update to affected ADR(s), migration p
 All PRs must verify compliance with the Hardware Abstraction and Safety Gates principles.  
 Complexity violations must be justified in `.specify/specs/NNN/plan.md` under the **Complexity Tracking** section.
 
-**Version**: 1.0.0 | **Ratified**: 2026-04-25 | **Last Amended**: 2026-04-25
+**Version**: 1.1.0 | **Ratified**: 2026-04-25 | **Last Amended**: 2026-08-11 (added principle IX)

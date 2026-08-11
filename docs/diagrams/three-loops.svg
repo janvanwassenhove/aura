@@ -1,0 +1,83 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000" role="img"
+     aria-label="Three loops on three clocks. Perception runs continuously against the camera: frame, downscale, embedding, match. Conversation is event-driven and passes through idle, listening, transcribing, thinking and speaking, returning to idle when it is done, with interrupted drawn as a state of its own rather than an error path. Maintenance runs every five minutes, checking whether the robot is reachable, the key is valid and the store is encrypted. Below, two panels show where the bugs actually live: shared hardware, where face recognition and gesture detection both want the same camera frame, and output becoming input, where the speaker sits next to the microphone.">
+  <defs>
+    <pattern id="g4" width="24" height="24" patternUnits="userSpaceOnUse">
+      <path d="M24 0H0V24" fill="none" stroke="#c9b998" stroke-width="0.5" opacity="0.35"/>
+    </pattern>
+    <marker id="a4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0 0 L10 5 L0 10 z" fill="#34302b"/>
+    </marker>
+    <marker id="a4r" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0 0 L10 5 L0 10 z" fill="#c0522d"/>
+    </marker>
+  </defs>
+
+  <rect width="1000" height="1000" fill="#f4efe3"/>
+  <rect width="1000" height="1000" fill="url(#g4)"/>
+  <rect x="12" y="12" width="976" height="976" fill="none" stroke="#b8933f" stroke-width="1.4"/>
+  <rect x="21" y="21" width="958" height="958" fill="none" stroke="#b8933f" stroke-width="0.7" opacity="0.6"/>
+
+  <text x="48" y="70" font-family="Consolas, ui-monospace, monospace" font-size="20" letter-spacing="3" fill="#8a7a55">FIG. 1 — THREE LOOPS, THREE CLOCKS</text>
+
+  <!-- perception -->
+  <rect x="48" y="100" width="904" height="130" fill="#efe7d6" stroke="#34302b" stroke-width="2.5"/>
+  <text x="72" y="140" font-family="Consolas, ui-monospace, monospace" font-size="24" fill="#34302b">PERCEPTION</text>
+  <text x="790" y="138" font-family="Consolas, ui-monospace, monospace" font-size="17" letter-spacing="2" fill="#c0522d">CONTINUOUS</text>
+  <text x="72" y="178" font-family="Consolas, ui-monospace, monospace" font-size="19" fill="#6f6659">frame &#8594; downscale &#8594; embedding &#8594; match against the gallery</text>
+  <text x="72" y="210" font-family="Consolas, ui-monospace, monospace" font-size="19" fill="#34302b">knowing who walked in is not a reply to a question</text>
+
+  <!-- conversation -->
+  <rect x="48" y="252" width="904" height="248" fill="#efe7d6" stroke="#34302b" stroke-width="2.5"/>
+  <text x="72" y="292" font-family="Consolas, ui-monospace, monospace" font-size="24" fill="#34302b">CONVERSATION</text>
+  <text x="762" y="290" font-family="Consolas, ui-monospace, monospace" font-size="17" letter-spacing="2" fill="#c0522d">EVENT-DRIVEN</text>
+
+  <g font-family="Consolas, ui-monospace, monospace" font-size="16" fill="#34302b">
+    <rect x="72" y="318" width="84" height="40" fill="#f4efe3" stroke="#34302b" stroke-width="1.6"/>
+    <text x="114" y="344" text-anchor="middle">IDLE</text>
+    <rect x="186" y="318" width="132" height="40" fill="#f4efe3" stroke="#34302b" stroke-width="1.6"/>
+    <text x="252" y="344" text-anchor="middle">LISTENING</text>
+    <rect x="348" y="318" width="168" height="40" fill="#f4efe3" stroke="#34302b" stroke-width="1.6"/>
+    <text x="432" y="344" text-anchor="middle">TRANSCRIBING</text>
+    <rect x="546" y="318" width="126" height="40" fill="#f4efe3" stroke="#34302b" stroke-width="1.6"/>
+    <text x="609" y="344" text-anchor="middle">THINKING</text>
+    <rect x="702" y="318" width="126" height="40" fill="#f4efe3" stroke="#34302b" stroke-width="1.6"/>
+    <text x="765" y="344" text-anchor="middle">SPEAKING</text>
+  </g>
+  <line x1="156" y1="338" x2="184" y2="338" stroke="#34302b" stroke-width="1.8" marker-end="url(#a4)"/>
+  <line x1="318" y1="338" x2="346" y2="338" stroke="#34302b" stroke-width="1.8" marker-end="url(#a4)"/>
+  <line x1="516" y1="338" x2="544" y2="338" stroke="#34302b" stroke-width="1.8" marker-end="url(#a4)"/>
+  <line x1="672" y1="338" x2="700" y2="338" stroke="#34302b" stroke-width="1.8" marker-end="url(#a4)"/>
+
+  <!-- done: speaking back to idle -->
+  <path d="M765 358 L765 392 L114 392 L114 360" fill="none" stroke="#34302b" stroke-width="1.8" marker-end="url(#a4)"/>
+  <rect x="410" y="378" width="76" height="24" fill="#efe7d6"/>
+  <text x="448" y="397" text-anchor="middle" font-family="Consolas, ui-monospace, monospace" font-size="16" fill="#8a7a55">done</text>
+
+  <!-- interrupted -->
+  <rect x="546" y="424" width="180" height="40" fill="#f6e5dc" stroke="#c0522d" stroke-width="2"/>
+  <text x="636" y="450" text-anchor="middle" font-family="Consolas, ui-monospace, monospace" font-size="16" fill="#c0522d">INTERRUPTED</text>
+  <path d="M765 358 L765 444 L730 444" fill="none" stroke="#c0522d" stroke-width="1.8" marker-end="url(#a4r)"/>
+  <path d="M546 444 L140 444 L140 362" fill="none" stroke="#c0522d" stroke-width="1.8" marker-end="url(#a4r)"/>
+  <text x="750" y="486" text-anchor="end" font-family="Consolas, ui-monospace, monospace" font-size="18" fill="#c0522d">a state of its own, not an error path</text>
+
+  <!-- maintenance -->
+  <rect x="48" y="522" width="904" height="130" fill="#efe7d6" stroke="#34302b" stroke-width="2.5"/>
+  <text x="72" y="562" font-family="Consolas, ui-monospace, monospace" font-size="24" fill="#34302b">MAINTENANCE</text>
+  <text x="730" y="560" font-family="Consolas, ui-monospace, monospace" font-size="17" letter-spacing="2" fill="#c0522d">EVERY 5 MINUTES</text>
+  <text x="72" y="600" font-family="Consolas, ui-monospace, monospace" font-size="19" fill="#6f6659">robot reachable? key valid? store actually encrypted?</text>
+  <text x="72" y="632" font-family="Consolas, ui-monospace, monospace" font-size="19" fill="#34302b">it reconnects by itself — and it reports that it did</text>
+
+  <!-- between the loops -->
+  <line x1="48" y1="700" x2="952" y2="700" stroke="#b8933f" stroke-width="1"/>
+  <text x="48" y="738" font-family="Consolas, ui-monospace, monospace" font-size="17" letter-spacing="2" fill="#8a7a55">THE BUGS ARE NOT IN THE LOOPS — THEY ARE BETWEEN THEM</text>
+
+  <rect x="48" y="762" width="904" height="98" fill="#efe7d6" stroke="#34302b" stroke-width="2"/>
+  <text x="72" y="798" font-family="Consolas, ui-monospace, monospace" font-size="21" fill="#34302b">SHARED HARDWARE</text>
+  <text x="72" y="828" font-family="Consolas, ui-monospace, monospace" font-size="18" fill="#6f6659">face recognition and gesture detection want the same camera frame</text>
+  <text x="72" y="852" font-family="Consolas, ui-monospace, monospace" font-size="18" fill="#c0522d">&#8594; one shared frame, with a short time-to-live</text>
+
+  <rect x="48" y="876" width="904" height="98" fill="#efe7d6" stroke="#34302b" stroke-width="2"/>
+  <text x="72" y="912" font-family="Consolas, ui-monospace, monospace" font-size="21" fill="#34302b">OUTPUT BECOMES INPUT</text>
+  <text x="72" y="942" font-family="Consolas, ui-monospace, monospace" font-size="18" fill="#6f6659">the speaker sits next to the microphone, joined by the air in the room</text>
+  <text x="72" y="966" font-family="Consolas, ui-monospace, monospace" font-size="18" fill="#c0522d">&#8594; gate it where the loop closes</text>
+</svg>

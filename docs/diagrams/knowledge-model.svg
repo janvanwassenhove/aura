@@ -1,0 +1,73 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 780" role="img"
+     aria-label="The graph model, in four node types. A person node — which holds the key — points to facts about that person, and to skills, which may belong to one person or to everybody. Each fact mentions topics, and the same topic can be reached from two different people's facts, which is what makes a shared topic the cheapest possible context. Topics are never entered by anyone: they exist because a fact mentioned them. Delete the person and their key goes with them, so their facts and every edge from them go too.">
+  <defs>
+    <pattern id="g5" width="24" height="24" patternUnits="userSpaceOnUse">
+      <path d="M24 0H0V24" fill="none" stroke="#c9b998" stroke-width="0.5" opacity="0.35"/>
+    </pattern>
+    <marker id="a5" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0 0 L10 5 L0 10 z" fill="#8a7a55"/>
+    </marker>
+  </defs>
+
+  <rect width="1000" height="780" fill="#f4efe3"/>
+  <rect width="1000" height="780" fill="url(#g5)"/>
+  <rect x="12" y="12" width="976" height="756" fill="none" stroke="#b8933f" stroke-width="1.4"/>
+  <rect x="21" y="21" width="958" height="738" fill="none" stroke="#b8933f" stroke-width="0.7" opacity="0.6"/>
+
+  <text x="48" y="70" font-family="Consolas, ui-monospace, monospace" font-size="20" letter-spacing="3" fill="#8a7a55">FIG. 2 — FOUR KINDS OF NODE</text>
+
+  <!-- edges, drawn first so the nodes sit on top -->
+  <g stroke="#8a7a55" stroke-width="1.8" fill="none">
+    <line x1="238" y1="256" x2="336" y2="196" marker-end="url(#a5)"/>
+    <line x1="242" y1="290" x2="336" y2="290" marker-end="url(#a5)"/>
+    <line x1="238" y1="324" x2="336" y2="384" marker-end="url(#a5)"/>
+    <line x1="600" y1="188" x2="700" y2="170" marker-end="url(#a5)"/>
+    <line x1="600" y1="200" x2="700" y2="286" marker-end="url(#a5)"/>
+    <line x1="600" y1="292" x2="700" y2="296" marker-end="url(#a5)"/>
+    <line x1="600" y1="388" x2="700" y2="404" marker-end="url(#a5)"/>
+    <line x1="600" y1="376" x2="700" y2="306" marker-end="url(#a5)"/>
+    <line x1="164" y1="366" x2="164" y2="452" marker-end="url(#a5)"/>
+  </g>
+
+  <!-- person -->
+  <circle cx="164" cy="290" r="76" fill="#34302b"/>
+  <text x="164" y="284" text-anchor="middle" font-family="Consolas, ui-monospace, monospace" font-size="20" fill="#f4efe3">PERSON</text>
+  <text x="164" y="312" text-anchor="middle" font-family="Consolas, ui-monospace, monospace" font-size="16" fill="#c9b998">holds the key</text>
+
+  <!-- facts -->
+  <g font-family="Consolas, ui-monospace, monospace" font-size="18" fill="#34302b">
+    <rect x="338" y="164" width="262" height="52" fill="#efe7d6" stroke="#34302b" stroke-width="2"/>
+    <text x="469" y="196" text-anchor="middle">FACT &#183; sport</text>
+    <rect x="338" y="264" width="262" height="52" fill="#efe7d6" stroke="#34302b" stroke-width="2"/>
+    <text x="469" y="296" text-anchor="middle">FACT &#183; likes</text>
+    <rect x="338" y="364" width="262" height="52" fill="#efe7d6" stroke="#34302b" stroke-width="2"/>
+    <text x="469" y="396" text-anchor="middle">FACT &#183; habit</text>
+  </g>
+
+  <!-- topics -->
+  <g font-family="Consolas, ui-monospace, monospace" font-size="17" fill="#34302b">
+    <circle cx="760" cy="164" r="56" fill="#efe7d6" stroke="#8a7a55" stroke-width="2"/>
+    <text x="760" y="170" text-anchor="middle">running</text>
+    <circle cx="760" cy="296" r="60" fill="#efe7d6" stroke="#8a7a55" stroke-width="2"/>
+    <text x="760" y="302" text-anchor="middle">espresso</text>
+    <circle cx="760" cy="424" r="56" fill="#efe7d6" stroke="#8a7a55" stroke-width="2"/>
+    <text x="760" y="430" text-anchor="middle">Java 21</text>
+  </g>
+  <text x="836" y="272" font-family="Consolas, ui-monospace, monospace" font-size="17" fill="#c0522d">one topic,</text>
+  <text x="836" y="296" font-family="Consolas, ui-monospace, monospace" font-size="17" fill="#c0522d">reached from</text>
+  <text x="836" y="320" font-family="Consolas, ui-monospace, monospace" font-size="17" fill="#c0522d">two facts &#8212;</text>
+  <text x="836" y="344" font-family="Consolas, ui-monospace, monospace" font-size="17" fill="#c0522d">and from</text>
+  <text x="836" y="368" font-family="Consolas, ui-monospace, monospace" font-size="17" fill="#c0522d">other people</text>
+
+  <!-- skill -->
+  <rect x="48" y="454" width="232" height="60" fill="#efe7d6" stroke="#34302b" stroke-width="2" stroke-dasharray="8 5"/>
+  <text x="164" y="492" text-anchor="middle" font-family="Consolas, ui-monospace, monospace" font-size="18" fill="#34302b">SKILL</text>
+  <text x="300" y="480" font-family="Consolas, ui-monospace, monospace" font-size="18" fill="#6f6659">a procedure that belongs to one person,</text>
+  <text x="300" y="506" font-family="Consolas, ui-monospace, monospace" font-size="18" fill="#6f6659">or to everybody</text>
+
+  <line x1="48" y1="566" x2="952" y2="566" stroke="#b8933f" stroke-width="1"/>
+  <text x="48" y="606" font-family="Consolas, ui-monospace, monospace" font-size="19" fill="#34302b">Topics are never entered by anyone. They exist because a fact mentioned</text>
+  <text x="48" y="636" font-family="Consolas, ui-monospace, monospace" font-size="19" fill="#34302b">them — so the vocabulary is emergent rather than designed. Nobody sat</text>
+  <text x="48" y="666" font-family="Consolas, ui-monospace, monospace" font-size="19" fill="#34302b">down and decided the taxonomy. It accreted.</text>
+  <text x="48" y="716" font-family="Consolas, ui-monospace, monospace" font-size="19" fill="#c0522d">Delete the person and the key goes with them: no key, no facts, no edges.</text>
+</svg>

@@ -1,0 +1,73 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 900" role="img"
+     aria-label="One conversational turn. Someone speaks. Round one runs a fast model on a short context — who is talking, a handful of facts about them, and the message — and most turns end there, going straight to speaking while still listening. If tools are needed, round two onwards switches to a stronger model that orchestrates: independent tool calls run concurrently, while anything approval-gated serialises through an approval gate that stops and asks the owner every time — unless the owner has switched that one tool off themselves — and never banks that approval for later.">
+  <defs>
+    <pattern id="g2" width="24" height="24" patternUnits="userSpaceOnUse">
+      <path d="M24 0H0V24" fill="none" stroke="#c9b998" stroke-width="0.5" opacity="0.35"/>
+    </pattern>
+    <marker id="a2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0 0 L10 5 L0 10 z" fill="#34302b"/>
+    </marker>
+    <marker id="a2r" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0 0 L10 5 L0 10 z" fill="#c0522d"/>
+    </marker>
+  </defs>
+
+  <rect width="1000" height="900" fill="#f4efe3"/>
+  <rect width="1000" height="900" fill="url(#g2)"/>
+  <rect x="12" y="12" width="976" height="876" fill="none" stroke="#b8933f" stroke-width="1.4"/>
+  <rect x="21" y="21" width="958" height="858" fill="none" stroke="#b8933f" stroke-width="0.7" opacity="0.6"/>
+
+  <text x="48" y="70" font-family="Consolas, ui-monospace, monospace" font-size="20" letter-spacing="3" fill="#8a7a55">FIG. 2 — ONE TURN</text>
+
+  <!-- someone speaks -->
+  <rect x="48" y="100" width="330" height="66" fill="#efe7d6" stroke="#34302b" stroke-width="2.5"/>
+  <text x="72" y="142" font-family="Consolas, ui-monospace, monospace" font-size="22" fill="#34302b">someone speaks</text>
+  <line x1="213" y1="166" x2="213" y2="204" stroke="#34302b" stroke-width="2.5" marker-end="url(#a2)"/>
+
+  <!-- round 1 -->
+  <rect x="48" y="206" width="580" height="132" fill="#efe7d6" stroke="#34302b" stroke-width="2.5"/>
+  <text x="72" y="240" font-family="Consolas, ui-monospace, monospace" font-size="17" letter-spacing="2" fill="#8a7a55">ROUND 1</text>
+  <text x="72" y="278" font-family="Consolas, ui-monospace, monospace" font-size="22" fill="#34302b">a fast model</text>
+  <text x="72" y="314" font-family="Consolas, ui-monospace, monospace" font-size="19" fill="#6f6659">short context: who is here, a few facts</text>
+  <line x1="213" y1="338" x2="213" y2="378" stroke="#34302b" stroke-width="2.5" marker-end="url(#a2)"/>
+
+  <!-- decision -->
+  <path d="M48 440 L213 380 L378 440 L213 500 Z" fill="#efe7d6" stroke="#34302b" stroke-width="2.5"/>
+  <text x="213" y="434" text-anchor="middle" font-family="Consolas, ui-monospace, monospace" font-size="21" fill="#34302b">tools</text>
+  <text x="213" y="460" text-anchor="middle" font-family="Consolas, ui-monospace, monospace" font-size="21" fill="#34302b">needed?</text>
+
+  <!-- no -> speak -->
+  <line x1="378" y1="440" x2="556" y2="440" stroke="#34302b" stroke-width="2.5" marker-end="url(#a2)"/>
+  <text x="466" y="424" text-anchor="middle" font-family="Consolas, ui-monospace, monospace" font-size="17" letter-spacing="1" fill="#8a7a55">NO</text>
+  <text x="466" y="474" text-anchor="middle" font-family="Consolas, ui-monospace, monospace" font-size="17" fill="#8a7a55">most turns</text>
+
+  <rect x="558" y="386" width="394" height="112" fill="#efe7d6" stroke="#34302b" stroke-width="2.5"/>
+  <text x="582" y="428" font-family="Consolas, ui-monospace, monospace" font-size="22" fill="#34302b">it speaks — and</text>
+  <text x="582" y="462" font-family="Consolas, ui-monospace, monospace" font-size="22" fill="#34302b">keeps listening</text>
+  <text x="582" y="488" font-family="Consolas, ui-monospace, monospace" font-size="17" fill="#c0522d">so you can cut it off mid-word</text>
+
+  <!-- yes -> round 2 -->
+  <line x1="213" y1="500" x2="213" y2="546" stroke="#34302b" stroke-width="2.5" marker-end="url(#a2)"/>
+  <text x="234" y="530" font-family="Consolas, ui-monospace, monospace" font-size="17" letter-spacing="1" fill="#8a7a55">YES</text>
+
+  <rect x="48" y="548" width="580" height="150" fill="#efe7d6" stroke="#34302b" stroke-width="2.5"/>
+  <text x="72" y="582" font-family="Consolas, ui-monospace, monospace" font-size="17" letter-spacing="2" fill="#8a7a55">ROUND 2 ONWARDS</text>
+  <text x="72" y="620" font-family="Consolas, ui-monospace, monospace" font-size="22" fill="#34302b">a stronger model orchestrates</text>
+  <text x="72" y="654" font-family="Consolas, ui-monospace, monospace" font-size="19" fill="#6f6659">independent tools run concurrently</text>
+  <text x="72" y="682" font-family="Consolas, ui-monospace, monospace" font-size="19" fill="#6f6659">approval-gated ones serialise</text>
+
+  <!-- gate -->
+  <line x1="338" y1="698" x2="338" y2="738" stroke="#c0522d" stroke-width="2.5" marker-end="url(#a2r)"/>
+  <rect x="48" y="740" width="580" height="134" fill="#f6e5dc" stroke="#c0522d" stroke-width="3"/>
+  <text x="72" y="778" font-family="Consolas, ui-monospace, monospace" font-size="20" letter-spacing="2" fill="#c0522d">APPROVAL GATE</text>
+  <text x="72" y="806" font-family="Consolas, ui-monospace, monospace" font-size="19" fill="#34302b">does it touch the world? then it stops</text>
+  <text x="72" y="832" font-family="Consolas, ui-monospace, monospace" font-size="19" fill="#34302b">and asks the owner — every single time,</text>
+  <text x="72" y="856" font-family="Consolas, ui-monospace, monospace" font-size="17" fill="#c0522d">unless you switched that one tool off yourself</text>
+
+  <!-- gate returns to speaking -->
+  <path d="M628 800 L755 800 L755 500" fill="none" stroke="#34302b" stroke-width="2.5" marker-end="url(#a2)"/>
+  <text x="775" y="700" font-family="Consolas, ui-monospace, monospace" font-size="17" fill="#8a7a55">approval is not a</text>
+  <text x="775" y="726" font-family="Consolas, ui-monospace, monospace" font-size="17" fill="#8a7a55">token you can bank:</text>
+  <text x="775" y="752" font-family="Consolas, ui-monospace, monospace" font-size="17" fill="#8a7a55">when a queue drains,</text>
+  <text x="775" y="778" font-family="Consolas, ui-monospace, monospace" font-size="17" fill="#8a7a55">it asks again</text>
+</svg>

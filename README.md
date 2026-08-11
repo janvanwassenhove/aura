@@ -3,16 +3,42 @@
 > **A desk robot that knows who you are, joins your workday, and keeps your
 > life private — on your own laptop.**
 
-AURA turns a **Reachy Mini** into a personal chief-of-staff: it recognises you,
-holds a real spoken conversation, reaches into your mail, calendar, chat and
-tasks, learns how *you* work, and moves like it means it. Everything personal
-is encrypted on your machine and never leaves it.
+<p align="center">
+  <img src="docs/screenshots/reachy-mini.webp" alt="An assembled Reachy Mini: a white rounded body, a head with two dark camera eyes, and two coiled wire antennae." width="440">
+</p>
+
+AURA turns a **Reachy Mini** into a personal chief-of-staff. It recognises the
+person in front of it, holds a real spoken conversation, reaches into mail,
+calendar, chat and tasks, learns how *you* work, and moves like it means it.
+
+The interesting part is where things live. Every key, every profile, every face
+embedding stays on your laptop, encrypted with a passphrase only you have. The
+robot on the desk holds nothing at all — steal it and you get motors. And
+because the robot is only a body, **the entire system runs without one**, which
+is how most of it was built.
 
 **[Download the app](https://github.com/janvanwassenhove/aura/releases/latest)** ·
-[Screenshots](https://github.com/janvanwassenhove/aura/releases/latest) (captured
-fresh in CI with every release) ·
+[What you need](#what-you-need) ·
+[How it fits together](#how-it-fits-together) ·
 [How it was built](docs/implementation-backlog.md) ·
 [Architecture decisions](docs/adr/)
+
+---
+
+## See it
+
+<p align="center">
+  <img src="docs/screenshots/console.webp" alt="The AURA console: robot state and camera on the left, the conversation in the middle, and the brain panel on the right." width="900">
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/brain-person.webp" alt="A person's profile in the brain panel: facts grouped by category, each with wiki-style links to topics." width="440">
+  <img src="docs/screenshots/knowledge-graph.webp" alt="The knowledge graph: a person node surrounded by facts, skills and the topics they mention." width="440">
+</p>
+
+*Captured from a demo build. The only profile in these images is fictional — the
+release pipeline photographs a throwaway stack precisely so no real one can
+appear here.*
 
 ### The name is the promise
 
@@ -25,17 +51,16 @@ fresh in CI with every release) ·
 
 ### Why it feels different
 
-- **It looks at you and talks back.** Sub-second spoken replies over a live
-  audio session, head tracking that follows your face, gestures timed to the
-  words. Say "Hey Richie" and just talk.
+- **It looks at you and talks back.** Spoken replies over a live audio session,
+  head tracking that follows your face, gestures timed to the words. Say "Hey
+  Richie" and just talk.
 - **It knows the room.** Faces are recognised, new visitors become guests, and
   every person gets their own encrypted profile — greeting, tone and context
   adapt to who is standing there.
-- **It does the work.** Mail, calendar, Teams, todos, music, screen control
-  and dev tasks behind one conversation, with approval gates on anything
-  sensitive.
-- **It gets better by itself.** Skills are written from real usage and
-  rewritten when the evidence says they should be.
+- **It does the work.** Mail, calendar, Teams, todos, music, screen control and
+  dev tasks behind one conversation, with approval gates on anything sensitive.
+- **It gets better by itself.** Skills are written from real usage — and the
+  assistant may *propose* one, but only you can save it.
 - **It keeps running when the internet doesn't.** Offline tier, local models,
   and a robot that behaves gracefully instead of freezing.
 - **Privacy is the product, not a checkbox.** AES-256-GCM per-person
@@ -43,17 +68,76 @@ fresh in CI with every release) ·
   destructive actions, and a scanner that blocks personal data from ever
   reaching git.
 
-### In one picture
+---
 
-```
-┌──────────────── LAPTOP ────────────────┐        ┌──── REACHY (Pi 5) ────┐
-│  aura-brain (:8020, loopback)           │  LAN   │  robot-runtime (:8001) │
-│  orchestrator · conversation · memory · │ ◄────► │  motion · audio I/O ·  │
-│  identity · connectors · knowledge 🔐   │ REST+WS│  offline behavior loop │
-│                                         │        └────────────────────────┘
-│  operator-console (:5173, Vue 3)        │   The Pi never holds keys,
-└─────────────────────────────────────────┘   tokens, or profile data.
-```
+## What you need
+
+**Short answer: a laptop. The robot is optional, and it was optional for most
+of this project's life** — the physical Reachy arrived months after development
+started, and everything until then was built and tested against a fake robot
+that speaks the same network contract.
+
+### To try the whole system — no hardware, no keys, no account
+
+| | |
+|---|---|
+| A laptop | Windows, macOS (Apple Silicon or Intel) or Linux |
+| Nothing else | `ROBOT_ADAPTER=fake` and `LLM_PROVIDER=echo` are the defaults in the dev environment |
+
+You get the console, the brain, the encrypted knowledge store, the graph,
+skills, the approval gate and the event log. Replies come back as `[echo] …`
+because no model is attached, which is enough to walk the whole system.
+
+### To have real conversations
+
+| | |
+|---|---|
+| An API key | OpenAI, OpenRouter or Google Gemini — one is enough |
+| Optional: a Microsoft 365 licence | Only for the live Work IQ connector; `M365_CONNECTOR=mock` needs no licence and no account |
+
+### To give it a body
+
+| | |
+|---|---|
+| A **Reachy Mini Wireless** | The wireless model, please: it has the Raspberry Pi 5, the battery and the radio *inside* the robot, so it is a host on your network rather than a peripheral on a cable. The two-machine split in this repository assumes exactly that. |
+| The same Wi-Fi | Laptop and robot on one network; the robot is reached at `reachy-mini.local:8001`, or by address |
+| Optional: the face-recognition extra | Face recognition needs the `[recognition]` extra (insightface). Without it the system runs fine and recognition stays inert. Note that insightface's pretrained models are published for non-commercial research use — check the licence of any model you ship. |
+
+Without the robot you lose exactly three things: motion, the camera (so face
+recognition and gestures), and room audio. Everything else — the whole brain,
+every connector, the approval machinery, the knowledge layer — behaves
+identically.
+
+### To develop on it
+
+| | |
+|---|---|
+| Python 3.11+ and [uv](https://docs.astral.sh/uv/) | The workspace is a uv monorepo |
+| Node 20+ | For the Vue console and the Electron shell |
+| git | And one command to arm the privacy gate, below |
+
+---
+
+## How it fits together
+
+**Two machines, and one of them is deliberately stupid.** Everything that could
+identify you lives on the laptop. The robot serves motion, audio and camera
+frames, and stores nothing at all.
+
+![Trust boundary: the laptop holds every key, token and profile and runs all five modules on one event bus; the robot has motors, speaker, microphone array and camera and stores nothing. A Wi-Fi link carries only move, speak and frame.](docs/diagrams/trust-boundary.svg)
+
+**One conversational turn.** A fast model answers most turns from a short
+context. Only turns that need tools reach the stronger model, and anything that
+touches the outside world stops at the approval gate first.
+
+![One turn: someone speaks, round one uses a fast model, most turns end there; if tools are needed round two onwards orchestrates with a stronger model and approval-gated calls stop and ask the owner.](docs/diagrams/one-turn.svg)
+
+More drawings — the loops that run whether or not anyone is talking, the
+knowledge model, envelope encryption, the bounds on a delegated agent — live in
+**[docs/diagrams/](docs/diagrams/)**, and the written architecture is in
+**[docs/architecture/overview.md](docs/architecture/overview.md)**.
+
+---
 
 ## Install (no build required)
 
@@ -63,12 +147,9 @@ Windows (`.exe`), macOS (`.dmg`, Apple Silicon + Intel) or Linux
 (`.AppImage`/`.deb`). First launch installs its own Python runtime; the app
 then checks for updates and offers to install them for you.
 
-You need a Reachy Mini for the embodiment, but **the whole stack runs without
-hardware** (FakeRobot) if you just want to try it.
+## Quick start (from source)
 
-## Quick start
-
-**Dry run (no hardware, no keys):**
+**Dry run — no hardware, no keys:**
 
 ```bash
 cp infra/dev/.env.example infra/dev/.env       # defaults: FakeRobot + echo LLM + mock M365
@@ -99,7 +180,9 @@ encrypted knowledge store.
   needs explicit approval for every write, commit, or push (off by default).
 - **Presentations**: synced speech + gesture co-pilot with slide navigation.
 - **Voice**: offline STT/TTS (whisper.cpp, kokoro) or the OpenAI Realtime
-  speech-to-speech transport with barge-in.
+  speech-to-speech transport with barge-in — a real state machine with
+  INTERRUPTED as a first-class state
+  ([details](docs/voice-conversation.md)).
 - **Survives failures**: heartbeat monitoring degrades gracefully — local LLM
   when the internet dies, regex fallback after that, and an on-device loop so
   the robot stays polite even with no brain at all.
@@ -107,28 +190,39 @@ encrypted knowledge store.
   conversation and mutes the microphone — because a voice assistant that can
   be triggered by ambient noise must be silenceable in one click.
 
+<p align="center">
+  <img src="docs/screenshots/robot-offline.webp" alt="The console with the robot offline: a diagnosis explaining the connection was refused, an address field pre-filled, and a button to go and find the robot." width="900">
+</p>
+
+*What a failure looks like: not a spinner, but the reason plus the field that
+fixes it.*
+
 ## Security model (ADR-008)
 
 | Principle | Mechanism |
 |-----------|-----------|
 | Profiles encrypted at rest | AES-256-GCM envelope: per-person DEK wrapped by an owner master key (scrypt from your passphrase) |
+| The passphrase is yours alone | Held in the OS credential store, written only after being read back — there is one copy, and losing it means the data is gone |
 | Local-only | Knowledge never egresses; prompts get a minimal role-based slice, never the profile |
 | Minors protected | `role=minor` → explicit facts only, no passive learning, ever (consent is owner-granted, explicit) |
 | Right to be forgotten | Deleting a person destroys their key — cryptographic erasure |
 | Destructive ops gated | Phone step-up approval via webhook when configured; otherwise a typed confirmation from the owner's own console (erasure must never be impossible) |
-| Sensitive actions gated | Approval gate is never bypassed; offline-queued actions never auto-execute on reconnect |
+| Sensitive actions gated | The gate is code in the tool path, not a line in a prompt. It can only be relaxed by the owner, per tool, with a checkbox that writes itself into the settings file. Offline-queued actions never auto-execute on reconnect |
 | The robot is dumb | The Pi holds no keys, tokens, or data — stealing it yields motors |
 | No secrets in logs | Tokens never logged; keyring-backed storage |
 
-Transparency: the console's **🧠 Knowledge** panel shows every person, every
-fact (editable), every observed signal (with confidence) — and the lock state.
+![Envelope encryption: a passphrase in the OS keyring derives an owner key that is never stored; the owner key wraps one key per person; each person's key encrypts only their own records, and destroying it leaves unreadable ciphertext.](docs/diagrams/envelope-encryption.svg)
+
+Transparency: the console's **brain** panel shows every person, every fact
+(editable), every observed signal (with confidence) — and the lock state.
 
 ## Repository layout
 
 ```
 apps/
 ├── aura-brain/           # THE laptop process: all five modules on one bus + wizard
-└── operator-console/     # Vue 3 + Pinia console
+├── operator-console/     # Vue 3 + Pinia console
+└── desktop/              # Electron shell: spawns the brain, serves the console
 
 services/
 ├── robot-runtime/        # Runs on the Pi: RobotAdapter, behavior engine, offline loop
@@ -150,9 +244,11 @@ infra/
 └── two-host-bringup.md   # Laptop ↔ Pi bring-up
 
 docs/
-├── setup-guide.md        # ★ Device day: unboxing → talking robot
+├── setup-guide.md             # ★ Device day: unboxing → talking robot
+├── diagrams/                  # ★ The canonical drawings — keep them true
+├── architecture/overview.md   # Written architecture
 ├── implementation-backlog.md  # The autonomous build ledger (source of truth)
-└── adr/                  # Architecture decision records (ADR-001…008)
+└── adr/                       # Architecture decision records (ADR-001…008)
 ```
 
 The five laptop services are **mounted into one `aura-brain` process** (one
@@ -180,8 +276,11 @@ Key rules (see [.specify/memory/constitution.md](.specify/memory/constitution.md
 - **FakeRobot is the primary dev target** — everything works without hardware.
 - No Reachy SDK imports outside `services/robot-runtime/`.
 - `M365_CONNECTOR=mock` needs no license; `LLM_PROVIDER=echo` needs no key.
-- Sensitive actions require approval — the gate is never bypassed.
+- Sensitive actions require approval — the gate is code, not a prompt.
 - Auth tokens must never appear in logs.
+- **If you change the shape of the system, update the drawing.** The diagrams
+  in `docs/diagrams/` are documentation, and documentation that lies is worse
+  than none.
 
 ## Status
 
@@ -216,27 +315,3 @@ Two caveats worth knowing before you build on this:
   degrades to inert). Check the licence of any model you ship.
 - **The name and the robot are not mine to license.** Reachy Mini is Pollen
   Robotics' hardware; this project is an independent piece of software for it.
-
-## Natural voice conversation (U84)
-
-The conversation layer is a real state machine (`aura_brain/conversation_manager.py`):
-IDLE → LISTENING → TRANSCRIBING → THINKING → SPEAKING, with INTERRUPTED as a
-first-class state. Every transition is logged with turn id, `tts_playing`,
-`llm_active` and `cancel_requested` (never audio or secrets).
-
-**Barge-in** works end-to-end: while the robot speaks, the mic keeps
-listening; an interruption stops the robot's audio instantly
-(`POST /robot/audio/stop` → playbin cut), cancels the in-flight LLM call and
-the speak task, and the interrupting utterance becomes the new active turn —
-with one-shot context telling the LLM its previous answer was cut off.
-
-**Characters** (`personas/*.json`, seeded on first run): friendly_assistant,
-dry_tech_butler, kids_companion, workshop_coach, quiet_mode. A character sets
-the system prompt, verbosity/humor, voice + speed, motion energy and
-interruptibility (`wake_word` | `vad` | `off`). Select via Settings
-(`ACTIVE_CHARACTER`), list via `GET /setup/characters`.
-
-Key settings (Settings panel / env): `VOICE_MODE=wake_word`, `WAKE_WORD`,
-`ACTIVE_CHARACTER`, `BARGE_IN_FACTOR` (interrupt sensitivity),
-`SESSION_MEMORY`, `SPEAK_STREAMING` (off = smoothest playback). See
-`docs/conversation_diagnosis.md` for the architecture map.

@@ -4,6 +4,50 @@
 
 AURA (Adaptive Unified Robotic Assistant) is a modular, event-driven AI assistant platform running on Reachy Mini. It coordinates voice input, language model reasoning, M365 tool use, robot motion, and operator visibility through a set of loosely coupled services connected by a shared event bus.
 
+> **Deployment note (ADR-007).** The mermaid graphs below draw the five laptop
+> services as separate boxes, which is how they are *packaged and tested*. They
+> are not separate **deployables**: since ADR-007 they are mounted into one
+> `aura-brain` process on one in-process event bus. Six containers implied an
+> independence that did not exist. Read the boxes as modules, not as processes.
+
+---
+
+## The drawings
+
+The canonical drawings live in [`docs/diagrams/`](../diagrams/) and are kept true
+as a rule, not a habit (constitution IX). The ones that matter most here:
+
+### Two hosts, one trust boundary
+
+![Trust boundary: the laptop holds every key, token and profile and runs all five modules on one event bus; the robot — a Reachy Mini Wireless with a Raspberry Pi 5 inside — has motors, speaker, microphone array and camera, and stores nothing. A Wi-Fi link carries only move, speak and frame.](../diagrams/trust-boundary.svg)
+
+### One conversational turn
+
+![One turn: someone speaks, round one uses a fast model on a short context and most turns end there; if tools are needed, round two onwards orchestrates with a stronger model, and anything touching the outside world stops at the approval gate.](../diagrams/one-turn.svg)
+
+### Three loops on three clocks
+
+Perception is continuous, conversation is event-driven, maintenance runs every
+five minutes. The interesting failures are between them, not inside them.
+
+![Three loops: perception runs continuously against the camera; conversation is an event-driven state machine with interrupted as a first-class state; maintenance ticks every five minutes. Below, the two composition hazards: shared camera hardware, and the speaker feeding back into the microphone.](../diagrams/three-loops.svg)
+
+### The knowledge model
+
+![Four node types: a person who holds the key, facts belonging to that person, topics that exist only because a fact mentioned them, and skills that belong to one person or to everybody.](../diagrams/knowledge-model.svg)
+
+### Envelope encryption (ADR-008)
+
+![Envelope encryption: a passphrase in the OS keyring derives an owner key that is never stored; it wraps one key per person; each person's key encrypts only their own records, and destroying it leaves ciphertext nobody can read.](../diagrams/envelope-encryption.svg)
+
+### Bounds on a delegated agent
+
+![Delegation bounds: the main loop may delegate to a sub-agent that may read but never write and never delegate onward; level three does not exist by construction. The three bounds are a read-only allowlist checked in the tool path, a round budget, and a depth limit.](../diagrams/delegation-bounds.svg)
+
+### Where a hook sits
+
+![Hook ordering: the model asks for a tool, a blocking hook may replace the call outright, the approval gate stops anything touching the outside world, the tool runs, and a trailing hook appends a note before the result returns to the model.](../diagrams/hook-order.svg)
+
 ---
 
 ## High-Level Architecture

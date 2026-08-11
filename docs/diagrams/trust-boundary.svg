@@ -1,0 +1,80 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 880" role="img"
+     aria-label="Two hosts. The laptop holds API keys, OAuth tokens, encrypted profiles, face embeddings, conversation history and skills, and runs the orchestrator, conversation, connectors, memory and identity modules in one process on one event bus. The robot — a Reachy Mini Wireless with a Raspberry Pi inside — has motors, a speaker, a microphone array and a camera, and stores nothing at all: no keys, no tokens, no profiles. A single Wi-Fi link carries move, speak and frame; no secrets cross it.">
+  <defs>
+    <pattern id="grid" width="24" height="24" patternUnits="userSpaceOnUse">
+      <path d="M24 0H0V24" fill="none" stroke="#c9b998" stroke-width="0.5" opacity="0.35"/>
+    </pattern>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0 0 L10 5 L0 10 z" fill="#34302b"/>
+    </marker>
+    <marker id="arrowback" viewBox="0 0 10 10" refX="1" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M10 0 L0 5 L10 10 z" fill="#34302b"/>
+    </marker>
+  </defs>
+
+  <rect width="1000" height="880" fill="#f4efe3"/>
+  <rect width="1000" height="880" fill="url(#grid)"/>
+  <rect x="12" y="12" width="976" height="856" fill="none" stroke="#b8933f" stroke-width="1.4"/>
+  <rect x="21" y="21" width="958" height="838" fill="none" stroke="#b8933f" stroke-width="0.7" opacity="0.6"/>
+
+  <text x="48" y="72" font-family="Consolas, ui-monospace, monospace" font-size="20" letter-spacing="3" fill="#8a7a55">FIG. 1 — TRUST BOUNDARY</text>
+
+  <!-- LAPTOP -->
+  <rect x="48" y="102" width="904" height="286" fill="#efe7d6" stroke="#34302b" stroke-width="2.5"/>
+  <rect x="48" y="102" width="904" height="54" fill="#34302b"/>
+  <text x="72" y="139" font-family="Consolas, ui-monospace, monospace" font-size="24" letter-spacing="2" fill="#f4efe3">LAPTOP</text>
+  <text x="810" y="137" font-family="Consolas, ui-monospace, monospace" font-size="17" letter-spacing="1" fill="#d8c9a4">TRUSTED</text>
+
+  <text x="72" y="192" font-family="Consolas, ui-monospace, monospace" font-size="16" letter-spacing="2" fill="#8a7a55">HOLDS</text>
+  <g font-family="Consolas, ui-monospace, monospace" font-size="20" fill="#34302b">
+    <text x="72" y="228">API keys</text>
+    <text x="72" y="262">OAuth tokens</text>
+    <text x="72" y="296">Encrypted profiles</text>
+    <text x="72" y="330">Face embeddings</text>
+    <text x="72" y="364">Conversation history</text>
+  </g>
+
+  <line x1="500" y1="176" x2="500" y2="372" stroke="#b8933f" stroke-width="1"/>
+
+  <text x="536" y="192" font-family="Consolas, ui-monospace, monospace" font-size="16" letter-spacing="2" fill="#8a7a55">RUNS</text>
+  <g font-family="Consolas, ui-monospace, monospace" font-size="20" fill="#34302b">
+    <text x="536" y="228">orchestrator, conversation,</text>
+    <text x="536" y="262">connectors, memory, identity</text>
+    <text x="536" y="300">one process, one event bus</text>
+  </g>
+  <text x="536" y="352" font-family="Consolas, ui-monospace, monospace" font-size="20" fill="#c0522d">every decision is made here</text>
+
+  <!-- the link -->
+  <line x1="500" y1="392" x2="500" y2="474" stroke="#34302b" stroke-width="2.5" marker-start="url(#arrowback)" marker-end="url(#arrow)"/>
+  <text x="470" y="422" text-anchor="end" font-family="Consolas, ui-monospace, monospace" font-size="20" letter-spacing="1" fill="#34302b">Wi-Fi</text>
+  <text x="470" y="452" text-anchor="end" font-family="Consolas, ui-monospace, monospace" font-size="17" fill="#8a7a55">no cable, no dock</text>
+  <text x="530" y="422" font-family="Consolas, ui-monospace, monospace" font-size="20" fill="#34302b">move &#183; speak &#183; frame</text>
+  <text x="530" y="452" font-family="Consolas, ui-monospace, monospace" font-size="20" fill="#c0522d">no secrets cross</text>
+
+  <!-- ROBOT -->
+  <rect x="48" y="494" width="904" height="270" fill="#efe7d6" stroke="#34302b" stroke-width="2.5" stroke-dasharray="9 6"/>
+  <rect x="48" y="494" width="904" height="54" fill="#4a423a"/>
+  <text x="72" y="531" font-family="Consolas, ui-monospace, monospace" font-size="24" letter-spacing="2" fill="#f4efe3">ROBOT</text>
+  <text x="252" y="529" font-family="Consolas, ui-monospace, monospace" font-size="17" letter-spacing="1" fill="#d8c9a4">REACHY MINI WIRELESS &#183; RASPBERRY PI 5 INSIDE</text>
+
+  <text x="72" y="584" font-family="Consolas, ui-monospace, monospace" font-size="16" letter-spacing="2" fill="#8a7a55">HAS</text>
+  <g font-family="Consolas, ui-monospace, monospace" font-size="20" fill="#34302b">
+    <text x="72" y="620">Motors</text>
+    <text x="72" y="654">Speaker</text>
+    <text x="72" y="688">Microphone array</text>
+    <text x="72" y="722">Camera</text>
+  </g>
+
+  <line x1="500" y1="568" x2="500" y2="740" stroke="#b8933f" stroke-width="1"/>
+
+  <text x="536" y="584" font-family="Consolas, ui-monospace, monospace" font-size="16" letter-spacing="2" fill="#8a7a55">STORES</text>
+  <text x="536" y="632" font-family="Consolas, ui-monospace, monospace" font-size="34" fill="#c0522d">nothing</text>
+  <g font-family="Consolas, ui-monospace, monospace" font-size="20" fill="#6f6659">
+    <text x="536" y="672">no keys, no tokens,</text>
+    <text x="536" y="702">no profiles</text>
+  </g>
+  <text x="536" y="740" font-family="Consolas, ui-monospace, monospace" font-size="20" fill="#c0522d">steal it and you get motors</text>
+
+  <line x1="48" y1="796" x2="952" y2="796" stroke="#b8933f" stroke-width="1"/>
+  <text x="500" y="832" text-anchor="middle" font-family="Consolas, ui-monospace, monospace" font-size="19" fill="#8a7a55">the trust boundary and the software boundary are the same line</text>
+</svg>

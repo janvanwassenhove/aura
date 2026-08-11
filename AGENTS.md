@@ -54,6 +54,7 @@ All feature work begins with a specification. No implementation task exists with
 - **Events drive state** — all state changes must emit a typed Pydantic event on the event bus
 - **No secrets in logs** — auth tokens, personal data, and M365 content must never appear in log output
 - **STT/TTS is pluggable** — use `STT_PROVIDER` / `TTS_PROVIDER` env vars; never hardcode a vendor
+- **Change the shape, change the drawing** — a unit that alters the trust boundary, the turn, a loop's cadence, the knowledge model, the key hierarchy or a sub-agent's bounds updates the matching SVG in `docs/diagrams/` in the same unit (constitution IX)
 
 ### Project Map
 

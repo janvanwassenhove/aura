@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 985" role="img"
+     aria-label="What a delegated agent may reach. Level one is the main loop: it may read, it may write once the owner approves, and it may delegate. It delegates to a level-two sub-agent, which may read but may never write and may never delegate onward, and which returns a summary rather than a context. Level three is drawn as an empty dashed box: it does not exist, by construction. Below are the three bounds on a sub-agent: a read-only allowlist checked in the tool path, a budget of six rounds, and a depth limit of two levels.">
+  <defs>
+    <pattern id="g3" width="24" height="24" patternUnits="userSpaceOnUse">
+      <path d="M24 0H0V24" fill="none" stroke="#c9b998" stroke-width="0.5" opacity="0.35"/>
+    </pattern>
+    <marker id="a3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0 0 L10 5 L0 10 z" fill="#34302b"/>
+    </marker>
+  </defs>
+
+  <rect width="1000" height="985" fill="#f4efe3"/>
+  <rect width="1000" height="985" fill="url(#g3)"/>
+  <rect x="12" y="12" width="976" height="961" fill="none" stroke="#b8933f" stroke-width="1.4"/>
+  <rect x="21" y="21" width="958" height="943" fill="none" stroke="#b8933f" stroke-width="0.7" opacity="0.6"/>
+
+  <text x="48" y="70" font-family="Consolas, ui-monospace, monospace" font-size="20" letter-spacing="3" fill="#8a7a55">FIG. 1 — WHAT A DELEGATED AGENT MAY REACH</text>
+
+  <!-- level 1 -->
+  <rect x="48" y="100" width="904" height="146" fill="#efe7d6" stroke="#34302b" stroke-width="3"/>
+  <text x="72" y="142" font-family="Consolas, ui-monospace, monospace" font-size="24" letter-spacing="1" fill="#34302b">THE MAIN LOOP</text>
+  <text x="820" y="138" font-family="Consolas, ui-monospace, monospace" font-size="17" letter-spacing="2" fill="#8a7a55">LEVEL 1</text>
+  <text x="72" y="182" font-family="Consolas, ui-monospace, monospace" font-size="20" fill="#6f6659">may read &#183; may write, once the owner approves</text>
+  <text x="72" y="216" font-family="Consolas, ui-monospace, monospace" font-size="20" fill="#6f6659">may delegate</text>
+
+  <line x1="360" y1="246" x2="360" y2="296" stroke="#34302b" stroke-width="2.5" marker-end="url(#a3)"/>
+  <text x="340" y="278" text-anchor="end" font-family="Consolas, ui-monospace, monospace" font-size="18" fill="#8a7a55">delegates one subtask</text>
+
+  <!-- level 2 -->
+  <rect x="48" y="298" width="904" height="152" fill="#efe7d6" stroke="#34302b" stroke-width="3" stroke-dasharray="10 6"/>
+  <text x="72" y="340" font-family="Consolas, ui-monospace, monospace" font-size="24" letter-spacing="1" fill="#34302b">A SUB-AGENT</text>
+  <text x="820" y="336" font-family="Consolas, ui-monospace, monospace" font-size="17" letter-spacing="2" fill="#8a7a55">LEVEL 2</text>
+  <text x="72" y="380" font-family="Consolas, ui-monospace, monospace" font-size="20" fill="#6f6659">may read</text>
+  <text x="72" y="414" font-family="Consolas, ui-monospace, monospace" font-size="20" fill="#c0522d">may NOT write, ever &#183; may NOT delegate onward</text>
+
+  <!-- returns -->
+  <path d="M820 298 L820 248" fill="none" stroke="#34302b" stroke-width="2.5" marker-end="url(#a3)"/>
+  <text x="800" y="278" text-anchor="end" font-family="Consolas, ui-monospace, monospace" font-size="18" fill="#8a7a55">returns a summary, not a context</text>
+
+  <!-- level 3 -->
+  <line x1="360" y1="450" x2="360" y2="498" stroke="#c0522d" stroke-width="2.5" stroke-dasharray="8 6"/>
+  <rect x="48" y="500" width="904" height="118" fill="#f6e5dc" stroke="#c0522d" stroke-width="2.5" stroke-dasharray="8 6"/>
+  <text x="820" y="536" font-family="Consolas, ui-monospace, monospace" font-size="17" letter-spacing="2" fill="#c0522d">LEVEL 3</text>
+  <text x="500" y="570" text-anchor="middle" font-family="Consolas, ui-monospace, monospace" font-size="23" fill="#c0522d">does not exist, by construction</text>
+
+  <!-- the three bounds -->
+  <line x1="48" y1="668" x2="952" y2="668" stroke="#b8933f" stroke-width="1"/>
+  <text x="48" y="704" font-family="Consolas, ui-monospace, monospace" font-size="17" letter-spacing="2" fill="#8a7a55">THE THREE BOUNDS ON A SUB-AGENT</text>
+
+  <text x="48" y="750" font-family="Consolas, ui-monospace, monospace" font-size="21" fill="#34302b">1 &#183; a read-only allowlist</text>
+  <text x="72" y="778" font-family="Consolas, ui-monospace, monospace" font-size="18" fill="#6f6659">checked in the tool path, not asked of the prompt</text>
+
+  <text x="48" y="826" font-family="Consolas, ui-monospace, monospace" font-size="21" fill="#34302b">2 &#183; a round budget</text>
+  <text x="72" y="854" font-family="Consolas, ui-monospace, monospace" font-size="18" fill="#6f6659">six rounds, then it returns whatever it has</text>
+
+  <text x="48" y="902" font-family="Consolas, ui-monospace, monospace" font-size="21" fill="#34302b">3 &#183; a depth limit</text>
+  <text x="72" y="930" font-family="Consolas, ui-monospace, monospace" font-size="18" fill="#6f6659">the tree is two levels, always</text>
+
+  <text x="620" y="750" font-family="Consolas, ui-monospace, monospace" font-size="18" fill="#c0522d">refused even where the</text>
+  <text x="620" y="776" font-family="Consolas, ui-monospace, monospace" font-size="18" fill="#c0522d">current mode allows it</text>
+  <text x="620" y="826" font-family="Consolas, ui-monospace, monospace" font-size="18" fill="#c0522d">no &#8220;just one more look&#8221;</text>
+  <text x="620" y="902" font-family="Consolas, ui-monospace, monospace" font-size="18" fill="#c0522d">unbounded depth is</text>
+  <text x="620" y="928" font-family="Consolas, ui-monospace, monospace" font-size="18" fill="#c0522d">unaccountable</text>
+</svg>
