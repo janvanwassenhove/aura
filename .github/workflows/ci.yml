@@ -104,6 +104,9 @@ jobs:
       - name: Updater verification tests
         working-directory: apps/desktop
         run: node test-updater-verify.cjs
+      - name: Console origin tests
+        working-directory: apps/desktop
+        run: node test-console-origin.cjs
 
   lint:
     runs-on: ubuntu-latest

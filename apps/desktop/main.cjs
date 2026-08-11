@@ -4,7 +4,7 @@
  * On launch it:
  *   1. reads infra/dev/.env (wizard output) for brain configuration,
  *   2. spawns aura-brain (uv) as a child process and waits for /health,
- *   3. serves the built operator console on http://localhost:5173
+ *   3. serves the built operator console on http://127.0.0.1:5173
  *      (same origin as the brain's default CORS allow-list),
  *   4. opens the console in a BrowserWindow with a tray icon.
  *
@@ -79,6 +79,12 @@ function migrateLegacyState() {
 const BRAIN_PORT = 8020
 const BRAIN_URL = `http://localhost:${BRAIN_PORT}`
 const CONSOLE_PORT = 5173
+// U229: address the console by IP, never by name. The static server binds
+// 127.0.0.1, but "localhost" resolves to ::1 first on Windows — so a Vite dev
+// server holding [::1]:5173 (5173 is Vite's default, so this is not exotic)
+// leaves our IPv4 bind succeeding while the window loads somebody else's app.
+// It looks exactly like a corrupted install and is not one.
+const CONSOLE_URL = `http://127.0.0.1:${CONSOLE_PORT}`
 
 let brainProc = null
 let staticServer = null
@@ -119,7 +125,9 @@ function brainEnv() {
   // Desktop defaults (only when the wizard/.env didn't decide already).
   env.ROBOT_RUNTIME_URL = env.ROBOT_RUNTIME_URL || 'http://reachy-mini.local:8001'
   env.HEARTBEAT_ENABLED = env.HEARTBEAT_ENABLED || 'true'
-  env.CORS_ORIGINS = env.CORS_ORIGINS || `http://localhost:${CONSOLE_PORT}`
+  // Both spellings: the window uses the IP, a human opening the console in a
+  // browser will type the name.
+  env.CORS_ORIGINS = env.CORS_ORIGINS || `${CONSOLE_URL},http://localhost:${CONSOLE_PORT}`
   env.PORT = String(BRAIN_PORT)
   // The desktop app is text-first: voice STT/TTS run on the robot (U22/U24),
   // not in this window. Local model providers would crash a laptop without
@@ -534,7 +542,7 @@ function createWindow() {
     {
       label: 'AURA',
       submenu: [
-        { label: 'Open console in browser', click: () => shell.openExternal(`http://localhost:${CONSOLE_PORT}`) },
+        { label: 'Open console in browser', click: () => shell.openExternal(CONSOLE_URL) },
         { label: 'Open brain API docs', click: () => shell.openExternal(`${BRAIN_URL}/docs`) },
         { label: 'Show brain log', click: () => shell.showItemInFolder(path.join(app.getPath('userData'), 'brain.log')) },
         { type: 'separator' },
@@ -738,7 +746,7 @@ if (!app.requestSingleInstanceLock()) {
       logPath = startBrain()
       await serveConsole()
       await waitForBrain()
-      if (mainWindow) mainWindow.loadURL(`http://localhost:${CONSOLE_PORT}`)
+      if (mainWindow) mainWindow.loadURL(CONSOLE_URL)
     } catch (err) {
       dialog.showErrorBox('AURA failed to start', `${err.message}${logPath ? `\nBrain log: ${logPath}` : ''}`)
     }
