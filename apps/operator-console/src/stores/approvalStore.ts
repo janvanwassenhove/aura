@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
+import { BRAIN_URL } from '../lib/endpoints'
 
 export interface PendingApproval {
   approvalId: string
@@ -12,7 +13,7 @@ export interface PendingApproval {
 export const useApprovalStore = defineStore('approval', () => {
   const pending = ref<PendingApproval[]>([])
 
-  const orchestratorUrl = import.meta.env.VITE_ORCHESTRATOR_URL ?? 'http://localhost:8003'
+  const orchestratorUrl = BRAIN_URL
 
   function applyEvent(event: Record<string, unknown>) {
     const type = event.event_type as string

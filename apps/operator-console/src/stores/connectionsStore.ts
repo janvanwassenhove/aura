@@ -1,8 +1,10 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
+import { BRAIN_URL } from '../lib/endpoints'
 
-const IDENTITY_URL = import.meta.env.VITE_IDENTITY_URL ?? 'http://localhost:8006'
-const CONNECTOR_URL = import.meta.env.VITE_CONNECTOR_URL ?? 'http://localhost:8004'
+// Identity and connectors are routes on the brain, not separate hosts (ADR-007).
+const IDENTITY_URL = BRAIN_URL
+const CONNECTOR_URL = BRAIN_URL
 
 export type ConnectorStatus = 'ok' | 'mock' | 'unauthenticated' | 'unavailable' | 'unknown'
 

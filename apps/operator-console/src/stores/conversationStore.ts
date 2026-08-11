@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
+import { BRAIN_URL } from '../lib/endpoints'
 
 export interface ConversationTurn {
   id: string
@@ -21,11 +22,9 @@ export const useConversationStore = defineStore('conversation', () => {
   // U75: AURA is driving the screen (mouse glow overlay + abort button).
   const screenControl = ref(false)
 
-  const conversationUrl = import.meta.env.VITE_CONVERSATION_URL ?? 'http://localhost:8002'
+  const conversationUrl = BRAIN_URL
   const orchestratorUrl =
-    import.meta.env.VITE_BRAIN_URL ??
-    import.meta.env.VITE_ORCHESTRATOR_URL ??
-    'http://localhost:8000'
+BRAIN_URL
 
   function addTurn(turn: ConversationTurn) {
     turns.value.push(turn)

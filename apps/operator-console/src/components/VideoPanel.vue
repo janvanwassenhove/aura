@@ -133,8 +133,8 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { Eye, Move, RotateCw, ScanFace, UserCheck, UserX, Video, VideoOff } from 'lucide-vue-next'
 import { useRobotStore } from '../stores/robotStore'
 import { useKnowledgeStore } from '../stores/knowledgeStore'
+import { BRAIN_URL } from '../lib/endpoints'
 
-const BRAIN_URL = import.meta.env.VITE_BRAIN_URL ?? import.meta.env.VITE_ORCHESTRATOR_URL ?? 'http://localhost:8000'
 
 const robotStore = useRobotStore()
 const knowledgeStore = useKnowledgeStore()

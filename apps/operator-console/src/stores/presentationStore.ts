@@ -1,14 +1,11 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
+import { BRAIN_URL } from '../lib/endpoints'
 
 // U206: co-presenter state for the presenter view. The subtitle comes from
 // PresentationBeatFired events on the WS; slide/armed-keywords come from the
 // brain's /presentation/status (polled while presenting).
 
-const BRAIN_URL =
-  import.meta.env.VITE_BRAIN_URL ??
-  import.meta.env.VITE_ORCHESTRATOR_URL ??
-  'http://localhost:8020'
 
 export interface PresentationStatus {
   active: boolean

@@ -128,6 +128,7 @@ import { computed, onMounted, ref } from 'vue'
 import { Bot, LoaderCircle } from 'lucide-vue-next'
 import { useSetupStore, type RobotProbe } from '../stores/setupStore'
 import { usePrefsStore, type Language } from '../stores/prefsStore'
+import { BRAIN_URL } from '../lib/endpoints'
 
 const emit = defineEmits<{ (e: 'done'): void }>()
 
@@ -151,10 +152,6 @@ const wakeWord = ref('')
 const passphrase = ref('')
 const secureError = ref('')
 
-const BRAIN_URL =
-  import.meta.env.VITE_BRAIN_URL ??
-  import.meta.env.VITE_ORCHESTRATOR_URL ??
-  'http://localhost:8000'
 
 const keyAlreadySet = computed(() => {
   const s = setup.status

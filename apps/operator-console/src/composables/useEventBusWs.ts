@@ -4,8 +4,9 @@ import { useConversationStore } from '../stores/conversationStore'
 import { useEventStore } from '../stores/eventStore'
 import { useApprovalStore } from '../stores/approvalStore'
 import { usePresentationStore } from '../stores/presentationStore'
+import { ROBOT_EVENTS_WS } from '../lib/endpoints'
 
-const WS_URL = import.meta.env.VITE_ROBOT_RUNTIME_WS ?? 'ws://localhost:8001/ws/events'
+const WS_URL = ROBOT_EVENTS_WS
 const RECONNECT_BASE_MS = 1_000
 const RECONNECT_MAX_MS = 30_000
 

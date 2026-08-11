@@ -4,8 +4,8 @@
  * On launch it:
  *   1. reads infra/dev/.env (wizard output) for brain configuration,
  *   2. spawns aura-brain (uv) as a child process and waits for /health,
- *   3. serves the built operator console on http://127.0.0.1:5173
- *      (same origin as the brain's default CORS allow-list),
+ *   3. serves the built operator console on 127.0.0.1 (port 5173 when free,
+ *      any free port otherwise) and tells it where the brain ended up,
  *   4. opens the console in a BrowserWindow with a tray icon.
  *
  * Quit (or last window closed) tears the brain down with it.
@@ -17,6 +17,7 @@ const { spawn, execSync } = require('child_process')
 const http = require('http')
 const fs = require('fs')
 const path = require('path')
+const { listenPreferring, pickFreePort, withRuntimeConfig } = require('./serving.cjs')
 
 // U37-installer: a packaged (NSIS) install carries the Python workspace under
 // resources/aura and the built console under resources/console; a dev checkout
@@ -75,16 +76,25 @@ function migrateLegacyState() {
   }
 }
 
-// 8020, not 8000: Pollen's "Reachy Mini Control" desktop app squats on 8000.
-const BRAIN_PORT = 8020
-const BRAIN_URL = `http://localhost:${BRAIN_PORT}`
-const CONSOLE_PORT = 5173
-// U229: address the console by IP, never by name. The static server binds
-// 127.0.0.1, but "localhost" resolves to ::1 first on Windows — so a Vite dev
-// server holding [::1]:5173 (5173 is Vite's default, so this is not exotic)
-// leaves our IPv4 bind succeeding while the window loads somebody else's app.
-// It looks exactly like a corrupted install and is not one.
-const CONSOLE_URL = `http://127.0.0.1:${CONSOLE_PORT}`
+// Preferred ports, not fixed ones. 8020 rather than 8000 because Pollen's
+// "Reachy Mini Control" app squats on 8000; 5173 because that is where a
+// developer expects the console. Both are only a first choice — U234 resolves
+// the real ports at startup, so another app holding either one costs nothing.
+const PREFERRED_BRAIN_PORT = Number(process.env.AURA_BRAIN_PORT) || 8020
+const PREFERRED_CONSOLE_PORT = Number(process.env.AURA_CONSOLE_PORT) || 5173
+
+// Filled in during startup by resolvePorts(). Everything reads the functions,
+// never a captured string, because these are not known until we have bound.
+let brainPort = PREFERRED_BRAIN_PORT
+let consolePort = PREFERRED_CONSOLE_PORT
+
+// U229: address both by IP, never by name. The servers bind 127.0.0.1, but
+// "localhost" resolves to ::1 first on Windows — so the name can reach a
+// different process holding the same port on the other address family. That
+// shipped, and the window loaded somebody else's app. It looks exactly like a
+// corrupted install and is not one.
+const brainUrl = () => `http://127.0.0.1:${brainPort}`
+const consoleUrl = () => `http://127.0.0.1:${consolePort}`
 
 let brainProc = null
 let staticServer = null
@@ -125,10 +135,11 @@ function brainEnv() {
   // Desktop defaults (only when the wizard/.env didn't decide already).
   env.ROBOT_RUNTIME_URL = env.ROBOT_RUNTIME_URL || 'http://reachy-mini.local:8001'
   env.HEARTBEAT_ENABLED = env.HEARTBEAT_ENABLED || 'true'
-  // Both spellings: the window uses the IP, a human opening the console in a
-  // browser will type the name.
-  env.CORS_ORIGINS = env.CORS_ORIGINS || `${CONSOLE_URL},http://localhost:${CONSOLE_PORT}`
-  env.PORT = String(BRAIN_PORT)
+  // Both spellings of the console origin: the window uses the IP, a human
+  // opening it in a browser will type the name.
+  env.CORS_ORIGINS = env.CORS_ORIGINS
+    || `${consoleUrl()},http://localhost:${consolePort}`
+  env.PORT = String(brainPort)
   // The desktop app is text-first: voice STT/TTS run on the robot (U22/U24),
   // not in this window. Local model providers would crash a laptop without
   // the model files installed.
@@ -308,7 +319,7 @@ function waitForBrain(timeoutMs = 90_000) {
   const deadline = Date.now() + timeoutMs
   return new Promise((resolve, reject) => {
     const tryOnce = () => {
-      const req = http.get(`${BRAIN_URL}/health`, { timeout: 2000 }, (res) => {
+      const req = http.get(`${brainUrl()}/health`, { timeout: 2000 }, (res) => {
         res.resume()
         if (res.statusCode === 200) return resolve()
         retry()
@@ -335,19 +346,27 @@ const MIME = {
 }
 
 function serveConsole() {
-  return new Promise((resolve, reject) => {
-    staticServer = http.createServer((req, res) => {
-      const urlPath = decodeURIComponent((req.url || '/').split('?')[0])
-      let file = path.join(CONSOLE_DIST, urlPath === '/' ? 'index.html' : urlPath)
-      if (!file.startsWith(CONSOLE_DIST) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) {
-        file = path.join(CONSOLE_DIST, 'index.html') // SPA fallback
-      }
-      res.writeHead(200, { 'Content-Type': MIME[path.extname(file)] || 'application/octet-stream' })
-      fs.createReadStream(file).pipe(res)
-    })
-    staticServer.once('error', reject)
-    staticServer.listen(CONSOLE_PORT, '127.0.0.1', () => resolve())
+  staticServer = http.createServer((req, res) => {
+    const urlPath = decodeURIComponent((req.url || '/').split('?')[0])
+    let file = path.join(CONSOLE_DIST, urlPath === '/' ? 'index.html' : urlPath)
+    if (!file.startsWith(CONSOLE_DIST) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) {
+      file = path.join(CONSOLE_DIST, 'index.html') // SPA fallback
+    }
+    const type = MIME[path.extname(file)] || 'application/octet-stream'
+    if (type === 'text/html') {
+      // small file, and it has to be rewritten anyway
+      res.writeHead(200, { 'Content-Type': type, 'Cache-Control': 'no-store' })
+      res.end(withRuntimeConfig(fs.readFileSync(file, 'utf-8'), {
+        brainUrl: brainUrl(),
+        robotEventsWs: `ws://127.0.0.1:${brainPort}/ws/events`,
+      }))
+      return
+    }
+    res.writeHead(200, { 'Content-Type': type })
+    fs.createReadStream(file).pipe(res)
   })
+  return listenPreferring(staticServer, PREFERRED_CONSOLE_PORT, '127.0.0.1',
+    (port, code) => console.warn(`console port ${port} is taken (${code}) — using a free one`))
 }
 
 // ---------------------------------------------------------------------------
@@ -404,7 +423,7 @@ function showOverlay() {
   }, 40)
   // Esc aborts the run (global — works whatever app has focus).
   globalShortcut.register('Escape', () => {
-    const req = http.request({ host: 'localhost', port: BRAIN_PORT, method: 'POST',
+    const req = http.request({ host: '127.0.0.1', port: brainPort, method: 'POST',
       path: '/orchestrator/computeruse/abort' })
     req.on('error', () => {})
     req.end()
@@ -542,8 +561,8 @@ function createWindow() {
     {
       label: 'AURA',
       submenu: [
-        { label: 'Open console in browser', click: () => shell.openExternal(CONSOLE_URL) },
-        { label: 'Open brain API docs', click: () => shell.openExternal(`${BRAIN_URL}/docs`) },
+        { label: 'Open console in browser', click: () => shell.openExternal(consoleUrl()) },
+        { label: 'Open brain API docs', click: () => shell.openExternal(`${brainUrl()}/docs`) },
         { label: 'Show brain log', click: () => shell.showItemInFolder(path.join(app.getPath('userData'), 'brain.log')) },
         { type: 'separator' },
         { role: 'quit' },
@@ -743,10 +762,18 @@ if (!app.requestSingleInstanceLock()) {
     try {
       migrateLegacyState()               // U177: rescue pre-userData state
       await ensureBootstrap(mainWindow)  // packaged first run: uv + sync
+      // U234: ports before processes. The console server binds first so we know
+      // its real port; the brain's port is probed next; only then is the brain
+      // spawned, because its CORS allow-list has to name the console origin
+      // that actually exists.
+      consolePort = await serveConsole()
+      brainPort = await pickFreePort(PREFERRED_BRAIN_PORT)
+      if (consolePort !== PREFERRED_CONSOLE_PORT || brainPort !== PREFERRED_BRAIN_PORT) {
+        console.warn(`resolved ports — console ${consolePort}, brain ${brainPort}`)
+      }
       logPath = startBrain()
-      await serveConsole()
       await waitForBrain()
-      if (mainWindow) mainWindow.loadURL(CONSOLE_URL)
+      if (mainWindow) mainWindow.loadURL(consoleUrl())
     } catch (err) {
       dialog.showErrorBox('AURA failed to start', `${err.message}${logPath ? `\nBrain log: ${logPath}` : ''}`)
     }

@@ -235,6 +235,7 @@ import { Brain, Lock, LockOpen, ScanFace, ShieldAlert, UserPlus, X } from 'lucid
 import WikiText from './WikiText.vue'
 import { useNavStore } from '../stores/navStore'
 import { useKnowledgeStore, type KnowledgeFact } from '../stores/knowledgeStore'
+import { BRAIN_URL } from '../lib/endpoints'
 
 defineEmits<{ close: [] }>()
 
@@ -273,7 +274,7 @@ const skillAddError = ref('')
 async function addSkill() {
   if (!store.detail) return
   skillAddError.value = ''
-  const BRAIN = import.meta.env.VITE_BRAIN_URL ?? import.meta.env.VITE_ORCHESTRATOR_URL ?? 'http://localhost:8000'
+  const BRAIN = BRAIN_URL
   const resp = await fetch(`${BRAIN}/skills`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

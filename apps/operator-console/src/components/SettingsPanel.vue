@@ -399,6 +399,7 @@ import { useSettingsStore, type LLMProvider, type ModelOption } from '../stores/
 import { useConnectionsStore, type ConnectorStatus } from '../stores/connectionsStore'
 import { ACCENTS, useThemeStore } from '../stores/themeStore'
 import { LANGUAGES, usePrefsStore } from '../stores/prefsStore'
+import { BRAIN_URL } from '../lib/endpoints'
 
 const emit = defineEmits<{ (e: 'close'): void }>()
 
@@ -568,9 +569,7 @@ async function switchToConnections() {
 }
 
 const BRAIN_URL_LOGS =
-  import.meta.env.VITE_BRAIN_URL ??
-  import.meta.env.VITE_ORCHESTRATOR_URL ??
-  'http://localhost:8000'
+BRAIN_URL
 async function saveGitHub() {
   await connStore.saveToken('github', githubToken.value)
   if (githubState.value.status === 'ok') githubToken.value = ''

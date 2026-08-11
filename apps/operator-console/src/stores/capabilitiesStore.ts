@@ -1,10 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
+import { BRAIN_URL } from '../lib/endpoints'
 
-const BRAIN_URL =
-  import.meta.env.VITE_BRAIN_URL ??
-  import.meta.env.VITE_ORCHESTRATOR_URL ??
-  'http://localhost:8000'
 
 export interface Capability {
   key: string

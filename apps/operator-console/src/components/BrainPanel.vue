@@ -489,6 +489,7 @@ import WikiText from './WikiText.vue'
 import { useKnowledgeStore } from '../stores/knowledgeStore'
 import { useNavStore } from '../stores/navStore'
 import { usePrefsStore } from '../stores/prefsStore'
+import { BRAIN_URL } from '../lib/endpoints'
 
 const props = defineProps<{ docked?: boolean }>()
 const emit = defineEmits<{ (e: 'close'): void }>()
@@ -752,10 +753,6 @@ interface SkillItem {
   personas: string[]; person: string; enabled: boolean; body: string
 }
 
-const BRAIN_URL =
-  import.meta.env.VITE_BRAIN_URL ??
-  import.meta.env.VITE_ORCHESTRATOR_URL ??
-  'http://localhost:8000'
 
 const skills = ref<SkillItem[]>([])
 const selected = ref<string>('_skills')

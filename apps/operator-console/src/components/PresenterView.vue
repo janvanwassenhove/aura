@@ -108,6 +108,7 @@ import {
   cancelLaptopSpeech, createMic, laptopAudioSupported, laptopMicSupported,
   speakOnLaptop, type MicController,
 } from '../composables/usePresenterAudio'
+import { BRAIN_URL } from '../lib/endpoints'
 
 const emit = defineEmits<{ close: [] }>()
 
@@ -115,7 +116,6 @@ const modalRoot = ref<HTMLElement | null>(null)
 useModal({ onClose: () => emit('close'), root: modalRoot })
 
 const store = usePresentationStore()
-const BRAIN_URL = import.meta.env.VITE_BRAIN_URL ?? import.meta.env.VITE_ORCHESTRATOR_URL ?? 'http://localhost:8020'
 
 const yamlText = ref('')
 const rawMode = ref(false)

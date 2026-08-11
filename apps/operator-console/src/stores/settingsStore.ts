@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
+import { BRAIN_URL } from '../lib/endpoints'
 
 export type LLMProvider = 'openai' | 'openrouter' | 'gemini' | 'echo'
 
@@ -21,7 +22,7 @@ export interface ModelOption {
 }
 
 export const useSettingsStore = defineStore('settings', () => {
-  const orchestratorUrl = import.meta.env.VITE_ORCHESTRATOR_URL ?? 'http://localhost:8003'
+  const orchestratorUrl = BRAIN_URL
 
   const provider = ref<LLMProvider>('openai')
   const model = ref<string>('')

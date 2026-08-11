@@ -308,8 +308,8 @@ import {
   Volume1, Volume2, VolumeX,
 } from 'lucide-vue-next'
 import { useRobotStore } from '../stores/robotStore'
+import { BRAIN_URL } from '../lib/endpoints'
 
-const BRAIN_URL = import.meta.env.VITE_BRAIN_URL ?? import.meta.env.VITE_ORCHESTRATOR_URL ?? 'http://localhost:8000'
 
 const robotStore = useRobotStore()
 

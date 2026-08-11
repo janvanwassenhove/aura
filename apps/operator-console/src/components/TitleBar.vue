@@ -77,6 +77,7 @@ import { Bot, CircleStop, Cpu, Info, Minus, Presentation, RotateCw, Settings, Sh
 import { useRobotStore } from '../stores/robotStore'
 import { usePrefsStore } from '../stores/prefsStore'
 import { useLayoutStore } from '../stores/layoutStore'
+import { BRAIN_URL } from '../lib/endpoints'
 
 const props = defineProps<{ wsStatus: 'connecting' | 'open' | 'closed' }>()
 defineEmits<{
@@ -85,7 +86,6 @@ defineEmits<{
 }>()
 
 // U184: panic stop — one click cuts speech, ends the session and mutes the mic.
-const BRAIN_URL = import.meta.env.VITE_BRAIN_URL ?? 'http://localhost:8020'
 const stopping = ref(false)
 const stopped = ref(false)
 async function panicStop() {

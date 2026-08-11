@@ -155,8 +155,8 @@ import { Bot, GraduationCap, LoaderCircle, Mic, Sparkles, Square, Trash2, Wrench
 import RichieAvatar from './RichieAvatar.vue'
 import { useConversationStore } from '../stores/conversationStore'
 import { usePrefsStore } from '../stores/prefsStore'
+import { BRAIN_URL } from '../lib/endpoints'
 
-const BRAIN_URL = import.meta.env.VITE_BRAIN_URL ?? import.meta.env.VITE_ORCHESTRATOR_URL ?? 'http://localhost:8000'
 
 const conversationStore = useConversationStore()
 

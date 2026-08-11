@@ -89,9 +89,9 @@
 
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
+import { BRAIN_URL } from '../lib/endpoints'
 
 const emit = defineEmits<{ start: [scenario: object] }>()
-const BRAIN_URL = import.meta.env.VITE_BRAIN_URL ?? import.meta.env.VITE_ORCHESTRATOR_URL ?? 'http://localhost:8020'
 
 interface FormBeat {
   _k: number; id: string; mode: string

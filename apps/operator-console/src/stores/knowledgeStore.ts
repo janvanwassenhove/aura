@@ -1,11 +1,8 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
+import { BRAIN_URL } from '../lib/endpoints'
 
 // The knowledge API is served by the brain (same origin as orchestrator after U11).
-const BRAIN_URL =
-  import.meta.env.VITE_BRAIN_URL ??
-  import.meta.env.VITE_ORCHESTRATOR_URL ??
-  'http://localhost:8000'
 
 export interface KnowledgePerson {
   person_id: string
