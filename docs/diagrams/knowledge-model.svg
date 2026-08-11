@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 780" role="img"
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="780" viewBox="0 0 1000 780" role="img"
      aria-label="The graph model, in four node types. A person node — which holds the key — points to facts about that person, and to skills, which may belong to one person or to everybody. Each fact mentions topics, and the same topic can be reached from two different people's facts, which is what makes a shared topic the cheapest possible context. Topics are never entered by anyone: they exist because a fact mentioned them. Delete the person and their key goes with them, so their facts and every edge from them go too.">
   <defs>
     <pattern id="g5" width="24" height="24" patternUnits="userSpaceOnUse">

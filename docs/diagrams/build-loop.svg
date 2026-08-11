@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 900" role="img"
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="900" viewBox="0 0 1000 900" role="img"
      aria-label="One unit through the loop. A backlog of numbered units hands over a unit. The loop picks and builds it, tests it, commits it, releases it, and finally writes a ledger entry — which returns to the backlog for the next unit. Committing and releasing both divert through an approval gate that stops and asks the owner every time, on round one and on round twenty, because the gate is code in the tool path rather than a line in the prompt. The one way out is a checkbox that silences a single named tool by writing it into the settings file. A panel at the bottom contrasts a vague ledger entry with a measured one.">
   <defs>
     <pattern id="g7" width="24" height="24" patternUnits="userSpaceOnUse">

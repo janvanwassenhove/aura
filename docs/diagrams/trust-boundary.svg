@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 880" role="img"
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="880" viewBox="0 0 1000 880" role="img"
      aria-label="Two hosts. The laptop holds API keys, OAuth tokens, encrypted profiles, face embeddings, conversation history and skills, and runs the orchestrator, conversation, connectors, memory and identity modules in one process on one event bus. The robot — a Reachy Mini Wireless with a Raspberry Pi inside — has motors, a speaker, a microphone array and a camera, and stores nothing at all: no keys, no tokens, no profiles. A single Wi-Fi link carries move, speak and frame; no secrets cross it.">
   <defs>
     <pattern id="grid" width="24" height="24" patternUnits="userSpaceOnUse">

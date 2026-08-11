@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000" role="img"
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="1000" viewBox="0 0 1000 1000" role="img"
      aria-label="Three loops on three clocks. Perception runs continuously against the camera: frame, downscale, embedding, match. Conversation is event-driven and passes through idle, listening, transcribing, thinking and speaking, returning to idle when it is done, with interrupted drawn as a state of its own rather than an error path. Maintenance runs every five minutes, checking whether the robot is reachable, the key is valid and the store is encrypted. Below, two panels show where the bugs actually live: shared hardware, where face recognition and gesture detection both want the same camera frame, and output becoming input, where the speaker sits next to the microphone.">
   <defs>
     <pattern id="g4" width="24" height="24" patternUnits="userSpaceOnUse">

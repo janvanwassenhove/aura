@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 900" role="img"
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="900" viewBox="0 0 1000 900" role="img"
      aria-label="One conversational turn. Someone speaks. Round one runs a fast model on a short context — who is talking, a handful of facts about them, and the message — and most turns end there, going straight to speaking while still listening. If tools are needed, round two onwards switches to a stronger model that orchestrates: independent tool calls run concurrently, while anything approval-gated serialises through an approval gate that stops and asks the owner every time — unless the owner has switched that one tool off themselves — and never banks that approval for later.">
   <defs>
     <pattern id="g2" width="24" height="24" patternUnits="userSpaceOnUse">

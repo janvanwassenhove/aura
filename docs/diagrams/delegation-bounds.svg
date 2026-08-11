@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 985" role="img"
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="985" viewBox="0 0 1000 985" role="img"
      aria-label="What a delegated agent may reach. Level one is the main loop: it may read, it may write once the owner approves, and it may delegate. It delegates to a level-two sub-agent, which may read but may never write and may never delegate onward, and which returns a summary rather than a context. Level three is drawn as an empty dashed box: it does not exist, by construction. Below are the three bounds on a sub-agent: a read-only allowlist checked in the tool path, a budget of six rounds, and a depth limit of two levels.">
   <defs>
     <pattern id="g3" width="24" height="24" patternUnits="userSpaceOnUse">
