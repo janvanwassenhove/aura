@@ -149,6 +149,14 @@ class RobotClient:
     async def set_tracking(self, enabled: bool) -> dict:
         return (await self._request("POST", "/robot/tracking", {"enabled": enabled})).json()
 
+    async def build(self) -> dict:
+        """U240: which code the robot is running. Empty dict for a runtime old
+        enough not to report it — which is itself the answer to the question."""
+        try:
+            return (await self._request("GET", "/health")).json().get("build") or {}
+        except (httpx.HTTPError, OSError):
+            return {}
+
     async def set_asleep(self, asleep: bool) -> bool:
         """U237: tell the RUNTIME the robot is asleep, so the loops that move it
         on their own initiative stop doing that. Without this the robot droops

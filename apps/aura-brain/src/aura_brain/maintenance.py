@@ -19,6 +19,8 @@ import logging
 import os
 from typing import Any
 
+from aura_brain import deploy_skew
+
 logger = logging.getLogger(__name__)
 
 
@@ -83,13 +85,37 @@ class MaintenanceLoop:
         except Exception:  # noqa: BLE001 — runtime unreachable
             checks["robot"] = "unreachable"
 
+        # U240: is the robot running the code this brain expects? Reported, never
+        # enforced — the Pi sat 74 commits behind for a month and the first sign
+        # was a 404 that made a button do nothing (U238). A tick is the right
+        # place: it already asks the robot how it is.
+        try:
+            skew = deploy_skew.compare(await self._robot.build())
+            checks["robot_build"] = skew["state"]
+            if skew["state"] == "behind":
+                actions.append(f"robot needs a deploy — {skew['detail']}")
+                logger.warning("deployment skew: %s", skew["detail"])
+        except Exception:  # noqa: BLE001 — never let a version check break a tick
+            checks["robot_build"] = "unknown"
+
         checks["llm_key"] = "ok" if os.environ.get("OPENAI_API_KEY") else "missing"
         checks["tts"] = checks["llm_key"]  # same credential today
         checks["knowledge"] = (
             "encrypted" if self._knowledge_encrypted() else "unencrypted (dev)"
         )
 
-        healthy = all(v in ("ok", "encrypted", "recovered") for v in checks.values())
+        # U240: `healthy` is about whether the system WORKS. A robot running
+        # older code usually works fine, so deployment skew must not flip this
+        # flag — it would leave the console permanently unhealthy over something
+        # informational, and a warning light that is always on is not a warning
+        # light. The drift is surfaced through `actions` instead, where it reads
+        # as "here is something to do" rather than "something is broken".
+        _FUNCTIONAL = ("ok", "encrypted", "recovered")
+        healthy = all(
+            v in _FUNCTIONAL
+            for name, v in checks.items()
+            if name != "robot_build"
+        )
         from shared_schemas.events.system import MaintenanceReport
 
         report = MaintenanceReport(

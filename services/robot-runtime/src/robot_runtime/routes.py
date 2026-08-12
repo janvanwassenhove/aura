@@ -12,6 +12,7 @@ from shared_schemas.robot.models import BehaviorState, MotionCommand, RobotMode
 
 from robot_runtime import sleep_state
 from robot_runtime.adapters.fake import FakeRobotAdapter
+from robot_runtime.build_info import build_info
 from robot_runtime.engine.behavior import BehaviorEngine
 
 router = APIRouter()
@@ -41,7 +42,13 @@ async def health() -> JSONResponse:
     if adapter is None:
         return JSONResponse({"status": "starting"}, status_code=503)
     status = await adapter.get_status()
-    return JSONResponse({"status": "ok", "robot": status.model_dump()})
+    # U240: say which code this is. The Pi is deployed by hand and drifted 74
+    # commits behind the laptop without anything being able to notice.
+    return JSONResponse({
+        "status": "ok",
+        "robot": status.model_dump(),
+        "build": build_info(),
+    })
 
 
 # ------------------------------------------------------------------
