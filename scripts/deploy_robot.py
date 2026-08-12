@@ -198,8 +198,22 @@ def enable_auto_update(enable: bool) -> int:
             return 1
         say(unit, "installed")
 
-    result = ssh(f"chmod +x {REMOTE_REPO}/scripts/robot_selfupdate.sh && "
-                 "sudo systemctl daemon-reload && "
+    # The updater lives OUTSIDE the checkout it updates: `git reset --hard`
+    # replaces files while bash is still reading the running script, and a robot
+    # older than the script would not have it at all. Copy it to a stable path.
+    src = REPO / "scripts" / "robot_selfupdate.sh"
+    sent = run(["scp", "-i", str(KEY), str(src), f"{HOST}:/tmp/aura-robot-selfupdate"], timeout=300)
+    if sent.returncode != 0:
+        print(f"could not copy the updater: {sent.stderr.strip()}")
+        return 1
+    installed = ssh("sudo install -m 0755 /tmp/aura-robot-selfupdate "
+                    "/usr/local/bin/aura-robot-selfupdate && rm -f /tmp/aura-robot-selfupdate")
+    if installed.returncode != 0:
+        print(f"could not install the updater: {installed.stderr.strip()}")
+        return 1
+    say("updater", "/usr/local/bin/aura-robot-selfupdate")
+
+    result = ssh("sudo systemctl daemon-reload && "
                  "sudo systemctl enable --now aura-robot-update.timer && "
                  "systemctl is-active aura-robot-update.timer")
     if "active" not in result.stdout:

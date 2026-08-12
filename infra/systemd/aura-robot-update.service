@@ -10,7 +10,10 @@ Wants=network-online.target
 Type=oneshot
 User=pollen
 WorkingDirectory=/home/pollen/aura
-ExecStart=/home/pollen/aura/scripts/robot_selfupdate.sh
+# Deliberately NOT the copy in the checkout: that file is replaced by the very
+# git reset this script performs, and it disappears entirely when the robot is
+# older than the script itself.
+ExecStart=/usr/local/bin/aura-robot-selfupdate
 # It restarts a service and syncs dependencies; give it room, but never let it
 # hang around holding the machine.
 TimeoutStartSec=1800

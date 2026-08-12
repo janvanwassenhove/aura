@@ -17,6 +17,18 @@
 #   4. Verify, then roll back on its own. An update nobody watched must be able
 #      to undo itself, or it is a gamble with somebody's living room.
 #
+# It runs from /usr/local/bin, NOT from the checkout. Two reasons, both found
+# by testing rather than by thinking:
+#
+#   * `git reset --hard` swaps files while bash is still reading this one. A
+#     shell script edited underneath a running shell executes garbage.
+#   * A robot far enough behind predates the script entirely — reset to an older
+#     tag and the updater deletes itself. The one thing that must survive being
+#     out of date is the thing that fixes being out of date.
+#
+# After a healthy update it refreshes that installed copy, so improvements to
+# the updater still reach the robot — one release later, deliberately.
+#
 # Everything lands in the journal: journalctl -u aura-robot-update
 
 set -uo pipefail
@@ -106,6 +118,15 @@ if [ -z "$ok" ]; then
     log "ROLLED BACK AND STILL UNHEALTHY — this needs a human"
   fi
   exit 1
+fi
+
+# Now that the new code is proven healthy, adopt its version of this script for
+# next time. Never before: a broken updater must not be able to break a robot.
+INSTALLED="${INSTALLED:-/usr/local/bin/aura-robot-selfupdate}"
+if [ -f "$REPO_DIR/scripts/robot_selfupdate.sh" ] && [ -w "$(dirname "$INSTALLED")" -o -n "$(sudo -n true 2>/dev/null && echo yes)" ]; then
+  if ! cmp -s "$REPO_DIR/scripts/robot_selfupdate.sh" "$INSTALLED"; then
+    sudo install -m 0755 "$REPO_DIR/scripts/robot_selfupdate.sh" "$INSTALLED"       && log "self-update script refreshed for next time"
+  fi
 fi
 
 log "updated to $latest_tag and healthy"
