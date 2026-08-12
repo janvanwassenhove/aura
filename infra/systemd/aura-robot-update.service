@@ -1,0 +1,16 @@
+[Unit]
+# U241: the robot follows release tags by itself. Installed by
+# `python scripts/deploy_robot.py --enable-auto-update`; remove the timer to
+# stop it. Logs: journalctl -u aura-robot-update
+Description=AURA robot self-update (release tags only)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=pollen
+WorkingDirectory=/home/pollen/aura
+ExecStart=/home/pollen/aura/scripts/robot_selfupdate.sh
+# It restarts a service and syncs dependencies; give it room, but never let it
+# hang around holding the machine.
+TimeoutStartSec=1800

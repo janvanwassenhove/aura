@@ -173,6 +173,47 @@ def deploy() -> int:
     return 0
 
 
+def enable_auto_update(enable: bool) -> int:
+    """U241: install (or remove) the timer that lets the robot follow releases.
+
+    Opt-in on purpose. Something that restarts a moving machine in someone's
+    house without being asked should be a decision, not a default.
+    """
+    if not enable:
+        ssh("sudo systemctl disable --now aura-robot-update.timer 2>/dev/null; "
+            "sudo rm -f /etc/systemd/system/aura-robot-update.{service,timer}; "
+            "sudo systemctl daemon-reload")
+        print("auto-update disabled and removed")
+        return 0
+
+    for unit in ("aura-robot-update.service", "aura-robot-update.timer"):
+        src = REPO / "infra" / "systemd" / unit
+        sent = run(["scp", "-i", str(KEY), str(src), f"{HOST}:/tmp/{unit}"], timeout=300)
+        if sent.returncode != 0:
+            print(f"could not copy {unit}: {sent.stderr.strip()}")
+            return 1
+        moved = ssh(f"sudo mv /tmp/{unit} /etc/systemd/system/{unit}")
+        if moved.returncode != 0:
+            print(f"could not install {unit}: {moved.stderr.strip()}")
+            return 1
+        say(unit, "installed")
+
+    result = ssh(f"chmod +x {REMOTE_REPO}/scripts/robot_selfupdate.sh && "
+                 "sudo systemctl daemon-reload && "
+                 "sudo systemctl enable --now aura-robot-update.timer && "
+                 "systemctl is-active aura-robot-update.timer")
+    if "active" not in result.stdout:
+        print(f"timer did not start: {result.stdout.strip()} {result.stderr.strip()}")
+        return 1
+    say("timer", "active")
+    nxt = ssh("systemctl list-timers aura-robot-update.timer --no-pager | sed -n 2p")
+    print()
+    print(nxt.stdout.strip())
+    print()
+    print("the robot now follows release tags. journalctl -u aura-robot-update to watch it.")
+    return 0
+
+
 def rollback() -> int:
     sha = ssh(f"cat {ROLLBACK_FILE}").stdout.strip()
     if not sha:
@@ -196,11 +237,19 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--check", action="store_true", help="report the skew and exit")
     ap.add_argument("--rollback", action="store_true", help="restore the recorded commit")
+    ap.add_argument("--enable-auto-update", action="store_true",
+                    help="install the timer that follows release tags")
+    ap.add_argument("--disable-auto-update", action="store_true",
+                    help="remove that timer")
     args = ap.parse_args()
     if args.check:
         return check()
     if args.rollback:
         return rollback()
+    if args.enable_auto_update:
+        return enable_auto_update(True)
+    if args.disable_auto_update:
+        return enable_auto_update(False)
     return deploy()
 
 

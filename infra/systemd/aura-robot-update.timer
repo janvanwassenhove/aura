@@ -1,0 +1,14 @@
+[Unit]
+Description=Check for an AURA robot release, hourly
+
+[Timer]
+# Hourly, not continuous: releases land a few times a day at most, and the
+# check is free while the update itself only proceeds when the robot is idle.
+OnBootSec=10min
+OnUnitActiveSec=1h
+# Spread the load off the exact hour — and off everyone else's exact hour.
+RandomizedDelaySec=10min
+Persistent=true
+
+[Install]
+WantedBy=timers.target
