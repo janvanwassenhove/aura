@@ -21,9 +21,29 @@ as a rule, not a habit (constitution IX). The ones that matter most here:
 
 ![Trust boundary: the laptop holds every key, token and profile and runs all five modules on one event bus; the robot — a Reachy Mini Wireless with a Raspberry Pi 5 inside — has motors, speaker, microphone array and camera, and stores nothing. A Wi-Fi link carries only move, speak and frame.](../diagrams/trust-boundary.svg)
 
+### What listens on what
+
+Both laptop processes are on loopback and both ports are chosen at launch. The
+console talks to exactly one address — the brain — over REST plus a single
+WebSocket at `/ws/events`; it never talks to the robot, not even for video. The
+Wi-Fi link runs one way: the laptop calls the robot, never the reverse.
+
+![The wiring: an Electron desktop shell on the laptop holds the Vue console and the aura-brain process, which talks REST and one WebSocket; the brain listens on 127.0.0.1:8020 and nothing binds a public interface. One Wi-Fi link carries HTTP in one direction only — move, speak, listen, frame — to robot-runtime on port 8001, which holds no keys and stores nothing.](../diagrams/wiring.svg)
+
 ### One conversational turn
 
 ![One turn: someone speaks, round one uses a fast model on a short context and most turns end there; if tools are needed, round two onwards orchestrates with a stronger model, and anything touching the outside world stops at the approval gate.](../diagrams/one-turn.svg)
+
+### The three media paths
+
+The robot carries the transducers; the laptop does the thinking. No model runs
+on the Pi and no key reaches it.
+
+![The media paths: the camera makes one JPEG at request time, downscaled on the Pi and pulled one frame at a time (0.22–0.28 s flat, where the MJPEG stream drifted to 2.5 s); the microphone returns 16 kHz mono plus a raw peak so silence is dropped before transcription; text-to-speech runs on the laptop and the robot is posted PCM it merely plays.](../diagrams/media-paths.svg)
+
+### What happens when something stops answering
+
+![The degradation ladder: a heartbeat every 30 s, three consecutive failures to DEGRADED, 30 s clean back to ONLINE. No robot — text only, and it says so. No internet — a local model answers without tools. No model at all — six regex commands survive. No laptop — after 15 s the robot says so once and keeps moving on its own.](../diagrams/degradation-ladder.svg)
 
 ### Three loops on three clocks
 

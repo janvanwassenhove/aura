@@ -8,6 +8,9 @@ accurate is the wrong place for anything that draws plausible boxes.
 |---|---|---|
 | `trust-boundary.svg` | The two hosts, and what each one is allowed to hold | README, ADR-008 |
 | `one-turn.svg` | One conversational turn: two model rounds and the approval gate | README |
+| `wiring.svg` | What listens on what: the two loopback processes, the console's one address, and the one-way Wi-Fi link | `docs/architecture/overview.md` |
+| `media-paths.svg` | The three media paths — camera, microphone, speaker — and where each one is processed | `docs/architecture/overview.md` |
+| `degradation-ladder.svg` | The heartbeat, and the four rungs the system falls through | `docs/architecture/overview.md` |
 | `three-loops.svg` | Perception, conversation and maintenance on three different clocks | `docs/architecture/overview.md` |
 | `knowledge-model.svg` | The four node types and the two edge types | ADR-008, `docs/architecture/overview.md` |
 | `envelope-encryption.svg` | Passphrase → owner key → one key per person → records | README, ADR-008 |
@@ -35,6 +38,11 @@ Concretely, update the relevant file when you change:
 - a sub-agent's allowlist, round budget or depth limit
   (`delegation-bounds.svg`)
 - where hooks fire relative to the gate (`hook-order.svg`)
+- a port, a protocol, or which process may call which (`wiring.svg`)
+- an audio or video format, endpoint, or where transcription and synthesis run
+  (`media-paths.svg`)
+- a heartbeat threshold, or what happens when a dependency stops answering
+  (`degradation-ladder.svg`)
 
 ## House style
 

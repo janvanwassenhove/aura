@@ -17,7 +17,7 @@
   <rect x="12" y="12" width="976" height="876" fill="none" stroke="#b8933f" stroke-width="1.4"/>
   <rect x="21" y="21" width="958" height="858" fill="none" stroke="#b8933f" stroke-width="0.7" opacity="0.6"/>
 
-  <text x="48" y="70" font-family="Consolas, ui-monospace, monospace" font-size="20" letter-spacing="3" fill="#8a7a55">FIG. 2 — ONE TURN</text>
+  <text x="48" y="70" font-family="Consolas, ui-monospace, monospace" font-size="20" letter-spacing="3" fill="#8a7a55">FIG. 3 — ONE TURN</text>
 
   <!-- someone speaks -->
   <rect x="48" y="100" width="330" height="66" fill="#efe7d6" stroke="#34302b" stroke-width="2.5"/>

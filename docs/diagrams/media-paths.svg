@@ -1,0 +1,79 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="880" viewBox="0 0 1000 880" role="img"
+     aria-label="The media paths. What it sees: the camera behind the eyes makes one JPEG at request time, downscaled on the Pi, fetched by the brain over GET /robot/camera/frame.jpg with never more than one frame in flight; the brain proxies every frame, caches it for eighty milliseconds so two viewers cost one grab, and matches faces on the laptop. Pull rather than push, because the MJPEG stream drifted to two and a half seconds behind while this holds a flat quarter of a second. What it hears: the microphone array sends sixteen kilohertz mono audio plus a raw peak level over POST /robot/listen or a chunked audio stream; speech-to-text runs in the cloud or locally with Whisper, and the wake word is matched in the transcript on the laptop. What it says: text-to-speech happens on the laptop, cloud or Kokoro and Piper offline, and the resulting PCM is posted to the robot, which plays it and holds no key.">
+  <defs>
+    <pattern id="grid" width="24" height="24" patternUnits="userSpaceOnUse">
+      <path d="M24 0H0V24" fill="none" stroke="#c9b998" stroke-width="0.5" opacity="0.35"/>
+    </pattern>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0 0 L10 5 L0 10 z" fill="#34302b"/>
+    </marker>
+    <marker id="arrowaccent" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0 0 L10 5 L0 10 z" fill="#c0522d"/>
+    </marker>
+  </defs>
+
+  <rect width="1000" height="880" fill="#f4efe3"/>
+  <rect width="1000" height="880" fill="url(#grid)"/>
+  <rect x="12" y="12" width="976" height="856" fill="none" stroke="#b8933f" stroke-width="1.4"/>
+  <rect x="21" y="21" width="958" height="838" fill="none" stroke="#b8933f" stroke-width="0.7" opacity="0.6"/>
+
+  <text x="48" y="72" font-family="Consolas, ui-monospace, monospace" font-size="20" letter-spacing="3" fill="#8a7a55">FIG. 4 — EYES AND EARS</text>
+  <text x="952" y="72" text-anchor="end" font-family="Consolas, ui-monospace, monospace" font-size="17" letter-spacing="1" fill="#8a7a55">ROBOT ←→ LAPTOP</text>
+
+  <!-- ============ PANEL 1 — SEES ============ -->
+  <rect x="48" y="102" width="904" height="222" fill="#efe7d6" stroke="#34302b" stroke-width="2.5"/>
+  <rect x="48" y="102" width="904" height="46" fill="#34302b"/>
+  <text x="72" y="134" font-family="Consolas, ui-monospace, monospace" font-size="20" letter-spacing="2" fill="#f4efe3">1 · WHAT IT SEES</text>
+  <g font-family="Consolas, ui-monospace, monospace" font-size="19" fill="#34302b">
+    <text x="72" y="192">camera behind the eyes</text>
+    <text x="72" y="222">one JPEG, made when</text>
+    <text x="72" y="252">asked, sized on the Pi</text>
+  </g>
+  <text x="500" y="196" text-anchor="middle" font-family="Consolas, ui-monospace, monospace" font-size="17" fill="#34302b">GET /camera/frame.jpg</text>
+  <line x1="396" y1="216" x2="604" y2="216" stroke="#34302b" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="500" y="248" text-anchor="middle" font-family="Consolas, ui-monospace, monospace" font-size="17" fill="#8a7a55">one frame in flight</text>
+  <g font-family="Consolas, ui-monospace, monospace" font-size="19" fill="#34302b">
+    <text x="628" y="192">the brain proxies it</text>
+    <text x="628" y="222">80 ms cache: two</text>
+    <text x="628" y="252">viewers, one grab</text>
+  </g>
+  <text x="72" y="302" font-family="Consolas, ui-monospace, monospace" font-size="17" fill="#8a7a55">Pull, not push. The MJPEG stream drifted to 2.5 s behind; this holds 0.22–0.28 s, flat.</text>
+
+  <!-- ============ PANEL 2 — HEARS ============ -->
+  <rect x="48" y="350" width="904" height="222" fill="#efe7d6" stroke="#34302b" stroke-width="2.5"/>
+  <rect x="48" y="350" width="904" height="46" fill="#34302b"/>
+  <text x="72" y="382" font-family="Consolas, ui-monospace, monospace" font-size="20" letter-spacing="2" fill="#f4efe3">2 · WHAT IT HEARS</text>
+  <g font-family="Consolas, ui-monospace, monospace" font-size="19" fill="#34302b">
+    <text x="72" y="440">microphone array</text>
+    <text x="72" y="470">16 kHz mono, plus</text>
+    <text x="72" y="500">the raw peak level</text>
+  </g>
+  <text x="500" y="444" text-anchor="middle" font-family="Consolas, ui-monospace, monospace" font-size="18" fill="#34302b">POST /robot/listen</text>
+  <line x1="396" y1="464" x2="604" y2="464" stroke="#34302b" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="500" y="496" text-anchor="middle" font-family="Consolas, ui-monospace, monospace" font-size="17" fill="#8a7a55">or a chunked stream</text>
+  <g font-family="Consolas, ui-monospace, monospace" font-size="19" fill="#34302b">
+    <text x="628" y="440">speech-to-text here:</text>
+    <text x="628" y="470">cloud, or Whisper</text>
+    <text x="628" y="500">running locally</text>
+  </g>
+  <text x="72" y="550" font-family="Consolas, ui-monospace, monospace" font-size="17" fill="#8a7a55">The peak arrives with the audio, so silence is dropped before anything is transcribed.</text>
+
+  <!-- ============ PANEL 3 — SAYS ============ -->
+  <rect x="48" y="598" width="904" height="222" fill="#efe7d6" stroke="#34302b" stroke-width="2.5"/>
+  <rect x="48" y="598" width="904" height="46" fill="#34302b"/>
+  <text x="72" y="630" font-family="Consolas, ui-monospace, monospace" font-size="20" letter-spacing="2" fill="#f4efe3">3 · WHAT IT SAYS</text>
+  <g font-family="Consolas, ui-monospace, monospace" font-size="19" fill="#34302b">
+    <text x="72" y="688">it plays the audio</text>
+    <text x="72" y="718">and does nothing</text>
+    <text x="72" y="748">else with it</text>
+  </g>
+  <text x="500" y="692" text-anchor="middle" font-family="Consolas, ui-monospace, monospace" font-size="18" fill="#c0522d">POST /robot/speak</text>
+  <line x1="604" y1="712" x2="396" y2="712" stroke="#c0522d" stroke-width="2.4" marker-end="url(#arrowaccent)"/>
+  <text x="500" y="744" text-anchor="middle" font-family="Consolas, ui-monospace, monospace" font-size="17" fill="#8a7a55">PCM 24 kHz, base64</text>
+  <g font-family="Consolas, ui-monospace, monospace" font-size="19" fill="#34302b">
+    <text x="628" y="688">text-to-speech here:</text>
+    <text x="628" y="718">cloud, or Kokoro</text>
+    <text x="628" y="748">and Piper offline</text>
+  </g>
+  <text x="72" y="798" font-family="Consolas, ui-monospace, monospace" font-size="17" fill="#8a7a55">In a live session the reply arrives in segments, each played as it lands rather than buffered</text>
+</svg>

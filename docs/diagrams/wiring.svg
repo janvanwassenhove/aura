@@ -1,0 +1,93 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="1000" viewBox="0 0 1000 1000" role="img"
+     aria-label="The wiring. On the laptop, an Electron desktop shell contains the Vue console and the aura-brain process. The console talks to the brain over HTTP REST and one WebSocket at /ws/events; the brain listens on 127.0.0.1 port 8020 and nothing binds a public interface. A single Wi-Fi link carries HTTP REST in one direction only, from laptop to robot: move, speak, listen and camera frames. The robot runs robot-runtime on port 8001 with motors, a speaker and microphone array, and a camera, holds no keys and stores nothing, and falls back to an on-device offline loop when no command arrives for fifteen seconds.">
+  <defs>
+    <pattern id="grid" width="24" height="24" patternUnits="userSpaceOnUse">
+      <path d="M24 0H0V24" fill="none" stroke="#c9b998" stroke-width="0.5" opacity="0.35"/>
+    </pattern>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0 0 L10 5 L0 10 z" fill="#34302b"/>
+    </marker>
+    <marker id="arrowback" viewBox="0 0 10 10" refX="1" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M10 0 L0 5 L10 10 z" fill="#34302b"/>
+    </marker>
+    <marker id="arrowaccent" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0 0 L10 5 L0 10 z" fill="#c0522d"/>
+    </marker>
+  </defs>
+
+  <rect width="1000" height="1000" fill="#f4efe3"/>
+  <rect width="1000" height="1000" fill="url(#grid)"/>
+  <rect x="12" y="12" width="976" height="976" fill="none" stroke="#b8933f" stroke-width="1.4"/>
+  <rect x="21" y="21" width="958" height="958" fill="none" stroke="#b8933f" stroke-width="0.7" opacity="0.6"/>
+
+  <text x="48" y="72" font-family="Consolas, ui-monospace, monospace" font-size="20" letter-spacing="3" fill="#8a7a55">FIG. 2 — THE WIRING</text>
+
+  <!-- ================= LAPTOP ================= -->
+  <rect x="48" y="102" width="904" height="424" fill="#efe7d6" stroke="#34302b" stroke-width="2.5"/>
+  <rect x="48" y="102" width="904" height="54" fill="#34302b"/>
+  <text x="72" y="139" font-family="Consolas, ui-monospace, monospace" font-size="24" letter-spacing="2" fill="#f4efe3">LAPTOP</text>
+  <text x="726" y="137" font-family="Consolas, ui-monospace, monospace" font-size="17" letter-spacing="1" fill="#d8c9a4">LOOPBACK ONLY</text>
+
+  <!-- desktop shell container -->
+  <rect x="76" y="180" width="848" height="298" fill="none" stroke="#8a7a55" stroke-width="1.4" stroke-dasharray="7 5"/>
+  <rect x="96" y="170" width="382" height="24" fill="#efe7d6"/>
+  <text x="100" y="189" font-family="Consolas, ui-monospace, monospace" font-size="16" letter-spacing="2" fill="#8a7a55">DESKTOP SHELL — ELECTRON</text>
+
+  <!-- console -->
+  <rect x="104" y="222" width="300" height="228" fill="#e6dcc5" stroke="#34302b" stroke-width="2"/>
+  <text x="128" y="264" font-family="Consolas, ui-monospace, monospace" font-size="22" letter-spacing="1" fill="#34302b">CONSOLE</text>
+  <line x1="128" y1="280" x2="380" y2="280" stroke="#8a7a55" stroke-width="1"/>
+  <g font-family="Consolas, ui-monospace, monospace" font-size="19" fill="#34302b">
+    <text x="128" y="316">Vue 3, static files</text>
+    <text x="128" y="348">served on a free port</text>
+    <text x="128" y="380">knows ONE address:</text>
+    <text x="128" y="412">the brain</text>
+  </g>
+
+  <!-- brain -->
+  <rect x="612" y="222" width="284" height="228" fill="#e6dcc5" stroke="#34302b" stroke-width="2"/>
+  <text x="636" y="264" font-family="Consolas, ui-monospace, monospace" font-size="22" letter-spacing="1" fill="#34302b">AURA-BRAIN</text>
+  <line x1="636" y1="280" x2="872" y2="280" stroke="#8a7a55" stroke-width="1"/>
+  <g font-family="Consolas, ui-monospace, monospace" font-size="19" fill="#34302b">
+    <text x="636" y="316">FastAPI, one process</text>
+    <text x="636" y="348">5 modules, 1 bus</text>
+    <text x="636" y="380">holds every secret</text>
+    <text x="636" y="412">127.0.0.1 : 8020</text>
+  </g>
+
+  <!-- console <-> brain -->
+  <text x="508" y="300" text-anchor="middle" font-family="Consolas, ui-monospace, monospace" font-size="18" fill="#34302b">HTTP / REST</text>
+  <line x1="404" y1="320" x2="612" y2="320" stroke="#34302b" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="404" y1="392" x2="612" y2="392" stroke="#34302b" stroke-width="2" marker-start="url(#arrowback)"/>
+  <text x="508" y="372" text-anchor="middle" font-family="Consolas, ui-monospace, monospace" font-size="18" fill="#34302b">WS /ws/events</text>
+  <text x="508" y="470" text-anchor="middle" font-family="Consolas, ui-monospace, monospace" font-size="16" fill="#8a7a55">every state change, pushed</text>
+
+  <text x="72" y="506" font-family="Consolas, ui-monospace, monospace" font-size="18" fill="#8a7a55">Both ports are chosen at launch. Nothing here binds a public interface.</text>
+
+  <!-- ================= LINK ================= -->
+  <line x1="754" y1="526" x2="754" y2="672" stroke="#c0522d" stroke-width="3" marker-end="url(#arrowaccent)"/>
+  <text x="88" y="576" font-family="Consolas, ui-monospace, monospace" font-size="20" letter-spacing="2" fill="#c0522d">WI-FI — ONE DIRECTION</text>
+  <g font-family="Consolas, ui-monospace, monospace" font-size="19" fill="#34302b">
+    <text x="88" y="612">HTTP/REST: move · speak · listen · frame</text>
+    <text x="88" y="644">The robot never dials the laptop. No secrets cross.</text>
+  </g>
+
+  <!-- ================= ROBOT ================= -->
+  <rect x="48" y="672" width="904" height="272" fill="#efe7d6" stroke="#34302b" stroke-width="2.5"/>
+  <rect x="48" y="672" width="904" height="54" fill="#34302b"/>
+  <text x="72" y="709" font-family="Consolas, ui-monospace, monospace" font-size="24" letter-spacing="2" fill="#f4efe3">ROBOT</text>
+  <text x="690" y="707" font-family="Consolas, ui-monospace, monospace" font-size="17" letter-spacing="1" fill="#d8c9a4">reachy.local : 8001</text>
+
+  <text x="72" y="768" font-family="Consolas, ui-monospace, monospace" font-size="20" fill="#34302b">robot-runtime — FastAPI. No keys. No storage. No model.</text>
+
+  <g>
+    <rect x="72" y="792" width="272" height="60" fill="#e6dcc5" stroke="#34302b" stroke-width="1.6"/>
+    <text x="92" y="830" font-family="Consolas, ui-monospace, monospace" font-size="19" fill="#34302b">MOTORS · 6 linkages</text>
+    <rect x="364" y="792" width="272" height="60" fill="#e6dcc5" stroke="#34302b" stroke-width="1.6"/>
+    <text x="384" y="830" font-family="Consolas, ui-monospace, monospace" font-size="19" fill="#34302b">SPEAKER · MIC ARRAY</text>
+    <rect x="656" y="792" width="272" height="60" fill="#e6dcc5" stroke="#34302b" stroke-width="1.6"/>
+    <text x="676" y="830" font-family="Consolas, ui-monospace, monospace" font-size="19" fill="#34302b">CAMERA</text>
+  </g>
+
+  <text x="72" y="906" font-family="Consolas, ui-monospace, monospace" font-size="18" fill="#8a7a55">OFFLINE LOOP — no command for 15 s: it says so, and keeps moving.</text>
+</svg>

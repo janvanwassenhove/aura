@@ -1,0 +1,73 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="860" viewBox="0 0 1000 860" role="img"
+     aria-label="The degradation ladder. A heartbeat pings every backend every thirty seconds; three consecutive failures drop the system into degraded mode, and thirty seconds of clean beats bring it back. Rung one: the robot is unreachable, so the assistant keeps working, text only, and says so. Rung two: the cloud model is unreachable, so a local OpenAI-compatible server answers instead, without tools. Rung three: there is no local model either, so six pattern-matched commands survive — the time, a timer, a reminder, a status check, and two honest refusals about mail and calendar. Rung four: the laptop itself is unreachable, so after fifteen seconds of silence the robot says so once and keeps moving on its own. None of these behaviours is to block.">
+  <defs>
+    <pattern id="grid" width="24" height="24" patternUnits="userSpaceOnUse">
+      <path d="M24 0H0V24" fill="none" stroke="#c9b998" stroke-width="0.5" opacity="0.35"/>
+    </pattern>
+    <marker id="arrowaccent" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M0 0 L10 5 L0 10 z" fill="#c0522d"/>
+    </marker>
+  </defs>
+
+  <rect width="1000" height="860" fill="#f4efe3"/>
+  <rect width="1000" height="860" fill="url(#grid)"/>
+  <rect x="12" y="12" width="976" height="836" fill="none" stroke="#b8933f" stroke-width="1.4"/>
+  <rect x="21" y="21" width="958" height="818" fill="none" stroke="#b8933f" stroke-width="0.7" opacity="0.6"/>
+
+  <text x="48" y="72" font-family="Consolas, ui-monospace, monospace" font-size="20" letter-spacing="3" fill="#8a7a55">FIG. 5 — THE DEGRADATION LADDER</text>
+
+  <!-- detector strip -->
+  <rect x="48" y="102" width="904" height="92" fill="#34302b"/>
+  <text x="72" y="140" font-family="Consolas, ui-monospace, monospace" font-size="20" letter-spacing="2" fill="#d8c9a4">HEARTBEAT</text>
+  <text x="72" y="172" font-family="Consolas, ui-monospace, monospace" font-size="19" fill="#f4efe3">every 30 s · 3 failures in a row → DEGRADED · 30 s clean → ONLINE</text>
+
+  <!-- accent: things get worse downwards -->
+  <line x1="62" y1="236" x2="62" y2="772" stroke="#c0522d" stroke-width="2.4" marker-end="url(#arrowaccent)"/>
+  <text x="62" y="222" text-anchor="middle" font-family="Consolas, ui-monospace, monospace" font-size="16" letter-spacing="1" fill="#c0522d">WORSE</text>
+
+  <!-- rung 1 -->
+  <rect x="88" y="236" width="864" height="120" fill="#efe7d6" stroke="#34302b" stroke-width="2"/>
+  <rect x="88" y="236" width="326" height="120" fill="#e6dcc5"/>
+  <line x1="414" y1="236" x2="414" y2="356" stroke="#34302b" stroke-width="2"/>
+  <text x="112" y="278" font-family="Consolas, ui-monospace, monospace" font-size="17" letter-spacing="2" fill="#8a7a55">RUNG 1</text>
+  <text x="112" y="316" font-family="Consolas, ui-monospace, monospace" font-size="21" fill="#34302b">no robot</text>
+  <g font-family="Consolas, ui-monospace, monospace" font-size="19" fill="#34302b">
+    <text x="440" y="288">everything else keeps working,</text>
+    <text x="440" y="320">text only — and it tells you so</text>
+  </g>
+
+  <!-- rung 2 -->
+  <rect x="88" y="374" width="864" height="120" fill="#efe7d6" stroke="#34302b" stroke-width="2"/>
+  <rect x="88" y="374" width="326" height="120" fill="#e6dcc5"/>
+  <line x1="414" y1="374" x2="414" y2="494" stroke="#34302b" stroke-width="2"/>
+  <text x="112" y="416" font-family="Consolas, ui-monospace, monospace" font-size="17" letter-spacing="2" fill="#8a7a55">RUNG 2</text>
+  <text x="112" y="454" font-family="Consolas, ui-monospace, monospace" font-size="21" fill="#34302b">no internet</text>
+  <g font-family="Consolas, ui-monospace, monospace" font-size="19" fill="#34302b">
+    <text x="440" y="426">a local model answers instead —</text>
+    <text x="440" y="458">same shape of reply, no tools</text>
+  </g>
+
+  <!-- rung 3 -->
+  <rect x="88" y="512" width="864" height="120" fill="#efe7d6" stroke="#34302b" stroke-width="2"/>
+  <rect x="88" y="512" width="326" height="120" fill="#e6dcc5"/>
+  <line x1="414" y1="512" x2="414" y2="632" stroke="#34302b" stroke-width="2"/>
+  <text x="112" y="554" font-family="Consolas, ui-monospace, monospace" font-size="17" letter-spacing="2" fill="#8a7a55">RUNG 3</text>
+  <text x="112" y="592" font-family="Consolas, ui-monospace, monospace" font-size="21" fill="#34302b">no model at all</text>
+  <g font-family="Consolas, ui-monospace, monospace" font-size="19" fill="#34302b">
+    <text x="440" y="564">six patterns survive: time, timer,</text>
+    <text x="440" y="596">reminder, status, and two refusals</text>
+  </g>
+
+  <!-- rung 4 -->
+  <rect x="88" y="650" width="864" height="120" fill="#efe7d6" stroke="#34302b" stroke-width="2"/>
+  <rect x="88" y="650" width="326" height="120" fill="#e6dcc5"/>
+  <line x1="414" y1="650" x2="414" y2="770" stroke="#34302b" stroke-width="2"/>
+  <text x="112" y="692" font-family="Consolas, ui-monospace, monospace" font-size="17" letter-spacing="2" fill="#8a7a55">RUNG 4</text>
+  <text x="112" y="730" font-family="Consolas, ui-monospace, monospace" font-size="21" fill="#34302b">no laptop</text>
+  <g font-family="Consolas, ui-monospace, monospace" font-size="19" fill="#34302b">
+    <text x="440" y="702">after 15 s of silence the robot</text>
+    <text x="440" y="734">says so once, and keeps moving</text>
+  </g>
+
+  <text x="88" y="816" font-family="Consolas, ui-monospace, monospace" font-size="18" fill="#8a7a55">Not one of these is “wait”. A degraded system says something; a frozen one says nothing.</text>
+</svg>
