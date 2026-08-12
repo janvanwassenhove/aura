@@ -36,6 +36,8 @@ from fastapi.responses import JSONResponse
 from shared_events.broadcaster import WebSocketBroadcaster
 from shared_events.bus import AsyncEventBus
 
+from aura_brain.greeting_policy import GreetingPolicy
+
 
 class BrainContext:
     """Holds the process-wide singletons shared by all mounted modules.
@@ -545,13 +547,21 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     ctx.bus.subscribe(_TCS, _voice_note_music)
 
-    _last_greeted: dict[str, float] = {}
-    _greet_cooldown = float(os.environ.get("GREET_COOLDOWN_S", "120"))
+    # U243: greet on ARRIVAL, not on a timer. See greeting_policy — a cooldown
+    # answers "how long since I last greeted you" when the question is "have you
+    # just arrived", and for a child sitting in the room those differ by a
+    # greeting every two minutes, out loud.
+    _greeting = GreetingPolicy()
 
     async def _on_person_recognized(event: PersonRecognized) -> None:
         ctx.pipeline.set_active_person(event.person_id if event.known else None)
         # U100: sleep mode → recognize silently, no greeting.
         if os.environ.get("ROBOT_ASLEEP", "false").lower() == "true":
+            # Still record the sighting: an hour asleep is not an hour away, and
+            # without this it would greet the moment it woke up.
+            if event.known and event.person_id:
+                import time as _t
+                _greeting.seen(event.person_id, _t.monotonic())
             return
         # Greet a KNOWN person: personalized text (the pipeline injects their
         # profile facts via the judgment layer, U19e). The pipeline publishes
@@ -561,20 +571,25 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         if event.known and event.display_name and event.person_id:
             import time as _time
 
-            now = _time.monotonic()
-            if now - _last_greeted.get(event.person_id, 0.0) < _greet_cooldown:
+            if not _greeting.should_greet(event.person_id, _time.monotonic()):
                 return
-            _last_greeted[event.person_id] = now
             name = event.display_name
             # U85: varied greetings — never the same "Dag Jan" twice in a row.
-            # A character's greeting_message wins when set; otherwise the LLM
-            # gets a random angle to riff on (time of day, plans, callback to
-            # a fact, playful, curious, …).
+            # The LLM gets a random angle to riff on (time of day, plans,
+            # callback to a fact, playful, curious, …).
+            #
+            # U243: a character's greeting_message is now a TONE, not a script.
+            # Taken literally it made every hello identical — "Hoi hoi! Zullen we
+            # iets leuks doen?", word for word, which is the most robotic thing
+            # in an app whose whole point is not sounding like one. It is passed
+            # to the model as the voice to hit rather than the text to say.
             character = ctx.characters.active() if hasattr(ctx, "characters") else None
+            character_note = ""
             if character is not None and character.greeting_message:
-                await ctx.bus.publish(ResponseDrafted(
-                    session_id=session_id, response_text=character.greeting_message))
-                return
+                character_note = (
+                    f' Your usual way of saying hello is "{character.greeting_message}" —'
+                    f" match that warmth and register, but do NOT repeat it verbatim."
+                )
             import random
             from datetime import datetime
 
@@ -595,8 +610,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
                     f"(system note: {name} just walked up and you recognized "
                     f"their face. {note}) Greet {name} by name in ONE short, "
                     f"warm, genuinely CURIOUS spoken sentence — sound interested, "
-                    f"not scripted. This time, {angle}. Never start with the same "
-                    f"words as before. No lists.",
+                    f"not scripted. This time, {angle}.{character_note} Never start "
+                    f"with the same words as before. No lists.",
                     session_id,
                 )
                 ambient.note_spontaneous(said)  # avoid repeating next time
