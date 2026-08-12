@@ -202,7 +202,16 @@ def enable_auto_update(enable: bool) -> int:
     # replaces files while bash is still reading the running script, and a robot
     # older than the script would not have it at all. Copy it to a stable path.
     src = REPO / "scripts" / "robot_selfupdate.sh"
-    sent = run(["scp", "-i", str(KEY), str(src), f"{HOST}:/tmp/aura-robot-selfupdate"], timeout=300)
+    # LF, whatever this machine checked out. A shell script with CRLF fails
+    # on the Pi as "env: 'bash\r': No such file or directory" — a message that
+    # names the wrong thing entirely. .gitattributes pins it too; this is the
+    # belt to that pair of braces, because scp copies bytes, not intentions.
+    with tempfile.TemporaryDirectory() as tmp:
+        staged = Path(tmp) / "aura-robot-selfupdate"
+        text = src.read_text(encoding="utf-8")
+        staged.write_bytes(text.replace("\r\n", "\n").encode("utf-8"))
+        sent = run(["scp", "-i", str(KEY), str(staged),
+                    f"{HOST}:/tmp/aura-robot-selfupdate"], timeout=300)
     if sent.returncode != 0:
         print(f"could not copy the updater: {sent.stderr.strip()}")
         return 1

@@ -1,0 +1,20 @@
+# U242: this repo is written on Windows and half of it runs on a Raspberry Pi.
+#
+# A shell script checked out with CRLF fails on Linux with a message that names
+# the wrong thing entirely:
+#
+#     env: 'bash\r': No such file or directory
+#
+# Anything that a Linux kernel, shell or systemd has to parse is pinned to LF,
+# whatever the developer's platform prefers.
+*.sh            text eol=lf
+*.service       text eol=lf
+*.timer         text eol=lf
+Dockerfile      text eol=lf
+*.bash          text eol=lf
+
+# Deployed to the Pi and read by uv/python there; LF keeps diffs honest too.
+*.py            text eol=lf
+*.toml          text eol=lf
+*.yml           text eol=lf
+*.yaml          text eol=lf

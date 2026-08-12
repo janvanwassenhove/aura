@@ -56,6 +56,29 @@ Verify what you can from here, and say plainly what you cannot:
 - **Camera, audio and speech need the owner's eyes and ears.** A deploy can
   cross many commits that touch the media path; do not claim those work.
 
+## Automatic updates (U241)
+
+```bash
+python scripts/deploy_robot.py --enable-auto-update    # or --disable-auto-update
+```
+
+Installs a systemd timer on the Pi that follows **release tags** hourly. It
+skips while the robot is busy, verifies health after the restart, and rolls
+itself back when the robot does not come back. Watch it with
+`journalctl -u aura-robot-update`.
+
+Two things it must never become:
+
+* **Following master.** The robot would chase commits that were true for ninety
+  seconds. Tags only, and every tag has been through CI.
+* **Running from the checkout.** The updater installs to
+  `/usr/local/bin/aura-robot-selfupdate`, because `git reset --hard` replaces
+  files while bash is still reading the running script, and a robot old enough
+  would not have the script at all.
+
+Deploy once by hand before enabling it: the timer can only carry the robot
+forward from a release that already contains the updater.
+
 ## Rolling back
 
 ```bash
