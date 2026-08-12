@@ -19,10 +19,13 @@ contract testing (ASGI transport against robot-runtime's app).
 
 from __future__ import annotations
 
+import logging
 import os
 
 import httpx
 from shared_schemas.robot.models import MotionCommand
+
+logger = logging.getLogger(__name__)
 
 
 def robot_auth_headers() -> dict[str, str]:
@@ -146,11 +149,27 @@ class RobotClient:
     async def set_tracking(self, enabled: bool) -> dict:
         return (await self._request("POST", "/robot/tracking", {"enabled": enabled})).json()
 
-    async def set_asleep(self, asleep: bool) -> dict:
+    async def set_asleep(self, asleep: bool) -> bool:
         """U237: tell the RUNTIME the robot is asleep, so the loops that move it
         on their own initiative stop doing that. Without this the robot droops
-        and stands back up within seconds."""
-        return (await self._request("POST", "/robot/sleep", {"asleep": asleep})).json()
+        and stands back up within seconds.
+
+        U238: returns False when the robot has no such route. The two hosts are
+        deployed separately — the Pi is flashed by hand, the laptop updates
+        itself — so a brain will regularly be newer than the runtime it talks
+        to. A missing route is a skew, not a fault, and it must never abort the
+        rest of a sequence.
+        """
+        try:
+            await self._request("POST", "/robot/sleep", {"asleep": asleep})
+            return True
+        except httpx.HTTPStatusError as exc:
+            if exc.response.status_code == 404:
+                logger.warning(
+                    "robot-runtime has no /robot/sleep (older than U237) — the robot "
+                    "will resume idle motion by itself; redeploy the Pi to fix that")
+                return False
+            raise
 
     async def stop_audio(self) -> dict:
         """U84 barge-in: cut the robot's current speech immediately."""

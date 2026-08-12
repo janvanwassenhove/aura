@@ -511,18 +511,31 @@ async def sleep() -> JSONResponse:
     else:
         _os.environ["VOICE_MODE"] = "off"
         _write_env({"ROBOT_ASLEEP": "true", "VOICE_MODE": "off"})
+    # U237: the runtime first. Its offline loop moves the robot every four
+    # seconds so it never looks frozen, and it knew nothing about sleep — so the
+    # robot lay down and stood straight back up. Order matters: tell it to stop
+    # moving before asking it to lie down.
+    #
+    # U238: in its OWN try. A robot older than U237 answers 404 here, and with
+    # this call inside the same block as the pose, one 404 meant the robot did
+    # nothing at all while the app cheerfully reported success. The laptop
+    # updates itself and the Pi is flashed by hand; a newer brain talking to an
+    # older robot is the normal state of this system, not an edge case.
+    runtime_honoured = False
     try:
-        # U237: the runtime first. Its offline loop moves the robot every four
-        # seconds so it never looks frozen, and it knew nothing about sleep —
-        # so the robot lay down and stood straight back up. Order matters: tell
-        # it to stop moving before asking it to lie down.
-        await _robot.set_asleep(True)
+        runtime_honoured = await _robot.set_asleep(True)
+    except (httpx.HTTPError, OSError):
+        pass
+    try:
         await _robot.set_tracking(False)
         from shared_schemas.robot.models import MotionCommand
         await _robot.execute_motion(MotionCommand(motion_id="sleep", speed=1.0, amplitude=0.6, direction=None))
     except (httpx.HTTPError, OSError):
         pass
-    return JSONResponse({"asleep": True})
+    # Say which kind of sleep this is. Without the runtime's half the robot lies
+    # down and gets back up on its own — the owner should hear that from the app
+    # rather than discover it by watching.
+    return JSONResponse({"asleep": True, "stays_down": runtime_honoured})
 
 
 @router.post("/wake")
@@ -534,10 +547,15 @@ async def wake() -> JSONResponse:
     _os.environ["VOICE_MODE"] = "wake_word"
     from aura_brain.setup_api import _write_env
     _write_env({"ROBOT_ASLEEP": "false", "VOICE_MODE": "wake_word"})
+    # Clear the runtime's state first: while it is set, the adapter refuses to
+    # start head tracking and a reconnect keeps the sleep pose. Its own try for
+    # the same reason as above — waking must never depend on the robot being as
+    # new as the brain.
     try:
-        # Clear the runtime's state first: while it is set, the adapter refuses
-        # to start head tracking and a reconnect keeps the sleep pose.
         await _robot.set_asleep(False)
+    except (httpx.HTTPError, OSError):
+        pass
+    try:
         from shared_schemas.robot.models import MotionCommand
         await _robot.execute_motion(MotionCommand(motion_id="wake_up", speed=1.0, amplitude=0.7, direction=None))
         await _robot.set_tracking(True)

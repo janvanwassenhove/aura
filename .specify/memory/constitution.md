@@ -60,6 +60,13 @@ A change to the **shape** of the system is not done until the drawing matches it
 A diagram that used to be true is worse than no diagram, because it is believed.  
 `docs/diagrams/README.md` lists which file covers what, and the house style for adding one.
 
+### X. The Two Hosts Update Separately
+The laptop updates itself (in-app updater, several releases a day); the Pi is flashed by hand and stays on whatever it was last given.  
+**A brain newer than the runtime it talks to is the NORMAL state of this system**, not an edge case — so every brain→runtime call added after the fact must be OPTIONAL: a 404 from an older robot is deployment skew, not a fault.  
+Concretely: call a new endpoint in its own `try`, never in the same block as the behaviour it accompanies, and never as the first step of a sequence that must still happen without it.  
+When the optional half is missing, SAY so in the response instead of reporting plain success — the owner should hear about a degradation from the app, not discover it by watching the robot.  
+Precedent: U195 (new camera route, probed once, falls back to the legacy stream) got this right. U237 did not: one 404 made the sleep button do nothing at all while the app reported success (fixed in U238).
+
 ---
 
 ## Architecture Constraints
@@ -103,4 +110,4 @@ Amendments require: documented rationale, update to affected ADR(s), migration p
 All PRs must verify compliance with the Hardware Abstraction and Safety Gates principles.  
 Complexity violations must be justified in `.specify/specs/NNN/plan.md` under the **Complexity Tracking** section.
 
-**Version**: 1.1.0 | **Ratified**: 2026-04-25 | **Last Amended**: 2026-08-11 (added principle IX)
+**Version**: 1.2.0 | **Ratified**: 2026-04-25 | **Last Amended**: 2026-08-12 (added principles IX and X)
