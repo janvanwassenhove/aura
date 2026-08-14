@@ -167,7 +167,13 @@ function brainEnv() {
     'code=code',
     'notepad=notepad',
     'spotify=explorer.exe spotify:',
-    'chrome=cmd /c start chrome',
+    // U248: WITH the debug port. open_browser_url talks to Chrome over the
+    // DevTools protocol, and a Chrome started without this flag does not
+    // listen — so the ladder's "browser" layer existed on paper and failed in
+    // practice, which pushed every search onto screen control. Only takes
+    // effect when AURA starts Chrome itself: an already-running Chrome is
+    // reused by Windows and keeps its original flags.
+    'chrome=cmd /c start chrome --remote-debugging-port=9222',
     'claude=explorer.exe shell:AppsFolder\\Claude_pzs8sxrjxfjjc!Claude',
     'chatgpt=explorer.exe shell:AppsFolder\\OpenAI.ChatGPT-Desktop_2p2nqsd0c76g0!ChatGPT',
   ].join(';')

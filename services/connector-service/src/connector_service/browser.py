@@ -20,6 +20,7 @@ import logging
 import os
 
 import httpx
+from shared_schemas.tool_outcome import mark_unavailable
 
 logger = logging.getLogger(__name__)
 
@@ -30,8 +31,14 @@ class ChromeBrowser:
         self._cdp = (cdp_url or os.environ.get("CHROME_CDP_URL", "http://localhost:9222")).rstrip("/")
         self._transport = transport  # injectable for tests (httpx.MockTransport)
 
-    _HINT = ("Chrome is not reachable on its debug port. Start Chrome with "
-             "--remote-debugging-port=9222 (or set CHROME_CDP_URL).")
+    # U248: marked, so a browser layer that cannot answer is visible to the
+    # skill ledger instead of reading as another ordinary result.
+    _HINT = mark_unavailable(
+        "browser",
+        "Chrome is not reachable on its debug port. Start Chrome with "
+        "--remote-debugging-port=9222 (or set CHROME_CDP_URL). Launching "
+        "Chrome through launch_app('chrome') sets this up, but only if no "
+        "Chrome is running yet.")
 
     def _client(self) -> httpx.AsyncClient:
         return httpx.AsyncClient(timeout=5.0, transport=self._transport)

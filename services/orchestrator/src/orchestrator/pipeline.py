@@ -31,6 +31,8 @@ from orchestrator.fallback_agent import FallbackAgent
 from orchestrator.intent_router import IntentRouter
 from orchestrator.llm import local_chat, openai_chat
 from orchestrator.persona_manager import PersonaManager
+from orchestrator.promise import NUDGE as PROMISE_NUDGE
+from orchestrator.promise import looks_like_a_promise
 from orchestrator.tool_schemas import LADDER_NOTE, build_tool_specs
 
 logger = logging.getLogger(__name__)
@@ -38,6 +40,11 @@ logger = logging.getLogger(__name__)
 # Tool name → connector-service path (method, path)
 _LANGUAGE_NAMES = {"en": "English", "nl": "Dutch", "fr": "French",
                    "de": "German", "es": "Spanish", "it": "Italian"}  # U130
+
+
+def trace_tools(trace: dict | None) -> list:
+    """Tools that actually ran this turn. Empty when the model only talked."""
+    return list((trace or {}).get("tools") or [])
 
 
 def _label_distance(a: str, b: str, maxd: int = 2) -> bool:
@@ -548,6 +555,7 @@ class OrchestratorPipeline:
         max_rounds = max(1, int(os.environ.get("AGENT_MAX_ROUNDS", "8")))
         self._stop_flags.discard(session_id)
         reply: str | None = None
+        nudged = False   # U248: the promise pushback fires at most once
 
         for round_no in range(1, max_rounds + 1):
             # Owner steering: guidance sent while the loop runs lands here.
@@ -583,6 +591,17 @@ class OrchestratorPipeline:
 
             if not tool_calls:
                 reply = content or "(no response)"
+                # U248: "Ik ga nu Chrome openen — even geduld" ended a turn in
+                # one second with no tool call at all. A reply that announces
+                # work is not an answer when nothing ran; push back ONCE, then
+                # accept whatever comes so this can never become a loop.
+                if (not nudged and not trace_tools(trace)
+                        and looks_like_a_promise(reply)):
+                    nudged = True
+                    logger.info("promised without acting; asking it to act or say so")
+                    messages.append({"role": "assistant", "content": reply})
+                    messages.append({"role": "system", "content": PROMISE_NUDGE})
+                    continue
                 await self._bus.publish(AgentRoundCompleted(
                     session_id=session_id, round_no=round_no, tool_names=[], done=True))
                 break

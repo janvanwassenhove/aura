@@ -313,7 +313,17 @@ LADDER_NOTE = (
     "needs the Spotify connection in Settings — OR use_computer (if enabled "
     "and approved): open Spotify, search the track on screen and play it. "
     "That is a legitimate use of the GUI layer since no lower layer can "
-    "select a specific track."
+    "select a specific track. "
+    "WHEN A LAYER COMES BACK UNAVAILABLE (a result marked "
+    "CAPABILITY_UNAVAILABLE): that is information, not a dead end. Do three "
+    "things, in this order. (1) Try the next layer up if one can genuinely do "
+    "the job — the ladder exists to be climbed, and an unavailable lower layer "
+    "is exactly the justification for climbing. (2) Never announce work you "
+    "have not done: no 'one moment', no 'I'll go and do that now'. Either it "
+    "is done, or you say plainly that it is not and why. (3) Name the smallest "
+    "concrete thing that would unblock it next time — a setting, a key, a "
+    "capability to switch on — and ask the owner for it rather than working "
+    "around it silently."
 )
 
 
