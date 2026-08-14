@@ -117,6 +117,7 @@ jobs:
           node test-packaging.cjs
           node test-console-origin.cjs
           node test-updater-verify.cjs
+          node test-bootstrap-extras.cjs
 
   # Boot a throwaway demo stack and photograph the app. Optional: a release
   # without screenshots beats no release, so failures here never block.

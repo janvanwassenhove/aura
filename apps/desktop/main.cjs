@@ -192,7 +192,7 @@ function hasUv() {
 //       recognition extra failed to build (no insightface AND no Pillow), the
 //       person avatar / "Take a photo" broke too. Re-sync so the fallback plain
 //       sync still lands Pillow even when the heavy extra can't build.
-const BOOTSTRAP_REV = '3'
+const BOOTSTRAP_REV = '4'   // U246: + the computeruse extra
 
 /** U218: is face recognition actually usable in the packaged environment?
  *
@@ -203,11 +203,25 @@ const BOOTSTRAP_REV = '3'
  *  "done" forever and the owner is left with `embedder: null` and a face that
  *  can never be taught. Verify the capability instead of a bookkeeping flag.
  */
+function sitePackagesDir() {
+  return path.join(REPO_ROOT, '.venv', 'Lib', 'site-packages')
+}
+
 function recognitionInstalled() {
-  const sitePackages = path.join(REPO_ROOT, '.venv', 'Lib', 'site-packages')
+  const sitePackages = sitePackagesDir()
   // Cheap: a directory check, no subprocess on the startup path.
   return fs.existsSync(path.join(sitePackages, 'insightface'))
       && fs.existsSync(path.join(sitePackages, 'onnxruntime'))
+}
+
+// U246: pyautogui is what `use_computer` drives the screen with. It lives in
+// the `computeruse` extra, which the bootstrap never asked for — and `uv sync`
+// PRUNES whatever is not requested, so an install that had it lost it on the
+// next launch. Everything that operates a real app goes through this: search
+// a track in Spotify, ask the Claude desktop app, type in Chrome. All three
+// were reported dead on the same day; all three are this one word.
+function computerUseInstalled() {
+  return fs.existsSync(path.join(sitePackagesDir(), 'pyautogui'))
 }
 
 async function ensureBootstrap(splashWindow) {
@@ -217,7 +231,8 @@ async function ensureBootstrap(splashWindow) {
   try { doneRev = (fs.readFileSync(marker, 'utf-8').match(/rev=(\d+)/) || [])[1] || '1' } catch { doneRev = '' }
   // Re-run when the revision changed OR when the environment lost the
   // recognition stack (post-update venv rebuild, or a failed earlier attempt).
-  if (doneRev === BOOTSTRAP_REV && hasUv() && recognitionInstalled()) return
+  if (doneRev === BOOTSTRAP_REV && hasUv()
+      && recognitionInstalled() && computerUseInstalled()) return
 
   const say = (msg) => {
     if (splashWindow && !splashWindow.isDestroyed()) {
@@ -256,16 +271,25 @@ async function ensureBootstrap(splashWindow) {
   // "recognition isn't installed" message (U213) explain it instead.
   let fails = 0
   try { fails = Number((fs.readFileSync(marker, 'utf-8').match(/recogFail=(\d+)/) || [])[1] || 0) } catch { fails = 0 }
-  try {
-    if (fails < 2) {
-      execSync('uv sync --all-packages --extra recognition',
-        { cwd: REPO_ROOT, stdio: 'ignore', shell: true, timeout: 1_800_000 })
-    } else {
-      execSync('uv sync --all-packages', { cwd: REPO_ROOT, stdio: 'ignore', shell: true, timeout: 900_000 })
+  // U246: three rungs, not two. `computeruse` carries pyautogui — without it
+  // every skill that operates a real application dies at its "now click the
+  // thing" step. It is asked for FIRST, but a wheel that will not build there
+  // must not cost the recognition stack as well, so the middle rung drops only
+  // the extra that failed rather than falling all the way to a bare sync.
+  const SYNCS = fails < 2
+    ? ['uv sync --all-packages --extra recognition --extra computeruse',
+       'uv sync --all-packages --extra recognition',
+       'uv sync --all-packages']
+    : ['uv sync --all-packages --extra computeruse',
+       'uv sync --all-packages']
+  for (const [i, cmd] of SYNCS.entries()) {
+    try {
+      execSync(cmd, { cwd: REPO_ROOT, stdio: 'ignore', shell: true, timeout: 1_800_000 })
+      break
+    } catch (err) {
+      console.error(`bootstrap sync failed (${cmd}):`, err.message)
+      if (i === SYNCS.length - 1) throw err
     }
-  } catch (err) {
-    console.error('sync with recognition extra failed, falling back:', err.message)
-    execSync('uv sync --all-packages', { cwd: REPO_ROOT, stdio: 'ignore', shell: true, timeout: 900_000 })
   }
   if (!recognitionInstalled()) fails += 1
   else fails = 0
