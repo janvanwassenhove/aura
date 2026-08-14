@@ -75,7 +75,17 @@ def summarize_observations(obs: list[dict], limit: int = 40) -> str:
     missing = Counter(
         cap for o in recent for cap in (o.get("unavailable") or []) if cap)
     tools = Counter(t for o in recent for t in (o.get("tools") or []) if t)
+    steers = [str(s2)[:200] for o in recent for s2 in (o.get("steering") or []) if s2]
     lines = [f"uses: {len(recent)}"]
+    if steers:
+        # U249: the owner correcting a running turn is the strongest evidence
+        # there is — they are saying, in their own words, how this should have
+        # gone. It used to steer the turn and evaporate.
+        lines.append("THE OWNER CORRECTED YOU MID-RUN — take these literally:")
+        for s2 in steers[-5:]:
+            lines.append(f"  - \"{s2}\"")
+        lines.append("  Fold these into the procedure so they do not have to "
+                     "say it again.")
     if missing:
         lines.append("UNAVAILABLE — these uses could not complete:")
         for cap, n in missing.most_common():

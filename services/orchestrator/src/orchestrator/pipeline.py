@@ -477,11 +477,44 @@ class OrchestratorPipeline:
                 "person": self._active_person_id or "",
                 "tools": sorted(set(trace.get("tools") or [])),
                 "unavailable": sorted(set(trace.get("unavailable") or [])),
+                # U249: what the owner said mid-run, verbatim. The optimizer
+                # weighs this above everything else in the digest.
+                "steering": [str(n)[:200] for n in (trace.get("steering") or [])],
             }
             for name in dict.fromkeys(trace["skills"]):
                 self._skills.record_observation(name, entry)
         except Exception as exc:  # noqa: BLE001 — never break a turn
             logger.debug("skill observation not recorded: %s", exc)
+
+    def _grant_capability(self, arguments: dict) -> str:
+        """U249: the owner already approved (the gate ran) — apply it.
+
+        Reaching this line means the approval card was shown and accepted. The
+        only thing left is to look the entry up and do exactly what it says;
+        nothing here comes from the model except which entry it named.
+        """
+        from orchestrator import unblocks
+
+        entry = unblocks.get(str(arguments.get("capability", "")))
+        if entry is None:
+            return (f"[request_capability: {arguments.get('capability')!r} is not "
+                    f"something you can ask for. Choose one of: "
+                    f"{', '.join(unblocks.CATALOGUE)}]")
+        if not entry.automatic:
+            # Nothing to flip — the owner has to do it. Say what, exactly.
+            return (f"The owner agreed. It needs their hands, though: "
+                    f"{entry.manual} Tell them that in your reply, briefly.")
+        try:
+            from aura_brain import setup_api  # noqa: PLC0415 — optional host
+            wrote = setup_api._write_env(dict(entry.env))
+        except Exception as exc:  # noqa: BLE001 — running outside the brain
+            logger.debug("capability grant could not persist: %s", exc)
+            wrote = False
+        for key, value in entry.env.items():
+            os.environ[key] = value          # live now, not after a restart
+        scope = "" if wrote else " for this session (the setting could not be saved)"
+        undo = f" To undo: {entry.undo}" if entry.undo else ""
+        return f"Granted: {entry.label}. It is active immediately{scope}.{undo}"
 
     async def _orchestrate_impl(self, text: str, session_id: str, timing: dict,
                                announce: bool = True, trace: dict | None = None) -> str:
@@ -510,6 +543,18 @@ class OrchestratorPipeline:
         system_prompt = _identity_prefix() + system_prompt
         if allowed:  # U58: the automation ladder governs every tool choice
             system_prompt += "\n\n" + LADDER_NOTE
+        # U249: the model can only ask for what it can NAME, so the catalogue
+        # travels with the tool. Listed here rather than in the schema so
+        # unblocks.py stays the one source of truth.
+        if "request_capability" in allowed:
+            from orchestrator import unblocks
+
+            system_prompt += (
+                "\n\nWHAT YOU MAY ASK FOR — call request_capability with one of "
+                "these keys when it is what stands between you and the job:\n"
+                + unblocks.describe_for_model()
+                + "\nAsk once, with a concrete reason. If the owner says no, "
+                "accept it and carry on with what you do have.")
 
         # U59: owner-taught skills (relevant ones in full, the rest by name).
         if self._skills is not None:
@@ -562,6 +607,12 @@ class OrchestratorPipeline:
             for note in self._drain_steering(session_id):
                 messages.append({"role": "system",
                                  "content": f"[Owner guidance — follow this now] {note}"})
+                # U249: a correction used to steer the turn and vanish. It is
+                # the single most valuable evidence there is — the owner saying
+                # how this SHOULD have gone — and it left no trace, so guiding
+                # never accumulated and the same mistake came back tomorrow.
+                if trace is not None:
+                    trace.setdefault("steering", []).append(note)
 
             await self._bus.publish(AgentRoundStarted(
                 session_id=session_id, round_no=round_no, max_rounds=max_rounds))
@@ -830,6 +881,8 @@ class OrchestratorPipeline:
                     finally:
                         await self._bus.publish(ComputerControlEnded(
                             session_id=session_id, summary=str(result_text)[:200] if 'result_text' in dir() else ""))
+            elif tool_name == "request_capability":
+                result_text = self._grant_capability(arguments)
             elif tool_name == "save_skill":
                 result_text = await self._save_skill(arguments)
             elif tool_name == "delegate_subtask":

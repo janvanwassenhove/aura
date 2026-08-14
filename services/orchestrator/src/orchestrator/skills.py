@@ -43,6 +43,7 @@ _MAX_OBS = 200             # U107: usage observations kept per skill
 # cap never bites when there are seven lines in eighteen months. Evidence that
 # old should not be rewriting a procedure either.
 _MAX_OBS_AGE_DAYS = float(os.environ.get("SKILL_OBS_MAX_AGE_DAYS", "180"))
+_RECENT_FOR_HEALTH = 10    # U249: how far back "is this skill still working?" looks
 
 
 @dataclass
@@ -339,8 +340,21 @@ class SkillStore:
                 prev = 0
             new_since = max(0, len(obs) - prev)
         last_ts = obs[-1]["ts"] if obs else None
+        # U249: how often the recent uses died on something that was not there.
+        # The old trigger counted USES, which surfaced a skill that works nine
+        # times and stayed silent about one that failed twice — exactly the
+        # wrong way round, and exactly what the owner saw.
+        recent = obs[-_RECENT_FOR_HEALTH:]
+        blocked = [o for o in recent if o.get("unavailable")]
+        missing: dict[str, int] = {}
+        for o in blocked:
+            for cap in o.get("unavailable") or []:
+                missing[cap] = missing.get(cap, 0) + 1
         return {
             "uses": len(obs),
             "new_since_optimized": new_since,
             "last_used": last_ts,
+            "recent": len(recent),
+            "blocked": len(blocked),
+            "missing": missing,
         }

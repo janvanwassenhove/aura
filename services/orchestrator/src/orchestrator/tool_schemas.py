@@ -225,6 +225,21 @@ TOOL_SCHEMAS: dict[str, dict] = {
             "url": {"type": "string", "description": "http(s) URL to open."},
         }, "required": ["url"], "additionalProperties": False},
     ),
+    "request_capability": _fn(
+        "request_capability",
+        "Ask the owner to switch on something you need but do not have. Use "
+        "this the moment a tool comes back CAPABILITY_UNAVAILABLE, instead of "
+        "working around it silently or leaving the owner guessing. You may "
+        "only name a capability from the list you were given — you cannot "
+        "invent one and you never supply a value. Sensitive: the owner "
+        "approves or refuses.",
+        {"type": "object", "properties": {
+            "capability": {"type": "string",
+                           "description": "One key from the list of things you may ask for."},
+            "reason": {"type": "string",
+                       "description": "One sentence: what you were trying to do and what it blocked."},
+        }, "required": ["capability", "reason"], "additionalProperties": False},
+    ),
     "use_computer": _fn(
         "use_computer",
         (

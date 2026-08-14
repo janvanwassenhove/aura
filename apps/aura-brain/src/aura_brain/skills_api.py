@@ -57,13 +57,31 @@ async def optimization_suggestions() -> JSONResponse:
     if _store is None:
         return JSONResponse({"suggestions": [], "threshold": 0})
     threshold = max(1, int(os.environ.get("SKILL_OPTIMIZE_THRESHOLD", "8")))
+    # U249: a skill that keeps hitting the same wall matters more than one that
+    # has simply been used a lot. Before this, the trigger counted uses only —
+    # so on the owner's machine it surfaced the Spotify skill (9 uses, working)
+    # and said nothing about the Chrome one (2 uses, both blocked). Two strikes
+    # in the recent window is enough; a working skill still needs `threshold`.
+    blocked_at = max(2, int(os.environ.get("SKILL_BLOCKED_THRESHOLD", "2")))
     out = []
     for skill in _store.all():
         m = _store.metrics(skill.name)
-        if m["new_since_optimized"] >= threshold:
-            out.append({"name": skill.name, "description": skill.description, **m})
-    out.sort(key=lambda s: s["new_since_optimized"], reverse=True)
-    return JSONResponse({"suggestions": out, "threshold": threshold})
+        by_use = m["new_since_optimized"] >= threshold
+        by_failure = m.get("blocked", 0) >= blocked_at
+        if not (by_use or by_failure):
+            continue
+        missing = m.get("missing") or {}
+        reason = (
+            f"blocked {m['blocked']}× in the last {m['recent']} uses"
+            + (f" ({', '.join(sorted(missing))} unavailable)" if missing else "")
+        ) if by_failure else f"{m['new_since_optimized']} new uses since the last rewrite"
+        out.append({"name": skill.name, "description": skill.description,
+                    "reason": reason, "blocked_by_failure": by_failure, **m})
+    # Failing skills first — they are the ones a rewrite can actually help.
+    out.sort(key=lambda s: (not s["blocked_by_failure"],
+                            -s.get("blocked", 0), -s["new_since_optimized"]))
+    return JSONResponse({"suggestions": out, "threshold": threshold,
+                         "blocked_threshold": blocked_at})
 
 
 @router.get("/{name}")

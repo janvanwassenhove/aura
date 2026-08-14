@@ -18,11 +18,20 @@ APPROVAL_REQUIRED: frozenset[str] = frozenset(
         "run_powershell",  # arbitrary shell — always asks, per command
         "write_file",  # writing to disk always asks
         "save_skill",  # self-training: every skill write is owner-approved
+        # U249: asking to be UNBLOCKED is the one request that can change the
+        # assistant's own boundaries, so it is gated hardest of all. The value
+        # is never model-supplied (see orchestrator/unblocks.py) — the owner is
+        # approving a named entry from a fixed catalogue.
+        "request_capability",
     }
 )
 
 # Personas / modes and the tool names available within each.
 # The orchestrator's ContextBuilder filters tool schemas to this list.
+# U249: `request_capability` is added to EVERY mode below. Asking to be
+# unblocked is not itself a capability — it opens an approval card the owner
+# reads. A mode that cannot ask is a mode that goes quiet when it hits a wall,
+# which is the behaviour this was built to end.
 MODE_TOOL_MAP: dict[str, frozenset[str]] = {
     "work": frozenset(
         {
@@ -117,4 +126,11 @@ MODE_TOOL_MAP: dict[str, frozenset[str]] = {
             "execute_motion",
         }
     ),
+}
+
+# Every mode may ask to be unblocked — see the note above MODE_TOOL_MAP. Done
+# here rather than by repeating the name five times, so a mode added later
+# cannot forget it.
+MODE_TOOL_MAP = {
+    mode: tools | {"request_capability"} for mode, tools in MODE_TOOL_MAP.items()
 }
