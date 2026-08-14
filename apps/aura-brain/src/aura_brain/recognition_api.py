@@ -33,6 +33,16 @@ def init(matcher: Any, embedder: Any, robot: Any, store: Any, loop: Any = None) 
     _matcher, _embedder, _robot, _store, _loop = matcher, embedder, robot, store, loop
 
 
+def matcher() -> Any:
+    """The live EmbeddingMatcher, or None before recognition is running.
+
+    U244: the knowledge API needs it so that deleting a person also erases
+    their enrolled face. Recognition may legitimately be off (no passphrase
+    set, no embedder), hence None rather than an assert.
+    """
+    return _matcher
+
+
 def set_sightings(log: Any) -> None:
     global _sightings
     _sightings = log

@@ -734,6 +734,23 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             _rec_matcher, _boot_embedder, _robot, ctx.knowledge_store,
             loop=ctx._perception,
         )
+        # U244: drop enrolments whose person no longer exists. Until now
+        # deleting a person left their face behind, and an orphan still wins
+        # matches — handing the pipeline an id that resolves to nobody, so the
+        # assistant answers without knowing who it is talking to. Best-effort
+        # and off the startup path: a failure here must never stop recognition.
+        import asyncio as _asyncio
+
+        from aura_brain import face_reconcile
+
+        async def _reconcile_faces() -> None:
+            try:
+                await face_reconcile.reconcile(_rec_matcher, ctx.knowledge_store)
+            except Exception as exc:  # noqa: BLE001 — never break boot
+                logging.getLogger(__name__).warning(
+                    "face reconciliation skipped: %s", exc)
+
+        _asyncio.ensure_future(_reconcile_faces())
 
     def _swap_knowledge_store(new_store) -> None:
         """Live-swap to the encrypted store (in-app secure enable, U34-slice)."""

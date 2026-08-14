@@ -294,6 +294,16 @@ async def forget_person(person_id: str, confirm: str = "") -> JSONResponse:
     await _require().delete_person(person_id)
     if _recognition_gallery is not None:  # U127: wipe their snapshots too
         _recognition_gallery.forget(person_id)
+    # U244: and their FACE. This was missing, so every deleted person left an
+    # enrolled embedding behind — ten of them by the time it was noticed. Two
+    # separate harms: the orphan still wins matches and hands the pipeline an
+    # id that resolves to nobody, and an erasure that leaves biometric data on
+    # disk is not an erasure (ADR-008 §9).
+    from aura_brain import recognition_api
+
+    faces = recognition_api.matcher()
+    if faces is not None:
+        faces.forget(person_id)
     return JSONResponse({"deleted": person_id})
 
 
