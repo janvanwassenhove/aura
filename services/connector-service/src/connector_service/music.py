@@ -19,6 +19,7 @@ import os
 from typing import Any
 
 import httpx
+from shared_schemas.tool_outcome import mark_unavailable
 
 logger = logging.getLogger(__name__)
 
@@ -67,7 +68,8 @@ class SpotifyMusic:
 
     async def list_devices(self) -> str:
         if self.mock:
-            return ("Speakers (mock): Sonos Living Room, Kitchen Sonos, Laptop. "
+            return mark_unavailable("music",
+                    "Speakers (mock): Sonos Living Room, Kitchen Sonos, Laptop. "
                     "Set SPOTIFY_ACCESS_TOKEN for real playback.")
         try:
             devices = await self._devices()
@@ -81,7 +83,8 @@ class SpotifyMusic:
 
     async def list_playlists(self) -> str:
         if self.mock:
-            return "Playlists (mock): Favorites, Focus, Dinner, Party Mix."
+            return mark_unavailable("music",
+                    "Playlists (mock): Favorites, Focus, Dinner, Party Mix.")
         try:
             resp = await self._api("GET", "/me/playlists?limit=20")
             resp.raise_for_status()
@@ -94,7 +97,7 @@ class SpotifyMusic:
 
     async def pause(self) -> str:
         if self.mock:
-            return "Paused the music (mock)."
+            return mark_unavailable("music", "Nothing was paused (mock).")
         try:
             await self._api("PUT", "/me/player/pause")
             return "Paused the music."
@@ -103,7 +106,7 @@ class SpotifyMusic:
 
     async def next_track(self) -> str:
         if self.mock:
-            return "Skipped to the next track (mock)."
+            return mark_unavailable("music", "Nothing was skipped (mock).")
         try:
             await self._api("POST", "/me/player/next")
             return "Skipped to the next track."
@@ -123,7 +126,7 @@ class SpotifyMusic:
             # No Spotify account token here, so the Web API can't play or pick a
             # device. Don't claim success — instead instruct the real fallback:
             # the desktop Spotify app is controllable via the media keys.
-            return (
+            return mark_unavailable("music",
                 "NOT_PLAYED_VIA_API. There is no Spotify account token, so I "
                 "cannot start playback through Spotify's API or pick the Sonos. "
                 "TO ACTUALLY START MUSIC NOW: call launch_app with name 'spotify' "

@@ -158,8 +158,8 @@ async def test_pipeline_beat_routes_through_the_agentic_loop_silently() -> None:
     calls: list[dict] = []
 
     class _FakePipeline:
-        async def orchestrate(self, text, session_id, announce=True):
-            calls.append({"text": text, "announce": announce})
+        async def orchestrate(self, text, session_id, announce=True, from_user=True):
+            calls.append({"text": text, "announce": announce, "from_user": from_user})
             return "Vandaag heb je drie meetings."
 
     from aura_brain import presentation_api as pa
@@ -168,6 +168,10 @@ async def test_pipeline_beat_routes_through_the_agentic_loop_silently() -> None:
     out = await pa._generate("mijn agenda vandaag", "één zin", "pipeline")
     assert out == "Vandaag heb je drie meetings."
     assert calls and calls[0]["announce"] is False    # never double-speaks
+    # U247: a presenter beat is the system talking, not the owner asking. It
+    # must not land in the skill ledger as a use of whatever skill its prompt
+    # happened to trigger.
+    assert calls[0]["from_user"] is False
     assert "mijn agenda vandaag" in calls[0]["text"]
 
 

@@ -613,6 +613,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
                     f"not scripted. This time, {angle}.{character_note} Never start "
                     f"with the same words as before. No lists.",
                     session_id,
+                    # U247: the robot saying hello is not a use of whatever
+                    # skill happened to match the greeting prompt.
+                    from_user=False,
                 )
                 ambient.note_spontaneous(said)  # avoid repeating next time
             except Exception as exc:

@@ -38,6 +38,11 @@ _MAX_INJECTED = 3          # full skill bodies per turn
 _MAX_BODY = 2000           # chars per injected body
 _NAME_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,63}$")
 _MAX_OBS = 200             # U107: usage observations kept per skill
+# U247: and a limit in TIME, not only in count. These lines quote the owner's
+# requests verbatim, and a rarely-used skill kept them indefinitely — the count
+# cap never bites when there are seven lines in eighteen months. Evidence that
+# old should not be rewriting a procedure either.
+_MAX_OBS_AGE_DAYS = float(os.environ.get("SKILL_OBS_MAX_AGE_DAYS", "180"))
 
 
 @dataclass
@@ -253,12 +258,26 @@ class SkillStore:
             entry = {"ts": round(time.time()), "seq": seq, **obs}
             with path.open("a", encoding="utf-8") as fh:
                 fh.write(json.dumps(entry, ensure_ascii=False) + "\n")
-            # Cap: keep only the most recent _MAX_OBS lines.
-            lines = path.read_text(encoding="utf-8").splitlines()
-            if len(lines) > _MAX_OBS:
-                path.write_text("\n".join(lines[-_MAX_OBS:]) + "\n", encoding="utf-8")
+            self._prune(path)
         except OSError as exc:
             logger.debug("skill observation not recorded for %s: %s", name, exc)
+
+    def _prune(self, path: Path) -> None:
+        """Keep the most recent _MAX_OBS lines, and drop anything older than
+        _MAX_OBS_AGE_DAYS. Rewrites only when something actually goes."""
+        lines = path.read_text(encoding="utf-8").splitlines()
+        kept = lines[-_MAX_OBS:]
+        if _MAX_OBS_AGE_DAYS > 0:
+            cutoff = time.time() - _MAX_OBS_AGE_DAYS * 86_400
+
+            def fresh(line: str) -> bool:
+                try:
+                    return float(json.loads(line).get("ts", 0)) >= cutoff
+                except (json.JSONDecodeError, TypeError, ValueError):
+                    return False   # unreadable and undateable: let it go
+            kept = [ln for ln in kept if fresh(ln)]
+        if len(kept) != len(lines):
+            path.write_text("\n".join(kept) + ("\n" if kept else ""), encoding="utf-8")
 
     def observations(self, name: str) -> list[dict]:
         path = self._obs_path(name)

@@ -56,14 +56,37 @@ Return ONLY a JSON object:
 
 
 def summarize_observations(obs: list[dict], limit: int = 40) -> str:
-    """Compact, model-friendly digest of how a skill has been used."""
+    """Compact, model-friendly digest of how a skill has been used.
+
+    U247: this used to report only what was ASKED — modes, people, request
+    texts — and the prompt then asked for "guardrails for the failure cases
+    implied by the usage evidence" against evidence in which nothing ever
+    failed. Observations now carry the tools a turn ran and the capabilities
+    that came back unavailable, and the failures lead, because a step that dies
+    the same way every time is the single most useful thing a rewrite can act
+    on.
+    """
     if not obs:
         return "(no recorded uses yet)"
     recent = obs[-limit:]
     reqs = [str(o.get("request", "")).strip() for o in recent if o.get("request")]
     personas = Counter(str(o.get("persona", "")) for o in recent if o.get("persona"))
     people = Counter(str(o.get("person", "")) for o in recent if o.get("person"))
-    lines = []
+    missing = Counter(
+        cap for o in recent for cap in (o.get("unavailable") or []) if cap)
+    tools = Counter(t for o in recent for t in (o.get("tools") or []) if t)
+    lines = [f"uses: {len(recent)}"]
+    if missing:
+        lines.append("UNAVAILABLE — these uses could not complete:")
+        for cap, n in missing.most_common():
+            lines.append(
+                f"  - {cap}: {n} of {len(recent)} uses hit this and stopped there")
+        lines.append(
+            "  Treat this as the main thing to fix: prefer a route that does "
+            "not need it, and if there is none, say so plainly instead of "
+            "half-executing.")
+    if tools:
+        lines.append("tools used: " + ", ".join(f"{k}×{v}" for k, v in tools.most_common()))
     if personas:
         lines.append("modes: " + ", ".join(f"{k}×{v}" for k, v in personas.most_common()))
     if people:

@@ -21,6 +21,7 @@ from shared_schemas.events.orchestrator import (
 )
 from shared_schemas.events.system import TurnLatencyMeasured
 from shared_schemas.robot.models import RobotMode
+from shared_schemas.tool_outcome import mark_unavailable, unavailable_capabilities
 
 from orchestrator import laptop_tools
 from orchestrator.approval_manager import ApprovalDeniedError, ApprovalManager, ApprovalTimeout
@@ -407,17 +408,29 @@ class OrchestratorPipeline:
         memory. Best-effort; never blocks or breaks a turn."""
         self._memory_hook = hook
 
-    async def orchestrate(self, text: str, session_id: str, announce: bool = True) -> str:
+    async def orchestrate(self, text: str, session_id: str, announce: bool = True,
+                          from_user: bool = True) -> str:
         """Process one user turn; times it and emits TurnLatencyMeasured (U23).
 
         U208: ``announce=False`` runs the full agentic loop (tools included) but
         does NOT publish ResponseDrafted, so nothing auto-speaks the reply. The
         co-presenter uses this to let an ``improvise`` beat pull live data via
         tools, then speak the result itself (once) through the robot.
+
+        U247: ``from_user=False`` for turns the SYSTEM starts — a greeting, a
+        presenter beat. Those run the same pipeline, so they were being written
+        into the skill ledger as uses: four of the seven recorded "uses" of the
+        Spotify skill on the owner's machine were the robot saying hello. A
+        learning loop fed that evidence rewrites a procedure from the wrong
+        material.
         """
         timing = {"llm_ms": 0.0, "tool_ms": 0.0}
+        # Per-turn, not per-instance: turns interleave, so this cannot be state
+        # on self. Filled in by _orchestrate_impl as the turn happens.
+        trace: dict = {"skills": [], "tools": [], "unavailable": []}
         t0 = time.perf_counter()
-        reply = await self._orchestrate_impl(text, session_id, timing, announce=announce)
+        reply = await self._orchestrate_impl(text, session_id, timing,
+                                             announce=announce, trace=trace)
         total_ms = (time.perf_counter() - t0) * 1000
         await self._bus.publish(TurnLatencyMeasured(
             session_id=session_id,
@@ -425,6 +438,14 @@ class OrchestratorPipeline:
             llm_ms=round(timing["llm_ms"], 1),
             tool_ms=round(timing["tool_ms"], 1),
         ))
+        # U247: the skill ledger line, written NOW that the turn is over and
+        # there is something to say about it. It used to be written before the
+        # turn ran, carrying only what was asked — so "add guardrails for the
+        # failure cases implied by the evidence" was asked of evidence that
+        # contained no failures.
+        if from_user:
+            self._record_skill_use(text, trace)
+
         # U109: feed the exchange into long-term memory (recognized people only).
         hook = getattr(self, "_memory_hook", None)
         if hook is not None and self._active_person_id:
@@ -434,8 +455,29 @@ class OrchestratorPipeline:
                 logger.debug("memory hook failed: %s", exc)
         return reply
 
+    def _record_skill_use(self, text: str, trace: dict) -> None:
+        """One ledger line per skill that was actually injected into this turn.
+
+        Best-effort in every direction: a turn is never worth losing over a
+        note about it.
+        """
+        if self._skills is None or not trace.get("skills"):
+            return
+        try:
+            entry = {
+                "request": text[:200],
+                "persona": str(self._persona.current_persona),
+                "person": self._active_person_id or "",
+                "tools": sorted(set(trace.get("tools") or [])),
+                "unavailable": sorted(set(trace.get("unavailable") or [])),
+            }
+            for name in dict.fromkeys(trace["skills"]):
+                self._skills.record_observation(name, entry)
+        except Exception as exc:  # noqa: BLE001 — never break a turn
+            logger.debug("skill observation not recorded: %s", exc)
+
     async def _orchestrate_impl(self, text: str, session_id: str, timing: dict,
-                               announce: bool = True) -> str:
+                               announce: bool = True, trace: dict | None = None) -> str:
         # Offline / DEGRADED mode: try a local model, then the regex FallbackAgent.
         if self._heartbeat and self._heartbeat.mode in (
             RobotMode.DEGRADED, RobotMode.OFFLINE, RobotMode.MAINTENANCE
@@ -470,14 +512,13 @@ class OrchestratorPipeline:
                 )
                 if block:
                     system_prompt += "\n\n" + block
-                # U107: record a usage observation per relevant skill so the
-                # self-optimizing loop has real evidence to rewrite from.
-                for sk in self._skills.relevant(text, str(persona), self._active_person_id):
-                    self._skills.record_observation(sk.name, {
-                        "request": text[:200],
-                        "persona": str(persona),
-                        "person": self._active_person_id or "",
-                    })
+                # U107/U247: note which skills this turn actually ran with. The
+                # ledger line is written after the turn, in orchestrate(), once
+                # the outcome is known.
+                if trace is not None:
+                    trace["skills"].extend(
+                        sk.name for sk in self._skills.relevant(
+                            text, str(persona), self._active_person_id))
             except Exception as exc:  # noqa: BLE001 — skills must never break a turn
                 logger.debug("skill injection failed: %s", exc)
 
@@ -548,6 +589,11 @@ class OrchestratorPipeline:
 
             assistant_tool_calls, tool_messages, executed = await self._run_tool_round(
                 tool_calls, session_id, timing)
+            # U247: what ran, and what came back saying it could not run. This
+            # is the half the learning loop never had.
+            if trace is not None:
+                trace["tools"].extend(executed)
+                trace["unavailable"].extend(unavailable_capabilities(tool_messages))
             messages.append({"role": "assistant", "content": content or None,
                              "tool_calls": assistant_tool_calls})
             messages.extend(tool_messages)
@@ -744,9 +790,13 @@ class OrchestratorPipeline:
                 )
             elif tool_name == "use_computer":
                 if self._computer_use is None:
-                    result_text = ("[use_computer: not available — enable Computer "
-                                   "Use in the capabilities panel (works with your "
-                                   "OpenAI or Anthropic key)]")
+                    # U247: marked, so the skill ledger can see that a step died
+                    # here rather than recording another apparently-fine use.
+                    result_text = mark_unavailable(
+                        "use_computer",
+                        "[use_computer: not available — enable Computer "
+                        "Use in the capabilities panel (works with your "
+                        "OpenAI or Anthropic key)]")
                 else:
                     from shared_schemas.events.orchestrator import (
                         ComputerControlEnded,

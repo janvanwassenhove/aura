@@ -186,7 +186,10 @@ async def agent_feedback(body: dict) -> JSONResponse:
         "add to your character's 'learned traits' in the Robot panel. Then "
         "confirm in one or two sentences what you learned."
     )
-    reply = await _pipeline.orchestrate(framed, session_id)
+    # U247: from_user=False — the owner IS driving this, but what would be
+    # recorded is the teaching frame above, not their sentence. A ledger line
+    # of our own boilerplate teaches the optimizer nothing.
+    reply = await _pipeline.orchestrate(framed, session_id, from_user=False)
     return JSONResponse({"reply": reply, "session_id": session_id})
 
 

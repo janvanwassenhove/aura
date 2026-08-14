@@ -98,7 +98,8 @@ async def _generate(topic: str, guardrails: str, engine: str) -> str:
             f"data: {topic}. {guard}"
         )
         try:
-            return (await _pipeline.orchestrate(prompt, _SESSION, announce=False) or "").strip()
+            return (await _pipeline.orchestrate(prompt, _SESSION, announce=False,
+                                                from_user=False) or "").strip()
         except Exception as exc:  # noqa: BLE001
             logger.warning("presentation pipeline improvise failed: %s", exc)
             return ""

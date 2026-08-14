@@ -34,10 +34,31 @@ async def test_play_on_named_device(mock_music) -> None:
 
 
 async def test_pause_next_playlists_devices(mock_music) -> None:
-    assert "aused" in await mock_music.pause()
-    assert "next" in (await mock_music.next_track()).lower()
+    assert "mock" in (await mock_music.pause()).lower()
+    assert "mock" in (await mock_music.next_track()).lower()
     assert "mock" in (await mock_music.list_playlists()).lower()
     assert "Sonos" in await mock_music.list_devices()
+
+
+async def test_mock_answers_never_claim_something_happened(mock_music) -> None:
+    """U247: without a token nothing is paused and nothing is skipped. The
+    replies used to say "Paused the music" and "Skipped to the next track",
+    which reads as success to a person and to every layer above the tool."""
+    assert "othing was paused" in await mock_music.pause()
+    assert "othing was skipped" in await mock_music.next_track()
+
+
+async def test_every_mock_answer_is_marked_unavailable(mock_music) -> None:
+    """The machine-readable half: the skill ledger has to be able to see that
+    these uses did not complete (see orchestrator/test_skill_learning)."""
+    from shared_schemas.tool_outcome import unavailable_capability
+
+    for result in (await mock_music.play(query="radiohead"),
+                   await mock_music.pause(),
+                   await mock_music.next_track(),
+                   await mock_music.list_playlists(),
+                   await mock_music.list_devices()):
+        assert unavailable_capability(result) == "music", result[:80]
 
 
 async def test_real_mode_when_token_set(monkeypatch) -> None:
