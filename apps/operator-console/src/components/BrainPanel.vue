@@ -103,10 +103,21 @@
         <!-- ── Right: skills library (U117: full editing + optimize live here) ── -->
         <section v-if="selected === '_skills'" class="brain-content">
           <!-- U108: proactive optimization suggestions -->
+          <!-- U250: a skill that keeps FAILING reads differently from one
+               that is merely busy. "+9" on a working skill and "+2" on a
+               broken one looked identical, which is how the broken one stayed
+               invisible. The reason comes from the brain, in words. -->
           <div v-if="suggestions.length" class="skill-suggest">
-            <span>🔧 <strong>{{ suggestions.length }} skill{{ suggestions.length === 1 ? '' : 's' }} ready to optimize</strong></span>
-            <button v-for="s in suggestions" :key="s.name" class="b-tag" :disabled="optimizing === s.name" @click="optimizeSkillByName(s.name)">
-              {{ s.name }} <em class="suggest-plus">+{{ s.new_since_optimized }}</em>
+            <span v-if="suggestions.some(s => s.blocked_by_failure)">
+              ⚠️ <strong>{{ suggestions.filter(s => s.blocked_by_failure).length }} skill{{ suggestions.filter(s => s.blocked_by_failure).length === 1 ? '' : 's' }} kept failing</strong>
+            </span>
+            <span v-else>🔧 <strong>{{ suggestions.length }} skill{{ suggestions.length === 1 ? '' : 's' }} ready to optimize</strong></span>
+            <button v-for="s in suggestions" :key="s.name" class="b-tag"
+                    :class="{ 'b-tag-warn': s.blocked_by_failure }"
+                    :title="s.reason"
+                    :disabled="optimizing === s.name" @click="optimizeSkillByName(s.name)">
+              {{ s.name }}
+              <em class="suggest-plus">{{ s.blocked_by_failure ? `${s.blocked}× blocked` : `+${s.new_since_optimized}` }}</em>
             </button>
           </div>
 
@@ -1509,6 +1520,12 @@ onMounted(async () => {
   background: color-mix(in srgb, var(--accent) 8%, transparent);
 }
 .suggest-plus { font-style: normal; color: var(--accent); font-weight: 700; }
+/* U250: a skill that kept failing must not look like a busy one. */
+.b-tag-warn {
+  border-color: var(--danger, #c0522d);
+  color: var(--danger, #c0522d);
+}
+.b-tag-warn .suggest-plus { color: inherit; }
 .b-uses { font-size: 0.64rem; color: var(--text-faint); }
 .b-skill-body { width: 100%; font-family: ui-monospace, monospace; resize: vertical; }
 .b-btn--ghost { background: none; border: 1px solid var(--border-strong); color: var(--text); }

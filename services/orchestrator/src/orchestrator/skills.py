@@ -225,6 +225,33 @@ class SkillStore:
             return None
         return self._metrics_dir / f"{name}.jsonl"
 
+    # U250: requests that matched NO skill. Until now these left no trace at
+    # all — so a thing the owner asks for every week, with no procedure behind
+    # it, was invisible. A skill can only be improved once it exists; this is
+    # how one gets proposed in the first place. Not a skill name, so it cannot
+    # collide with one (_NAME_RE forbids a leading underscore).
+    _UNMATCHED = "_unmatched"
+
+    def _unmatched_path(self) -> Path:
+        return self._metrics_dir / f"{self._UNMATCHED}.jsonl"
+
+    def record_unmatched(self, entry: dict) -> None:
+        """Note a request no skill covered. Best-effort, same rules as the rest:
+        capped, expiring, and never allowed to break a turn."""
+        path = self._unmatched_path()
+        try:
+            self._metrics_dir.mkdir(parents=True, exist_ok=True)
+            seq = self._max_seq(self.unmatched()) + 1
+            with path.open("a", encoding="utf-8") as fh:
+                fh.write(json.dumps({"ts": round(time.time()), "seq": seq, **entry},
+                                    ensure_ascii=False) + "\n")
+            self._prune(path)
+        except OSError as exc:
+            logger.debug("unmatched request not recorded: %s", exc)
+
+    def unmatched(self) -> list[dict]:
+        return self._read_jsonl(self._unmatched_path())
+
     def _opt_path(self, name: str) -> Path | None:
         # Records the observation count at the last optimization, so the UI
         # can surface "N new signals since you last optimized this skill".
@@ -280,8 +307,8 @@ class SkillStore:
         if len(kept) != len(lines):
             path.write_text("\n".join(kept) + ("\n" if kept else ""), encoding="utf-8")
 
-    def observations(self, name: str) -> list[dict]:
-        path = self._obs_path(name)
+    @staticmethod
+    def _read_jsonl(path: Path | None) -> list[dict]:
         if path is None or not path.exists():
             return []
         out: list[dict] = []
@@ -294,6 +321,9 @@ class SkillStore:
             except json.JSONDecodeError:
                 continue
         return out
+
+    def observations(self, name: str) -> list[dict]:
+        return self._read_jsonl(self._obs_path(name))
 
     def mark_optimized(self, name: str) -> None:
         """Record that the skill's accumulated usage evidence has been reviewed.

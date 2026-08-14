@@ -213,3 +213,94 @@ async def propose_optimization(
         "proposed_body": proposed,
         "based_on": len(obs),
     }
+
+
+_NEW_SKILL_PROMPT = """\
+You draft a new "skill" — a step-by-step procedure an AI assistant will follow
+for a task its owner keeps asking for and which no existing procedure covers.
+
+Here are the real requests, in the owner's own words, that nothing handled:
+{examples}
+
+{failures}
+Existing skills (do NOT duplicate one; if the topic really belongs in one of
+these, say so instead of drafting):
+{existing}
+
+Available tools, in the order the assistant should prefer them:
+{tools}
+
+Write the procedure the assistant should have followed. Rules:
+- Numbered, imperative, specific, checkable steps; prerequisites first.
+- Use tools that EXIST. Never invent a capability, and never describe a step
+  the assistant cannot actually take.
+- If a step needs something that is currently unavailable, say what to do
+  instead AND that the assistant should ask the owner for it.
+- Same language the owner used.
+- Keep it short. A procedure nobody reads is worse than none.
+
+Return ONLY a JSON object:
+{{"worth_adding": true|false,
+  "name": "<kebab-case, max 64 chars>",
+  "description": "<one line, what this is for>",
+  "triggers": ["<word or phrase that should activate it>", ...],
+  "body": "<the numbered procedure>",
+  "rationale": "<=2 sentences: why this deserves to exist>"}}
+"""
+
+
+async def propose_new_skill(
+    store: Any,
+    examples: list[str],
+    chat_fn: ChatFn,
+    *,
+    tools: str = "",
+    model: str | None = None,
+) -> dict:
+    """U250: draft (never save) a skill for something asked repeatedly that no
+    existing skill covers.
+
+    ``worth_adding: false`` is a real answer and the common one — most repeated
+    phrasings are conversation, not a procedure. A loop that produces a skill
+    every time it is asked would bury the owner in things to approve, which is
+    the same failure as never asking at all.
+    """
+    if not examples:
+        return {"error": "nothing to draft from"}
+    existing = "\n".join(
+        f"  - {s.name}: {s.description}" for s in store.all()) or "  (none yet)"
+    unavailable = sorted({
+        cap for e in getattr(store, "unmatched", lambda: [])()
+        for cap in (e.get("unavailable") or [])})
+    failures = (
+        "These attempts also ran into something that was not available: "
+        + ", ".join(unavailable) + ". Take that into account.\n"
+    ) if unavailable else ""
+    prompt = _NEW_SKILL_PROMPT.format(
+        examples="\n".join(f"  - {e[:160]}" for e in examples[:12]),
+        failures=failures, existing=existing, tools=tools or "(not listed)",
+    )
+    try:
+        resp = await chat_fn([{"role": "user", "content": prompt}], model=model)
+    except Exception as exc:  # noqa: BLE001
+        return {"error": f"draft failed ({type(exc).__name__})"}
+    data = _extract_json(resp.get("content") or "")
+    if not data:
+        return {"error": "the model did not return a usable draft"}
+    if not data.get("worth_adding"):
+        return {"worth_adding": False,
+                "rationale": str(data.get("rationale", "")).strip()}
+    body = str(data.get("body", "")).strip()
+    name = str(data.get("name", "")).strip().lower()
+    if not body or not name:
+        return {"error": "the draft had no name or no body"}
+    triggers = [str(t).strip().lower() for t in (data.get("triggers") or []) if str(t).strip()]
+    return {
+        "worth_adding": True,
+        "name": name,
+        "description": str(data.get("description", "")).strip(),
+        "triggers": triggers,
+        "body": body,
+        "rationale": str(data.get("rationale", "")).strip(),
+        "based_on": len(examples),
+    }

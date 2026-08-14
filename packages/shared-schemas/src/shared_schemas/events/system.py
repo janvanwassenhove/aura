@@ -19,6 +19,29 @@ class MaintenanceReport(BaseEvent):
     actions: list[str] = Field(default_factory=list)
 
 
+class SkillProposalRaised(BaseEvent):
+    """U250: the assistant brought a skill up ITSELF.
+
+    Until now a proposal waited behind a button, so a skill could die at the
+    same step every day and nothing said a word. This is the assistant asking:
+    here is what keeps going wrong, here is what I would write instead — may I?
+
+    It is a QUESTION, never a change. Nothing is saved until the owner applies
+    it through the ordinary save path, exactly as with every skill write since
+    U59.
+    """
+
+    event_type: Literal["SkillProposalRaised"] = "SkillProposalRaised"
+    kind: str = "rewrite"          # "rewrite" | "new"
+    skill: str = ""                # existing skill, or the topic for a new one
+    reason: str = ""               # why this came up, in the owner's terms
+    rationale: str = ""            # what the rewrite changes and why
+    current_body: str = ""
+    proposed_body: str = ""
+    description: str = ""          # new skills only
+    triggers: list[str] = Field(default_factory=list)   # new skills only
+
+
 class BackendHeartbeatOk(BaseEvent):
     event_type: Literal["BackendHeartbeatOk"] = "BackendHeartbeatOk"
     session_id: str = ""

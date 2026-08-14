@@ -32,12 +32,14 @@ class MaintenanceLoop:
         knowledge_encrypted: Any,   # Callable[[], bool]
         session_id: str = "default",
         interval_s: float = 300.0,
+        skill_proposer: Any = None,   # U250: SkillProposer | None
     ) -> None:
         self._bus = bus
         self._robot = robot
         self._knowledge_encrypted = knowledge_encrypted
         self._session_id = session_id
         self._interval = interval_s
+        self._proposer = skill_proposer
         self._task: asyncio.Task | None = None
 
     def start(self) -> None:
@@ -110,6 +112,21 @@ class MaintenanceLoop:
         # informational, and a warning light that is always on is not a warning
         # light. The drift is surfaced through `actions` instead, where it reads
         # as "here is something to do" rather than "something is broken".
+        # U250: is any skill worth bringing up? Deliberately AFTER the health
+        # checks and outside `healthy` — a procedure that could be better is
+        # not a fault, and a warning light that is always on is not a warning
+        # light (the same reasoning as robot_build in U240). It lands in
+        # `actions`: "here is something to decide", not "something is broken".
+        if self._proposer is not None:
+            try:
+                raised = await self._proposer.review()
+                if raised:
+                    actions.append(
+                        f"skill proposal: {raised['kind']} '{raised['skill']}' — "
+                        f"{raised['reason']}")
+            except Exception as exc:  # noqa: BLE001 — never break a tick
+                logger.debug("skill proposal review failed: %s", exc)
+
         _FUNCTIONAL = ("ok", "encrypted", "recovered")
         healthy = all(
             v in _FUNCTIONAL

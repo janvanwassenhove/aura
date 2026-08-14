@@ -468,7 +468,22 @@ class OrchestratorPipeline:
         Best-effort in every direction: a turn is never worth losing over a
         note about it.
         """
-        if self._skills is None or not trace.get("skills"):
+        if self._skills is None:
+            return
+        if not trace.get("skills"):
+            # U250: nothing covered this request. Worth knowing — a thing asked
+            # for every week with no procedure behind it used to be invisible,
+            # and a skill cannot be improved before it exists.
+            try:
+                self._skills.record_unmatched({
+                    "request": text[:200],
+                    "persona": str(self._persona.current_persona),
+                    "person": self._active_person_id or "",
+                    "tools": sorted(set(trace.get("tools") or [])),
+                    "unavailable": sorted(set(trace.get("unavailable") or [])),
+                })
+            except Exception as exc:  # noqa: BLE001 — never break a turn
+                logger.debug("unmatched request not recorded: %s", exc)
             return
         try:
             entry = {

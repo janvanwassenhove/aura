@@ -778,11 +778,22 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     from aura_brain.maintenance import MaintenanceLoop
 
     def _make_maintenance() -> MaintenanceLoop:
+        # U250: the tick is already the place that asks "how are things" — so
+        # it is where the assistant looks at its own skills and raises the one
+        # worth the owner's attention. Off via SKILL_PROPOSALS=false.
+        proposer = None
+        if os.environ.get("SKILL_PROPOSALS", "true").lower() == "true":
+            store = getattr(ctx.pipeline, "_skills", None)
+            if store is not None:
+                from aura_brain.skill_proposals import SkillProposer
+
+                proposer = SkillProposer(store, ctx.bus, session_id=session_id)
         return MaintenanceLoop(
             ctx.bus, _robot,
             knowledge_encrypted=knowledge_api.is_omk_loaded,
             session_id=session_id,
             interval_s=float(os.environ.get("MAINTENANCE_INTERVAL_S", "300")),
+            skill_proposer=proposer,
         )
 
     if os.environ.get("MAINTENANCE_ENABLED", "true").lower() == "true":
