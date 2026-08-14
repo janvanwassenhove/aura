@@ -94,6 +94,7 @@ class RealtimeSession:
         meter: CostMeter | None = None,
         on_reply=None,                 # callable(str) — feeds the echo guard
         trace=None,                    # TurnTrace | None — first-turn latency marks
+        instructions_provider=None,    # U245: async () -> str, re-asked while open
     ) -> None:
         self._robot = robot
         self._bus = bus
@@ -104,6 +105,12 @@ class RealtimeSession:
         self._meter = meter or METER
         self._on_reply = on_reply
         self._trace = trace
+        # U245: a session runs for minutes and the room changes inside it —
+        # someone else walks up, or the owner is recognized a beat after the
+        # first word. Instructions fixed at connect would have it talking to
+        # whoever happened to be there when the socket opened.
+        self._instructions_provider = instructions_provider
+        self._instructions_checked = 0.0
         self._last_activity = time.monotonic()
         # Playback clock: mic chunks are dropped while now < _playing_until
         # (+ a speaker tail) so the server never hears Richie's own voice.
@@ -129,6 +136,41 @@ class RealtimeSession:
     @property
     def _speaker_tail_s(self) -> float:
         return float(os.environ.get("SELF_HEARING_COOLDOWN_S", "1.2"))
+
+    @property
+    def _refresh_s(self) -> float:
+        """How often to re-ask who is in the room. 0 disables the refresh."""
+        return float(os.environ.get("REALTIME_CONTEXT_REFRESH_S", "5"))
+
+    async def _refresh_instructions(self, conn) -> bool:
+        """Re-ask the provider; push a session.update only if it changed.
+
+        Returns whether anything was sent — the tests read that rather than
+        counting network calls. Never raises: losing the refresh costs a stale
+        person note, losing the session costs the conversation.
+        """
+        if self._instructions_provider is None or self._refresh_s <= 0:
+            return False
+        now = time.monotonic()
+        if now - self._instructions_checked < self._refresh_s:
+            return False
+        self._instructions_checked = now
+        try:
+            fresh = await self._instructions_provider()
+        except Exception as exc:  # noqa: BLE001 — keep the session alive
+            logger.debug("instructions refresh failed: %s", exc)
+            return False
+        if not fresh or fresh == self._instructions:
+            return False
+        self._instructions = fresh
+        try:
+            await conn.session.update(
+                session={"type": "realtime", "instructions": fresh})
+        except Exception as exc:  # noqa: BLE001 — same
+            logger.debug("session.update for new instructions failed: %s", exc)
+            return False
+        logger.info("realtime session instructions refreshed (room changed)")
+        return True
 
     @property
     def _barge_in(self) -> bool:
@@ -206,6 +248,7 @@ class RealtimeSession:
                         mic.result()
                         self.closed_reason = "mic stream ended"
                         return
+                    await self._refresh_instructions(conn)
                     now = time.monotonic()
                     if now - started > self._max_s:
                         self.closed_reason = f"max session length ({self._max_s:.0f}s)"

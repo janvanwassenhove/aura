@@ -604,7 +604,7 @@ class VoiceLoop:
             if not pcm:
                 return False
             character = getattr(self._manager, "character", None) if self._manager else None
-            instructions = getattr(character, "character_prompt", "") or ""
+            instructions = await self._instructions(character)
             voice_id = getattr(character, "voice_id", "") or "alloy"
             import base64
 
@@ -700,6 +700,25 @@ class VoiceLoop:
                 logger.warning("realtime turn failed, using pipeline: %s", exc)
             return False
 
+    async def _instructions(self, character: Any) -> str:
+        """U245: what a Realtime turn or session is told — character voice PLUS
+        who is in the room.
+
+        This path never calls the pipeline, so nothing here comes for free. The
+        person note is asked of the pipeline rather than rebuilt, so the spoken
+        and the typed path cannot drift apart again; failing to get it costs
+        the personal half, never the turn.
+        """
+        from aura_brain.voice_context import build_instructions
+
+        prompt = getattr(character, "character_prompt", "") or ""
+        note = ""
+        try:
+            note = await self._pipeline.person_note()
+        except Exception as exc:  # noqa: BLE001 — speech must never wait on this
+            logger.debug("person note unavailable for the realtime path: %s", exc)
+        return build_instructions(prompt, note)
+
     async def _realtime_session_turn(self, command: str) -> bool:
         """U154: open a conversation session — the robot mic streams into ONE
         persistent Realtime connection, server VAD does the turn-taking, and
@@ -713,7 +732,7 @@ class VoiceLoop:
 
         try:
             character = getattr(self._manager, "character", None) if self._manager else None
-            instructions = getattr(character, "character_prompt", "") or ""
+            instructions = await self._instructions(character)
             voice_id = getattr(character, "voice_id", "") or "alloy"
             _t = _TRACE.current(self._session_id)
             if _t is not None:
@@ -725,7 +744,9 @@ class VoiceLoop:
             sess = realtime_session.RealtimeSession(
                 robot=self._robot, bus=self._bus, session_id=self._session_id,
                 instructions=instructions, voice=voice_id,
-                on_reply=self.note_spoken, trace=_t)
+                on_reply=self.note_spoken, trace=_t,
+                # U245: the room can change inside one session — re-ask.
+                instructions_provider=lambda: self._instructions(character))
             logger.info("realtime session opening (command=%r)", command[:60])
             self._active_session = sess          # U184: panic stop handle
             try:

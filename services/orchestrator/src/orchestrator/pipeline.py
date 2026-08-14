@@ -382,6 +382,25 @@ class OrchestratorPipeline:
         """Update the currently-recognized person (called on PersonRecognized events)."""
         self._active_person_id = person_id
 
+    async def person_note(self) -> str:
+        """Who is being spoken to, as a system-prompt note — "" when nobody is.
+
+        U245: this used to be four lines inline in the turn pipeline, which
+        meant the realtime speech path (which never calls the pipeline) had no
+        way to reach it and simply did without. The result was an assistant
+        that greeted the owner by name through one path and told him it had
+        never met him through the other. It is public so both paths ask the
+        same question and get the same answer.
+
+        Goes through the JudgmentLayer on purpose rather than reading facts
+        directly: that is where the role rules live (a guest gets a name only,
+        a minor gets explicit facts and never observed signals — ADR-008 §10).
+        """
+        if self._judgment is None or not self._active_person_id:
+            return ""
+        person_ctx = await self._judgment.build_context(self._active_person_id)
+        return person_ctx.to_system_note() if person_ctx is not None else ""
+
     def set_memory_hook(self, hook) -> None:
         """U109: async (person_id, user_text, reply_text) -> None, called after
         each turn with a recognized person so the brain can grow long-term
@@ -433,10 +452,9 @@ class OrchestratorPipeline:
         ctx_str = await self._context.build_context()
 
         # U19e: prepend a minimal personal-context note when a person is active.
-        if self._judgment is not None and self._active_person_id:
-            person_ctx = await self._judgment.build_context(self._active_person_id)
-            if person_ctx is not None:
-                ctx_str = person_ctx.to_system_note() + "\n\n" + ctx_str
+        note = await self.person_note()
+        if note:
+            ctx_str = note + "\n\n" + ctx_str
 
         tool_list_str = await self._context.build_tool_list(allowed)
         system_prompt = self._persona.render_system_prompt(ctx_str, tool_list_str)

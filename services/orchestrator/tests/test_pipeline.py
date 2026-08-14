@@ -83,3 +83,77 @@ async def test_announce_false_runs_but_stays_silent(
 
     assert reply                      # the loop still produced a reply
     assert received == []             # …but nothing was announced
+
+
+# --------------------------------------------------------------------------
+# U245: person_note() — the one answer to "who am I talking to".
+#
+# It used to be four lines inline in the turn pipeline, which meant the realtime
+# speech path had no way to reach it and simply went without: the assistant
+# greeted the owner by name through one path and told him it had never met him
+# through the other. Public so both paths ask the same question.
+# --------------------------------------------------------------------------
+
+
+class _FakeJudgment:
+    """Stands in for JudgmentLayer: returns a context, or None for someone it
+    cannot resolve (a deleted guest whose face is still enrolled — see U244)."""
+
+    def __init__(self, known: dict) -> None:
+        self._known = known
+
+    async def build_context(self, person_id):
+        note = self._known.get(person_id)
+        if note is None:
+            return None
+        return type("Ctx", (), {"to_system_note": lambda self: note})()
+
+
+async def test_person_note_is_empty_when_nobody_is_recognized(
+    pipeline: OrchestratorPipeline,
+) -> None:
+    pipeline.set_judgment_layer(_FakeJudgment({"jan": "Talking to: Jan (owner)."}))
+    assert await pipeline.person_note() == ""
+
+
+async def test_person_note_carries_the_active_person(
+    pipeline: OrchestratorPipeline,
+) -> None:
+    pipeline.set_judgment_layer(_FakeJudgment({"jan": "Talking to: Jan (owner)."}))
+    pipeline.set_active_person("jan")
+    assert await pipeline.person_note() == "Talking to: Jan (owner)."
+
+
+async def test_an_id_that_resolves_to_nobody_yields_no_note(
+    pipeline: OrchestratorPipeline,
+) -> None:
+    """U244's orphaned faces produced exactly this: a person_id that wins the
+    match and has no profile behind it. Empty, never a crash."""
+    pipeline.set_judgment_layer(_FakeJudgment({"jan": "Talking to: Jan (owner)."}))
+    pipeline.set_active_person("guest-7")
+    assert await pipeline.person_note() == ""
+
+
+async def test_person_note_without_a_judgment_layer(
+    pipeline: OrchestratorPipeline,
+) -> None:
+    """Recognition off, or the store still locked."""
+    pipeline.set_active_person("jan")
+    assert await pipeline.person_note() == ""
+
+
+async def test_the_turn_pipeline_still_uses_it(
+    pipeline: OrchestratorPipeline,
+) -> None:
+    """The extraction must not have dropped the note from the typed path."""
+    seen = {}
+
+    class Spy(_FakeJudgment):
+        async def build_context(self, person_id):
+            seen["asked"] = person_id
+            return await super().build_context(person_id)
+
+    pipeline.set_judgment_layer(Spy({"jan": "Talking to: Jan (owner)."}))
+    pipeline.set_active_person("jan")
+    await pipeline.orchestrate("hello", "session-note")
+    assert seen.get("asked") == "jan"
