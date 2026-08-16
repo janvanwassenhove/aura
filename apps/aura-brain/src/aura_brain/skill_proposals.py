@@ -56,6 +56,12 @@ class SkillProposer:
         if pick is None:
             return None
 
+        # Already waiting for an answer? Then this is not news.
+        from aura_brain import proposal_inbox
+
+        if proposal_inbox.waiting_for(pick.kind, pick.name):
+            return None
+
         proposal = (await self._draft_rewrite(pick) if pick.kind == "rewrite"
                     else await self._draft_new(pick))
         if proposal is None:
@@ -65,6 +71,11 @@ class SkillProposer:
             return None
 
         self._last_raised[f"{pick.kind}:{pick.name}"] = now or time.time()
+        # U251: file it before publishing. The event reaches a console that
+        # happens to be open; the inbox is what makes it survive until the
+        # owner actually looks — which, for a tick that runs all day, is the
+        # difference between a working loop and a loop nobody ever sees.
+        proposal = proposal_inbox.file(proposal)
         await self._publish(proposal)
         logger.info("raised a %s proposal for %r (%s)",
                     pick.kind, pick.name, pick.reason)
@@ -120,4 +131,6 @@ class SkillProposer:
         from shared_schemas.events.system import SkillProposalRaised
 
         await self._bus.publish(SkillProposalRaised(
-            session_id=self._session_id, **proposal))
+            session_id=self._session_id,
+            **{k: v for k, v in proposal.items()
+               if k not in ("id", "raised_at")}))

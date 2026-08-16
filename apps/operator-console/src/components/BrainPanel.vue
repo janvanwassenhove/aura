@@ -156,6 +156,40 @@
             </div>
           </template>
 
+          <!-- U251: proposals the assistant raised BY ITSELF and nobody has
+               answered. The tick runs all day; the owner looks in the evening,
+               so these have to wait rather than flash past on the event bus. -->
+          <div v-for="p in proposals" :key="p.id" class="skill-opt skill-opt--raised">
+            <p class="skill-opt-head">
+              <span class="raised-badge">{{ p.kind === 'new' ? 'New skill' : 'Rewrite' }}</span>
+              <strong>{{ p.skill }}</strong> — {{ p.reason }}
+            </p>
+            <p v-if="p.rationale" class="content-hint">{{ p.rationale }}</p>
+            <p v-if="p.kind === 'new'" class="content-hint">
+              {{ p.description }}
+              <template v-if="p.triggers?.length">
+                · triggers: <span v-for="t in p.triggers" :key="t" class="b-tag">“{{ t }}”</span>
+              </template>
+            </p>
+            <div class="skill-opt-diff">
+              <div v-if="p.kind !== 'new'" class="skill-opt-col">
+                <span class="skill-opt-label">Current</span>
+                <pre class="skill-opt-pre">{{ p.current_body }}</pre>
+              </div>
+              <div class="skill-opt-col">
+                <span class="skill-opt-label">{{ p.kind === 'new' ? 'Proposed skill' : 'Proposed' }}</span>
+                <pre class="skill-opt-pre skill-opt-pre--new">{{ p.proposed_body }}</pre>
+              </div>
+            </div>
+            <div class="inline-add">
+              <button class="b-btn" :disabled="applyingProposal === p.id" @click="acceptProposal(p)">
+                {{ p.kind === 'new' ? 'Add this skill' : 'Apply rewrite' }}
+              </button>
+              <button class="b-btn b-btn--ghost" :disabled="applyingProposal === p.id" @click="editProposal(p)">Edit first</button>
+              <button class="b-btn b-btn--ghost" :disabled="applyingProposal === p.id" @click="dismissProposal(p)">No thanks</button>
+            </div>
+          </div>
+
           <!-- U117: optimize proposal — before/after diff, owner applies -->
           <div v-if="skillProposal" class="skill-opt">
             <p class="skill-opt-head"><strong>{{ skillProposal.name }}</strong> — proposed rewrite, based on {{ skillProposal.based_on }} use(s). {{ skillProposal.rationale }}</p>
@@ -965,13 +999,32 @@ async function fetchSkills(): Promise<void> {
       const s = await fetch(`${BRAIN_URL}/skills/suggestions`)
       suggestions.value = s.ok ? (await s.json()).suggestions ?? [] : []
     } catch { suggestions.value = [] }
+    try {
+      const p = await fetch(`${BRAIN_URL}/skills/proposals`)
+      proposals.value = p.ok ? (await p.json()).proposals ?? [] : []
+    } catch { proposals.value = [] }
   } catch { skills.value = [] }
 }
 
 // ── U117: skills are managed HERE now (editor + optimize, ex-Settings) ──
 interface SkillMetric { uses: number; new_since_optimized: number; last_used: number | null }
 const skillMetrics = ref<Record<string, SkillMetric>>({})
-const suggestions = ref<{ name: string; new_since_optimized: number }[]>([])
+const suggestions = ref<{ name: string; new_since_optimized: number; blocked?: number; blocked_by_failure?: boolean; reason?: string }[]>([])
+
+// U251: proposals the assistant raised by itself, waiting for an answer.
+interface RaisedProposal {
+  id: string
+  kind: 'rewrite' | 'new'
+  skill: string
+  reason: string
+  rationale: string
+  description?: string
+  triggers?: string[]
+  current_body: string
+  proposed_body: string
+}
+const proposals = ref<RaisedProposal[]>([])
+const applyingProposal = ref('')
 const optimizing = ref('')
 const optimizeNote = ref('')
 interface SkillProposal { name: string; changed: boolean; rationale: string; current_body: string; proposed_body: string; based_on: number }
@@ -1068,6 +1121,72 @@ async function optimizeSkillCard(sk: SkillItem): Promise<void> {
 async function optimizeSkillByName(name: string): Promise<void> {
   const sk = skills.value.find(s => s.name === name)
   if (sk) await optimizeSkillCard(sk)
+}
+
+// ── U251: answering a proposal the assistant raised itself ───────────────
+//
+// Three answers, and "Edit first" matters as much as the other two: a draft
+// written from three of your own sentences is a good starting point and rarely
+// the finished thing. Approving something you had to accept whole is how an
+// owner ends up with skills they do not recognise.
+
+async function resolveProposal(p: RaisedProposal): Promise<void> {
+  await fetch(`${BRAIN_URL}/skills/proposals/${encodeURIComponent(p.id)}`,
+              { method: 'DELETE' }).catch(() => null)
+  proposals.value = proposals.value.filter(x => x.id !== p.id)
+}
+
+async function acceptProposal(p: RaisedProposal): Promise<void> {
+  applyingProposal.value = p.id
+  try {
+    // A rewrite keeps the existing skill's triggers, person and personas —
+    // only the procedure changes. A new one is created from the draft.
+    const existing = skills.value.find(s => s.name === p.skill)
+    const payload = p.kind === 'new'
+      ? { name: p.skill, description: p.description ?? '', triggers: p.triggers ?? [],
+          personas: [], person: '', enabled: true, body: p.proposed_body }
+      : { ...existing, body: p.proposed_body, mark_optimized: true }
+    if (p.kind !== 'new' && !existing) {
+      optimizeNote.value = `${p.skill} no longer exists.`
+      await resolveProposal(p)
+      return
+    }
+    const resp = await fetch(`${BRAIN_URL}/skills`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }).catch(() => null)
+    if (resp && resp.ok) {
+      await resolveProposal(p)
+      await fetchSkills()
+    } else {
+      optimizeNote.value = resp
+        ? String((await resp.json().catch(() => ({}))).error ?? `HTTP ${resp.status}`)
+        : 'brain unreachable'
+    }
+  } finally {
+    applyingProposal.value = ''
+  }
+}
+
+async function editProposal(p: RaisedProposal): Promise<void> {
+  const existing = skills.value.find(s => s.name === p.skill)
+  editSkillIsNew.value = p.kind === 'new'
+  editSkillTriggers.value = (p.kind === 'new' ? p.triggers ?? [] : existing?.triggers ?? []).join(', ')
+  editSkillDraft.value = {
+    name: p.skill,
+    description: p.kind === 'new' ? p.description ?? '' : existing?.description ?? '',
+    triggers: p.kind === 'new' ? p.triggers ?? [] : existing?.triggers ?? [],
+    personas: existing?.personas ?? [],
+    person: existing?.person ?? '',
+    enabled: existing?.enabled ?? true,
+    body: p.proposed_body,
+  }
+  // Off the list: it is the owner's draft now, not an open question.
+  await resolveProposal(p)
+}
+
+async function dismissProposal(p: RaisedProposal): Promise<void> {
+  await resolveProposal(p)
 }
 
 async function applySkillProposal(): Promise<void> {
@@ -1520,6 +1639,16 @@ onMounted(async () => {
   background: color-mix(in srgb, var(--accent) 8%, transparent);
 }
 .suggest-plus { font-style: normal; color: var(--accent); font-weight: 700; }
+/* U251: a proposal the assistant raised itself reads as a question, not as a
+   result of something the owner just clicked. */
+.skill-opt--raised { border-left: 3px solid var(--accent); }
+.raised-badge {
+  display: inline-block; margin-right: 0.4rem; padding: 0.05rem 0.35rem;
+  font-size: 0.64rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.04em; border-radius: var(--radius-sm, 3px);
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  color: var(--accent);
+}
 /* U250: a skill that kept failing must not look like a busy one. */
 .b-tag-warn {
   border-color: var(--danger, #c0522d);

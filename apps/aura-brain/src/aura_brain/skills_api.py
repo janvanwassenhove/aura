@@ -84,6 +84,32 @@ async def optimization_suggestions() -> JSONResponse:
                          "blocked_threshold": blocked_at})
 
 
+@router.get("/proposals")
+async def list_proposals() -> JSONResponse:
+    """U251: skill proposals the assistant raised and the owner has not
+    answered yet.
+
+    The maintenance tick runs all day; the owner opens the app in the evening.
+    Without this, every proposal existed for the milliseconds it took to cross
+    the event bus. (Declared before /{name} so it is not swallowed by that
+    path parameter — same reason as /suggestions above.)
+    """
+    from aura_brain import proposal_inbox
+
+    return JSONResponse({"proposals": proposal_inbox.open_proposals()})
+
+
+@router.delete("/proposals/{proposal_id}")
+async def resolve_proposal(proposal_id: str) -> JSONResponse:
+    """Answered — applied through POST /skills, or dismissed. Either way it
+    stops being a question."""
+    from aura_brain import proposal_inbox
+
+    if not proposal_inbox.resolve(proposal_id):
+        return JSONResponse({"error": "unknown proposal"}, status_code=404)
+    return JSONResponse({"resolved": proposal_id})
+
+
 @router.get("/{name}")
 async def get_skill(name: str) -> JSONResponse:
     skill = _store.get(name) if _store else None

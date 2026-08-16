@@ -14,8 +14,20 @@ import pytest
 os.environ.setdefault("DATABASE_URL", "sqlite+aiosqlite:///:memory:")
 os.environ.setdefault("LLM_PROVIDER", "echo")
 
+from aura_brain import proposal_inbox
 from aura_brain.skill_proposals import SkillProposer
 from orchestrator.skills import SkillStore
+
+
+@pytest.fixture(autouse=True)
+def _clean_inbox():
+    """U251 gave the proposer a process-wide inbox so a raised proposal
+    survives until the owner looks. That is right in production and makes
+    these tests order-dependent: the second one to run finds the first one's
+    question still waiting and correctly stays quiet."""
+    proposal_inbox._reset_for_tests()
+    yield
+    proposal_inbox._reset_for_tests()
 
 
 class FakeBus:
