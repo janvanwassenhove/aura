@@ -6,11 +6,36 @@
         <div class="cam-frame">
           <img v-if="camera.frameSrc.value" :src="camera.frameSrc.value" alt="Robot camera" class="cam-img">
           <div v-else class="cam-empty" />
+          <!-- U161: aim the head by dragging on the picture — the ball sits
+               where you last pointed, so the control reads like "look there".
+               U162: only in Manual; in Follow the pad is not rendered at all,
+               so aiming and face-tracking can never fight over the head. -->
+          <div
+            v-if="manualMode"
+            ref="padEl"
+            class="aim-pad"
+            title="Drag to aim the head — double-click to centre"
+            @pointerdown="startAim"
+            @pointermove="moveAim"
+            @pointerup="endAim"
+            @pointercancel="endAim"
+            @dblclick="centreAim"
+          >
+            <div class="aim-cross aim-cross--h" />
+            <div class="aim-cross aim-cross--v" />
+            <div class="aim-ball" :style="ballStyle" />
+          </div>
           <span class="cam-tag">{{ camTag }}</span>
-          <div class="cam-controls">
-            <button class="cam-btn" title="Look left" @click="aim(-0.4)"><ChevronLeft :size="12" /></button>
-            <button class="cam-btn" title="Recentre" @click="aim(0)"><Crosshair :size="12" /></button>
-            <button class="cam-btn" title="Look right" @click="aim(0.4)"><ChevronRight :size="12" /></button>
+          <!-- U162: one explicit switch — he follows you, or you aim. Never both. -->
+          <div class="head-mode" role="group" aria-label="Head control mode">
+            <button :class="['head-mode-btn', !manualMode && 'on']" :disabled="switching" :title="followTitle" @click="setHeadMode(false)">
+              <Eye :size="12" /> Follow
+              <span v-if="!manualMode" :class="['face-dot', robot.faceVisible && 'on']" />
+            </button>
+            <button :class="['head-mode-btn', manualMode && 'on']" :disabled="switching"
+                    title="You aim the head and torso — follow-me is off" @click="setHeadMode(true)">
+              <Move :size="12" /> Manual
+            </button>
           </div>
         </div>
         <div class="cam-body">
@@ -19,6 +44,13 @@
             <button class="d2-mini-toggle" :class="{ on: prefs.voiceMode === 'wake_word' }" title="Mic armed for the wake word" @click="toggleWakeWord">Mic</button>
             <button class="d2-mini-toggle" :class="{ on: robot.tracking }" title="Head follows the person he sees" @click="robot.setTracking(!robot.tracking, BRAIN_URL)">Follow</button>
             <button class="d2-mini-toggle" :class="{ on: proactiveOn }" title="Speaks up unprompted for reminders" @click="toggleProactive">Proactive</button>
+          </div>
+          <!-- Torso: a separate axis from the head, so it gets its own control -->
+          <div v-if="manualMode" class="slider-row">
+            <span class="row-label">Torso</span>
+            <input v-model.number="bodyYaw" type="range" min="-1" max="1" step="0.02" aria-label="Torso yaw"
+                   class="vol" @input="sendAim" @dblclick="centreTorso">
+            <button class="d2-ghost-btn" title="Centre the torso" @click="centreTorso">⌖</button>
           </div>
           <div class="slider-row">
             <span class="row-label">Volume</span>
@@ -215,7 +247,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
-import { ChevronLeft, ChevronRight, Crosshair, TriangleAlert } from 'lucide-vue-next'
+import { Eye, Move, TriangleAlert } from 'lucide-vue-next'
 import { CHARACTERS } from '../lib/characters'
 import { BRAIN_URL } from '../lib/endpoints'
 import { useCameraFeed } from '../composables/useCameraFeed'
@@ -243,14 +275,91 @@ const camTag = computed(() => {
   return 'no one in view'
 })
 
-async function aim(direction: number): Promise<void> {
+// ── U161/U162: manual aim — head via the pad on the picture, torso via its
+// own slider, gated behind an explicit Follow/Manual switch ─────────────────
+const padEl = ref<HTMLElement | null>(null)
+const aimX = ref(0)          // -1..1, left → right   (head yaw)
+const aimY = ref(0)          // -1..1, up   → down    (head pitch)
+const bodyYaw = ref(0)       // -1..1                 (torso yaw)
+const dragging = ref(false)
+const switching = ref(false)
+
+// Manual is simply "follow-me is off" — deriving it from the shared store is
+// what keeps the Follow mini-toggle and this switch from ever disagreeing.
+const manualMode = computed(() => !robot.tracking)
+
+const followTitle = computed(() => {
+  if (manualMode.value) return 'The robot follows the nearest face'
+  return robot.faceVisible
+    ? 'Following — a face is in view'
+    : 'Following, but no face in view right now (it will look around to find one)'
+})
+
+async function setHeadMode(manual: boolean): Promise<void> {
+  if (switching.value || manual === manualMode.value) return
+  switching.value = true
   try {
-    await fetch(`${BRAIN_URL}/robot/aim`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(direction === 0 ? { recenter: true } : { yaw: direction }),
-    })
-  } catch { /* robot offline */ }
+    if (await robot.setTracking(!manual, BRAIN_URL) && manual) {
+      // Start from where the head actually is (centre) rather than wherever
+      // the ball was left last time, which would yank the head on first drag.
+      aimX.value = 0
+      aimY.value = 0
+    }
+  } finally { switching.value = false }
 }
+
+const ballStyle = computed(() => ({
+  left: `${((aimX.value + 1) / 2) * 100}%`,
+  top: `${((aimY.value + 1) / 2) * 100}%`,
+}))
+
+// The robot moves far slower than pointermove fires; sending every event would
+// queue hundreds of poses and the head would keep moving long after you let
+// go. At most one request in flight, always with the LATEST position.
+let inFlight = false
+let pendingSend = false
+async function sendAim(): Promise<void> {
+  // The guard lives here too, not just in the template, so a stale drag can't
+  // slip a pose through after the mode flipped back to Follow.
+  if (!manualMode.value) return
+  if (inFlight) { pendingSend = true; return }
+  inFlight = true
+  try {
+    const resp = await fetch(`${BRAIN_URL}/robot/aim`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ yaw: aimX.value, pitch: aimY.value, body_yaw: bodyYaw.value }),
+    }).catch(() => null)
+    if (resp?.ok) {
+      const r = await resp.json().catch(() => ({}))
+      if (r.tracking_paused) robot.tracking = false
+    }
+  } finally {
+    inFlight = false
+    if (pendingSend) { pendingSend = false; void sendAim() }
+  }
+}
+
+function pointToAim(ev: PointerEvent): void {
+  const el = padEl.value
+  if (!el) return
+  const r = el.getBoundingClientRect()
+  aimX.value = Math.max(-1, Math.min(1, ((ev.clientX - r.left) / r.width) * 2 - 1))
+  aimY.value = Math.max(-1, Math.min(1, ((ev.clientY - r.top) / r.height) * 2 - 1))
+}
+function startAim(ev: PointerEvent): void {
+  dragging.value = true
+  ;(ev.currentTarget as HTMLElement).setPointerCapture?.(ev.pointerId)
+  pointToAim(ev)
+  void sendAim()
+}
+function moveAim(ev: PointerEvent): void {
+  if (!dragging.value) return
+  pointToAim(ev)
+  void sendAim()
+}
+function endAim(): void { dragging.value = false }
+function centreAim(): void { aimX.value = 0; aimY.value = 0; void sendAim() }
+function centreTorso(): void { bodyYaw.value = 0; void sendAim() }
 
 // ── Body toggles ───────────────────────────────────────────────────────────
 const asleep = ref(false)
@@ -533,13 +642,28 @@ onUnmounted(() => clearInterval(statusTimer))
   position: absolute; left: 9px; bottom: 9px; color: #fff; font-size: 11.5px;
   padding: 3px 10px; border-radius: 999px; background: rgba(8, 16, 11, 0.5);
 }
-.cam-controls { position: absolute; right: 9px; bottom: 9px; display: flex; gap: 4px; }
-.cam-btn {
-  display: inline-flex; align-items: center; justify-content: center;
-  width: 24px; height: 24px; border-radius: 6px;
-  background: rgba(8, 16, 11, 0.5); border: 1px solid rgba(255, 255, 255, 0.25);
-  color: #fff; cursor: pointer;
+/* U161: the aim pad sits over the whole picture; the crosshair says "this is
+   a control", the ball says where the head is pointed. */
+.aim-pad { position: absolute; inset: 0; cursor: crosshair; touch-action: none; }
+.aim-cross { position: absolute; background: rgba(255, 255, 255, 0.18); pointer-events: none; }
+.aim-cross--h { left: 8%; right: 8%; top: 50%; height: 1px; }
+.aim-cross--v { top: 8%; bottom: 8%; left: 50%; width: 1px; }
+.aim-ball {
+  position: absolute; width: 14px; height: 14px; border-radius: 50%;
+  background: var(--accent); border: 2px solid #fff;
+  transform: translate(-50%, -50%); pointer-events: none;
+  box-shadow: 0 0 8px rgba(0, 0, 0, 0.45);
 }
+.head-mode { position: absolute; right: 9px; bottom: 9px; display: flex; gap: 3px; }
+.head-mode-btn {
+  display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px;
+  border-radius: 999px; font-size: 11px; font-weight: 600; cursor: pointer;
+  background: rgba(8, 16, 11, 0.55); border: 1px solid rgba(255, 255, 255, 0.25);
+  color: #fff; font-family: inherit;
+}
+.head-mode-btn.on { background: var(--accent); border-color: var(--accent); }
+.face-dot { width: 7px; height: 7px; border-radius: 50%; background: rgba(255, 255, 255, 0.35); }
+.face-dot.on { background: #fff; }
 .cam-body { padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
 .toggle-row { display: flex; gap: 6px; flex-wrap: wrap; }
 .slider-row { display: flex; align-items: center; gap: 9px; }

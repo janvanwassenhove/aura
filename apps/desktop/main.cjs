@@ -475,9 +475,9 @@ ipcMain.on('aura:screen-control', (_e, active) => {
 // Window, tray, menu
 // ---------------------------------------------------------------------------
 
-// Splash: lined bot icon (lucide "bot" path). charset=utf-8 + HTML entities so
-// the ellipsis/middot render correctly (a plain data: URL mis-decodes them as
-// Latin-1). The app-region:drag is a leftover from the frameless era; harmless.
+// Splash: lined bot icon (lucide "bot" path), draggable since the window is
+// frameless. charset=utf-8 + HTML entities so the ellipsis/middot render
+// correctly (a plain data: URL mis-decodes them as Latin-1).
 const SPLASH_HTML = `data:text/html;charset=utf-8,
 <body style="margin:0;background:%230f172a;color:%23e2e8f0;font-family:sans-serif;-webkit-app-region:drag;
 display:flex;align-items:center;justify-content:center;height:100vh;flex-direction:column">
@@ -501,8 +501,9 @@ function createWindow() {
     height: 900,
     title: 'AURA Operator Console',
     backgroundColor: '#0f172a',
-    // D2: native OS chrome. The custom title bar (U33) went with the redesign —
-    // a frameless window with no TitleBar.vue cannot even be dragged.
+    // D2: the console's own header IS the title bar (drag region + window
+    // controls live in AppHeader.vue) — a native bar above it would double it.
+    frame: false,
     icon: path.join(__dirname, 'build', 'icon.png'),
     webPreferences: {
       contextIsolation: true,
@@ -588,6 +589,10 @@ function createWindow() {
     }
   })
 
+  // D2: no visible menu bar — the frameless window has the console's own
+  // header as its title bar. The menu still exists (never shown) purely to
+  // keep the accelerators alive: reload, zoom, and DevTools in dev builds.
+  // U221 (S15) still holds: DevTools stays out of packaged builds.
   const menu = Menu.buildFromTemplate([
     {
       label: 'AURA',
@@ -599,8 +604,6 @@ function createWindow() {
         { role: 'quit' },
       ],
     },
-    // U221 (S15): DevTools is a debugging tool, not a feature — in a packaged
-    // build it mostly serves someone trying to talk the owner into opening it.
     { label: 'View', submenu: [
       { role: 'reload' },
       ...(IS_PACKAGED ? [] : [{ role: 'toggleDevTools' }]),

@@ -56,17 +56,35 @@
       </button>
     </div>
 
+    <!-- Theme lives where the eyes already are; one click, no settings trip -->
+    <button
+      class="theme-btn" :title="theme.theme === 'dark' ? 'Switch to light — warm paper' : 'Switch to dark — deep evergreen'"
+      :aria-label="theme.theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'"
+      @click="theme.theme = theme.theme === 'dark' ? 'light' : 'dark'"
+    >
+      <Sun v-if="theme.theme === 'dark'" :size="15" />
+      <MoonStar v-else :size="15" />
+    </button>
+
     <!-- Stop never moves. Same place, same colour, every mode, every density. -->
     <button class="stop-btn" :disabled="stopping" title="Stops speech mid-word, ends the turn, mic off" @click="panicStop">
       <CircleStop :size="13" /> {{ stopping ? 'Stopping…' : 'Stop' }}
     </button>
+
+    <!-- The header IS the title bar (frameless window): OS controls, our chrome -->
+    <div v-if="isElectron" class="win-controls" role="group" aria-label="Window">
+      <button class="win-btn" title="Minimize" aria-label="Minimize" @click="aura?.minimize()"><Minus :size="14" /></button>
+      <button class="win-btn" title="Maximize / restore" aria-label="Maximize or restore" @click="aura?.toggleMaximize()"><Square :size="11" /></button>
+      <button class="win-btn win-btn--close" title="Close" aria-label="Close window" @click="aura?.close()"><X :size="14" /></button>
+    </div>
   </header>
 </template>
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import {
-  BriefcaseBusiness, ChevronDown, CircleStop, Equal, Home, Menu, Minus, Moon, Presentation,
+  BriefcaseBusiness, ChevronDown, CircleStop, Equal, Home, Menu, Minus,
+  Moon, MoonStar, Presentation, Square, Sun, X,
 } from 'lucide-vue-next'
 import { BRAIN_URL } from '../../lib/endpoints'
 import { DENSITY_META, usePrefsStore, type Density } from '../../stores/prefsStore'
@@ -74,6 +92,14 @@ import { MODE_META, useModeStore, type UiMode } from '../../stores/modeStore'
 import { useCharacterStore } from '../../stores/characterStore'
 import { useKnowledgeStore } from '../../stores/knowledgeStore'
 import { useNavStore } from '../../stores/navStore'
+import { useThemeStore } from '../../stores/themeStore'
+
+// D2: the frameless window's title bar is this header — Electron exposes the
+// window verbs on `window.aura`, absent when the console runs in a browser.
+const aura = (window as never as { aura?: {
+  isElectron?: boolean; minimize: () => void; toggleMaximize: () => void; close: () => void
+} }).aura
+const isElectron = !!aura?.isElectron
 
 const props = defineProps<{ wsStatus: 'connecting' | 'open' | 'closed' }>()
 
@@ -82,6 +108,7 @@ const prefs = usePrefsStore()
 const characterStore = useCharacterStore()
 const knowledge = useKnowledgeStore()
 const nav = useNavStore()
+const theme = useThemeStore()
 
 const modes = ([
   { id: 'home', icon: Home },
@@ -175,7 +202,11 @@ async function panicStop(): Promise<void> {
   display: flex; align-items: center; gap: 12px; flex-shrink: 0;
   background: var(--chrome); border-bottom: 1px solid var(--line);
   padding: 9px 12px 9px 14px;
+  /* The header doubles as the frameless window's title bar: the background
+     drags the window, every control below opts back out. */
+  -webkit-app-region: drag;
 }
+.hdr button, .hdr [role='group'] { -webkit-app-region: no-drag; }
 .hdr-mark { display: flex; flex-shrink: 0; }
 .hdr-spacer { flex: 1; min-width: 6px; }
 
@@ -254,4 +285,21 @@ async function panicStop(): Promise<void> {
   font-size: 12.5px; font-weight: 700; cursor: pointer; font-family: inherit; flex-shrink: 0;
 }
 .stop-btn:hover:not(:disabled) { background: var(--danger); color: #fff; }
+
+.theme-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 30px; height: 28px; border-radius: 8px; flex-shrink: 0;
+  background: transparent; border: 1px solid var(--line); color: var(--ink-3);
+  cursor: pointer;
+}
+.theme-btn:hover { color: var(--ink); background: var(--sunken); }
+
+.win-controls { display: flex; flex-shrink: 0; margin: -9px -12px -9px 2px; align-self: stretch; }
+.win-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 40px; border: none; background: transparent; color: var(--ink-3);
+  cursor: pointer;
+}
+.win-btn:hover { background: var(--sunken); color: var(--ink); }
+.win-btn--close:hover { background: var(--danger); color: #fff; }
 </style>

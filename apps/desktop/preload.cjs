@@ -1,6 +1,6 @@
 // AURA preload — the only bridge between the console (renderer) and Electron.
-// The window-control entries survive the D2 move to native OS chrome so an
-// older console build against a newer shell keeps its buttons working.
+// Exposes window controls for the integrated title bar (D2: the app header IS
+// the title bar); nothing else.
 const { contextBridge, ipcRenderer } = require('electron')
 
 contextBridge.exposeInMainWorld('aura', {
