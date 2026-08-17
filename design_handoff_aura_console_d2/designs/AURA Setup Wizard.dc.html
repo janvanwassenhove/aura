@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+:root, :root[data-aura-w='light'] {
+  --bg:#f0efe9; --chrome:#e9e7df; --surface:#ffffff; --surface-2:#f7f6f2; --sunken:#e9e8e1; --hover:#eceae2;
+  --line:#dcdad0; --line-strong:#b8b6aa;
+  --ink:#1a2420; --ink-2:#43524a; --ink-3:#6b776f;
+  --accent:#1f6f46; --accent-deep:#175236; --accent-wash:#e4efe7; --on-accent:#ffffff;
+  --ok:#1f6f46; --ok-wash:#e4efe7; --warn:#9a6510; --warn-wash:#f7ecd6; --danger:#b3362a; --danger-wash:#f8e5e2;
+  --info:#20609e; --info-wash:#e3edf6; --present:#6d4fa1; --present-wash:#ece5f6;
+}
+:root[data-aura-w='dark'] {
+  --bg:#0e1512; --chrome:#131b17; --surface:#17201b; --surface-2:#1c2721; --sunken:#0b110e; --hover:#233029;
+  --line:#2b3830; --line-strong:#465548;
+  --ink:#e6ece7; --ink-2:#a9b8ae; --ink-3:#7c8b81;
+  --accent:#4fae7c; --accent-deep:#7fd3a8; --accent-wash:#1c2f25; --on-accent:#0b1710;
+  --ok:#4fae7c; --ok-wash:#1c2f25; --warn:#d9a441; --warn-wash:#33270f; --danger:#e0655a; --danger-wash:#361511;
+  --info:#5c9dd6; --info-wash:#152634; --present:#a98fd6; --present-wash:#261d38;
+}
+html, body { margin:0; padding:0; height:100%; }
+body { font-family:'IBM Plex Sans', system-ui, sans-serif; background:var(--bg); color:var(--ink); }
+a { color:var(--accent); } a:hover { color:var(--accent-deep); }
+svg.lu { width:1em; height:1em; stroke:currentColor; stroke-width:2; fill:none; stroke-linecap:round; stroke-linejoin:round; flex-shrink:0; }
+.mono { font-family:'IBM Plex Mono', ui-monospace, monospace; }
+@keyframes breathe { 0%,100% { transform:translateY(0) } 50% { transform:translateY(-3px) } }
+@keyframes spin { to { transform:rotate(360deg) } }
+@media (prefers-reduced-motion: reduce) { * { animation:none !important } }
+</style>
+</helmet>
+<div data-screen-label="AURA setup wizard" style="display:flex; height:100vh; background:var(--bg); color:var(--ink); overflow:hidden">
+
+  <!-- ═══ Stepper ═══ -->
+  <aside style="width:250px; flex-shrink:0; background:var(--chrome); border-right:1px solid var(--line); display:flex; flex-direction:column; padding:20px 16px; overflow-y:auto">
+    <div style="display:flex; align-items:center; gap:10px; margin-bottom:22px">
+      <svg viewBox="0 0 64 64" style="width:30px; height:30px; animation:breathe 4.6s ease-in-out infinite" fill="none"><g stroke="var(--ink)" stroke-width="1.9" stroke-linecap="round"><path d="M18 26 L13 6"></path><path d="M46 26 L52 8"></path></g><circle cx="13" cy="5" r="2.4" fill="var(--accent)"></circle><circle cx="52.4" cy="7" r="2.4" fill="var(--accent)"></circle><rect x="8" y="21" width="48" height="31" rx="14" fill="var(--surface-2)" stroke="var(--ink)" stroke-width="2.3"></rect><circle cx="22.5" cy="36" r="8.4" fill="var(--ink)"></circle><circle cx="41.5" cy="36" r="8.4" fill="var(--ink)"></circle><circle cx="25.6" cy="32.6" r="2.4" fill="var(--surface)"></circle><circle cx="44.6" cy="32.6" r="2.4" fill="var(--surface)"></circle></svg>
+      <div style="line-height:1.2">
+        <div style="font-size:15px; font-weight:700">Set up AURA</div>
+        <div class="mono" style="font-size:10.5px; color:var(--ink-3)">{{ progressLabel }}</div>
+      </div>
+    </div>
+
+    <sc-for list="{{ steps }}" as="st" hint-placeholder-count="5">
+      <button onClick="{{ st.select }}" style="{{ st.style }}">
+        <span style="{{ st.numStyle }}">{{ st.num }}</span>
+        <span style="flex:1; min-width:0; text-align:left; line-height:1.25">
+          <span style="{{ st.titleStyle }}">{{ st.title }}</span>
+          <span style="display:block; font-size:11px; color:var(--ink-3); margin-top:2px">{{ st.sub }}</span>
+        </span>
+      </button>
+    </sc-for>
+
+    <div style="flex:1"></div>
+    <p style="margin:16px 0 0; font-size:11.5px; color:var(--ink-3); line-height:1.5">You can leave at any point — AURA remembers where you stopped, and every step is repeatable from Settings.</p>
+  </aside>
+
+  <!-- ═══ Step body ═══ -->
+  <main style="flex:1; min-width:0; display:flex; flex-direction:column; min-height:0">
+    <div style="flex:1; min-height:0; overflow-y:auto; padding:32px 40px 24px">
+      <div style="max-width:680px">
+
+        <!-- ── 1 · What AURA is (and the manual correction) ── -->
+        <sc-if value="{{ s1 }}" hint-placeholder-val="{{ true }}">
+          <h1 style="{{ h1 }}">Meet your assistant</h1>
+          <p style="{{ lead }}">AURA is a brain that runs on this laptop. A robot is optional — it gives the brain a face, a voice and a camera, but everything works without one.</p>
+
+          <div style="display:flex; gap:12px; flex-wrap:wrap; margin-bottom:22px">
+            <label style="flex:1; min-width:220px; display:flex; flex-direction:column; gap:5px">
+              <span style="{{ fieldLabel }}">What is he called?</span>
+              <input defaultValue="Richie" maxLength="24" aria-label="Assistant name" style="{{ fieldStyle }}" />
+              <span style="font-size:11.5px; color:var(--ink-3)">Used in greetings, the wake word and the title bar.</span>
+            </label>
+            <label style="flex:1; min-width:220px; display:flex; flex-direction:column; gap:5px">
+              <span style="{{ fieldLabel }}">Reply language</span>
+              <select aria-label="Reply language" style="{{ fieldStyle }}">
+                <option>Automatic — match the speaker</option>
+                <option>Nederlands</option>
+                <option>English</option>
+                <option>Français</option>
+              </select>
+              <span style="font-size:11.5px; color:var(--ink-3)">Automatic answers each person in the language they used.</span>
+            </label>
+          </div>
+
+          <div style="display:flex; gap:12px; align-items:flex-start; padding:15px 17px; border:1.5px solid var(--warn); border-radius:12px; background:var(--warn-wash); margin-bottom:22px">
+            <svg class="lu" viewBox="0 0 24 24" style="width:17px;height:17px; color:var(--warn); flex-shrink:0; margin-top:2px"><path d="M12 9v4"></path><path d="M12 17h.01"></path><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path></svg>
+            <div style="min-width:0">
+              <h2 style="margin:0 0 6px; font-size:14.5px">Correction to the printed guide</h2>
+              <p style="margin:0 0 9px; font-size:13.5px; color:var(--ink-2); line-height:1.5">The manual's sync line is wrong. Use the one below — this is the only place it matters, and it is already correct here.</p>
+              <div style="display:flex; flex-direction:column; gap:6px">
+                <div class="mono" style="font-size:12px; padding:8px 11px; border-radius:8px; background:var(--surface); color:var(--ink-3); text-decoration:line-through">aura sync --from robot --all</div>
+                <div class="mono" style="display:flex; align-items:center; gap:9px; font-size:12px; padding:8px 11px; border-radius:8px; background:var(--surface); border:1px solid var(--ok); color:var(--ink)">
+                  <span style="flex:1; min-width:0">aura sync --target robot --profile default</span>
+                  <button title="Copy" style="background:none; border:none; color:var(--ink-3); cursor:pointer; padding:0; display:inline-flex"><svg class="lu" viewBox="0 0 24 24" style="width:14px;height:14px"><rect width="14" height="14" x="8" y="8" rx="2"></rect><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path></svg></button>
+                </div>
+              </div>
+              <p style="margin:9px 0 0; font-size:12px; color:var(--ink-3)">You will not need to type it: the wizard runs the right command for you in step 3.</p>
+            </div>
+          </div>
+
+          <h2 style="{{ h2 }}">What this takes</h2>
+          <sc-for list="{{ intro }}" as="i" hint-placeholder-count="3">
+            <div style="display:flex; gap:11px; align-items:flex-start; padding:11px 0; border-bottom:1px solid var(--line)">
+              <span style="{{ i.iconStyle }}" dangerouslySetInnerHTML="{{ i.icon }}"></span>
+              <div style="min-width:0">
+                <div style="font-size:14px; font-weight:600">{{ i.title }}</div>
+                <div style="font-size:13px; color:var(--ink-2); margin-top:2px">{{ i.body }}</div>
+              </div>
+              <span style="flex:1"></span>
+              <span class="mono" style="font-size:11px; color:var(--ink-3); flex-shrink:0; padding-top:3px">{{ i.time }}</span>
+            </div>
+          </sc-for>
+        </sc-if>
+
+        <!-- ── 2 · Find the robot, honestly ── -->
+        <sc-if value="{{ s2 }}" hint-placeholder-val="{{ false }}">
+          <h1 style="{{ h1 }}">Is there a robot on this network?</h1>
+          <p style="{{ lead }}">AURA listens for a Reachy Mini announcing itself. Here is exactly what it found, and what it means.</p>
+
+          <div style="{{ scanBoxStyle }}">
+            <div style="display:flex; align-items:center; gap:12px">
+              <span style="{{ scanIconStyle }}" dangerouslySetInnerHTML="{{ scanIcon }}"></span>
+              <div style="flex:1; min-width:0">
+                <div style="font-size:15px; font-weight:700">{{ scanTitle }}</div>
+                <div style="font-size:13px; color:var(--ink-2); margin-top:2px">{{ scanSub }}</div>
+              </div>
+              <button onClick="{{ rescan }}" style="{{ ghostBtn }}">Scan again</button>
+            </div>
+          </div>
+
+          <sc-if value="{{ noRobot }}" hint-placeholder-val="{{ true }}">
+            <h2 style="{{ h2 }}">Why nothing shows up</h2>
+            <p style="margin:0 0 12px; font-size:13.5px; color:var(--ink-2)">Three things have to be true before a robot can appear. Check them in this order — most setups fail at the second.</p>
+            <sc-for list="{{ preconditions }}" as="p" hint-placeholder-count="3">
+              <div style="display:flex; gap:12px; align-items:flex-start; padding:13px 15px; border:1px solid var(--line); border-radius:11px; background:var(--surface); margin-bottom:8px">
+                <span style="{{ p.badgeStyle }}">{{ p.num }}</span>
+                <div style="flex:1; min-width:0">
+                  <div style="font-size:14px; font-weight:600">{{ p.title }}</div>
+                  <div style="font-size:13px; color:var(--ink-2); margin-top:3px; line-height:1.5">{{ p.body }}</div>
+                  <div class="mono" style="font-size:11.5px; color:var(--ink-3); margin-top:5px">{{ p.check }}</div>
+                </div>
+                <span style="{{ p.stateStyle }}">{{ p.state }}</span>
+              </div>
+            </sc-for>
+
+            <h2 style="{{ h2 }}">Know the address? Type it</h2>
+            <div style="display:flex; gap:8px; margin-bottom:10px; flex-wrap:wrap">
+              <input placeholder="http://192.168.1.42:8001  ·  or reachy.local" aria-label="Robot address" class="mono" style="flex:1; min-width:200px; padding:10px 13px; background:var(--surface); border:1.5px solid var(--line-strong); border-radius:10px; color:var(--ink); font-size:13px; outline:none" />
+              <button style="{{ secondaryBtn }}">Test</button>
+            </div>
+            <p style="margin:0 0 24px; font-size:12.5px; color:var(--ink-3)">A successful test reports the robot's mode and battery level.</p>
+          </sc-if>
+
+          <sc-if value="{{ robotFound }}" hint-placeholder-val="{{ false }}">
+            <h2 style="{{ h2 }}">Found on your network</h2>
+            <sc-for list="{{ foundList }}" as="f" hint-placeholder-count="1">
+              <button style="{{ f.style }}">
+                <span class="mono" style="flex:1; min-width:0; text-align:left; font-size:13px">{{ f.url }}</span>
+                <span style="font-size:12px; color:var(--ink-2)">{{ f.meta }}</span>
+              </button>
+            </sc-for>
+            <div style="height:16px"></div>
+          </sc-if>
+
+          <!-- Continuing without a robot is a real choice, sized like one -->
+          <div style="display:flex; gap:12px; flex-wrap:wrap">
+            <button onClick="{{ next }}" style="{{ primaryBtn }}">{{ robotPrimaryLabel }}</button>
+            <button onClick="{{ skipRobot }}" style="{{ equalChoiceBtn }}">
+              <span style="font-size:14px; font-weight:700">Continue without a robot</span>
+              <span style="display:block; font-size:12.5px; font-weight:400; color:var(--ink-2); margin-top:3px">Chat, memory, skills and connections all work. Add the robot whenever it arrives — nothing has to be redone.</span>
+            </button>
+          </div>
+        </sc-if>
+
+        <!-- ── 3 · Install on the robot ── -->
+        <sc-if value="{{ s3 }}" hint-placeholder-val="{{ false }}">
+          <h1 style="{{ h1 }}">Install AURA on the robot</h1>
+          <p style="{{ lead }}">No terminal, no SD card. AURA copies itself over, starts the service and verifies it answers — with your approval for each thing it changes.</p>
+
+          <h2 style="{{ h2 }}">What will happen</h2>
+          <sc-for list="{{ installSteps }}" as="i" hint-placeholder-count="4">
+            <div style="display:flex; gap:12px; align-items:flex-start; padding:12px 15px; border:1px solid var(--line); border-radius:11px; background:var(--surface); margin-bottom:7px">
+              <span style="{{ i.dotStyle }}"></span>
+              <div style="flex:1; min-width:0">
+                <div style="font-size:14px; font-weight:600">{{ i.title }}</div>
+                <div class="mono" style="font-size:11.5px; color:var(--ink-3); margin-top:3px">{{ i.detail }}</div>
+              </div>
+              <span style="{{ i.tagStyle }}">{{ i.tag }}</span>
+            </div>
+          </sc-for>
+
+          <div style="display:flex; gap:12px; align-items:flex-start; padding:15px 17px; border:1.5px solid var(--accent); border-radius:12px; background:var(--accent-wash); margin:18px 0 22px">
+            <button onClick="{{ toggleSelfUpdate }}" aria-pressed="{{ selfUpdate }}" style="{{ switchStyle }}"><span style="{{ knobStyle }}"></span></button>
+            <div style="min-width:0">
+              <div style="font-size:14.5px; font-weight:700">Keep the robot up to date by itself</div>
+              <p style="margin:4px 0 0; font-size:13px; color:var(--ink-2); line-height:1.5">On by default, and on from the very first install — that is the point. The robot checks nightly, installs fixes, and tells you afterwards in Activity. Anything that changes what it may <em>do</em> still asks you first.</p>
+            </div>
+          </div>
+
+          <div style="display:flex; gap:10px; flex-wrap:wrap">
+            <button onClick="{{ next }}" style="{{ primaryBtn }}">Approve &amp; install</button>
+            <button onClick="{{ next }}" style="{{ secondaryBtn }}">Skip — I will do it later</button>
+          </div>
+        </sc-if>
+
+        <!-- ── 4 · Choose a brain ── -->
+        <sc-if value="{{ s4 }}" hint-placeholder-val="{{ false }}">
+          <h1 style="{{ h1 }}">Choose a brain</h1>
+          <p style="{{ lead }}">He needs one language model to think with. The key is stored on this laptop, encrypted, and never shown again — not even to you.</p>
+
+          <div style="display:flex; flex-direction:column; gap:9px; margin-bottom:20px">
+            <sc-for list="{{ providers }}" as="p" hint-placeholder-count="3">
+              <button onClick="{{ p.select }}" style="{{ p.style }}">
+                <span style="{{ p.radioStyle }}"></span>
+                <span style="flex:1; min-width:0; text-align:left">
+                  <span style="display:block; font-size:14.5px; font-weight:600">{{ p.name }}</span>
+                  <span style="display:block; font-size:12.5px; color:var(--ink-2); margin-top:2px">{{ p.note }}</span>
+                </span>
+                <sc-if value="{{ p.badge }}" hint-placeholder-val="{{ false }}">
+                  <span style="{{ p.badgeStyle }}">{{ p.badge }}</span>
+                </sc-if>
+              </button>
+            </sc-for>
+          </div>
+
+          <label style="display:flex; flex-direction:column; gap:5px; margin-bottom:8px">
+            <span style="{{ fieldLabel }}">{{ keyLabel }}</span>
+            <input type="password" placeholder="{{ keyPlaceholder }}" aria-label="API key" style="{{ fieldStyle }}" />
+          </label>
+          <p style="margin:0 0 18px; font-size:12.5px; color:var(--ink-3)">{{ keyNote }}</p>
+
+          <div style="display:flex; gap:11px; align-items:flex-start; padding:13px 15px; border:1px solid var(--line); border-radius:11px; background:var(--surface)">
+            <svg class="lu" viewBox="0 0 24 24" style="width:16px;height:16px; color:var(--ink-3); flex-shrink:0; margin-top:2px"><circle cx="12" cy="12" r="10"></circle><path d="M12 16v-4"></path><path d="M12 8h.01"></path></svg>
+            <p style="margin:0; font-size:12.5px; color:var(--ink-2); line-height:1.5">No key yet? OpenRouter has free models that are good enough to finish this setup and try him out. You can swap provider later in Settings › Intelligence without redoing anything.</p>
+          </div>
+        </sc-if>
+
+        <!-- ── 5 · Hands-free voice ── -->
+        <sc-if value="{{ s5 }}" hint-placeholder-val="{{ false }}">
+          <h1 style="{{ h1 }}">Hands-free voice</h1>
+          <p style="{{ lead }}">With the wake word on, you say his name and he starts listening — through the robot's own microphone, or this laptop's if there is no robot.</p>
+
+          <div style="display:flex; gap:12px; align-items:flex-start; padding:15px 17px; border:1.5px solid {{ wakeBorder }}; border-radius:12px; background:{{ wakeBg }}; margin-bottom:18px">
+            <button onClick="{{ toggleWake }}" aria-pressed="{{ wakeOn }}" style="{{ wakeSwitchStyle }}"><span style="{{ wakeKnobStyle }}"></span></button>
+            <div style="min-width:0">
+              <div style="font-size:14.5px; font-weight:700">Listen for a wake word</div>
+              <p style="margin:4px 0 0; font-size:13px; color:var(--ink-2); line-height:1.5">Off means he only speaks when you press the microphone button. Nothing is recorded or sent while he waits for the word — the listening happens on the device.</p>
+            </div>
+          </div>
+
+          <sc-if value="{{ wakeOn }}" hint-placeholder-val="{{ true }}">
+            <label style="display:flex; flex-direction:column; gap:5px; max-width:320px">
+              <span style="{{ fieldLabel }}">Wake word</span>
+              <input defaultValue="Richie" maxLength="24" aria-label="Wake word" style="{{ fieldStyle }}" />
+              <span style="font-size:11.5px; color:var(--ink-3)">Two or three syllables work best. Short words trigger by accident.</span>
+            </label>
+          </sc-if>
+        </sc-if>
+
+        <!-- ── 6 · Create you ── -->
+        <sc-if value="{{ s6 }}" hint-placeholder-val="{{ false }}">
+          <h1 style="{{ h1 }}">Who are you?</h1>
+          <p style="{{ lead }}">The first person becomes the owner: the only one who can change what AURA may do. Everything below is stored encrypted on this laptop and never leaves it.</p>
+
+          <div style="display:flex; gap:16px; align-items:flex-start; flex-wrap:wrap; margin-bottom:22px">
+            <div style="position:relative; flex-shrink:0">
+              <span style="width:76px; height:76px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; background:var(--accent); color:var(--on-accent); font-size:26px; font-weight:700">JA</span>
+              <button title="Use a photo instead of initials" style="position:absolute; right:-2px; bottom:-2px; width:26px; height:26px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; background:var(--surface); color:var(--ink-2); border:1px solid var(--line-strong); cursor:pointer; padding:0"><svg class="lu" viewBox="0 0 24 24" style="width:13px;height:13px"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"></path><circle cx="12" cy="13" r="3"></circle></svg></button>
+            </div>
+            <div style="flex:1; min-width:240px; display:flex; flex-direction:column; gap:12px">
+              <label style="display:flex; flex-direction:column; gap:5px">
+                <span style="{{ fieldLabel }}">What should he call you?</span>
+                <input defaultValue="Jan" aria-label="Your name" style="{{ fieldStyle }}" />
+              </label>
+              <label style="display:flex; flex-direction:column; gap:5px">
+                <span style="{{ fieldLabel }}">Anything he should know from the start</span>
+                <textarea rows="2" aria-label="About you" style="{{ fieldStyle }}" defaultValue="Keep answers short. I cycle to work. Standup is at 9:30."></textarea>
+              </label>
+            </div>
+          </div>
+
+          <h2 style="{{ h2 }}">Teach him your face <span style="font-size:12px; font-weight:400; color:var(--ink-3); text-transform:none; letter-spacing:0">optional</span></h2>
+          <div style="display:flex; gap:14px; align-items:center; flex-wrap:wrap; padding:14px 16px; border:1px solid var(--line); border-radius:12px; background:var(--surface); margin-bottom:22px">
+            <div style="width:120px; aspect-ratio:4/3; border-radius:9px; background:linear-gradient(160deg,#2b3a30 0%,#1a231d 60%,#121a15 100%); flex-shrink:0"></div>
+            <div style="flex:1; min-width:200px">
+              <p style="margin:0 0 9px; font-size:13px; color:var(--ink-2); line-height:1.5">Four photos, taken here, turned into a maths fingerprint. The photos are discarded; the fingerprint never leaves this laptop and can be deleted in one click.</p>
+              <div style="display:flex; gap:8px; flex-wrap:wrap">
+                <button style="{{ secondaryBtn }}">Take four photos</button>
+                <button style="{{ ghostBtn }}">Not now</button>
+              </div>
+            </div>
+          </div>
+
+          <h2 style="{{ h2 }}">Lock the vault</h2>
+          <sc-if value="{{ alreadyEncrypted }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex; align-items:center; gap:11px; padding:13px 15px; border:1.5px solid var(--ok); border-radius:11px; background:var(--ok-wash)">
+              <svg class="lu" viewBox="0 0 24 24" style="width:17px;height:17px; color:var(--ok); flex-shrink:0"><path d="m9 12 2 2 4-4"></path><circle cx="12" cy="12" r="10"></circle></svg>
+              <p style="margin:0; font-size:13.5px; color:var(--ink-2)">Already encrypted on this machine — nothing to do. Change the passphrase later in Settings › People &amp; privacy.</p>
+            </div>
+          </sc-if>
+          <sc-if value="{{ notEncrypted }}" hint-placeholder-val="{{ true }}">
+            <p style="margin:0 0 10px; font-size:13.5px; color:var(--ink-2); line-height:1.5">A passphrase encrypts everything he knows about people (AES-256). Face data never leaves this laptop. You can also do this later from People.</p>
+            <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:8px">
+              <input type="password" placeholder="Passphrase — at least 8 characters" aria-label="Vault passphrase" style="{{ passStyle }}" />
+              <input type="password" placeholder="Again" aria-label="Repeat passphrase" style="{{ passStyle }}" />
+            </div>
+            <sc-if value="{{ passError }}" hint-placeholder-val="{{ false }}">
+              <p style="margin:0 0 8px; font-size:12.5px; font-weight:600; color:var(--danger)">{{ passError }}</p>
+            </sc-if>
+            <p style="margin:0; font-size:12.5px; color:var(--ink-3)">There is no recovery. Forget it and the profiles are gone — which is the point.</p>
+          </sc-if>
+        </sc-if>
+
+        <!-- ── 7 · What you are looking at ── -->
+        <sc-if value="{{ s7 }}" hint-placeholder-val="{{ false }}">
+          <h1 style="{{ h1 }}">What you are looking at</h1>
+          <p style="{{ lead }}">Five things to know, then you are done. All of it is repeatable — nothing here is a one-shot decision.</p>
+
+          <sc-for list="{{ tour }}" as="t" hint-placeholder-count="5">
+            <article style="display:flex; gap:14px; align-items:flex-start; padding:15px 17px; border:1px solid var(--line); border-radius:12px; background:var(--surface); margin-bottom:9px">
+              <span style="{{ t.iconStyle }}" dangerouslySetInnerHTML="{{ t.icon }}"></span>
+              <div style="min-width:0">
+                <h2 style="margin:0 0 4px; font-size:15px">{{ t.title }}</h2>
+                <p style="margin:0; font-size:13.5px; color:var(--ink-2); line-height:1.55">{{ t.body }}</p>
+                <sc-if value="{{ t.extra }}" hint-placeholder-val="{{ false }}">
+                  <p style="margin:7px 0 0; font-size:12.5px; color:var(--ink-3); line-height:1.5">{{ t.extra }}</p>
+                </sc-if>
+              </div>
+            </article>
+          </sc-for>
+
+          <div style="display:flex; gap:12px; align-items:center; padding:15px 17px; border:1.5px solid var(--accent); border-radius:12px; background:var(--accent-wash); margin-top:16px">
+            <svg class="lu" viewBox="0 0 24 24" style="width:18px;height:18px; color:var(--accent); flex-shrink:0"><path d="m9 12 2 2 4-4"></path><circle cx="12" cy="12" r="10"></circle></svg>
+            <p style="margin:0; font-size:13.5px; color:var(--ink-2)">Start in <strong>Home</strong> mode with mail set to “asks first”. Loosen it once you trust him — Modes › Home.</p>
+          </div>
+        </sc-if>
+      </div>
+    </div>
+
+    <!-- ═══ Footer nav ═══ -->
+    <footer style="display:flex; align-items:center; gap:12px; padding:14px 40px; border-top:1px solid var(--line); background:var(--chrome); flex-shrink:0">
+      <button onClick="{{ back }}" style="{{ backStyle }}">Back</button>
+      <span style="flex:1"></span>
+      <span style="font-size:12.5px; color:var(--ink-3)">{{ footerNote }}</span>
+      <sc-if value="{{ canSkip }}" hint-placeholder-val="{{ true }}">
+        <button onClick="{{ next }}" title="{{ skipHint }}" style="{{ skipStyle }}">{{ skipLabel }}</button>
+      </sc-if>
+      <button onClick="{{ next }}" style="{{ primaryBtn }}">{{ nextLabel }}</button>
+    </footer>
+  </main>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{
+  &quot;theme&quot;: { &quot;editor&quot;: &quot;enum&quot;, &quot;options&quot;: [&quot;light&quot;, &quot;dark&quot;], &quot;default&quot;: &quot;light&quot;, &quot;tsType&quot;: &quot;'light' | 'dark'&quot;, &quot;section&quot;: &quot;Appearance&quot; },
+  &quot;startStep&quot;: { &quot;editor&quot;: &quot;enum&quot;, &quot;options&quot;: [&quot;1&quot;, &quot;2&quot;, &quot;3&quot;, &quot;4&quot;, &quot;5&quot;, &quot;6&quot;, &quot;7&quot;], &quot;default&quot;: &quot;1&quot;, &quot;tsType&quot;: &quot;string&quot;, &quot;section&quot;: &quot;Behavior&quot; },
+  &quot;robotFound&quot;: { &quot;editor&quot;: &quot;boolean&quot;, &quot;default&quot;: false, &quot;tsType&quot;: &quot;boolean&quot;, &quot;section&quot;: &quot;Behavior&quot; },
+  &quot;keyAlreadySet&quot;: { &quot;editor&quot;: &quot;boolean&quot;, &quot;default&quot;: false, &quot;tsType&quot;: &quot;boolean&quot;, &quot;section&quot;: &quot;Behavior&quot; },
+  &quot;alreadyEncrypted&quot;: { &quot;editor&quot;: &quot;boolean&quot;, &quot;default&quot;: false, &quot;tsType&quot;: &quot;boolean&quot;, &quot;section&quot;: &quot;Behavior&quot; }
+}">
+class Component extends DCLogic {
+  state = { step: null, robotFound: null, selfUpdate: true, scanning: false, skipped: false, provider: 'openrouter', wakeOn: true }
+  componentDidMount() { this.applyTheme() }
+  componentDidUpdate() { this.applyTheme() }
+  applyTheme() { document.documentElement.dataset.auraW = this.props.theme ?? 'light' }
+
+  renderVals() {
+    const s = this.state
+    const step = s.step ?? Number(this.props.startStep ?? 1)
+    const robotFound = s.robotFound ?? (this.props.robotFound ?? false)
+    const keySet = !!this.props.keyAlreadySet
+
+    const STEPS = [
+      ['Meet your assistant', 'name, language, one correction'],
+      ['Find the robot', 'or decide to go without'],
+      ['Install on the robot', 'with your approval'],
+      ['Choose a brain', 'provider and key'],
+      ['Hands-free voice', 'wake word'],
+      ['Create you', 'owner, face, vault'],
+      ['Learn the panels', 'five things, then done'],
+    ]
+    const steps = STEPS.map(([title, sub], i) => {
+      const n = i + 1, done = n < step, active = n === step
+      return {
+        title, sub, num: done ? '✓' : String(n),
+        style: `display:flex; align-items:flex-start; gap:11px; width:100%; padding:10px 11px; margin-bottom:3px; border:none; border-radius:10px; cursor:pointer; font-family:inherit; background:${active ? 'var(--surface)' : 'transparent'};${active ? ' box-shadow:inset 0 0 0 1px var(--line-strong);' : ''}`,
+        numStyle: `width:23px; height:23px; border-radius:50%; flex-shrink:0; display:inline-flex; align-items:center; justify-content:center; font-size:11.5px; font-weight:700; background:${done ? 'var(--accent)' : active ? 'var(--accent-wash)' : 'var(--sunken)'}; color:${done ? 'var(--on-accent)' : active ? 'var(--accent)' : 'var(--ink-3)'}`,
+        titleStyle: `font-size:13.5px; font-weight:${active ? 700 : 500}; color:${active ? 'var(--ink)' : 'var(--ink-2)'}`,
+        select: () => this.setState({ step: n }),
+      }
+    })
+
+    const icon = (d, w = 18) => ({ __html: `<svg class="lu" viewBox="0 0 24 24" style="width:${w}px;height:${w}px">${d}</svg>` })
+    const iconWrap = (c) => `width:34px; height:34px; border-radius:10px; flex-shrink:0; display:inline-flex; align-items:center; justify-content:center; background:${c}-wash; color:${c}`
+    const iw = (color, wash) => `width:34px; height:34px; border-radius:10px; flex-shrink:0; display:inline-flex; align-items:center; justify-content:center; background:${wash}; color:${color}`
+
+    const state = (ok, label) => ({
+      state: label,
+      stateStyle: `font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; padding:2px 8px; border-radius:999px; flex-shrink:0; background:${ok ? 'var(--ok-wash)' : 'var(--warn-wash)'}; color:${ok ? 'var(--ok)' : 'var(--warn)'}`,
+    })
+
+    return {
+      theme: this.props.theme ?? 'light',
+      progressLabel: `Step ${step} of 7`,
+      steps,
+      s1: step === 1, s2: step === 2, s3: step === 3, s4: step === 4,
+      s5: step === 5, s6: step === 6, s7: step === 7,
+
+      // Step 4 — provider + key
+      providers: [
+        { id: 'openai', name: 'OpenAI', note: 'GPT models. Paid, needs a key from platform.openai.com.', badge: '' },
+        { id: 'openrouter', name: 'OpenRouter', note: 'One key, many models — including free ones to start with.', badge: 'easiest' },
+        { id: 'gemini', name: 'Google Gemini', note: 'Generous free tier, good at vision and screen control.', badge: '' },
+      ].map(p => ({
+        ...p,
+        style: `display:flex; align-items:center; gap:12px; width:100%; padding:13px 15px; border-radius:11px; cursor:pointer; font-family:inherit; background:${p.id === s.provider ? 'var(--accent-wash)' : 'var(--surface)'}; border:1.5px solid ${p.id === s.provider ? 'var(--accent)' : 'var(--line)'}; color:var(--ink)`,
+        radioStyle: `width:17px; height:17px; border-radius:50%; flex-shrink:0; border:2px solid ${p.id === s.provider ? 'var(--accent)' : 'var(--line-strong)'}; background:${p.id === s.provider ? 'var(--accent)' : 'transparent'}; box-shadow:${p.id === s.provider ? 'inset 0 0 0 3px var(--surface)' : 'none'}`,
+        badgeStyle: 'font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; padding:2px 8px; border-radius:999px; background:var(--ok-wash); color:var(--ok); flex-shrink:0',
+        select: () => this.setState({ provider: p.id }),
+      })),
+      keyLabel: keySet ? 'API key — already set' : 'API key',
+      keyPlaceholder: keySet ? '••••••••••••' : s.provider === 'openai' ? 'sk-…' : s.provider === 'gemini' ? 'AIza…' : 'sk-or-…',
+      keyNote: keySet
+        ? 'Leave empty to keep the key you already stored for this provider.'
+        : 'Pasted once, encrypted immediately, never displayed again — you will replace it rather than read it.',
+
+      // Step 5 — wake word
+      wakeOn: s.wakeOn,
+      toggleWake: () => this.setState({ wakeOn: !s.wakeOn }),
+      wakeBorder: s.wakeOn ? 'var(--accent)' : 'var(--line-strong)',
+      wakeBg: s.wakeOn ? 'var(--accent-wash)' : 'var(--surface)',
+      wakeSwitchStyle: `position:relative; width:44px; height:25px; border-radius:999px; flex-shrink:0; cursor:pointer; border:none; padding:0; background:${s.wakeOn ? 'var(--accent)' : 'var(--line-strong)'}`,
+      wakeKnobStyle: `position:absolute; top:3px; left:${s.wakeOn ? 22 : 3}px; width:19px; height:19px; border-radius:50%; background:#fff; transition:left 0.15s`,
+
+      // Step 6 — vault states
+      alreadyEncrypted: !!this.props.alreadyEncrypted,
+      notEncrypted: !this.props.alreadyEncrypted,
+      passError: '',
+      passStyle: 'flex:1; min-width:200px; padding:9px 12px; background:var(--surface); border:1.5px solid var(--line-strong); border-radius:10px; color:var(--ink); font-size:13.5px; outline:none; font-family:inherit; box-sizing:border-box',
+
+      foundList: [{ url: 'http://192.168.1.42:8001', meta: 'idle · battery 82%', style: 'display:flex; align-items:center; gap:10px; width:100%; padding:11px 14px; border-radius:11px; background:var(--surface); border:1.5px solid var(--ok); color:var(--ink); cursor:pointer; font-family:inherit' }],
+
+      h1: 'margin:0 0 8px; font-size:27px; line-height:1.2; letter-spacing:-0.02em',
+      h2: 'margin:24px 0 10px; font-size:12px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:var(--ink-3)',
+      lead: 'margin:0 0 22px; font-size:15px; color:var(--ink-2); line-height:1.55; max-width:62ch',
+      fieldLabel: 'font-size:12.5px; color:var(--ink-3)',
+      fieldStyle: 'flex:1; min-width:170px; padding:9px 12px; background:var(--surface); border:1.5px solid var(--line-strong); border-radius:10px; color:var(--ink); font-size:13.5px; outline:none; font-family:inherit; box-sizing:border-box',
+      primaryBtn: 'padding:11px 22px; border-radius:10px; background:var(--accent); color:var(--on-accent); border:none; font-size:14px; font-weight:700; cursor:pointer; font-family:inherit; flex-shrink:0',
+      secondaryBtn: 'padding:10px 18px; border-radius:10px; background:var(--surface); border:1.5px solid var(--line-strong); color:var(--ink); font-size:13.5px; font-weight:600; cursor:pointer; font-family:inherit; flex-shrink:0',
+      ghostBtn: 'padding:8px 14px; border-radius:9px; background:transparent; border:1px solid var(--line-strong); color:var(--ink-2); font-size:12.5px; font-weight:600; cursor:pointer; font-family:inherit; flex-shrink:0',
+      equalChoiceBtn: 'flex:1; min-width:260px; text-align:left; padding:13px 18px; border-radius:10px; background:var(--surface); border:1.5px solid var(--line-strong); color:var(--ink); cursor:pointer; font-family:inherit',
+
+      intro: [
+        { title: 'This laptop', body: 'The brain runs here. It stays here — nothing is uploaded.', time: 'ready', icon: icon('<rect width="18" height="12" x="3" y="4" rx="2"></rect><path d="M2 20h20"></path>'), iconStyle: iw('var(--accent)', 'var(--accent-wash)') },
+        { title: 'A robot, if you have one', body: 'Optional. It gives the brain a face, a voice and eyes.', time: '~5 min', icon: icon('<path d="M12 8V4H8"></path><rect width="16" height="12" x="4" y="8" rx="2"></rect><path d="M2 14h2"></path><path d="M20 14h2"></path><path d="M15 13v2"></path><path d="M9 13v2"></path>'), iconStyle: iw('var(--info)', 'var(--info-wash)') },
+        { title: 'Ten quiet minutes', body: 'Mostly reading. You can stop halfway and come back.', time: '~10 min', icon: icon('<circle cx="12" cy="12" r="10"></circle><path d="M12 6v6l4 2"></path>'), iconStyle: iw('var(--ink-2)', 'var(--sunken)') },
+      ],
+
+      // Step 2 — honest scan
+      noRobot: !robotFound,
+      scanBoxStyle: `display:flex; flex-direction:column; gap:12px; padding:16px 18px; border:1.5px solid ${robotFound ? 'var(--ok)' : 'var(--line-strong)'}; border-radius:12px; background:${robotFound ? 'var(--ok-wash)' : 'var(--surface)'}; margin-bottom:8px`,
+      scanIcon: s.scanning
+        ? { __html: '<svg class="lu" viewBox="0 0 24 24" style="width:18px;height:18px;animation:spin 1s linear infinite"><path d="M21 12a9 9 0 1 1-6.2-8.6"></path></svg>' }
+        : robotFound
+          ? icon('<path d="m9 12 2 2 4-4"></path><circle cx="12" cy="12" r="10"></circle>')
+          : icon('<circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path>'),
+      scanIconStyle: iw(robotFound ? 'var(--ok)' : 'var(--ink-3)', robotFound ? 'var(--surface)' : 'var(--sunken)'),
+      scanTitle: s.scanning ? 'Looking…' : robotFound ? 'Reachy Mini found' : 'No robot found on this network',
+      scanSub: s.scanning
+        ? 'Listening for mDNS announcements for 6 seconds'
+        : robotFound
+          ? 'reachy.local · 192.168.1.42 · firmware 1.4.2 · responded in 14 ms'
+          : 'That is not a failure — it usually means one of the three things below, and it may simply mean you have no robot yet.',
+      rescan: () => {
+        this.setState({ scanning: true })
+        setTimeout(() => this.setState({ scanning: false, robotFound: !robotFound }), 1400)
+      },
+      preconditions: [
+        { num: '1', title: 'The robot is on and finished booting', body: 'The antennas twitch once when it is ready. From cold that takes about 40 seconds.', check: 'Look at the robot, not the screen', ...state(true, 'assumed') },
+        { num: '2', title: 'Both are on the same network', body: 'Not guest wifi, not a different band that isolates clients. This is where most setups fail: laptops on 5 GHz guest cannot see a robot on the 2.4 GHz main network.', check: 'This laptop is on: Thuisnet-5G', ...state(false, 'check this') },
+        { num: '3', title: 'The robot is running its own AURA service', body: 'A brand-new robot has nothing installed yet — so it cannot announce itself. That is what the next step is for.', check: 'Nothing has been installed yet', ...state(false, 'step 3') },
+      ],
+      robotPrimaryLabel: robotFound ? 'Use this robot' : 'I fixed something — scan again',
+      skipRobot: () => this.setState({ step: 4, skipped: true }),
+      robotFound,
+
+      // Step 3 — install
+      installSteps: [
+        { title: 'Copy the AURA service to the robot', detail: 'aura sync --target robot --profile default  ·  ~40 MB over your network', tag: 'needs approval', dotStyle: 'width:9px;height:9px;border-radius:50%;background:var(--accent);flex-shrink:0;margin-top:5px', tagStyle: 'font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; padding:2px 8px; border-radius:999px; background:var(--warn-wash); color:var(--warn); flex-shrink:0' },
+        { title: 'Start it and set it to run at boot', detail: 'systemd unit aura-robot.service · enabled', tag: 'needs approval', dotStyle: 'width:9px;height:9px;border-radius:50%;background:var(--accent);flex-shrink:0;margin-top:5px', tagStyle: 'font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; padding:2px 8px; border-radius:999px; background:var(--warn-wash); color:var(--warn); flex-shrink:0' },
+        { title: 'Check it answers, move the head once', detail: 'handshake + one nod, so you can see it worked', tag: 'safe', dotStyle: 'width:9px;height:9px;border-radius:50%;background:var(--ok);flex-shrink:0;margin-top:5px', tagStyle: 'font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; padding:2px 8px; border-radius:999px; background:var(--ok-wash); color:var(--ok); flex-shrink:0' },
+        { title: 'Leave nothing else behind', detail: 'no accounts, no keys, no outbound connections from the robot', tag: 'safe', dotStyle: 'width:9px;height:9px;border-radius:50%;background:var(--ok);flex-shrink:0;margin-top:5px', tagStyle: 'font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; padding:2px 8px; border-radius:999px; background:var(--ok-wash); color:var(--ok); flex-shrink:0' },
+      ],
+      selfUpdate: s.selfUpdate,
+      toggleSelfUpdate: () => this.setState({ selfUpdate: !s.selfUpdate }),
+      switchStyle: `position:relative; width:44px; height:25px; border-radius:999px; flex-shrink:0; cursor:pointer; border:none; padding:0; background:${s.selfUpdate ? 'var(--accent)' : 'var(--line-strong)'}`,
+      knobStyle: `position:absolute; top:3px; left:${s.selfUpdate ? 22 : 3}px; width:19px; height:19px; border-radius:50%; background:#fff; transition:left 0.15s`,
+
+      // Step 5 — panels
+      tour: [
+        { title: 'Talk is where you live', body: 'The conversation, with Richie’s state above it and today’s context beside it. Type, or hold to talk.', extra: 'The three-line icon top-right sets how much detail you see — calm for the kitchen, full for your desk.', icon: icon('<path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"></path>'), iconStyle: iw('var(--accent)', 'var(--accent-wash)') },
+        { title: 'Modes decide what he may do', body: 'Home, Work and Present are not themes — they are boundaries. The green chips under the header list exactly what is allowed, what asks first, and what is refused.', extra: 'Click that chip row to change any of it. Quiet hours sit next to the modes and mean “never speak first”.', icon: icon('<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"></path>'), iconStyle: iw('var(--warn)', 'var(--warn-wash)') },
+        { title: 'People is his memory', body: 'Everyone he knows, what he remembers about them, and where each fact came from. Delete anything, any time.', extra: 'When he cannot see who is talking, he asks — and answers as a guest until you say otherwise.', icon: icon('<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M22 21v-2a4 4 0 0 0-3-3.87"></path>'), iconStyle: iw('var(--info)', 'var(--info-wash)') },
+        { title: 'Skills and Robot', body: 'Skills are procedures he has learned and what triggers them. Robot is the body: camera, gestures, dances, motion history and the connection.', extra: '', icon: icon('<path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"></path>'), iconStyle: iw('var(--present)', 'var(--present-wash)') },
+        { title: 'Stop is always there', body: 'Top right, in every mode, at every detail level. It cuts him off mid-word, ends the turn and switches the mic off.', extra: 'Nothing he does is irreversible without asking you first — and every ask names the rule that caused it.', icon: icon('<circle cx="12" cy="12" r="10"></circle><rect width="6" height="6" x="9" y="9" rx="1"></rect>'), iconStyle: iw('var(--danger)', 'var(--danger-wash)') },
+      ],
+
+      back: () => this.setState({ step: Math.max(1, step - 1) }),
+      backStyle: `padding:10px 18px; border-radius:10px; background:transparent; border:1.5px solid var(--line-strong); color:var(--ink-2); font-size:13.5px; font-weight:600; cursor:pointer; font-family:inherit; ${step === 1 ? 'visibility:hidden;' : ''}`,
+      next: () => this.setState({ step: Math.min(7, step + 1) }),
+      nextLabel: step === 7 ? 'Start talking to Richie' : step === 6 ? 'Create me and continue' : 'Continue',
+      // Every step is skippable except the last — the vault says "Later", the rest "Skip".
+      // Steps 2 and 3 own a deliberate inline alternative — a second footer Skip would just repeat it.
+      canSkip: step < 7 && step !== 2 && step !== 3,
+      skipStyle: 'padding:10px 18px; border-radius:10px; background:transparent; border:1.5px solid var(--line-strong); color:var(--ink-2); font-size:13.5px; font-weight:600; cursor:pointer; font-family:inherit; flex-shrink:0',
+      skipLabel: step === 6 ? 'Later' : 'Skip',
+      skipHint: step === 6
+        ? 'Set a passphrase later in Settings › People & privacy — he works unencrypted until you do'
+        : 'Leave this for later — every step is repeatable from Settings',
+      footerNote: [
+        'Nothing is changed yet',
+        s.skipped ? '' : 'You can add a robot later',
+        'Every action asks before it runs',
+        'The key is encrypted the moment you continue',
+        'Listening happens on the device',
+        'Stored encrypted on this laptop',
+        'Repeatable from Settings › About',
+      ][step - 1],
+    }
+  }
+}
+</script>
+</body>
+</html>

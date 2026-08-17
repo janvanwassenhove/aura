@@ -10,7 +10,6 @@ import time
 
 import httpx
 from shared_events.bus import AsyncEventBus
-from shared_policies import APPROVAL_REQUIRED
 from shared_schemas.events.conversation import IntentRecognized, ResponseDrafted
 from shared_schemas.events.orchestrator import (
     AgentRoundCompleted,
@@ -842,7 +841,13 @@ class OrchestratorPipeline:
 
             await self._bus.publish(ToolCallRequested(session_id=session_id, tool_name=tool_name))
 
-            if tool_name in APPROVAL_REQUIRED:
+            # D2: the gate is mode-aware. A group the owner set to `asks`
+            # stops every one of its tools; one set to `allows` runs without
+            # the gate; ungrouped tools keep the APPROVAL_REQUIRED baseline
+            # and can never be loosened from the Modes view.
+            from orchestrator import mode_policy
+
+            if mode_policy.requires_approval(tool_name, self._router.mode):
                 try:
                     await self._approval.request_approval(tool_name, arguments)
                 except ApprovalTimeout:

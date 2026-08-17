@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+/* Recreated from apps/operator-console/src/styles/tokens.css (U33/U193/U215/U223) */
+:root, :root[data-theme='light'] {
+  --bg:#f1f5f9; --surface:#ffffff; --surface-2:#f8fafc; --surface-3:#eef2f7; --surface-hover:#e2e8f0;
+  --border:#cbd5e1; --border-strong:#94a3b8;
+  --text:#0f172a; --text-muted:#475569; --text-faint:#64748b;
+  --ok:#16a34a; --ok-text:#166534; --ok-bg:#dcfce7; --warn:#d97706; --warn-text:#92400e; --warn-bg:#fef3c7;
+  --danger:#dc2626; --danger-text:#991b1b; --danger-bg:#fee2e2;
+  --info:#9333ea; --info-text:#6b21a8; --info-bg:#f3e8ff;
+  --overlay:rgba(15,23,42,0.35);
+  --accent:#15803d; --accent-hover:#166534; --accent-soft:#15803d; --accent-border:#4ade80; --on-accent:#ffffff;
+}
+:root[data-theme='dark'] {
+  --bg:#0f172a; --surface:#1e293b; --surface-2:#172033; --surface-3:#0f172a; --surface-hover:#253349;
+  --border:#334155; --border-strong:#475569;
+  --text:#e2e8f0; --text-muted:#94a3b8; --text-faint:#94a3b8;
+  --ok:#22c55e; --ok-text:#86efac; --ok-bg:#14532d; --warn:#f59e0b; --warn-text:#fde68a; --warn-bg:#78350f;
+  --danger:#ef4444; --danger-text:#fca5a5; --danger-bg:#450a0a;
+  --info:#a855f7; --info-text:#e9d5ff; --info-bg:#581c87;
+  --overlay:rgba(0,0,0,0.6);
+  --accent-soft:#86efac;
+}
+html, body { margin:0; padding:0; height:100%; }
+body { font-family:Inter, system-ui, sans-serif; background:var(--bg); color:var(--text); }
+a { color: var(--accent); } a:hover { color: var(--accent-hover); }
+svg.lu { width:1em; height:1em; stroke:currentColor; stroke-width:2; fill:none; stroke-linecap:round; stroke-linejoin:round; flex-shrink:0; }
+input[type=range] { accent-color: var(--accent); }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.5} }
+</style>
+</helmet>
+<div data-screen-label="AURA Console — current UI recreation" style="display:flex; flex-direction:column; height:100vh; background:var(--bg); color:var(--text); font-size:16px; overflow:hidden">
+
+  <!-- ═══ TitleBar.vue ═══ -->
+  <header style="display:flex; align-items:stretch; height:38px; flex-shrink:0; background:var(--surface); border-bottom:1px solid var(--border); user-select:none">
+    <div style="display:flex; align-items:center; gap:0.5rem; padding:0 0.9rem">
+      <svg class="lu" viewBox="0 0 24 24" style="width:17px;height:17px;color:var(--accent-soft)"><path d="M12 8V4H8"></path><rect width="16" height="12" x="4" y="8" rx="2"></rect><path d="M2 14h2"></path><path d="M20 14h2"></path><path d="M15 13v2"></path><path d="M9 13v2"></path></svg>
+      <span style="font-weight:600; font-size:0.85rem; letter-spacing:0.03em">AURA</span>
+      <span style="width:1px; height:16px; background:var(--border); margin:0 0.35rem"></span>
+      <span title="Console ↔ brain event stream: open" style="display:flex; align-items:center; gap:0.3rem; font-size:0.72rem; color:var(--text-muted)">
+        <span style="width:8px; height:8px; border-radius:50%; background:var(--ok)"></span>
+        App: Connected
+      </span>
+      <span title="Robot connection: home" style="display:flex; align-items:center; gap:0.3rem; font-size:0.72rem; color:var(--text-muted)">
+        <svg class="lu" viewBox="0 0 24 24" style="width:12px;height:12px;color:var(--ok-text)"><rect width="16" height="16" x="4" y="4" rx="2"></rect><rect width="6" height="6" x="9" y="9"></rect><path d="M15 2v2"></path><path d="M15 20v2"></path><path d="M2 15h2"></path><path d="M2 9h2"></path><path d="M20 15h2"></path><path d="M20 9h2"></path><path d="M9 2v2"></path><path d="M9 20v2"></path></svg>
+        Robot: home
+      </span>
+    </div>
+    <div style="flex:1"></div>
+    <div style="display:flex; align-items:center">
+      <button title="Toggle left panel" onClick="{{ toggleLeft }}" style="display:flex; align-items:center; justify-content:center; width:40px; height:38px; background:none; border:none; cursor:pointer; color:var(--text-muted)" style-hover="color:var(--text); background:var(--surface-hover)"><svg class="lu" viewBox="0 0 24 24" style="width:15px;height:15px"><rect width="18" height="18" x="3" y="3" rx="2"></rect><path d="M9 3v18"></path></svg></button>
+      <button title="Toggle bottom panel (Events)" onClick="{{ toggleBottom }}" style="display:flex; align-items:center; justify-content:center; width:40px; height:38px; background:none; border:none; cursor:pointer; color:var(--text-muted)" style-hover="color:var(--text); background:var(--surface-hover)"><svg class="lu" viewBox="0 0 24 24" style="width:15px;height:15px"><rect width="18" height="18" x="3" y="3" rx="2"></rect><path d="M3 15h18"></path></svg></button>
+      <button title="Brain panel (people, skills, graph)" onClick="{{ toggleRight }}" style="display:flex; align-items:center; justify-content:center; width:40px; height:38px; background:none; border:none; cursor:pointer; color:var(--text-muted)" style-hover="color:var(--text); background:var(--surface-hover)"><svg class="lu" viewBox="0 0 24 24" style="width:15px;height:15px"><rect width="18" height="18" x="3" y="3" rx="2"></rect><path d="M15 3v18"></path></svg></button>
+      <button title="Restart brain (load new code/settings)" style="display:flex; align-items:center; justify-content:center; width:40px; height:38px; background:none; border:none; cursor:pointer; color:var(--text-muted)" style-hover="color:var(--text); background:var(--surface-hover)"><svg class="lu" viewBox="0 0 24 24" style="width:15px;height:15px"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"></path><path d="M21 3v5h-5"></path></svg></button>
+      <button title="Present with the robot" style="display:flex; align-items:center; justify-content:center; width:40px; height:38px; background:none; border:none; cursor:pointer; color:var(--text-muted)" style-hover="color:var(--text); background:var(--surface-hover)"><svg class="lu" viewBox="0 0 24 24" style="width:16px;height:16px"><path d="M2 3h20"></path><path d="M21 3v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V3"></path><path d="m7 21 5-5 5 5"></path></svg></button>
+      <button title="Capabilities &amp; permissions" style="display:flex; align-items:center; justify-content:center; width:40px; height:38px; background:none; border:none; cursor:pointer; color:var(--text-muted)" style-hover="color:var(--text); background:var(--surface-hover)"><svg class="lu" viewBox="0 0 24 24" style="width:16px;height:16px"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"></path><path d="m9 12 2 2 4-4"></path></svg></button>
+      <button title="About AURA" style="display:flex; align-items:center; justify-content:center; width:40px; height:38px; background:none; border:none; cursor:pointer; color:var(--text-muted)" style-hover="color:var(--text); background:var(--surface-hover)"><svg class="lu" viewBox="0 0 24 24" style="width:16px;height:16px"><circle cx="12" cy="12" r="10"></circle><path d="M12 16v-4"></path><path d="M12 8h.01"></path></svg></button>
+      <button title="Settings" style="display:flex; align-items:center; justify-content:center; width:40px; height:38px; background:none; border:none; cursor:pointer; color:var(--text-muted)" style-hover="color:var(--text); background:var(--surface-hover)"><svg class="lu" viewBox="0 0 24 24" style="width:16px;height:16px"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg></button>
+      <span style="width:1px; height:16px; background:var(--border); margin:0 0.35rem; align-self:center"></span>
+      <button title="Minimize" style="display:flex; align-items:center; justify-content:center; width:40px; height:38px; background:none; border:none; cursor:pointer; color:var(--text-muted)" style-hover="background:var(--surface-hover)"><svg class="lu" viewBox="0 0 24 24" style="width:15px;height:15px"><path d="M5 12h14"></path></svg></button>
+      <button title="Maximize" style="display:flex; align-items:center; justify-content:center; width:40px; height:38px; background:none; border:none; cursor:pointer; color:var(--text-muted)" style-hover="background:var(--surface-hover)"><svg class="lu" viewBox="0 0 24 24" style="width:12px;height:12px"><rect width="18" height="18" x="3" y="3" rx="2"></rect></svg></button>
+      <button title="Close" style="display:flex; align-items:center; justify-content:center; width:40px; height:38px; background:none; border:none; cursor:pointer; color:var(--text-muted)" style-hover="background:var(--danger); color:#fff"><svg class="lu" viewBox="0 0 24 24" style="width:15px;height:15px"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button>
+    </div>
+  </header>
+
+  <!-- ═══ Workspace (App.vue U76) ═══ -->
+  <main style="display:flex; padding:0.8rem; gap:0; flex:1; min-height:0; min-width:0; overflow:hidden">
+
+    <!-- ── Left dock: RobotPanel + VideoPanel ── -->
+    <sc-if value="{{ showLeft }}" hint-placeholder-val="{{ true }}">
+    <div style="display:flex; flex-direction:column; min-height:0; overflow-y:auto; flex-shrink:0; width:300px">
+
+      <!-- RobotPanel.vue -->
+      <section style="background:var(--surface); border:1px solid var(--border); border-radius:0.5rem; padding:1.15rem 1.15rem 1rem; display:flex; flex-direction:column; flex-shrink:0">
+        <h2 style="font-size:0.9rem; font-weight:600; text-transform:uppercase; letter-spacing:0.05em; color:var(--text-muted); margin:0 0 0.9rem">Robot State</h2>
+        <div style="display:flex; align-items:center; gap:0.5rem; padding:0.3rem 0; font-size:0.8rem">
+          <span title="Mode: home" style="width:9px; height:9px; border-radius:50%; background:var(--ok-text); flex-shrink:0"></span>
+          <span style="color:var(--text)">idle</span>
+          <span style="color:var(--text-faint); display:inline-flex; align-items:center"><svg class="lu" viewBox="0 0 24 24" style="width:13px;height:13px"><path d="M11 5 6 9H2v6h4l5 4V5z"></path><line x1="22" x2="16" y1="9" y2="15"></line><line x1="16" x2="22" y1="9" y2="15"></line></svg></span>
+          <span title="92% confident" style="color:var(--text-faint); display:inline-flex; align-items:center; gap:0.25rem; margin-left:auto">
+            <svg class="lu" viewBox="0 0 24 24" style="width:12px;height:12px"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg> Jan
+          </span>
+        </div>
+
+        <!-- U125 toggle tiles -->
+        <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:0.4rem; margin:0.5rem 0 0.4rem">
+          <button title="Awake — click for sleep mode" style="display:flex; flex-direction:column; align-items:center; gap:0.25rem; padding:0.45rem 0.2rem; min-width:0; background:color-mix(in srgb, var(--accent) 10%, transparent); border:1px solid var(--accent); border-radius:0.5rem; color:var(--accent); cursor:pointer">
+            <svg class="lu" viewBox="0 0 24 24" style="width:16px;height:16px"><path d="M12 2v10"></path><path d="M18.4 6.6a9 9 0 1 1-12.77.04"></path></svg>
+            <span style="font-size:0.62rem; letter-spacing:0.02em">Awake</span>
+          </button>
+          <button title="Listening for “Richie …” — click to stop" style="display:flex; flex-direction:column; align-items:center; gap:0.25rem; padding:0.45rem 0.2rem; min-width:0; background:color-mix(in srgb, var(--accent) 10%, transparent); border:1px solid var(--accent); border-radius:0.5rem; color:var(--accent); cursor:pointer">
+            <svg class="lu" viewBox="0 0 24 24" style="width:16px;height:16px"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" x2="12" y1="19" y2="22"></line></svg>
+            <span style="font-size:0.62rem; letter-spacing:0.02em">Mic</span>
+          </button>
+          <button title="Following faces — click to stop" style="display:flex; flex-direction:column; align-items:center; gap:0.25rem; padding:0.45rem 0.2rem; min-width:0; background:color-mix(in srgb, var(--accent) 10%, transparent); border:1px solid var(--accent); border-radius:0.5rem; color:var(--accent); cursor:pointer">
+            <svg class="lu" viewBox="0 0 24 24" style="width:16px;height:16px"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+            <span style="font-size:0.62rem; letter-spacing:0.02em">Follow</span>
+          </button>
+          <button title="Proactive off — only speaks when addressed" style="display:flex; flex-direction:column; align-items:center; gap:0.25rem; padding:0.45rem 0.2rem; min-width:0; background:var(--surface-2); border:1px solid var(--border-strong); border-radius:0.5rem; color:var(--text-faint); cursor:pointer" style-hover="border-color:var(--accent-border)">
+            <svg class="lu" viewBox="0 0 24 24" style="width:16px;height:16px"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"></path><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"></path></svg>
+            <span style="font-size:0.62rem; letter-spacing:0.02em">Notify</span>
+          </button>
+        </div>
+
+        <!-- U192 panic stop -->
+        <button title="Cuts the robot off mid-sentence, ends the conversation and switches the mic off" style="display:flex; align-items:center; justify-content:center; gap:0.4rem; width:100%; margin:0 0 0.5rem; padding:0.45rem 0.5rem; background:transparent; color:var(--danger); border:1px solid var(--danger); border-radius:0.5rem; font-size:0.76rem; font-weight:600; cursor:pointer; font-family:inherit" style-hover="background:var(--danger); color:#fff">
+          <svg class="lu" viewBox="0 0 24 24" style="width:15px;height:15px"><circle cx="12" cy="12" r="10"></circle><rect width="6" height="6" x="9" y="9" rx="1"></rect></svg>
+          <span>Stop talking</span>
+        </button>
+
+        <!-- volume -->
+        <div style="display:flex; align-items:center; gap:0.5rem; margin-top:0.3rem">
+          <span style="display:inline-flex; align-items:center; gap:0.3rem; flex-shrink:0; font-size:0.82rem; color:var(--text)">
+            <svg class="lu" viewBox="0 0 24 24" style="width:14px;height:14px"><path d="M11 5 6 9H2v6h4l5 4V5z"></path><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path><path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path></svg>
+            Volume
+          </span>
+          <input type="range" min="0" max="100" defaultValue="80" aria-label="Speaker volume" style="flex:1 1 0; min-width:0" />
+          <span style="font-size:0.72rem; color:var(--text-faint); min-width:2.2rem; flex-shrink:0; text-align:right">80%</span>
+        </div>
+
+        <!-- persona -->
+        <div style="margin-top:0.9rem; display:flex; flex-direction:column; gap:0.35rem">
+          <span style="display:inline-flex; align-items:center; gap:0.3rem; font-size:0.82rem; color:var(--text)">
+            <svg class="lu" viewBox="0 0 24 24" style="width:14px;height:14px"><path d="M12 8V4H8"></path><rect width="16" height="12" x="4" y="8" rx="2"></rect><path d="M2 14h2"></path><path d="M20 14h2"></path><path d="M15 13v2"></path><path d="M9 13v2"></path></svg>
+            Persona
+          </span>
+          <div style="display:flex; align-items:center; gap:0.4rem; min-width:0">
+            <select aria-label="Persona" style="flex:1 1 0; min-width:0; background:var(--surface-2); border:1px solid var(--border-strong); border-radius:0.5rem; color:var(--text); padding:0.3rem 0.4rem; font-size:0.8rem; font-family:inherit">
+              <option>Richie (cheerful sidekick)</option>
+              <option>Default (no character)</option>
+              <option>Presenter</option>
+            </select>
+            <button title="Edit this persona" style="flex-shrink:0; background:none; border:1px solid var(--border-strong); border-radius:0.5rem; color:var(--text-faint); cursor:pointer; padding:0.3rem 0.4rem; display:flex" style-hover="color:var(--text)">
+              <svg class="lu" viewBox="0 0 24 24" style="width:13px;height:13px"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- U114 collapsible: Actions -->
+        <div style="margin-top:1.1rem">
+          <button onClick="{{ toggleActions }}" style="display:inline-flex; align-items:center; gap:0.3rem; background:none; border:none; padding:0.2rem 0; cursor:pointer; color:var(--text-faint); font-size:0.72rem; font-weight:600; text-transform:uppercase; letter-spacing:0.05em; font-family:inherit" style-hover="color:var(--text)">
+            <svg class="lu" viewBox="0 0 24 24" style="{{ actionsChevStyle }}"><path d="m9 18 6-6-6-6"></path></svg> Actions
+          </button>
+          <sc-if value="{{ actionsOpen }}" hint-placeholder-val="{{ false }}">
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.5rem; margin-top:0.4rem">
+              <sc-for list="{{ actionBtns }}" as="a" hint-placeholder-count="8">
+                <button style="display:inline-flex; align-items:center; justify-content:center; gap:0.35rem; background:var(--surface-3); border:1px solid var(--border); border-radius:0.25rem; color:var(--text-muted); font-size:0.78rem; padding:0.45rem 0.5rem; cursor:pointer; font-family:inherit" style-hover="color:var(--text); border-color:var(--accent-border)">{{ a }}</button>
+              </sc-for>
+            </div>
+            <h3 style="font-size:0.72rem; font-weight:600; letter-spacing:0.04em; color:var(--text-faint); text-transform:uppercase; margin:1.1rem 0 0.55rem">Dance</h3>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.5rem">
+              <sc-for list="{{ danceBtns }}" as="a" hint-placeholder-count="4">
+                <button style="display:inline-flex; align-items:center; justify-content:center; gap:0.35rem; background:var(--surface-3); border:1px solid var(--border); border-radius:0.25rem; color:var(--text-muted); font-size:0.78rem; padding:0.45rem 0.5rem; cursor:pointer; font-family:inherit" style-hover="color:var(--text); border-color:var(--accent-border)">{{ a }}</button>
+              </sc-for>
+            </div>
+            <h3 style="font-size:0.72rem; font-weight:600; letter-spacing:0.04em; color:var(--text-faint); text-transform:uppercase; margin:1.1rem 0 0.55rem">Speak &amp; Move</h3>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.5rem">
+              <sc-for list="{{ performBtns }}" as="a" hint-placeholder-count="4">
+                <button style="display:inline-flex; align-items:center; justify-content:center; gap:0.35rem; background:var(--surface-3); border:1px solid var(--border); border-radius:0.25rem; color:var(--text-muted); font-size:0.78rem; padding:0.45rem 0.5rem; cursor:pointer; font-family:inherit" style-hover="color:var(--text); border-color:var(--accent-border)">{{ a }}</button>
+              </sc-for>
+            </div>
+          </sc-if>
+        </div>
+
+        <!-- Motion log (collapsed) -->
+        <div style="margin-top:1.1rem">
+          <button onClick="{{ toggleMotion }}" style="display:inline-flex; align-items:center; gap:0.3rem; background:none; border:none; padding:0.2rem 0; cursor:pointer; color:var(--text-faint); font-size:0.72rem; font-weight:600; text-transform:uppercase; letter-spacing:0.05em; font-family:inherit" style-hover="color:var(--text)">
+            <svg class="lu" viewBox="0 0 24 24" style="{{ motionChevStyle }}"><path d="m9 18 6-6-6-6"></path></svg> Motion log
+            <span style="font-size:0.62rem; padding:0 0.35rem; border-radius:999px; margin-left:0.25rem; background:var(--surface-2); border:1px solid var(--border); text-transform:none">3</span>
+          </button>
+          <sc-if value="{{ motionOpen }}" hint-placeholder-val="{{ false }}">
+            <ul style="list-style:none; padding:0; margin:0.3rem 0 0; max-height:132px; overflow-y:auto">
+              <sc-for list="{{ motions }}" as="m" hint-placeholder-count="3">
+                <li style="display:flex; align-items:center; gap:0.5rem; padding:0.22rem 0; font-size:0.8rem; line-height:1.2">
+                  <span style="{{ m.dotStyle }}"></span>
+                  <span style="flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">{{ m.name }}</span>
+                  <span style="color:var(--text-faint); font-variant-numeric:tabular-nums">{{ m.time }}</span>
+                </li>
+              </sc-for>
+            </ul>
+          </sc-if>
+        </div>
+
+        <!-- App logs (collapsed) -->
+        <div style="margin-top:1.1rem">
+          <button style="display:inline-flex; align-items:center; gap:0.3rem; background:none; border:none; padding:0.2rem 0; cursor:pointer; color:var(--text-faint); font-size:0.72rem; font-weight:600; text-transform:uppercase; letter-spacing:0.05em; font-family:inherit" style-hover="color:var(--text)">
+            <svg class="lu" viewBox="0 0 24 24" style="width:13px;height:13px"><path d="m9 18 6-6-6-6"></path></svg> App logs
+          </button>
+        </div>
+      </section>
+
+      <!-- VideoPanel.vue -->
+      <section style="background:var(--surface); border:1px solid var(--border); border-radius:0.5rem; padding:1.15rem 1.15rem 1rem; display:flex; flex-direction:column; margin-top:1rem; flex-shrink:0">
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:0.5rem">
+          <h2 style="font-size:0.9rem; font-weight:600; text-transform:uppercase; letter-spacing:0.05em; color:var(--text-muted); margin:0">Robot Camera</h2>
+          <span style="display:inline-flex; align-items:center; gap:0.4rem">
+            <button title="Reconnect the camera stream" style="display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; border-radius:5px; cursor:pointer; background:none; border:1px solid var(--border); color:var(--text-muted)" style-hover="color:var(--text); border-color:var(--accent)"><svg class="lu" viewBox="0 0 24 24" style="width:12px;height:12px"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"></path><path d="M21 3v5h-5"></path></svg></button>
+            <span style="display:inline-flex; align-items:center; gap:0.25rem; font-size:0.65rem; font-weight:700; letter-spacing:0.05em; color:var(--danger); border:1px solid var(--danger); border-radius:999px; padding:0.05rem 0.45rem">
+              <svg class="lu" viewBox="0 0 24 24" style="width:11px;height:11px"><path d="m16 13 5.223 3.482a.5.5 0 0 0 .777-.416V7.87a.5.5 0 0 0-.752-.432L16 10.5"></path><rect x="2" y="6" width="14" height="12" rx="2"></rect></svg> LIVE
+            </span>
+          </span>
+        </div>
+        <div style="position:relative; width:100%; aspect-ratio:16/9; background:#1a2332; border:1px solid var(--border); border-radius:0.375rem; overflow:hidden">
+          <!-- simulated camera view -->
+          <div style="position:absolute; inset:0; background:linear-gradient(160deg, #2a3548 0%, #1a2332 55%, #141c2b 100%)"></div>
+          <div style="position:absolute; left:8%; right:8%; top:50%; height:1px; background:rgba(255,255,255,0.18)"></div>
+          <div style="position:absolute; top:8%; bottom:8%; left:50%; width:1px; background:rgba(255,255,255,0.18)"></div>
+          <div style="position:absolute; left:0.5rem; bottom:0.5rem; display:inline-flex; align-items:center; gap:0.3rem; background:rgba(15,23,42,0.6); color:#fff; font-size:0.72rem; padding:0.2rem 0.55rem; border-radius:999px; backdrop-filter:blur(4px)">
+            <svg class="lu" viewBox="0 0 24 24" style="width:13px;height:13px"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><polyline points="16 11 18 13 22 9"></polyline></svg>
+            Jan <span style="opacity:0.75">92%</span>
+          </div>
+          <div role="group" aria-label="Head control mode" style="position:absolute; right:0.5rem; top:0.5rem; display:inline-flex; border-radius:6px; overflow:hidden; border:1px solid rgba(255,255,255,0.25); background:rgba(15,23,42,0.55); backdrop-filter:blur(4px)">
+            <button style="display:inline-flex; align-items:center; gap:0.25rem; padding:0.2rem 0.5rem; font-size:0.66rem; font-weight:600; background:var(--accent); border:none; color:#fff; cursor:pointer">
+              <svg class="lu" viewBox="0 0 24 24" style="width:12px;height:12px"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg> Follow
+              <span style="width:5px; height:5px; border-radius:50%; background:var(--ok); box-shadow:0 0 4px var(--ok); margin-left:0.1rem"></span>
+            </button>
+            <button style="display:inline-flex; align-items:center; gap:0.25rem; padding:0.2rem 0.5rem; font-size:0.66rem; font-weight:600; background:none; border:none; border-left:1px solid rgba(255,255,255,0.25); color:#fff; cursor:pointer; opacity:0.65" style-hover="opacity:1">
+              <svg class="lu" viewBox="0 0 24 24" style="width:12px;height:12px"><polyline points="5 9 2 12 5 15"></polyline><polyline points="9 5 12 2 15 5"></polyline><polyline points="15 19 12 22 9 19"></polyline><polyline points="19 9 22 12 19 15"></polyline><line x1="2" x2="22" y1="12" y2="12"></line><line x1="12" x2="12" y1="2" y2="22"></line></svg> Manual
+            </button>
+          </div>
+        </div>
+        <form style="display:flex; gap:0.4rem; margin-top:0.5rem">
+          <input placeholder="person id (e.g. jan)" style="width:100%; padding:0.3rem 0.5rem; background:var(--surface-3); border:1px solid var(--border); border-radius:0.25rem; color:var(--text); font-size:0.8rem; outline:none; font-family:inherit; flex:1; min-width:0" />
+          <button type="button" style="display:inline-flex; align-items:center; gap:0.3rem; font-size:0.78rem; padding:0.3rem 0.7rem; white-space:nowrap; flex-shrink:0; border-radius:0.375rem; background:var(--accent); color:var(--on-accent); cursor:pointer; border:none; font-family:inherit" style-hover="background:var(--accent-hover)">
+            <svg class="lu" viewBox="0 0 24 24" style="width:13px;height:13px"><path d="M3 7V5a2 2 0 0 1 2-2h2"></path><path d="M17 3h2a2 2 0 0 1 2 2v2"></path><path d="M21 17v2a2 2 0 0 1-2 2h-2"></path><path d="M7 21H5a2 2 0 0 1-2-2v-2"></path><path d="M8 14s1.5 2 4 2 4-2 4-2"></path><path d="M9 9h.01"></path><path d="M15 9h.01"></path></svg>
+            This is me
+          </button>
+        </form>
+      </section>
+    </div>
+    <div style="width:9px; cursor:col-resize; flex-shrink:0"></div>
+    </sc-if>
+
+    <!-- ── Center: Conversation + Event Log ── -->
+    <div style="flex:1; min-width:20rem; min-height:0; display:flex; flex-direction:column">
+      <section style="background:var(--surface); border:1px solid var(--border); border-radius:0.5rem; padding:1.15rem 1.15rem 1rem; display:flex; flex-direction:column; flex:1; min-height:0">
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:0.5rem">
+          <h2 style="font-size:0.9rem; font-weight:600; text-transform:uppercase; letter-spacing:0.05em; color:var(--text-muted); margin:0">Conversation</h2>
+          <button title="Clear this conversation" style="display:inline-flex; align-items:center; gap:0.25rem; font-size:0.68rem; padding:0.15rem 0.45rem; border-radius:5px; background:none; border:1px solid var(--border); color:var(--text-muted); cursor:pointer; font-family:inherit" style-hover="color:var(--danger); border-color:var(--danger)">
+            <svg class="lu" viewBox="0 0 24 24" style="width:12px;height:12px"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path><line x1="10" x2="10" y1="11" y2="17"></line><line x1="14" x2="14" y1="11" y2="17"></line></svg> Clear
+          </button>
+        </div>
+        <div role="log" style="overflow-y:auto; flex:1; display:flex; flex-direction:column; gap:0.5rem; margin-bottom:0.75rem">
+          <div style="padding:0.5rem; border-radius:0.375rem; background:var(--surface-3); border-left:3px solid var(--accent)">
+            <div style="display:flex; justify-content:space-between; margin-bottom:0.2rem">
+              <span style="font-size:0.7rem; font-weight:600; text-transform:uppercase; color:var(--text-muted)">You</span>
+              <span style="font-size:0.7rem; color:var(--text-faint)">09:12:04</span>
+            </div>
+            <div style="font-size:0.85rem">What meetings do I have today?</div>
+          </div>
+          <div style="padding:0.5rem; border-radius:0.375rem; background:var(--surface-2); border-left:3px solid var(--ok)">
+            <div style="display:flex; justify-content:space-between; margin-bottom:0.2rem">
+              <span style="display:flex; align-items:center; gap:0.3rem; font-size:0.7rem; font-weight:600; text-transform:uppercase; color:var(--text-muted)">
+                <svg viewBox="0 0 64 64" style="width:20px; height:20px" fill="none"><g stroke="var(--text)" stroke-width="1.6" stroke-linecap="round"><path d="M18 26 L13 6"></path><path d="M46 26 L52 8"></path></g><circle cx="13" cy="5" r="2" fill="var(--text)"></circle><circle cx="52.4" cy="7" r="2" fill="var(--text)"></circle><rect x="8" y="22" width="48" height="30" rx="13" fill="var(--surface)" stroke="var(--text)" stroke-width="2"></rect><circle cx="22.5" cy="36" r="8.2" fill="#20242b"></circle><circle cx="41.5" cy="36" r="8.2" fill="#20242b"></circle><circle cx="25.6" cy="32.8" r="2.1" fill="#fff" fill-opacity="0.9"></circle><circle cx="44.6" cy="32.8" r="2.1" fill="#fff" fill-opacity="0.9"></circle><path d="M12 62 q2 -9 12 -9 h16 q10 0 12 9 z" fill="var(--surface)" stroke="var(--text)" stroke-width="2"></path></svg>
+                AURA
+              </span>
+              <span style="font-size:0.7rem; color:var(--text-faint)">09:12:06</span>
+            </div>
+            <div style="font-size:0.85rem">You have 3 meetings today: standup at 9:30, the design review at 11:00, and a 1:1 with Sam at 15:00. The design review has no agenda yet — want me to nudge the organiser?</div>
+            <div style="margin-top:0.3rem; font-size:0.7rem; padding:0.1rem 0.4rem; border-radius:0.25rem; display:inline-flex; align-items:center; gap:0.25rem; background:var(--ok-bg); color:var(--ok-text)">
+              <svg class="lu" viewBox="0 0 24 24" style="width:11px;height:11px"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg>
+              m365.calendar_list — succeeded
+            </div>
+          </div>
+          <div style="padding:0.5rem; border-radius:0.375rem; background:var(--surface-3); border-left:3px solid var(--accent)">
+            <div style="display:flex; justify-content:space-between; margin-bottom:0.2rem">
+              <span style="font-size:0.7rem; font-weight:600; text-transform:uppercase; color:var(--text-muted)">You</span>
+              <span style="font-size:0.7rem; color:var(--text-faint)">09:12:41</span>
+            </div>
+            <div style="font-size:0.85rem">Play some skate punk on the kitchen speaker</div>
+          </div>
+          <div style="padding:0.5rem; border-radius:0.375rem; background:var(--surface-2); border-left:3px solid var(--ok)">
+            <div style="display:flex; justify-content:space-between; margin-bottom:0.2rem">
+              <span style="font-size:0.7rem; font-weight:600; text-transform:uppercase; color:var(--text-muted)">AURA</span>
+              <span style="font-size:0.7rem; color:var(--text-faint)">09:12:44</span>
+            </div>
+            <div style="font-size:0.85rem">On it — queueing your Skate Punk Essentials playlist on the kitchen Sonos. 🎸</div>
+            <div style="margin-top:0.3rem; font-size:0.7rem; padding:0.1rem 0.4rem; border-radius:0.25rem; display:inline-flex; align-items:center; gap:0.25rem; background:var(--warn-bg); color:var(--warn-text)">
+              <svg class="lu" viewBox="0 0 24 24" style="width:11px;height:11px"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg>
+              music.play — pending
+            </div>
+          </div>
+        </div>
+        <div style="font-size:0.75rem; color:var(--text-faint); margin-bottom:0.5rem">Last turn: 2140ms total (LLM 1890ms + tools 250ms)</div>
+        <div style="display:flex; gap:0.4rem; align-items:flex-end; padding-top:0.25rem; min-width:0">
+          <textarea rows="1" placeholder="Type a message… or use the mic" aria-label="Message to the assistant" style="flex:1 1 0; min-width:0; padding:0.4rem 0.75rem; background:var(--surface-3); border:1px solid var(--border); border-radius:0.375rem; color:var(--text); font-size:0.85rem; outline:none; resize:none; box-sizing:border-box; font-family:inherit; line-height:1.4; min-height:36px; max-height:160px"></textarea>
+          <div style="display:flex; gap:0.4rem; align-items:stretch; flex-shrink:0; height:36px">
+            <button title="Talk using the laptop mic" style="display:inline-flex; align-items:center; justify-content:center; width:38px; border-radius:0.375rem; background:var(--surface-3); border:1px solid var(--border); color:var(--text-muted); cursor:pointer" style-hover="color:var(--text); border-color:var(--accent-border)"><svg class="lu" viewBox="0 0 24 24" style="width:15px;height:15px"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" x2="12" y1="19" y2="22"></line></svg></button>
+            <button title="Talk using Richie's own microphone" style="display:inline-flex; align-items:center; justify-content:center; width:38px; border-radius:0.375rem; background:var(--surface-3); border:1px solid var(--border); color:var(--text-muted); cursor:pointer" style-hover="color:var(--text); border-color:var(--accent-border)"><svg class="lu" viewBox="0 0 24 24" style="width:15px;height:15px"><path d="M12 8V4H8"></path><rect width="16" height="12" x="4" y="8" rx="2"></rect><path d="M2 14h2"></path><path d="M20 14h2"></path><path d="M15 13v2"></path><path d="M9 13v2"></path></svg></button>
+            <button title="Teach: send the typed text as training feedback" style="display:inline-flex; align-items:center; justify-content:center; width:38px; border-radius:0.375rem; background:var(--surface-3); border:1px solid var(--border); color:var(--text-muted); cursor:pointer" style-hover="color:var(--text); border-color:var(--accent-border)"><svg class="lu" viewBox="0 0 24 24" style="width:15px;height:15px"><path d="M21.42 10.92a1 1 0 0 0 0-1.84L12.83 5.18a2 2 0 0 0-1.66 0L2.6 9.08a1 1 0 0 0 0 1.83l8.57 3.91a2 2 0 0 0 1.66 0z"></path><path d="M22 10v6"></path><path d="M6 12.5V16a6 3 0 0 0 12 0v-3.5"></path></svg></button>
+            <button style="flex-shrink:0; height:36px; padding:0 1rem; border-radius:0.375rem; background:var(--accent); color:var(--on-accent); font-size:0.85rem; cursor:pointer; border:none; font-family:inherit" style-hover="background:var(--accent-hover)">Send</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Event Log dock (U113: closed by default) -->
+      <sc-if value="{{ showBottom }}" hint-placeholder-val="{{ false }}">
+        <div style="height:9px; cursor:row-resize; flex-shrink:0"></div>
+        <section style="background:var(--surface); border:1px solid var(--border); border-radius:0.5rem; padding:1.15rem 1.15rem 1rem; display:flex; flex-direction:column; height:200px; flex-shrink:0">
+          <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:0.5rem">
+            <h2 style="font-size:0.9rem; font-weight:600; text-transform:uppercase; letter-spacing:0.05em; color:var(--text-muted); margin:0">Event Log</h2>
+            <button style="background:transparent; border:none; color:var(--text-faint); cursor:pointer; padding:0.25rem 0.5rem; font-size:0.75rem; font-family:inherit" style-hover="color:var(--text-muted)">Clear</button>
+          </div>
+          <input placeholder="Filter by event type…" style="width:100%; padding:0.3rem 0.5rem; background:var(--surface-3); border:1px solid var(--border); border-radius:0.25rem; color:var(--text); font-size:0.8rem; outline:none; box-sizing:border-box; margin-bottom:0.5rem; font-family:inherit" />
+          <ul style="list-style:none; padding:0; margin:0; flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:0.25rem">
+            <sc-for list="{{ events }}" as="e" hint-placeholder-count="5">
+              <li style="display:flex; align-items:center; gap:0.4rem; padding:0.2rem 0.25rem; border-radius:0.25rem; font-size:0.75rem" style-hover="background:var(--surface-3)">
+                <span style="flex:1; color:var(--accent-soft); font-family:monospace">{{ e.type }}</span>
+                <span style="color:var(--text-faint); font-family:monospace; font-size:0.7rem">{{ e.session }}</span>
+                <span style="color:var(--text-faint); white-space:nowrap">{{ e.time }}</span>
+              </li>
+            </sc-for>
+          </ul>
+        </section>
+      </sc-if>
+    </div>
+
+    <!-- ── Right dock: BrainPanel (docked) ── -->
+    <sc-if value="{{ showRight }}" hint-placeholder-val="{{ true }}">
+    <div style="width:9px; cursor:col-resize; flex-shrink:0"></div>
+    <aside style="flex-shrink:0; min-height:0; display:flex; flex-direction:column; background:var(--surface); border:1px solid var(--border); border-radius:0.5rem; overflow:hidden; width:min(780px, 44vw)">
+      <header style="display:flex; align-items:center; gap:0.75rem; padding:0.9rem 1.1rem; border-bottom:1px solid var(--border)">
+        <span style="font-weight:600; font-size:0.95rem; display:inline-flex; align-items:center; gap:0.45rem; flex:1">
+          <svg class="lu" viewBox="0 0 24 24" style="width:17px;height:17px"><path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z"></path><path d="M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z"></path><path d="M15 13a4.5 4.5 0 0 1-3-4 4.5 4.5 0 0 1-3 4"></path><path d="M17.599 6.5a3 3 0 0 0 .399-1.375"></path><path d="M6.003 5.125A3 3 0 0 0 6.401 6.5"></path><path d="M3.477 10.896a4 4 0 0 1 .585-.396"></path><path d="M19.938 10.5a4 4 0 0 1 .585.396"></path><path d="M6 18a4 4 0 0 1-1.967-.516"></path><path d="M19.967 17.484A4 4 0 0 1 18 18"></path></svg>
+          AURA's brain
+        </span>
+        <span title="Profiles are encrypted and unlocked" style="font-size:0.68rem; color:var(--ok-text); display:inline-flex; align-items:center; gap:0.25rem">
+          <svg class="lu" viewBox="0 0 24 24" style="width:12px;height:12px"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"></path><path d="m9 12 2 2 4-4"></path></svg>
+          Private &amp; encrypted
+        </span>
+      </header>
+      <div style="flex:1; display:flex; min-height:0">
+        <!-- rail -->
+        <nav style="width:12rem; border-right:1px solid var(--border); padding:0.75rem 0.6rem; display:flex; flex-direction:column; gap:0.25rem; overflow:hidden; background:var(--surface-2); flex-shrink:0">
+          <button onClick="{{ selectSkills }}" style="{{ railSkillsStyle }}">
+            <span style="width:28px; height:28px; border-radius:50%; flex-shrink:0; display:inline-flex; align-items:center; justify-content:center; background:var(--surface); color:var(--accent); border:1px solid var(--accent)"><svg class="lu" viewBox="0 0 24 24" style="width:15px;height:15px"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"></path></svg></span>
+            <span style="flex:1; font-size:0.83rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; text-align:left">Skills library</span>
+            <span style="font-size:0.7rem; color:var(--text-faint)">6</span>
+          </button>
+          <button style="display:flex; align-items:center; gap:0.55rem; background:none; border:none; border-radius:0.5rem; padding:0.45rem 0.55rem; cursor:pointer; color:var(--text); font-family:inherit" style-hover="background:var(--surface-hover)">
+            <span style="width:28px; height:28px; border-radius:50%; flex-shrink:0; display:inline-flex; align-items:center; justify-content:center; background:var(--surface); color:var(--accent); border:1px solid var(--accent)"><svg class="lu" viewBox="0 0 24 24" style="width:15px;height:15px"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" x2="15.42" y1="13.51" y2="17.49"></line><line x1="15.41" x2="8.59" y1="6.51" y2="10.49"></line></svg></span>
+            <span style="flex:1; font-size:0.83rem; text-align:left">Graph</span>
+          </button>
+          <div style="font-size:0.66rem; text-transform:uppercase; letter-spacing:0.06em; color:var(--text-faint); margin:0.6rem 0.4rem 0.15rem">People</div>
+          <div style="flex:1; min-height:0; overflow-y:auto; display:flex; flex-direction:column; gap:0.25rem">
+            <sc-for list="{{ people }}" as="p" hint-placeholder-count="3">
+              <button onClick="{{ p.select }}" style="{{ p.rowStyle }}">
+                <span style="width:28px; height:28px; border-radius:50%; flex-shrink:0; display:inline-flex; align-items:center; justify-content:center; background:var(--accent); color:var(--on-accent); font-size:0.7rem; font-weight:700">{{ p.initials }}</span>
+                <span style="flex:1; font-size:0.83rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; text-align:left">{{ p.name }}</span>
+                <span style="{{ p.roleStyle }}">{{ p.role }}</span>
+              </button>
+            </sc-for>
+          </div>
+          <button style="background:none; border:1px dashed var(--border-strong); color:var(--accent); font-weight:600; border-radius:0.5rem; padding:0.4rem; font-size:0.78rem; cursor:pointer; font-family:inherit; margin:0.3rem 0.4rem" style-hover="background:var(--surface); border-color:var(--accent)">+ Add person</button>
+        </nav>
+
+        <!-- content: selected person (Jan) -->
+        <sc-if value="{{ personView }}" hint-placeholder-val="{{ true }}">
+        <section style="flex:1; min-width:0; overflow-y:auto; overflow-x:hidden; padding:1.1rem 1.35rem 1.5rem">
+          <div style="display:flex; align-items:center; gap:0.8rem; margin-bottom:1.1rem">
+            <div style="position:relative; flex-shrink:0">
+              <span style="width:46px; height:46px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; background:var(--accent); color:var(--on-accent); font-size:1rem; font-weight:700">JA</span>
+              <button title="Change avatar" style="position:absolute; right:-2px; bottom:-2px; width:20px; height:20px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; background:var(--surface); color:var(--text-muted); border:1px solid var(--border-strong); cursor:pointer; padding:0"><svg class="lu" viewBox="0 0 24 24" style="width:12px;height:12px"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"></path><circle cx="12" cy="13" r="3"></circle></svg></button>
+            </div>
+            <div style="display:flex; align-items:center; gap:0.6rem">
+              <h2 style="margin:0; font-size:1.05rem">Jan</h2>
+              <span style="font-size:0.62rem; text-transform:uppercase; letter-spacing:0.04em; padding:0.1rem 0.4rem; border-radius:999px; border:1px solid currentColor; color:var(--ok-text)">owner</span>
+              <button title="Rename or change this person's role" style="background:none; border:none; color:var(--text-faint); cursor:pointer; padding:0.15rem; display:inline-flex; border-radius:0.25rem" style-hover="color:var(--text)"><svg class="lu" viewBox="0 0 24 24" style="width:12px;height:12px"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg></button>
+            </div>
+            <span style="flex:1"></span>
+            <button title="Teach this person's face" style="display:inline-flex; align-items:center; gap:0.3rem; font-size:0.75rem; background:var(--surface-2); border:1px solid var(--border-strong); border-radius:0.5rem; color:var(--text); padding:0.3rem 0.55rem; cursor:pointer; font-family:inherit">
+              <svg class="lu" viewBox="0 0 24 24" style="width:14px;height:14px"><path d="M3 7V5a2 2 0 0 1 2-2h2"></path><path d="M17 3h2a2 2 0 0 1 2 2v2"></path><path d="M21 17v2a2 2 0 0 1-2 2h-2"></path><path d="M7 21H5a2 2 0 0 1-2-2v-2"></path><path d="M8 14s1.5 2 4 2 4-2 4-2"></path><path d="M9 9h.01"></path><path d="M15 9h.01"></path></svg> Teach face
+            </button>
+            <button title="More actions" style="display:inline-flex; align-items:center; gap:0.3rem; font-size:0.75rem; background:var(--surface-2); border:1px solid var(--border-strong); border-radius:0.5rem; color:var(--text); padding:0.3rem 0.55rem; cursor:pointer">
+              <svg class="lu" viewBox="0 0 24 24" style="width:14px;height:14px"><circle cx="12" cy="12" r="1"></circle><circle cx="19" cy="12" r="1"></circle><circle cx="5" cy="12" r="1"></circle></svg>
+            </button>
+          </div>
+
+          <!-- person tabs (U112) -->
+          <nav role="tablist" style="display:flex; gap:0.25rem; margin:0.6rem 0 0.8rem; border-bottom:1px solid var(--border-strong)">
+            <sc-for list="{{ personTabs }}" as="t" hint-placeholder-count="4">
+              <button role="tab" onClick="{{ t.select }}" style="{{ t.style }}">{{ t.label }}</button>
+            </sc-for>
+          </nav>
+
+          <!-- Profile tab -->
+          <h3 style="font-size:0.8rem; font-weight:600; text-transform:uppercase; letter-spacing:0.05em; color:var(--text-faint); margin:0 0 0.5rem">About</h3>
+          <textarea rows="2" aria-label="About this person" style="width:100%; background:var(--surface-2); border:1px solid var(--border-strong); border-radius:0.5rem; color:var(--text); padding:0.4rem 0.55rem; font-size:0.78rem; resize:vertical; box-sizing:border-box; font-family:inherit" defaultValue="The owner. Direct communicator, prefers short answers. Rides his bike to work — see [[morning-briefing]]."></textarea>
+
+          <h3 style="font-size:0.8rem; font-weight:600; text-transform:uppercase; letter-spacing:0.05em; color:var(--text-faint); margin:1.4rem 0 0.5rem">Facts <span style="font-size:0.62rem; padding:0 0.35rem; border-radius:999px; background:var(--surface-2); border:1px solid var(--border); text-transform:none; letter-spacing:normal">7</span></h3>
+          <sc-for list="{{ factGroups }}" as="g" hint-placeholder-count="3">
+            <div style="margin-bottom:0.45rem">
+              <h4 style="margin:0 0 0.25rem; font-size:0.68rem; font-weight:600; text-transform:uppercase; letter-spacing:0.04em; color:var(--accent)">{{ g.key }} <span style="color:var(--text-faint); font-weight:400">×{{ g.count }}</span></h4>
+              <div style="display:flex; flex-wrap:wrap; gap:0.4rem; margin-bottom:0.6rem">
+                <sc-for list="{{ g.values }}" as="v" hint-placeholder-count="2">
+                  <span style="display:inline-flex; align-items:center; gap:0.35rem; font-size:0.75rem; padding:0.25rem 0.6rem; border-radius:999px; background:var(--surface-2); border:1px solid var(--border-strong)">
+                    {{ v }}
+                    <button aria-label="Delete fact" style="background:none; border:none; color:var(--text-faint); cursor:pointer; padding:0; display:inline-flex" style-hover="color:var(--danger)"><svg class="lu" viewBox="0 0 24 24" style="width:10px;height:10px"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button>
+                  </span>
+                </sc-for>
+              </div>
+            </div>
+          </sc-for>
+          <div style="display:flex; gap:0.45rem; margin-top:0.6rem">
+            <input placeholder="what (e.g. hobby)" aria-label="Fact key" style="background:var(--surface-2); border:1px solid var(--border-strong); border-radius:0.5rem; color:var(--text); padding:0.4rem 0.55rem; font-size:0.78rem; min-width:8rem; font-family:inherit" />
+            <input placeholder="answer (e.g. cycling)" aria-label="Fact value" style="flex:1; background:var(--surface-2); border:1px solid var(--border-strong); border-radius:0.5rem; color:var(--text); padding:0.4rem 0.55rem; font-size:0.78rem; min-width:8rem; font-family:inherit" />
+            <button style="background:var(--accent); color:var(--on-accent); border:none; border-radius:0.5rem; padding:0.4rem 0.8rem; font-size:0.78rem; cursor:pointer; font-family:inherit" style-hover="background:var(--accent-hover)">Add fact</button>
+          </div>
+        </section>
+        </sc-if>
+        <sc-if value="{{ skillsView }}" hint-placeholder-val="{{ false }}">
+        <section style="flex:1; min-width:0; overflow-y:auto; overflow-x:hidden; padding:1.1rem 1.35rem 1.5rem">
+          <div style="display:flex; flex-wrap:wrap; gap:0.4rem; align-items:center; padding:0.5rem 0.65rem; margin-bottom:0.6rem; font-size:0.76rem; border:1px solid var(--accent); border-radius:0.5rem; background:color-mix(in srgb, var(--accent) 8%, transparent)">
+            <span>🔧 <strong>1 skill ready to optimize</strong></span>
+            <button style="font-size:0.65rem; padding:0.08rem 0.4rem; border-radius:999px; border:1px solid var(--border); color:var(--text-faint); background:none; cursor:pointer; font-family:inherit">morning-briefing <em style="font-style:normal; color:var(--accent); font-weight:700">+4</em></button>
+          </div>
+          <h3 style="font-size:0.8rem; font-weight:600; text-transform:uppercase; letter-spacing:0.05em; color:var(--text-faint); margin:0 0 0.5rem">General skills</h3>
+          <p style="font-size:0.78rem; color:var(--text-faint); margin:0 0 0.7rem">Procedures that apply to everyone. Teach new ones with the 🎓 button, or add below.</p>
+          <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(min(15rem,100%),1fr)); gap:0.6rem">
+            <sc-for list="{{ skills }}" as="sk" hint-placeholder-count="4">
+              <article style="border:1px solid var(--border-strong); border-radius:0.5rem; background:var(--surface-2); padding:0.7rem 0.8rem; min-width:0; display:flex; flex-direction:column; gap:0.35rem">
+                <header style="display:flex; align-items:center; gap:0.4rem; min-width:0">
+                  <span style="font-family:ui-monospace,monospace; font-weight:600; font-size:0.8rem; flex:1; min-width:0; overflow-wrap:anywhere">{{ sk.name }}</span>
+                  <span style="font-size:0.64rem; color:var(--text-faint)">{{ sk.uses }}</span>
+                  <button title="Optimize" style="background:none; border:none; color:var(--text-faint); cursor:pointer; padding:0.1rem; display:inline-flex" style-hover="color:var(--text)"><svg class="lu" viewBox="0 0 24 24" style="width:12px;height:12px"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"></path></svg></button>
+                  <button title="Edit" style="background:none; border:none; color:var(--text-faint); cursor:pointer; padding:0.1rem; display:inline-flex" style-hover="color:var(--text)"><svg class="lu" viewBox="0 0 24 24" style="width:12px;height:12px"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg></button>
+                </header>
+                <p style="margin:0; font-size:0.75rem; color:var(--text-faint)">{{ sk.desc }}</p>
+                <div style="display:flex; flex-wrap:wrap; gap:0.25rem">
+                  <sc-for list="{{ sk.triggers }}" as="t" hint-placeholder-count="2">
+                    <span style="font-size:0.65rem; padding:0.08rem 0.4rem; border-radius:999px; border:1px solid var(--border); color:var(--text-faint)">“{{ t }}” ×</span>
+                  </sc-for>
+                  <button style="font-size:0.65rem; padding:0.08rem 0.4rem; border-radius:999px; border:1px dashed var(--border); color:var(--text-faint); background:none; cursor:pointer; font-family:inherit">+ trigger</button>
+                </div>
+              </article>
+            </sc-for>
+          </div>
+          <div style="margin-top:1.2rem; padding-top:0.9rem; border-top:1px solid var(--border)">
+            <button style="background:none; border:1px solid var(--border-strong); color:var(--text); border-radius:0.5rem; padding:0.4rem 0.8rem; font-size:0.78rem; cursor:pointer; font-family:inherit">+ New skill</button>
+          </div>
+        </section>
+        </sc-if>
+      </div>
+    </aside>
+    </sc-if>
+  </main>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{
+  &quot;theme&quot;: { &quot;editor&quot;: &quot;enum&quot;, &quot;options&quot;: [&quot;light&quot;, &quot;dark&quot;], &quot;default&quot;: &quot;light&quot;, &quot;tsType&quot;: &quot;'light' | 'dark'&quot;, &quot;section&quot;: &quot;Appearance&quot; }
+}">
+class Component extends DCLogic {
+  state = { theme: null, actionsOpen: false, motionOpen: false, showLeft: true, showRight: true, showBottom: false, selected: 'jan' }
+  componentDidMount() { this.applyTheme() }
+  componentDidUpdate() { this.applyTheme() }
+  applyTheme() {
+    const t = this.props.theme ?? 'light'
+    document.documentElement.dataset.theme = t
+  }
+  renderVals() {
+    const s = this.state
+    const set = (k, v) => () => this.setState({ [k]: v })
+    const railItem = (active) =>
+      `display:flex; align-items:center; gap:0.55rem; background:${active ? 'var(--surface)' : 'none'}; border:none; border-radius:0.5rem; padding:0.45rem 0.55rem; cursor:pointer; color:var(--text); font-family:inherit; width:100%;${active ? ' box-shadow: inset 0 0 0 1px var(--border-strong);' : ''}`
+    const roleColor = { owner: 'var(--ok-text)', family: 'var(--accent)', minor: 'var(--warn)', guest: 'var(--text-faint)', demo: 'var(--text-faint)' }
+    const roleStyle = (role) =>
+      `font-size:0.62rem; text-transform:uppercase; letter-spacing:0.04em; padding:0.1rem 0.4rem; border-radius:999px; border:1px ${role === 'demo' ? 'dashed' : 'solid'} currentColor; color:${roleColor[role]}`
+    const peopleData = [
+      { id: 'jan', name: 'Jan', initials: 'JA', role: 'owner' },
+      { id: 'sam', name: 'Sam', initials: 'SA', role: 'family' },
+      { id: 'noor', name: 'Noor', initials: 'NO', role: 'minor' },
+      { id: 'ada', name: 'Ada (sample)', initials: 'AD', role: 'demo' },
+    ]
+    const people = peopleData.map(p => ({
+      ...p,
+      rowStyle: railItem(s.selected === p.id),
+      roleStyle: roleStyle(p.role),
+      select: () => this.setState({ selected: p.id }),
+    }))
+    const tabStyle = (active) =>
+      `background:none; border:none; border-bottom:2px solid ${active ? 'var(--accent)' : 'transparent'}; padding:0.35rem 0.7rem; font-size:0.8rem; color:${active ? 'var(--accent)' : 'var(--text-faint)'}; cursor:pointer; font-family:inherit;${active ? ' font-weight:600;' : ''}`
+    const personTabs = ['Profile', 'Memory', 'Sources', 'Skills'].map((label, i) => ({
+      label, style: tabStyle(i === 0), select: () => {},
+    }))
+    const chev = (open) => `width:13px;height:13px;transition:transform 0.15s;${open ? 'transform:rotate(90deg);' : ''}`
+    const dot = (c) => `width:8px; height:8px; border-radius:50%; flex-shrink:0; background:var(--${c})`
+    return {
+      theme: this.props.theme ?? 'light',
+      showLeft: s.showLeft, showRight: s.showRight, showBottom: s.showBottom,
+      toggleLeft: () => this.setState({ showLeft: !s.showLeft }),
+      toggleRight: () => this.setState({ showRight: !s.showRight }),
+      toggleBottom: () => this.setState({ showBottom: !s.showBottom }),
+      actionsOpen: s.actionsOpen, motionOpen: s.motionOpen,
+      toggleActions: () => this.setState({ actionsOpen: !s.actionsOpen }),
+      toggleMotion: () => this.setState({ motionOpen: !s.motionOpen }),
+      actionsChevStyle: chev(s.actionsOpen), motionChevStyle: chev(s.motionOpen),
+      actionBtns: ['Wake up', 'Sleep', 'Wave', 'Nod', 'Gesture', 'Bow', 'Look around', 'Shake'],
+      danceBtns: ['Dance', 'Bop', 'Sway', 'Spin'],
+      performBtns: ['Say hi', 'Introduce', 'Joke', 'Compliment'],
+      motions: [
+        { name: 'nod', time: '09:12:06', dotStyle: dot('ok') },
+        { name: 'gesture', time: '09:12:44', dotStyle: dot('warn') },
+        { name: 'wave', time: '09:08:31', dotStyle: dot('ok') },
+      ],
+      events: [
+        { type: 'ResponseDrafted', session: 'a3f19c02', time: '09:12:44' },
+        { type: 'MotionStarted', session: 'a3f19c02', time: '09:12:44' },
+        { type: 'ApprovalRequested', session: 'a3f19c02', time: '09:12:43' },
+        { type: 'TranscriptUpdated', session: 'a3f19c02', time: '09:12:41' },
+        { type: 'PersonRecognized', session: '', time: '09:11:58' },
+        { type: 'RobotStateChanged', session: '', time: '09:08:12' },
+      ],
+      people,
+      personView: s.selected !== '_skills',
+      skillsView: s.selected === '_skills',
+      selectSkills: () => this.setState({ selected: '_skills' }),
+      railSkillsStyle: railItem(s.selected === '_skills'),
+      personTabs,
+      factGroups: [
+        { key: 'hobby', count: 2, values: ['cycling', 'skate punk drumming'] },
+        { key: 'coffee', count: 1, values: ['oat milk latte, no sugar'] },
+        { key: 'work', count: 3, values: ['tech lead at Sopra', 'prefers morning focus blocks', 'standup at 9:30'] },
+        { key: 'music', count: 1, values: ['NOFX, Millencolin, Pennywise'] },
+      ],
+      skills: [
+        { name: 'morning-briefing', desc: 'Weather, calendar, top mail and todos in one spoken update.', uses: '23×', triggers: ['briefing', 'morning'] },
+        { name: 'play-music', desc: 'Queue a playlist on Spotify, target a Sonos speaker by room name.', uses: '17×', triggers: ['play', 'music'] },
+        { name: 'meeting-prep', desc: 'Pull the agenda, attendees and last thread before a meeting.', uses: '9×', triggers: ['prep', 'meeting'] },
+        { name: 'deploy-checklist', desc: 'Run tests, check CI, then ask before tagging a release.', uses: '4×', triggers: ['deploy', 'release'] },
+      ],
+    }
+  }
+}
+</script>
+</body>
+</html>

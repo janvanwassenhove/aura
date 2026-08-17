@@ -372,6 +372,42 @@ export const useKnowledgeStore = defineStore('knowledge', () => {
     detail.value = null
   }
 
+  // ── D2: who is talking (the identity chip + "who is typing?" bar) ────────
+  //
+  // `speaker` is the person the conversation is attributed to: recognised by
+  // the camera, or chosen by hand. null means "ask" — misattributed memory is
+  // worse than no memory, so nothing defaults to the owner. 'guest' is a real
+  // choice: answer generically, save nothing.
+  const speaker = ref<string | null>(null)
+  const speakerSource = ref<'face' | 'manual' | null>(null)
+  // Auto-drop to Guest after this long with no face (ms). The person card
+  // stays the escape hatch either way.
+  const GUEST_AFTER_MS = 10 * 60 * 1000
+  let guestTimer: ReturnType<typeof setTimeout> | null = null
+
+  function setSpeaker(personId: string | null, source: 'face' | 'manual' = 'manual'): void {
+    speaker.value = personId
+    speakerSource.value = personId === null ? null : source
+    if (guestTimer) { clearTimeout(guestTimer); guestTimer = null }
+  }
+
+  /** Called when the camera loses every face: after the grace period the
+   *  session stops speaking as anyone. A face re-appearing cancels it. */
+  function noteNoFace(): void {
+    if (guestTimer || speaker.value === null || speaker.value === 'guest') return
+    guestTimer = setTimeout(() => {
+      guestTimer = null
+      if (speakerSource.value === 'face') setSpeaker('guest', 'manual')
+    }, GUEST_AFTER_MS)
+  }
+  function noteFaceSeen(): void {
+    if (guestTimer) { clearTimeout(guestTimer); guestTimer = null }
+  }
+
+  // D2 People view selection (replaces the old dock-tab navigation).
+  const selectedPerson = ref<string | null>(null)
+  const personTab = ref<'Profile' | 'Memory' | 'Sources' | 'Skills'>('Profile')
+
   function $reset() {
     people.value = []
     detail.value = null
@@ -380,11 +416,18 @@ export const useKnowledgeStore = defineStore('knowledge', () => {
     locked.value = false
     loading.value = false
     error.value = null
+    speaker.value = null
+    speakerSource.value = null
+    selectedPerson.value = null
+    personTab.value = 'Profile'
+    if (guestTimer) { clearTimeout(guestTimer); guestTimer = null }
   }
 
   return {
     people, detail, tier, omkLoaded, locked, brainError, loading, error, recognitionEnabled,
     sightings,
+    speaker, speakerSource, selectedPerson, personTab,
+    setSpeaker, noteNoFace, noteFaceSeen,
     fetchTier, fetchPeople, inspectPerson, upsertPerson, saveDescription,
     addFact, updateFact, deleteFact, ingestSources, importChats, exportBrain, fetchSnapshots, flagSnapshotWrong, renamePerson, mergePerson, forgetPerson, setConsent, lock,
     fetchRecognition, secure, teachFace,

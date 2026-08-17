@@ -4,8 +4,14 @@
     {
       "name": "operator-console",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev", "--prefix", "apps/operator-console"],
-      "port": 5173
+      "runtimeArgs": [
+        "run",
+        "dev",
+        "--prefix",
+        "apps/operator-console"
+      ],
+      "port": 5173,
+      "autoPort": true
     }
   ]
 }

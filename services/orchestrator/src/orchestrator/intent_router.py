@@ -44,7 +44,12 @@ class IntentRouter:
         self._handlers.setdefault(tool_name, []).append(handler)
 
     def allowed_tools(self) -> frozenset[str]:
-        return MODE_TOOL_MAP.get(self._mode, frozenset())
+        # D2: the owner's per-mode overrides (Modes view) apply on top of the
+        # baseline MODE_TOOL_MAP — a blocked group disappears, an allowed one
+        # appears, immediately.
+        from orchestrator import mode_policy
+
+        return mode_policy.allowed_tools(self._mode)
 
     def is_allowed(self, tool_name: str) -> bool:
         return tool_name in self.allowed_tools()

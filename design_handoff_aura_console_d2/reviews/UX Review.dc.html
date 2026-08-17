@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&amp;family=IBM+Plex+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+html, body { margin:0; padding:0; }
+body { font-family:'IBM Plex Sans', system-ui, sans-serif; background:#f4f3ef; color:#1a2420; }
+a { color:#15803d; } a:hover { color:#166534; }
+</style>
+</helmet>
+<div data-screen-label="AURA UI/UX Review" style="max-width:880px; margin:0 auto; padding:56px 32px 96px; line-height:1.55">
+
+  <header style="margin-bottom:40px">
+    <p style="margin:0 0 8px; font-family:'IBM Plex Mono', monospace; font-size:12px; letter-spacing:0.12em; text-transform:uppercase; color:#5c6b63">aura · operator console · aug 2026</p>
+    <h1 style="margin:0 0 12px; font-size:34px; line-height:1.15; letter-spacing:-0.02em">UI/UX review &amp; assessment</h1>
+    <p style="margin:0; font-size:16px; color:#43524a; max-width:60ch">Grounded in the full console source (<span style="font-family:'IBM Plex Mono',monospace; font-size:13.5px">App.vue, tokens.css</span>, all 19 components + stores). The faithful recreation is in <a href="AURA Console (Current).dc.html">AURA Console (Current)</a>; the proposal in <a href="AURA Console (Redesigned).dc.html">AURA Console (Redesigned)</a>.</p>
+  </header>
+
+  <!-- verdict -->
+  <section style="background:#1a2420; color:#e8ede9; border-radius:12px; padding:24px 28px; margin-bottom:44px">
+    <h2 style="margin:0 0 10px; font-size:13px; font-family:'IBM Plex Mono',monospace; letter-spacing:0.1em; text-transform:uppercase; color:#7fb99a">Verdict</h2>
+    <p style="margin:0; font-size:16.5px">The console is an unusually well-<em>engineered</em> UI — token discipline, honest failure states, real accessibility work — that has grown by accretion into three competing products: a robot remote control, a chat client, and a knowledge manager. The seams show as icon soup, scattered configuration, five status vocabularies, and a mode system that runs the whole backend but is invisible in the UI. Nothing needs to be thrown away; it needs one information architecture and one visual voice.</p>
+  </section>
+
+  <!-- strengths -->
+  <section style="margin-bottom:44px">
+    <h2 style="margin:0 0 16px; font-size:22px; letter-spacing:-0.01em">What is genuinely good <span style="font-size:13px; color:#5c6b63; font-weight:400">(keep all of this)</span></h2>
+    <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:12px">
+      <div style="background:#fff; border:1px solid #d9ded8; border-radius:10px; padding:16px 18px">
+        <h3 style="margin:0 0 6px; font-size:14.5px">Failure states that fix themselves</h3>
+        <p style="margin:0; font-size:13.5px; color:#43524a">Robot offline shows the <em>cause</em> (mDNS vs refused vs timeout), an address field, and a network scan — right where the error is (U198–U200). Best-in-class.</p>
+      </div>
+      <div style="background:#fff; border:1px solid #d9ded8; border-radius:10px; padding:16px 18px">
+        <h3 style="margin:0 0 6px; font-size:14.5px">Safety is designed, not bolted on</h3>
+        <p style="margin:0; font-size:13.5px; color:#43524a">Labelled panic stop with spelled-out consequences (U192), approval gate with remember-choice, styled destructive confirms (U223), vault state that never lies (U180).</p>
+      </div>
+      <div style="background:#fff; border:1px solid #d9ded8; border-radius:10px; padding:16px 18px">
+        <h3 style="margin:0 0 6px; font-size:14.5px">Token + a11y discipline</h3>
+        <p style="margin:0; font-size:13.5px; color:#43524a">One tokens.css, no raw hex in components, AA contrast fixes (U215/U223), <span style="font-family:'IBM Plex Mono',monospace; font-size:12.5px">:focus-visible</span>, reduced-motion support. Rare in a side project.</p>
+      </div>
+      <div style="background:#fff; border:1px solid #d9ded8; border-radius:10px; padding:16px 18px">
+        <h3 style="margin:0 0 6px; font-size:14.5px">Micro-UX judgment</h3>
+        <p style="margin:0; font-size:13.5px; color:#43524a">Shared tracking state so two switches can't disagree (U162), face-visible dot (U165), self-pacing camera loop, container-query input row. The details are loved.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- findings -->
+  <section style="margin-bottom:44px">
+    <h2 style="margin:0 0 6px; font-size:22px; letter-spacing:-0.01em">Findings</h2>
+    <p style="margin:0 0 18px; font-size:14px; color:#5c6b63">Ordered by impact. Severity: <span style="display:inline-block; padding:1px 8px; border-radius:999px; background:#fbe3e0; color:#8c2f24; font-size:12px; font-weight:600">high</span> <span style="display:inline-block; padding:1px 8px; border-radius:999px; background:#faf0d8; color:#7a5410; font-size:12px; font-weight:600">medium</span> <span style="display:inline-block; padding:1px 8px; border-radius:999px; background:#e5ece7; color:#43524a; font-size:12px; font-weight:600">low</span></p>
+
+    <sc-for list="{{ findings }}" as="f" hint-placeholder-count="7">
+      <article style="background:#fff; border:1px solid #d9ded8; border-radius:12px; padding:20px 24px; margin-bottom:14px">
+        <header style="display:flex; align-items:baseline; gap:10px; margin-bottom:8px; flex-wrap:wrap">
+          <span style="font-family:'IBM Plex Mono',monospace; font-size:12px; color:#5c6b63">{{ f.id }}</span>
+          <h3 style="margin:0; font-size:17px; flex:1; min-width:200px">{{ f.title }}</h3>
+          <span style="{{ f.sevStyle }}">{{ f.sev }}</span>
+        </header>
+        <p style="margin:0 0 10px; font-size:14.5px; color:#2a3630">{{ f.body }}</p>
+        <p style="margin:0 0 10px; font-size:13px; color:#5c6b63"><strong style="color:#43524a">Evidence:</strong> {{ f.evidence }}</p>
+        <p style="margin:0; font-size:13.5px; padding:10px 14px; background:#eef4ef; border-radius:8px; color:#1f4531"><strong>→ Recommendation:</strong> {{ f.rec }}</p>
+      </article>
+    </sc-for>
+  </section>
+
+  <!-- directions -->
+  <section style="margin-bottom:44px">
+    <h2 style="margin:0 0 6px; font-size:22px; letter-spacing:-0.01em">Three redesign directions</h2>
+    <p style="margin:0 0 18px; font-size:14px; color:#5c6b63">All three keep every current function. They differ in what the product claims to be.</p>
+    <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:14px">
+      <div style="background:#fff; border:2px solid #15803d; border-radius:12px; padding:20px 22px; position:relative">
+        <span style="position:absolute; top:-11px; left:18px; background:#15803d; color:#fff; font-size:11px; font-weight:700; letter-spacing:0.06em; text-transform:uppercase; padding:2px 10px; border-radius:999px">built as the mock</span>
+        <h3 style="margin:6px 0 8px; font-size:17px">A — Mission Control</h3>
+        <p style="margin:0 0 10px; font-size:13.5px; color:#43524a">Mode-first. A Home / Work / Present switcher is the top-level control; it visibly sets the robot's boundaries (which tool groups are live). One status cluster, one activity rail, no modals — settings become a view.</p>
+        <p style="margin:0; font-size:12.5px; color:#5c6b63"><strong>Best when:</strong> the mode boundary story (your stated goal) is the product.</p>
+      </div>
+      <div style="background:#fff; border:1px solid #d9ded8; border-radius:12px; padding:20px 22px">
+        <h3 style="margin:6px 0 8px; font-size:17px">B — Companion</h3>
+        <p style="margin:0 0 10px; font-size:13.5px; color:#43524a">Chat-first. Richie's face, state and camera live in a persistent presence strip; brain and controls are slide-over drawers. Warmer, softer identity — feels like a creature, not a dashboard.</p>
+        <p style="margin:0; font-size:12.5px; color:#5c6b63"><strong>Best when:</strong> family members are the main users.</p>
+      </div>
+      <div style="background:#fff; border:1px solid #d9ded8; border-radius:12px; padding:20px 22px">
+        <h3 style="margin:6px 0 8px; font-size:17px">C — Workbench</h3>
+        <p style="margin:0 0 10px; font-size:13.5px; color:#43524a">Leans into VS Code: an icon activity bar with full views (Talk, Brain, Robot, Events, Config), command palette, dockable everything. The brain finally gets the room U228 fought for.</p>
+        <p style="margin:0; font-size:12.5px; color:#5c6b63"><strong>Best when:</strong> you (the operator/developer) are the only user.</p>
+      </div>
+    </div>
+  </section>
+
+  <section style="background:#fff; border:1px solid #d9ded8; border-radius:12px; padding:22px 26px">
+    <h2 style="margin:0 0 10px; font-size:18px">What the redesigned mock changes, concretely</h2>
+    <ul style="margin:0; padding-left:20px; font-size:14.5px; color:#2a3630; display:flex; flex-direction:column; gap:7px">
+      <li><strong>Mode switcher</strong> in the header — Home / Work / Present — with a capability strip showing exactly which tool groups the current mode permits (mail, calendar, dev, music, screen) and which are locked.</li>
+      <li><strong>One status cluster</strong>: Brain · Robot · Vault as three consistent chips with one vocabulary; everything else (latency, realtime spend) moves into a hover/expanded detail.</li>
+      <li><strong>Activity rail</strong> replaces title-bar icon soup + modals: Talk, Brain, Robot, Present, Events, Settings are peer views. Stop stays permanently visible.</li>
+      <li><strong>Robot presence card</strong>: camera, state, follow/mic/awake and persona in one compact card; the 16-button gesture farm becomes a "Gestures" popover.</li>
+      <li><strong>Settings consolidation</strong>: LLM, connections, appearance, capabilities and per-mode voice in one place, sectioned — no more env-var-only settings.</li>
+      <li><strong>Visual voice</strong>: IBM Plex Sans/Mono, a calmer pine-green on warm paper (dark: deep evergreen), 2 radii, 5 type sizes, no emoji-as-icons.</li>
+    </ul>
+  </section>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  renderVals() {
+    const sev = {
+      high: 'display:inline-block; padding:1px 10px; border-radius:999px; background:#fbe3e0; color:#8c2f24; font-size:12px; font-weight:600',
+      medium: 'display:inline-block; padding:1px 10px; border-radius:999px; background:#faf0d8; color:#7a5410; font-size:12px; font-weight:600',
+      low: 'display:inline-block; padding:1px 10px; border-radius:999px; background:#e5ece7; color:#43524a; font-size:12px; font-weight:600',
+    }
+    const F = (id, title, s, body, evidence, rec) => ({ id, title, sev: s, sevStyle: sev[s], body, evidence, rec })
+    return { findings: [
+      F('01', 'Modes run the system but are invisible in the UI', 'high',
+        'Home / work / presentation modes define what the robot may do (MODE_TOOL_MAP in shared-policies, per-mode personas, even per-mode TTS voices) — exactly the boundary system you care about. Yet the console never lets you see or set the mode: it surfaces only as a 9px tinted dot in Robot State and the word after "Robot:" in the title bar. Per-mode voices are configurable only by editing env vars.',
+        'robotStore.statusBadgeClass maps mode→dot color; no component calls POST /robot/mode; SettingsPanel hint: "Per mode: set TTS_VOICE_WORK / TTS_VOICE_HOME / … in the env."',
+        'Promote mode to a first-class header switcher with a visible capability boundary ("Work: mail, calendar, dev · music locked"). Switching modes is the single most consequential user action the UI currently hides.'),
+      F('02', 'Three competing navigation systems', 'high',
+        'Surfaces are reached three different ways: resizable docks (robot, chat, brain, events), five full-screen modals (Settings, Capabilities, About, Presenter, Wizard), and collapsible sections buried inside panels (Actions, Motion log, App logs). Eight unlabelled 15px icons in the title bar are the only map. Skills already had to migrate from Settings to Brain (U117) — a symptom of the IA not having a home for things.',
+        'TitleBar.vue: 8 icon buttons + 3 window controls; App.vue mounts 5 overlay components; RobotPanel contains 3 collapsible subsections.',
+        'One navigation model: a labelled activity rail where Talk, Brain, Robot, Present, Events and Settings are peer views. Modals only for interrupts (approval, confirm).'),
+      F('03', 'Five status vocabularies for one question: "is it working?"', 'high',
+        'App uses a colored dot + text; Robot uses a cpu icon + mode word; the vault uses a shield/lock badge in the brain header; connections use pill badges in a modal; LLM keys use check/circle icons; degraded states appear as banners (UpdateBanner, brain-restart, robot-offline). The U151 comment admits users read "Connected · offline" as contradictory — the fix relabelled it instead of unifying it.',
+        'TitleBar status spans; BrainPanel .brain-tier; SettingsPanel ConnStatusBadge + .settings-badges; three different banner components.',
+        'One status cluster (Brain · Robot · Vault) with a single chip grammar, expanding to a detail popover that owns latency, spend, connector health and diagnosis.'),
+      F('04', 'The Robot State panel is a junk drawer', 'medium',
+        'One 300px card stacks: status strip, realtime cost, 4 toggle tiles, panic button, briefing time, volume, persona picker + a full inline persona editor (7 fields), 16 gesture buttons in 3 collapsed groups, motion log, and app logs. Persona (an identity concern) and app logs (a debug concern) don\u2019t belong in a robot status card.',
+        'RobotPanel.vue is 37.8KB / ~900 lines — the second largest component after BrainPanel (79.6KB).',
+        'Split by intent: presence card (state, camera, follow/mic/awake, volume) · gestures popover · persona editor moves next to modes · logs live with Events.'),
+      F('05', 'Configuration is scattered across four places', 'medium',
+        'LLM + connections + appearance sit in a Settings modal; capabilities/permissions in a second modal; persona editing in Robot State; robot address inside an error card; voice engine exists twice (global in Settings, per-persona in Robot State) with different option labels; briefing time is in Robot State but proactive speech is conceptually a mode/notification setting.',
+        'SettingsPanel.vue (45KB, 3 tabs), CapabilitiesPanel.vue, RobotPanel persona editor, VideoPanel enrollment, wizard.',
+        'One Settings view, sectioned (Intelligence, Connections, Robot, Voice per mode, Privacy & permissions, Appearance) — capabilities are permissions, they belong in settings, one click from the mode strip.'),
+      F('06', 'No visual voice — competent but anonymous', 'medium',
+        'Inter + Tailwind-palette colors + 4 selectable accents = looks like every internal tool. 15+ distinct font sizes (0.6–1.05rem), 5 border radii, chat turns as left-border cards, emoji (🎓🔧✨🎙️) mixed into a lucide icon system, and a green accent that reads "default admin theme" rather than "AURA". The delightful Richie avatar (RichieAvatar.vue) is the only brand element — and it only appears at 20px in chat turns.',
+        'tokens.css: 4 accent blocks; App.vue global styles; ConversationPanel .turn-user/.turn-assistant; grep: 6 emoji used as icons.',
+        'Commit to one identity: a robot-console voice (Plex Sans/Mono works well), one accent with semantic status colors, 2 radii, a 5-step type scale, Richie as a real presence. Kill the accent picker or make it per-persona.'),
+      F('07', 'The layout argues with itself about what the app is', 'low',
+        'The brain dock defaults to 780px wide and forcibly widens to 780 when opened, taking space from chat — justified in a code comment: "The brain is the app; the chat is one way into it." Meanwhile chat is the only always-visible center view and onboarding points users at chat first. On a 1440px laptop, brain (780) + robot (300) leave chat ~320px — the input row\u2019s own container query treats that as an edge case.',
+        'layoutStore.ts U227/U228 comments; openRight() forces rightWidth=780; CENTER_MIN=320 in App.vue.',
+        'Make them peers instead of rivals: Brain becomes a full view on the activity rail (all the width it wants, when you\u2019re in it), while a slim context strip keeps person-recognition visible from Talk.'),
+      F('08', 'Small paper cuts', 'low',
+        'Trigger words are added via a native prompt() (BrainPanel addTrigger) next to an otherwise styled UI. The graph, skills and people share one rail but Graph has no count/preview. The event log filter is substring-only. "This is me" enrollment sits under the camera but writes to the brain\u2019s people list — the connection is invisible. Volume has no mute toggle despite VolumeX icons existing.',
+        'BrainPanel.vue prompt(); EventLogPanel.vue filter; VideoPanel enroll-row.',
+        'Sweep pass: styled trigger input, clickable mute, enrollment that visibly lands in People (toast + rail highlight).'),
+    ] }
+  }
+}
+</script>
+</body>
+</html>

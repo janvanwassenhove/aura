@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+html, body { margin:0; padding:0; }
+body { font-family:'IBM Plex Sans', system-ui, sans-serif; background:#f4f3ef; color:#1a2420; }
+a { color:#15803d; } a:hover { color:#166534; }
+.mono { font-family:'IBM Plex Mono', ui-monospace, monospace; }
+</style>
+</helmet>
+<div data-screen-label="D Unified — critique" style="max-width:900px; margin:0 auto; padding:56px 32px 96px; line-height:1.55">
+
+  <header style="margin-bottom:38px">
+    <p class="mono" style="margin:0 0 8px; font-size:12px; letter-spacing:0.12em; text-transform:uppercase; color:#5c6b63">critique · direction D · companion ⇄ workbench</p>
+    <h1 style="margin:0 0 12px; font-size:34px; line-height:1.15; letter-spacing:-0.02em">Does the unified console actually work?</h1>
+    <p style="margin:0; font-size:16px; color:#43524a; max-width:62ch">An honest pass over <a href="AURA Console (D — Unified).dc.html">D — Unified</a>: what earns its place, what is decoration, and where it quietly reintroduces the problems the <a href="UX Review.dc.html">original review</a> was written to solve.</p>
+  </header>
+
+  <section style="background:#1a2420; color:#e8ede9; border-radius:12px; padding:24px 28px; margin-bottom:40px">
+    <h2 class="mono" style="margin:0 0 10px; font-size:13px; letter-spacing:0.1em; text-transform:uppercase; color:#7fb99a">Verdict</h2>
+    <p style="margin:0 0 12px; font-size:16.5px">The boundary system is now genuinely good — modes are visible, legible and consequential, identity is handled honestly, and Stop never leaves the screen. That part I would ship.</p>
+    <p style="margin:0; font-size:16.5px">The surface switch is the problem. Two complete UIs over one backend means ~60% of the product is built twice, the user carries a mental model they didn't ask for, and the header now offers two identical-looking pill switches where one changes what a robot may do in your house and the other only changes how dense the pixels are. D solves the IA problem inside each surface and creates a new one between them.</p>
+  </section>
+
+  <!-- scorecard -->
+  <section style="margin-bottom:40px">
+    <h2 style="margin:0 0 14px; font-size:22px; letter-spacing:-0.01em">Scorecard</h2>
+    <div style="background:#fff; border:1px solid #d9ded8; border-radius:12px; padding:8px 22px 14px">
+      <sc-for list="{{ scores }}" as="s" hint-placeholder-count="8">
+        <div style="display:flex; align-items:center; gap:14px; padding:11px 0; border-bottom:1px solid #eceae4">
+          <span style="width:180px; flex-shrink:0; font-size:14.5px; font-weight:600">{{ s.label }}</span>
+          <span style="width:120px; flex-shrink:0; height:7px; border-radius:999px; background:#e8e6de; position:relative; overflow:hidden">
+            <span style="{{ s.barStyle }}"></span>
+          </span>
+          <span class="mono" style="{{ s.scoreStyle }}">{{ s.score }}</span>
+          <span style="flex:1; min-width:0; font-size:13.5px; color:#43524a">{{ s.note }}</span>
+        </div>
+      </sc-for>
+    </div>
+  </section>
+
+  <!-- sense -->
+  <section style="margin-bottom:40px">
+    <h2 style="margin:0 0 6px; font-size:22px; letter-spacing:-0.01em">Sense — what earns its place</h2>
+    <p style="margin:0 0 16px; font-size:14px; color:#5c6b63">Keep these even if the structure changes.</p>
+    <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:12px">
+      <sc-for list="{{ sense }}" as="s" hint-placeholder-count="6">
+        <div style="background:#fff; border:1px solid #d9ded8; border-radius:10px; padding:16px 18px">
+          <h3 style="margin:0 0 6px; font-size:14.5px">{{ s.title }}</h3>
+          <p style="margin:0; font-size:13.5px; color:#43524a">{{ s.body }}</p>
+        </div>
+      </sc-for>
+    </div>
+  </section>
+
+  <!-- nonsense -->
+  <section style="margin-bottom:40px">
+    <h2 style="margin:0 0 6px; font-size:22px; letter-spacing:-0.01em">Nonsense — what to cut or rethink</h2>
+    <p style="margin:0 0 16px; font-size:14px; color:#5c6b63">Ordered by how much damage it does. Severity: <span style="display:inline-block; padding:1px 8px; border-radius:999px; background:#fbe3e0; color:#8c2f24; font-size:12px; font-weight:600">high</span> <span style="display:inline-block; padding:1px 8px; border-radius:999px; background:#faf0d8; color:#7a5410; font-size:12px; font-weight:600">medium</span> <span style="display:inline-block; padding:1px 8px; border-radius:999px; background:#e5ece7; color:#43524a; font-size:12px; font-weight:600">low</span></p>
+    <sc-for list="{{ nonsense }}" as="n" hint-placeholder-count="9">
+      <article style="background:#fff; border:1px solid #d9ded8; border-radius:12px; padding:20px 24px; margin-bottom:13px">
+        <header style="display:flex; align-items:baseline; gap:10px; margin-bottom:8px; flex-wrap:wrap">
+          <span class="mono" style="font-size:12px; color:#5c6b63">{{ n.id }}</span>
+          <h3 style="margin:0; font-size:17px; flex:1; min-width:200px">{{ n.title }}</h3>
+          <span style="{{ n.sevStyle }}">{{ n.sev }}</span>
+        </header>
+        <p style="margin:0 0 10px; font-size:14.5px; color:#2a3630">{{ n.body }}</p>
+        <p style="margin:0; font-size:13.5px; padding:10px 14px; background:#eef4ef; border-radius:8px; color:#1f4531"><strong>→ Fix:</strong> {{ n.fix }}</p>
+      </article>
+    </sc-for>
+  </section>
+
+  <!-- walkthroughs -->
+  <section style="margin-bottom:40px">
+    <h2 style="margin:0 0 6px; font-size:22px; letter-spacing:-0.01em">Three tasks, walked through</h2>
+    <p style="margin:0 0 16px; font-size:14px; color:#5c6b63">Where the design holds and where a real person stalls.</p>
+    <sc-for list="{{ tasks }}" as="t" hint-placeholder-count="3">
+      <article style="background:#fff; border:1px solid #d9ded8; border-radius:12px; padding:20px 24px; margin-bottom:13px">
+        <header style="display:flex; align-items:baseline; gap:10px; margin-bottom:10px; flex-wrap:wrap">
+          <h3 style="margin:0; font-size:16.5px; flex:1; min-width:220px">{{ t.title }}</h3>
+          <span style="{{ t.verdictStyle }}">{{ t.verdict }}</span>
+        </header>
+        <ol style="margin:0 0 10px; padding-left:20px; font-size:14px; color:#2a3630; display:flex; flex-direction:column; gap:5px">
+          <sc-for list="{{ t.steps }}" as="st" hint-placeholder-count="4">
+            <li>{{ st }}</li>
+          </sc-for>
+        </ol>
+        <p style="margin:0; font-size:13.5px; color:#5c6b63"><strong style="color:#43524a">Friction:</strong> {{ t.friction }}</p>
+      </article>
+    </sc-for>
+  </section>
+
+  <section style="background:#fff; border:2px solid #15803d; border-radius:12px; padding:24px 28px">
+    <h2 style="margin:0 0 10px; font-size:20px">What I'd do next: D2, one surface with a density dial</h2>
+    <p style="margin:0 0 14px; font-size:14.5px; color:#2a3630">Keep every screen D built, drop the idea that they are two apps.</p>
+    <ul style="margin:0 0 14px; padding-left:20px; font-size:14.5px; color:#2a3630; display:flex; flex-direction:column; gap:7px">
+      <li><strong>One layout, three densities</strong> — Calm / Standard / Full, on a single control that changes how much of the <em>same</em> screen is exposed: Calm hides the log, inspector and mono detail; Full shows everything Workbench does. Progressive disclosure, not a second app.</li>
+      <li><strong>Modes stay exactly as they are</strong> — the header switcher, the capability chips, the boundary line. It is the one thing D got unambiguously right.</li>
+      <li><strong>Density follows the person, not a toggle</strong> — Noor and Sam get Calm by default, the owner gets Full. Face recognition already knows who is standing there; use it.</li>
+      <li><strong>Every feature has exactly one home</strong> — camera, persona, approvals, people each live in one place that grows detail with density, instead of existing twice in two idioms.</li>
+      <li><strong>Visual differentiation by mode, not by surface</strong> — Present already recolours the chrome. Let modes own the visual shift; density only changes information volume.</li>
+    </ul>
+    <p style="margin:0; font-size:13.5px; color:#5c6b63">Cost of not doing this: every feature from here on needs two designs, two builds, and a decision about which surface it belongs to — which is exactly the ambiguity finding 02 of the original review was about.</p>
+  </section>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  renderVals() {
+    const sev = {
+      high: 'display:inline-block; padding:1px 10px; border-radius:999px; background:#fbe3e0; color:#8c2f24; font-size:12px; font-weight:600',
+      medium: 'display:inline-block; padding:1px 10px; border-radius:999px; background:#faf0d8; color:#7a5410; font-size:12px; font-weight:600',
+      low: 'display:inline-block; padding:1px 10px; border-radius:999px; background:#e5ece7; color:#43524a; font-size:12px; font-weight:600',
+    }
+    const N = (id, title, s, body, fix) => ({ id, title, sev: s, sevStyle: sev[s], body, fix })
+    const bar = (n) => {
+      const c = n >= 8 ? '#15803d' : n >= 6 ? '#9a6510' : '#b3362a'
+      return `position:absolute; left:0; top:0; bottom:0; width:${n * 10}%; border-radius:999px; background:${c}`
+    }
+    const scoreStyle = (n) => `width:34px; flex-shrink:0; font-size:13px; font-weight:600; color:${n >= 8 ? '#15803d' : n >= 6 ? '#9a6510' : '#b3362a'}`
+    const S = (label, score, note) => ({ label, score: score + '/10', barStyle: bar(score), scoreStyle: scoreStyle(score), note })
+    const V = (v) => `display:inline-block; padding:2px 11px; border-radius:999px; font-size:12px; font-weight:600; ${v === 'works' ? 'background:#e4efe7; color:#1f6f46' : v === 'stalls' ? 'background:#fbe3e0; color:#8c2f24' : 'background:#faf0d8; color:#7a5410'}`
+    return {
+      scores: [
+        S('Mode / boundaries', 9, 'Visible, legible, consequential. The strongest idea in the whole review.'),
+        S('Safety & trust', 9, 'Stop always present, approvals explain themselves, guest chat says it saves nothing.'),
+        S('Findability', 5, 'Within a surface: good. Across surfaces: you must know which one holds what.'),
+        S('Learnability', 5, 'Two idioms to learn instead of one; nothing teaches the surface concept.'),
+        S('Consistency', 6, 'Shared spine and palette hold; naming and component vocabulary drift between surfaces.'),
+        S('Efficiency (operator)', 8, 'Workbench is fast, dense and complete — the palette + rail + panel work.'),
+        S('Efficiency (family)', 7, 'Companion reads well, but the card column is starting to sprawl.'),
+        S('Visual identity', 7, 'Committed and coherent; Richie is finally present, but Companion reads cooler than intended.'),
+        S('Maintainability', 3, 'Roughly 60% of the product exists twice in two idioms. This is the real cost.'),
+      ],
+      sense: [
+        { title: 'Modes are finally real', body: 'The switcher, the boundary line and the capability chips make “what may this robot do right now” answerable at a glance — the single biggest gap in the current console.' },
+        { title: 'The approval explains itself', body: '“Home mode normally blocks mail, so he is asking” ties the gate back to the boundary that caused it. The reason changes per mode. That is rare and correct.' },
+        { title: 'Identity is handled honestly', body: 'Unknown face vs empty room are different questions and get different copy; Guest openly states nothing is saved rather than silently misattributing memory.' },
+        { title: 'Stop never moves', body: 'Same place, same colour, on both surfaces, in every mode. Panic controls should be boring and unmissable — this one is.' },
+        { title: 'Workbench is actually specified', body: 'Seven views with real content — facts with provenance, retrieval budget, skills with required connectors, remembered decisions. It is clear what each does.' },
+        { title: 'One status grammar', body: 'Brain · Robot · Vault, same three things, same order, everywhere. Five vocabularies collapsed into one.' },
+      ],
+      nonsense: [
+        N('D-01', 'Two surfaces is a product decision disguised as a preference', 'high',
+          'Companion and Workbench duplicate roughly 60% of the surface area — camera, persona, voice, people, approvals, gestures all exist twice in two different idioms. Every future feature now needs a design in both, or an arbitrary ruling about where it lives. The user also has to learn a concept nobody asked for: “which surface am I in, and does it matter?” (It doesn’t, for capability — but nothing says so.)',
+          'Collapse to one layout with a density dial (see D2 below). If you keep two surfaces, they must be genuinely non-overlapping — e.g. Companion is a wall-tablet/kiosk build and Workbench is the desktop app — not two views of the same window.'),
+        N('D-02', 'The two header switchers look identical and are wildly unequal', 'high',
+          'Mode (changes what a robot may physically do in your house) and Surface (changes pixel density) sit adjacent, in the same pill-group shape, at the same size. Affordance should track consequence. Right now the most dangerous control in the app is visually a sibling of the most harmless one.',
+          'Make mode unmistakably heavier: bigger, coloured, left-anchored, with the capability chips attached to it. Demote surface/density to an icon control near Settings, or remove it entirely per D-01.'),
+        N('D-03', 'Four modes now mix two different axes', 'high',
+          'Home, Work and Present are capability boundaries. Quiet is a speaking behaviour — its chips have to say “speaks first ✗”, which is not a tool group. It also overlaps Home-with-proactive-off. Modes that mean two different kinds of thing will drift further as you add “Guest mode”, “Night mode”, “Demo mode”.',
+          'Keep modes purely as capability scopes (Home / Work / Present). Make Quiet a separate persistent toggle — “speaks first: on/off” — that composes with any mode. State it as such in Config.'),
+        N('D-04', 'The status cluster lost its labels and is now three green dots', 'medium',
+          'Fixing the header overflow cost the labels. Three same-colour dots carry no information at a glance, fail for colour-blind users, and require hover to learn what they are — the exact “status is unreadable” complaint from the original review, in a new form.',
+          'Show labels when there is room and collapse to dots only below a breakpoint, or better: show a single health chip that names the problem when there is one (“Sonos token expired”) and stays quiet when all is well.'),
+        N('D-05', 'Companion’s card column is becoming the new junk drawer', 'medium',
+          'Camera, In-the-room, Today, Kitchen speaker, Gestures, Voice — six stacked cards that already scroll at 900px. This is finding 04 of the original review (“Robot State is a junk drawer”) reappearing on a nicer background. Card count only ever goes up.',
+          'Cap it at three cards and make the set contextual: what he is doing now, what is next, one control cluster. Everything else moves into chat as an actionable reply or into the Brain.'),
+        N('D-06', 'You can see the boundaries but not edit them where you are', 'medium',
+          'Capability chips render in Companion, but the only editor is Workbench › Config › modes. A family user can read the rules and never change them — defensible — but there is no link, no lock icon, no “ask the owner” path. Direction A had an explicit “Edit boundaries →” affordance; D lost it.',
+          'Make the chip row clickable: owner → jumps to the mode editor; non-owner → explains who can change it. Never render a rule with no route to its source.'),
+        N('D-07', 'Some mode × surface cells are nonsense', 'medium',
+          'Present mode on the Companion surface shows a breathing avatar, a music player and a Today card while you are on stage. Quiet mode on Workbench shows a hushed robot next to a 12-line event log. Eight combinations, of which maybe five are meaningful.',
+          'Let mode drive layout: entering Present should switch to the presenter view regardless of surface, and Quiet should suppress the presence animation everywhere. Modes are stronger than surfaces — treat them that way.'),
+        N('D-08', 'Once you pick a speaker there is no way to say “not me”', 'medium',
+          'The identity bar is good, but it is one-shot: after choosing Jan, nothing in Companion lets you switch person, and the person card offers only “Brain →”. Shared devices get misattributed memory — the failure the bar exists to prevent.',
+          'Make the person card the persistent identity control: click it to reassign or drop to Guest, with a visible “switch person” affordance. Auto-drop to Guest after N minutes of no face.'),
+        N('D-09', 'The keyboard story exists on one surface only', 'low',
+          '⌘K, ⌘1–6 and ⌘, are advertised in Workbench tooltips; Companion has none. Someone who lives in the palette loses it the moment they switch surface — and the palette is the one navigation idea that could span both.',
+          'Make the command palette global and surface-agnostic. It is also the honest answer to D-01: one palette, one set of actions, density only changes what is drawn.'),
+        N('D-10', 'Naming has already drifted', 'low',
+          '“Goal mode” in the header group label, “mode:” in the status bar, “house rules” in direction B, “boundaries” in the chip row, “modes.*.allow” in Config. Four names for one concept in one product, before a line of it is built.',
+          'Pick one word — Mode — and one sub-word — allows / asks / blocked. Use them in the UI, the config keys and the docs identically.'),
+      ],
+      tasks: [
+        { title: 'Family member: “stop the music, it is too loud”', verdict: 'works', verdictStyle: V('works'),
+          steps: ['Opens Companion — Richie is visible and states what he is doing.', 'Kitchen speaker card is right there with a pause button and a volume slider.', 'One click. No chat, no mode knowledge, no menu.'],
+          friction: 'None worth naming — this is the case Companion justifies itself with.' },
+        { title: 'Owner: “why did it not send that email?”', verdict: 'partly', verdictStyle: V('partly'),
+          steps: ['Reads the inline approval in chat — it names the rule that caused the ask. Good.', 'Wants to change that rule: the capability chips are visible but not clickable (D-06).', 'Must know to switch surface → Workbench → Config → modes → modes.work.ask. Four steps and a concept.'],
+          friction: 'The explanation is excellent and the route to act on it is hidden behind the surface switch.' },
+        { title: 'Guest picks up the laptop and types a question', verdict: 'stalls', verdictStyle: V('stalls'),
+          steps: ['No face in view → identity bar asks “Who is typing?”. Correct and clear.', 'Picks Guest; card says nothing is saved. Still correct.', 'Jan comes back and types — Richie is still answering as Guest, and there is no visible way to switch back (D-08).'],
+          friction: 'The hand-off in is designed; the hand-off out is not. Shared devices break exactly here.' },
+      ],
+    }
+  }
+}
+</script>
+</body>
+</html>

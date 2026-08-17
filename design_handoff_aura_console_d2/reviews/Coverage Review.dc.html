@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+html, body { margin:0; padding:0; }
+body { font-family:'IBM Plex Sans', system-ui, sans-serif; background:#f4f3ef; color:#1a2420; }
+a { color:#15803d; } a:hover { color:#166534; }
+.mono { font-family:'IBM Plex Mono', ui-monospace, monospace; }
+</style>
+</helmet>
+<div data-screen-label="Functionality coverage review" style="max-width:1000px; margin:0 auto; padding:52px 30px 90px; line-height:1.55">
+
+  <header style="margin-bottom:34px">
+    <p class="mono" style="margin:0 0 8px; font-size:12px; letter-spacing:0.12em; text-transform:uppercase; color:#5c6b63">coverage audit · d2 vs. the shipping console</p>
+    <h1 style="margin:0 0 12px; font-size:33px; line-height:1.15; letter-spacing:-0.02em">Does the redesign cover everything Richie does?</h1>
+    <p style="margin:0; font-size:15.5px; color:#43524a; max-width:64ch">Every capability found in the source — components, Pinia stores and the brain endpoints they call — checked against <a href="AURA Console (D2 — One Surface).dc.html">D2</a> and the <a href="AURA Setup Wizard.dc.html">setup wizard</a>. Your constraint was that all working functionality is maintained, so anything missing is a defect, not a trade-off.</p>
+  </header>
+
+  <section style="display:flex; gap:12px; flex-wrap:wrap; margin-bottom:34px">
+    <sc-for list="{{ tally }}" as="t" hint-placeholder-count="4">
+      <div style="{{ t.style }}">
+        <div style="font-size:30px; font-weight:700; letter-spacing:-0.02em">{{ t.n }}</div>
+        <div style="font-size:13px; font-weight:600; margin-top:2px">{{ t.label }}</div>
+        <div style="font-size:12px; opacity:0.75; margin-top:3px">{{ t.note }}</div>
+      </div>
+    </sc-for>
+  </section>
+
+  <sc-for list="{{ groups }}" as="g" hint-placeholder-count="9">
+    <section style="margin-bottom:26px">
+      <h2 style="margin:0 0 4px; font-size:19px; letter-spacing:-0.01em">{{ g.title }}</h2>
+      <p class="mono" style="margin:0 0 12px; font-size:11.5px; color:#5c6b63">{{ g.src }}</p>
+      <div style="background:#fff; border:1px solid #d9ded8; border-radius:12px; overflow:hidden">
+        <sc-for list="{{ g.rows }}" as="r" hint-placeholder-count="5">
+          <div style="{{ r.rowStyle }}">
+            <span style="{{ r.badgeStyle }}">{{ r.badge }}</span>
+            <div style="flex:1; min-width:0">
+              <div style="font-size:14px; font-weight:600">{{ r.feature }}</div>
+              <div style="font-size:12.5px; color:#5c6b63; margin-top:2px">{{ r.detail }}</div>
+            </div>
+            <div style="flex:1; min-width:180px; font-size:13px; color:#2a3630">{{ r.where }}</div>
+          </div>
+        </sc-for>
+      </div>
+    </section>
+  </sc-for>
+
+  <section style="background:#1a2420; color:#e8ede9; border-radius:12px; padding:24px 28px; margin-top:34px">
+    <h2 class="mono" style="margin:0 0 12px; font-size:13px; letter-spacing:0.1em; text-transform:uppercase; color:#7fb99a">{{ missingHeading }}</h2>
+    <p style="margin:0 0 14px; font-size:15px">{{ missingLead }}</p>
+    <ol style="margin:0; padding-left:20px; font-size:14.5px; display:flex; flex-direction:column; gap:9px">
+      <sc-for list="{{ gaps }}" as="x" hint-placeholder-count="11">
+        <li><strong>{{ x.title }}</strong> — {{ x.body }} <span style="opacity:0.65">{{ x.where }}</span></li>
+      </sc-for>
+    </ol>
+    <p style="margin:16px 0 0; font-size:13.5px; opacity:0.8">{{ closingNote }}</p>
+    <p style="margin:12px 0 0; font-size:13px; opacity:0.7; border-top:1px solid rgba(232,237,233,0.2); padding-top:12px">{{ droppedNote }}</p>
+  </section>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  renderVals() {
+    const S = {
+      ok: { badge: '✓', bg: '#e4efe7', fg: '#1f6f46' },
+      part: { badge: '~', bg: '#f7ecd6', fg: '#8a5a10' },
+      gap: { badge: '✕', bg: '#f8e5e2', fg: '#a5352a' },
+      dropped: { badge: '–', bg: '#e5ece7', fg: '#43524a' },
+    }
+    const R = (state, feature, detail, where, src) => ({
+      state, feature, detail, where, src,
+      badge: S[state].badge,
+      badgeStyle: `width:22px; height:22px; border-radius:50%; flex-shrink:0; display:inline-flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; background:${S[state].bg}; color:${S[state].fg}`,
+      rowStyle: 'display:flex; align-items:flex-start; gap:12px; padding:11px 16px; border-bottom:1px solid #eceae4; flex-wrap:wrap',
+    })
+    const G = (title, src, rows) => ({ title, src, rows })
+    const groups = [
+      G('Conversation', 'ConversationPanel.vue · orchestrator', [
+        R('ok', 'Typed chat with the brain', 'Transcript, per-turn tool badges, clear conversation', 'Talk view'),
+        R('ok', 'Laptop mic + robot mic', 'Two separate capture paths', 'Talk composer (mic button)'),
+        R('ok', 'Teach from a message', 'Sends the typed text as training feedback', 'Talk composer (teach button)'),
+        R('ok', 'Turn latency + realtime spend', 'LLM ms, tool ms, live cost', 'Talk presence header at Full'),
+        R('ok', 'Tool-call result detail', 'Badge expands to the sent and returned payloads, timing and the rule that allowed it', 'Talk › tool badge'),
+      ]),
+      G('Robot body & state', 'RobotPanel.vue · VideoPanel.vue · robotStore.ts', [
+        R('ok', 'Awake / sleep, mic arm, follow-me, proactive', 'Four state toggles with shared tracking state', 'Robot view + Talk presence'),
+        R('ok', 'Panic stop', 'Cuts speech, ends the turn, mic off', 'Header — always visible'),
+        R('ok', 'Volume', 'Speaker level', 'Robot view + context card'),
+        R('ok', 'Gestures, dances, performances', '16 actions in three groups', 'Robot › Ask him to…'),
+        R('ok', 'Motion log', 'Recent motions with outcome', 'Robot view at Full'),
+        R('ok', 'Camera stream + manual head control', 'Live view, follow vs manual, head nudges', 'Robot view + Talk camera card'),
+        R('ok', 'Robot connection diagnosis', 'mDNS/refused/timeout, address field, network scan', 'Setup wizard step 2 · Robot › Connection'),
+        R('ok', 'Persona editor', 'Seven fields (name, voice, rate, verbosity, humour, gestures, wake response) plus the instruction text', 'Robot › Persona › Edit'),
+        R('ok', 'Briefing time', 'When the proactive morning briefing fires', 'Robot › Briefing'),
+        R('ok', 'App logs / brain restart', 'App-log facet in Activity; restart in About', 'Activity › app log · About'),
+      ]),
+      G('People & memory', 'BrainPanel.vue · knowledgeStore.ts', [
+        R('ok', 'People list, add, select, roles', 'Owner-scoped: others see only themselves', 'People view'),
+        R('ok', 'Facts with provenance', 'Key/value, source and confidence at Full', 'People › facts'),
+        R('ok', 'Per-person skills', 'Bound skills with triggers and connectors', 'People › skills'),
+        R('ok', 'Knowledge graph', 'Draggable, zoomable, typed nodes — grows with the data', 'People › graph + full Graph view'),
+        R('ok', 'Teach face (enrolment)', 'Four photos → embedding', 'People + wizard step 6'),
+        R('ok', 'Forget a person', 'Right-to-be-forgotten, owner only', 'People › Forget this person'),
+        R('ok', 'Vault state (encrypted / unlocked)', 'Never lies about lock state', 'Header health chip · Settings › Privacy'),
+        R('ok', 'Memory tab', 'Editable per-person memory with a real empty state', 'People › Memory'),
+        R('ok', 'Sources tab', 'Per-person blog/site/github with health, add, read-now, import and export', 'People › Sources'),
+        R('ok', 'Recognition snapshots + “that isn’t them”', 'Sightings with confidence, each correctable; hidden when no face is enrolled', 'People › Recently seen'),
+        R('ok', 'Unknown visitors → tag or dismiss', 'Untagged queue, tag onto a person (absorbing the guest) or dismiss', 'People list › Unknown visitors'),
+        R('ok', 'Import a ChatGPT/Claude export', 'Mines a data export locally for facts', 'People › Sources › Import'),
+        R('ok', 'Export the brain as JSON', 'Full dump of people, facts, signals', 'People › Sources › Export'),
+        R('ok', 'Consent scope per person', 'Full / basic / none, per person', 'People header › Consent'),
+        R('ok', '[[wiki-links]] between facts and skills', 'Substituted inline and clickable; the same target is one shared graph node', 'People › facts + graph'),
+      ]),
+      G('Skills', 'BrainPanel.vue (skills library) · /skills', [
+        R('ok', 'Skills library with triggers', 'Description, trigger words, usage count, connectors', 'Skills view'),
+        R('ok', 'Optimize suggestion', 'Learned observations folded in after review', 'Skills banner'),
+        R('ok', 'New skill / edit skill', 'Entry points present', 'Skills view'),
+        R('ok', 'Skill body editor', 'Name, who may use it, modes, trigger chips, the procedure itself, and Test it now', 'Skills › New skill / edit'),
+        R('ok', 'Per-persona scoping', 'Who may use it and which modes, editable in the skill editor', 'Skills › editor'),
+      ]),
+      G('Modes & permissions', 'shared-policies · CapabilitiesPanel.vue · ApprovalPanel.vue', [
+        R('ok', 'Mode switcher', 'Home / Work / Present as a first-class header control', 'Header'),
+        R('ok', 'Per-mode tool boundaries', 'Allow / ask / blocked per tool group, editable', 'Modes view'),
+        R('ok', 'Per-mode persona, voice, memory writing', 'Was env-only', 'Modes › behaviour'),
+        R('ok', 'Quiet hours', 'Never speaks first, composes with any mode', 'Header toggle'),
+        R('ok', 'Approval gate with remember-choice', 'Names the rule that caused the ask, links to it', 'Talk (inline)'),
+        R('ok', 'Remembered decisions / auto-approvals', 'Revocable list', 'Settings › Privacy'),
+        R('ok', 'Capability toggles', 'Four capabilities with their real state, screen control showing its app limit', 'Settings › Capabilities'),
+        R('ok', 'Allowed-apps list for screen control', 'Editable chip list, hidden when the mode blocks screen control', 'Modes › Apps he may drive'),
+      ]),
+      G('Presentations', 'PresenterView.vue · ScenarioBuilder.vue', [
+        R('ok', 'Scenario picker + beats', 'Slide and keyword cues, say/do per beat', 'Present view'),
+        R('ok', 'Run / rehearse', 'Running switches to Present mode and locks tools', 'Present run bar'),
+        R('ok', 'YAML import', 'Power-user path alongside the builder', 'Present header'),
+        R('ok', 'Presenter settings', 'Persona, voice, slide source, audience questions', 'Present aside'),
+        R('ok', 'Laptop audio / laptop mic toggles', 'Live toggles in the presenter HUD', 'Present › HUD'),
+        R('ok', 'Live presenter HUD', 'Beat counter, saying-now, next cue, transport and audience camera', 'Present › HUD'),
+      ]),
+      G('Setup wizard, step by step', 'SetupWizard.vue (6 steps) → redesigned as 7', [
+        R('ok', 'Step 1 · Meet your assistant', 'Name (max 24) and reply language: auto / NL / EN / FR', 'Wizard step 1'),
+        R('ok', 'Step 2 · Find the robot', 'mDNS scan, manual address + Test, honest empty state, three preconditions, continue-without-a-robot as an equal choice', 'Wizard step 2'),
+        R('ok', 'Step 3 · Install on the robot', 'New — per-action approval, the corrected sync command, self-update on by default', 'Wizard step 3'),
+        R('ok', 'Step 4 · Choose a brain', 'OpenAI / OpenRouter / Gemini, key field, already-set state, free-model hint', 'Wizard step 4'),
+        R('ok', 'Step 5 · Hands-free voice', 'Wake-word switch and editable wake word', 'Wizard step 5'),
+        R('ok', 'Step 6 · Create yourself + vault', 'New — you as owner, optional face enrolment, passphrase with min-8 and already-encrypted states', 'Wizard step 6'),
+        R('ok', 'Step 7 · Learn the panels', 'Replaces the bare “You’re all set”: five things, then done', 'Wizard step 7'),
+        R('ok', 'Back / Skip / Later navigation', 'Footer Skip on steps 1, 4 and 5; Later on the vault; steps 2 and 3 carry their own inline alternative instead; jump freely via the stepper', 'Wizard footer + stepper'),
+        R('ok', 'Resumable & repeatable', 'Remembers where you stopped; every step re-runnable later', 'Wizard aside · About › Re-run setup'),
+      ]),
+      G('Settings & configuration', 'settingsStore · prefsStore · connectionsStore', [
+        R('ok', 'LLM provider + API key', 'Provider and key status, changeable after setup', 'Settings › Intelligence'),
+        R('ok', 'Wake word + hands-free', 'Toggle and editable word', 'Settings › Voice'),
+        R('ok', 'Connections (M365, Google, GitHub, Slack, Spotify/Sonos)', 'Status, test and reconnect per connector', 'Settings › Connections'),
+        R('ok', 'Capability switches', 'Screen control, face recognition, proactive speech, shell', 'Settings › Capabilities'),
+        R('ok', 'Model roles', 'Conversation, voice, tasks, screen control', 'Settings › Intelligence'),
+        R('ok', 'Device-code auth flows', 'Live code on the connector row with the open-the-page action, plus Test and Reconnect', 'Settings › Connections'),
+        R('ok', 'Conversation engine + access self-check', 'Pipeline/realtime with a Test realtime access action', 'Settings › Intelligence'),
+        R('ok', 'Update banner (download-then-install)', 'Already-downloaded update, install-and-restart in one click, dismissible', 'Header › update banner'),
+      ]),
+      G('Events & diagnostics', 'EventLogPanel.vue · app logs', [
+        R('ok', 'Event bus stream', 'Typed events with session ids', 'Activity view + Talk strip at Full'),
+        R('ok', 'Faceted log', 'Events, motion, app log, approvals', 'Activity tabs'),
+        R('ok', 'Filter', 'Substring filter', 'Activity'),
+        R('ok', 'Mind visualisation', 'New — the same events drawn as a working brain', 'Activity + Talk card'),
+        R('ok', 'Diagnostics export', 'Copy a report with no personal data', 'About'),
+      ]),
+      G('Shell & window', 'App.vue · TitleBar.vue · layoutStore', [
+        R('ok', 'View navigation', 'Collapsible labelled rail, same at every density', 'Rail'),
+        R('ok', 'Density / detail level', 'Calm / Standard / Full, auto per person', 'Header dial'),
+        R('ok', 'Light & dark theme', 'Both drawn', 'Settings › Appearance'),
+        R('ok', 'About', 'Version, updates, restart, re-run setup, licences', 'About view'),
+        R('dropped', 'Frameless window controls', 'Deliberately not carried over: the console uses native window chrome instead of custom traffic lights', 'By design'),
+        R('dropped', 'Dockable, resizable panels', 'Deliberately not carried over: the density dial replaces manual docking', 'By design'),
+      ]),
+    ]
+    const count = (st) => groups.reduce((a, g) => a + g.rows.filter(r => r.state === st).length, 0)
+    // The closing list IS the badged rows — one source, so counts can never drift.
+    const missing = groups.flatMap(g => g.rows.filter(r => r.state === 'gap').map(r => ({
+      title: r.feature, body: r.detail.charAt(0).toLowerCase() + r.detail.slice(1) + '.',
+      where: `(${r.src || g.src.split(' · ')[0]})`,
+    })))
+    const droppedRows = groups.flatMap(g => g.rows.filter(r => r.state === 'dropped'))
+    const tile = (bg, fg) => `flex:1 1 170px; box-sizing:border-box; background:${bg}; color:${fg}; border-radius:12px; padding:16px 18px`
+    return {
+      groups,
+      missingCount: missing.length,
+      missingHeading: missing.length ? 'What is still missing' : 'Nothing is missing',
+      missingLead: missing.length
+        ? `${missing.length} capabilit${missing.length === 1 ? 'y' : 'ies'} in the shipping console still ${missing.length === 1 ? 'has' : 'have'} no home in D2. None are large; all are real.`
+        : 'Nothing. Every capability found in the source now has a designed home in D2, and every partly-covered entry point has its detail view drawn.',
+      closingNote: missing.length
+        ? "Say the word and I'll add them — most are one card or one row in a view that already exists."
+        : 'The audit is derived from the badged rows above, so this stays honest as the design changes: add a gap row and it reappears here.',
+      droppedNote: droppedRows.length
+        ? `Deliberately not carried over: ${droppedRows.map(r => r.feature.toLowerCase()).join(' · ')}. Those are decisions, not gaps — the density dial replaces manual docking, and window chrome belongs to the OS.`
+        : '',
+      tally: [
+        { n: count('ok'), label: 'Fully covered', note: 'designed and reachable', style: tile('#e4efe7', '#14532d') },
+        { n: count('part'), label: 'Partly covered', note: 'entry point exists, detail undrawn', style: tile('#f7ecd6', '#6b4508') },
+        { n: missing.length, label: 'Missing', note: 'no home in D2 yet', style: tile('#f8e5e2', '#7d2419') },
+        { n: groups.length, label: 'Areas audited', note: 'components + stores + endpoints', style: tile('#fff', '#1a2420') },
+      ],
+      gaps: missing,
+    }
+  }
+}
+</script>
+</body>
+</html>

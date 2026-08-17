@@ -97,6 +97,11 @@ def init(
     _presentation_mgr = presentation_mgr
     _gateway_mgr = gateway_mgr
     _webhook_dispatcher = webhook_dispatcher
+    # D2: per-mode voices live in the mode-policy store now; re-export them
+    # into the env the TTS layer reads so a stored choice survives restarts.
+    from orchestrator import mode_policy
+
+    mode_policy.apply_stored_voices()
 
 
 # ------------------------------------------------------------------
@@ -388,9 +393,59 @@ async def set_mode(body: dict) -> JSONResponse:
     mode = body.get("mode", "")
     try:
         _router.set_mode(mode)
+        # D2: mode and persona share a vocabulary (work/home/presentation…) and
+        # the header switch means both — the boundary AND the voice/behaviour.
+        if _persona_mgr is not None:
+            _persona_mgr.switch(mode)
     except ValueError as exc:
         return JSONResponse({"error": str(exc)}, status_code=422)
     return JSONResponse({"mode": _router.mode})
+
+
+# ------------------------------------------------------------------
+# Mode policy (D2) — the chip row and the Modes editor
+# ------------------------------------------------------------------
+
+
+@router.get("/orchestrator/policy")
+async def get_policy() -> JSONResponse:
+    """Per mode, per tool group: allows / asks / blocked — derived from the
+    real MODE_TOOL_MAP + APPROVAL_REQUIRED plus the owner's overrides. The
+    console renders this; it never hand-writes a rule."""
+    from orchestrator import mode_policy
+
+    assert _router is not None
+    return JSONResponse(mode_policy.describe(_router.mode))
+
+
+@router.post("/orchestrator/policy")
+async def set_policy(body: dict) -> JSONResponse:
+    """One row of the Modes editor: {mode, group, state}. Takes effect
+    immediately — allowed_tools() and the approval gate read it live."""
+    from orchestrator import mode_policy
+
+    assert _router is not None
+    try:
+        state, source = mode_policy.set_group_state(
+            str(body.get("mode", "")), str(body.get("group", "")), str(body.get("state", "")))
+    except ValueError as exc:
+        return JSONResponse({"error": str(exc)}, status_code=422)
+    return JSONResponse({"mode": body.get("mode"), "group": body.get("group"),
+                         "state": state, "source": source})
+
+
+@router.post("/orchestrator/policy/behaviour")
+async def set_policy_behaviour(body: dict) -> JSONResponse:
+    """Per-mode persona, voice, speaks-first and memory-writing — the settings
+    that used to live only in env vars (TTS_VOICE_WORK, …)."""
+    from orchestrator import mode_policy
+
+    mode = str(body.get("mode", ""))
+    try:
+        merged = mode_policy.set_behaviour(mode, body.get("behaviour") or {})
+    except ValueError as exc:
+        return JSONResponse({"error": str(exc)}, status_code=422)
+    return JSONResponse({"mode": mode, "behaviour": merged})
 
 
 # ------------------------------------------------------------------

@@ -2,56 +2,43 @@ import { defineStore } from 'pinia'
 import { ref, watch } from 'vue'
 
 export type Theme = 'dark' | 'light'
-export type Accent = 'blue' | 'green' | 'purple' | 'amber'
 
 const STORAGE_KEY = 'aura-appearance'
 
-export const ACCENTS: { id: Accent; label: string }[] = [
-  { id: 'blue', label: 'Blue' },
-  { id: 'green', label: 'Green' },
-  { id: 'purple', label: 'Purple' },
-  { id: 'amber', label: 'Amber' },
-]
-
-function loadSaved(): { theme: Theme; accent: Accent } {
+// D2: one accent (AURA green). The four-accent picker is gone by design —
+// `--present` purple is a semantic signal for Present mode, not a preference.
+function loadSaved(): { theme: Theme } {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (raw) {
       const parsed = JSON.parse(raw)
-      return {
-        theme: parsed.theme === 'dark' ? 'dark' : 'light',
-        accent: ACCENTS.some(a => a.id === parsed.accent) ? parsed.accent : 'green',
-      }
+      return { theme: parsed.theme === 'dark' ? 'dark' : 'light' }
     }
   } catch { /* corrupted storage → defaults */ }
-  // U193: light + green is the default appearance. Anyone who already picked
-  // something keeps it — this only decides what a fresh install opens with.
-  return { theme: 'light', accent: 'green' }
+  // Light is the default appearance; this only decides what a fresh install
+  // opens with — anyone who already picked something keeps it.
+  return { theme: 'light' }
 }
 
 export const useThemeStore = defineStore('theme', () => {
   const saved = loadSaved()
   const theme = ref<Theme>(saved.theme)
-  const accent = ref<Accent>(saved.accent)
 
   function apply() {
-    const root = document.documentElement
-    root.dataset.theme = theme.value
-    root.dataset.accent = accent.value
+    document.documentElement.dataset.auraTheme = theme.value
   }
 
   function persist() {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ theme: theme.value, accent: accent.value }))
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ theme: theme.value }))
     } catch { /* storage full/blocked — theme still applies for this session */ }
   }
 
-  watch([theme, accent], () => { apply(); persist() })
+  watch(theme, () => { apply(); persist() })
 
   function $reset() {
     theme.value = 'light'
-    accent.value = 'green'
   }
 
-  return { theme, accent, apply, $reset }
+  return { theme, apply, $reset }
 })

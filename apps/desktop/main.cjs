@@ -475,9 +475,9 @@ ipcMain.on('aura:screen-control', (_e, active) => {
 // Window, tray, menu
 // ---------------------------------------------------------------------------
 
-// Splash: lined bot icon (lucide "bot" path), draggable since the window is
-// frameless. charset=utf-8 + HTML entities so the ellipsis/middot render
-// correctly (a plain data: URL mis-decodes them as Latin-1).
+// Splash: lined bot icon (lucide "bot" path). charset=utf-8 + HTML entities so
+// the ellipsis/middot render correctly (a plain data: URL mis-decodes them as
+// Latin-1). The app-region:drag is a leftover from the frameless era; harmless.
 const SPLASH_HTML = `data:text/html;charset=utf-8,
 <body style="margin:0;background:%230f172a;color:%23e2e8f0;font-family:sans-serif;-webkit-app-region:drag;
 display:flex;align-items:center;justify-content:center;height:100vh;flex-direction:column">
@@ -501,7 +501,8 @@ function createWindow() {
     height: 900,
     title: 'AURA Operator Console',
     backgroundColor: '#0f172a',
-    frame: false, // U33: the console draws its own title bar
+    // D2: native OS chrome. The custom title bar (U33) went with the redesign —
+    // a frameless window with no TitleBar.vue cannot even be dragged.
     icon: path.join(__dirname, 'build', 'icon.png'),
     webPreferences: {
       contextIsolation: true,

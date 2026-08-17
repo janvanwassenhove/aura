@@ -16,6 +16,24 @@ export const LANGUAGES: { id: Language; label: string }[] = [
 export type VoiceMode = 'off' | 'wake_word'
 export type VoiceEngine = 'pipeline' | 'realtime'  // U132
 
+/** D2: one surface, three depths. Density changes how much of the SAME screen
+ * is exposed — it never changes what the robot may do. */
+export type Density = 'calm' | 'standard' | 'full'
+
+export const DENSITY_META: Record<Density, { label: string; hint: string }> = {
+  calm: { label: 'Calm', hint: 'Just the conversation. Large type, no logs, no jargon.' },
+  standard: { label: 'Standard', hint: 'Adds context cards, tool results and the quick asks.' },
+  full: { label: 'Full', hint: 'Everything: activity log, timings, provenance.' },
+}
+
+/** The depth a recognised person gets before anyone touches the dial:
+ * kids and guests calm, family standard, the owner everything. */
+export function densityForRole(role: string | null | undefined): Density {
+  if (role === 'owner') return 'full'
+  if (role === 'family') return 'standard'
+  return 'calm'
+}
+
 export const usePrefsStore = defineStore('prefs', () => {
   const assistantName = ref('AURA')
   const language = ref<Language>('auto')
@@ -25,6 +43,30 @@ export const usePrefsStore = defineStore('prefs', () => {
   const ttsVoice = ref('alloy')
   const saving = ref(false)
   const error = ref<string | null>(null)
+
+  // ── D2 shell state (client-side, persisted locally) ──────────────────────
+  const density = ref<Density>(
+    (localStorage.getItem('aura-density') as Density) || 'standard',
+  )
+  // Whether the dial was set by hand this session. Untouched → density follows
+  // whoever is recognised (kids get Calm without asking for it).
+  const densityTouched = ref(false)
+  const railCollapsed = ref(localStorage.getItem('aura-rail') === 'collapsed')
+
+  function setDensity(d: Density): void {
+    density.value = d
+    densityTouched.value = true
+    try { localStorage.setItem('aura-density', d) } catch { /* session-only */ }
+  }
+  /** A person change resets the hand-set flag so auto-density can follow. */
+  function followPerson(role: string | null | undefined): void {
+    if (!densityTouched.value) density.value = densityForRole(role)
+  }
+  function resetDensityTouch(): void { densityTouched.value = false }
+  function toggleRail(): void {
+    railCollapsed.value = !railCollapsed.value
+    try { localStorage.setItem('aura-rail', railCollapsed.value ? 'collapsed' : 'open') } catch { /* session-only */ }
+  }
 
   async function fetchPrefs(): Promise<void> {
     try {
@@ -73,5 +115,10 @@ export const usePrefsStore = defineStore('prefs', () => {
     }
   }
 
-  return { assistantName, language, voiceMode, voiceEngine, wakeWord, ttsVoice, saving, error, fetchPrefs, save }
+  return {
+    assistantName, language, voiceMode, voiceEngine, wakeWord, ttsVoice, saving, error,
+    density, densityTouched, railCollapsed,
+    setDensity, followPerson, resetDensityTouch, toggleRail,
+    fetchPrefs, save,
+  }
 })

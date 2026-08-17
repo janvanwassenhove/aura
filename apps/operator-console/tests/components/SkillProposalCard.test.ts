@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { setActivePinia, createPinia } from 'pinia'
-import BrainPanel from '../../src/components/BrainPanel.vue'
+import SkillsView from '../../src/views/SkillsView.vue'
 
 /** U251: proposals the assistant raised BY ITSELF, waiting for an answer.
  *
@@ -10,9 +10,11 @@ import BrainPanel from '../../src/components/BrainPanel.vue'
  *  evening, so a card that only exists while the console is open is a loop
  *  nobody ever sees.
  *
- *  The case that matters most here is a NEW skill: applying a rewrite could
- *  reuse the existing skill's record, but a new one has nothing to merge with,
- *  and getting that wrong means the button does nothing.
+ *  D2 moved these cards from the brain dock to the Skills view — the
+ *  behaviour they pin is unchanged. The case that matters most is a NEW
+ *  skill: a rewrite can reuse the existing skill's record, but a new one has
+ *  nothing to merge with, and getting that wrong means the button does
+ *  nothing.
  */
 
 const NEW_PROPOSAL = {
@@ -62,7 +64,7 @@ function stubFetch(proposals: unknown[], skills: unknown[] = []) {
 
 async function mountWithSkills(proposals: unknown[], skills: unknown[] = []) {
   const calls = stubFetch(proposals, skills)
-  const w = mount(BrainPanel, { global: { stubs: { WikiText: true } } })
+  const w = mount(SkillsView, { global: { stubs: { WikiText: true } } })
   await flushPromises()
   await flushPromises()
   return { w, calls }
@@ -98,7 +100,7 @@ describe('raised skill proposals', () => {
 
   it('creates the skill from the draft when accepted', async () => {
     const { w, calls } = await mountWithSkills([NEW_PROPOSAL])
-    await w.find('.skill-opt--raised .b-btn').trigger('click')
+    await w.find('.skill-opt--raised .d2-primary-btn').trigger('click')
     await flushPromises()
 
     const save = calls.find(c => c.init?.method === 'POST' && c.url.endsWith('/skills'))
@@ -111,7 +113,7 @@ describe('raised skill proposals', () => {
 
   it('keeps a rewritten skill’s triggers and only changes the procedure', async () => {
     const { w, calls } = await mountWithSkills([REWRITE_PROPOSAL], [EXISTING_CHROME])
-    await w.find('.skill-opt--raised .b-btn').trigger('click')
+    await w.find('.skill-opt--raised .d2-primary-btn').trigger('click')
     await flushPromises()
 
     const save = calls.find(c => c.init?.method === 'POST' && c.url.endsWith('/skills'))
@@ -123,7 +125,7 @@ describe('raised skill proposals', () => {
 
   it('tells the brain the question is answered, so it stops asking', async () => {
     const { w, calls } = await mountWithSkills([NEW_PROPOSAL])
-    await w.find('.skill-opt--raised .b-btn').trigger('click')
+    await w.find('.skill-opt--raised .d2-primary-btn').trigger('click')
     await flushPromises()
     expect(calls.some(c => c.init?.method === 'DELETE' && c.url.includes('/skills/proposals/p1')))
       .toBe(true)
@@ -131,7 +133,7 @@ describe('raised skill proposals', () => {
 
   it('lets the owner refuse, and does not save anything', async () => {
     const { w, calls } = await mountWithSkills([NEW_PROPOSAL])
-    const buttons = w.findAll('.skill-opt--raised .b-btn')
+    const buttons = w.findAll('.skill-opt--raised .proposal-actions button')
     await buttons[buttons.length - 1].trigger('click')   // "No thanks"
     await flushPromises()
 
@@ -142,12 +144,12 @@ describe('raised skill proposals', () => {
 
   it('lets the owner edit it first — a draft is a starting point', async () => {
     const { w, calls } = await mountWithSkills([NEW_PROPOSAL])
-    const buttons = w.findAll('.skill-opt--raised .b-btn')
+    const buttons = w.findAll('.skill-opt--raised .proposal-actions button')
     await buttons[1].trigger('click')                    // "Edit first"
     await flushPromises()
 
     expect(calls.some(c => c.init?.method === 'POST' && c.url.endsWith('/skills'))).toBe(false)
-    const editor = w.find('.skill-editor-inline')
+    const editor = w.find('.editor')
     expect(editor.exists()).toBe(true)
     // v-model values live on the elements, not in the markup.
     const name = editor.find<HTMLInputElement>('input[aria-label="Skill name"]')
