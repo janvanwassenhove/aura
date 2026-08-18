@@ -65,7 +65,7 @@
           <div class="slider-row">
             <span class="row-label">Persona</span>
             <select v-model="activePersona" class="d2-field persona-select" aria-label="Persona" @change="applyPersona">
-              <option v-for="c in brainCharacters" :key="c.id" :value="c.id">{{ c.name }}</option>
+              <option v-for="c in brainCharacters" :key="c.id" :value="c.id">{{ c.display_name }}</option>
             </select>
             <button class="d2-ghost-btn" title="Edit this persona" @click="editorOpen = !editorOpen">Edit</button>
           </div>
@@ -98,7 +98,7 @@
       <!-- ═══ Persona editor: the fields that make a character sound like itself ═══ -->
       <section v-if="editorOpen && editingCharacter" class="d2-card persona-editor">
         <div class="pe-head">
-          <h3>{{ editingCharacter.name }}</h3>
+          <h3>{{ editingCharacter.display_name }}</h3>
           <span class="mono pe-meta">voice &amp; behaviour</span>
           <span class="spacer" />
           <button class="pe-x" title="Close without saving" @click="editorOpen = false">✕</button>
@@ -113,17 +113,18 @@
           <label class="pe-field">
             <span>Verbosity</span>
             <select v-model="editingCharacter.verbosity" class="d2-field" aria-label="Verbosity">
-              <option value="short">short answers</option>
-              <option value="balanced">balanced</option>
+              <option value="brief">brief</option>
+              <option value="normal">normal</option>
               <option value="detailed">explain the reasoning</option>
             </select>
           </label>
           <label class="pe-field">
             <span>Humour</span>
-            <select v-model.number="editingCharacter.humor_level" class="d2-field" aria-label="Humour">
-              <option :value="0">none</option>
-              <option :value="0.3">dry, occasional</option>
-              <option :value="0.7">playful</option>
+            <select v-model="editingCharacter.humor_level" class="d2-field" aria-label="Humour">
+              <option value="none">none</option>
+              <option value="low">dry, occasional</option>
+              <option value="medium">playful</option>
+              <option value="high">full comedian</option>
             </select>
           </label>
           <label class="pe-field">
@@ -131,6 +132,7 @@
             <select v-model="editingCharacter.interruptibility" class="d2-field" aria-label="Interruptibility">
               <option value="wake_word">wake word cuts him off</option>
               <option value="vad">any voice cuts him off</option>
+              <option value="off">never — he finishes his sentence</option>
             </select>
           </label>
           <label class="pe-field">
@@ -421,8 +423,11 @@ async function applyVolume(): Promise<void> {
 
 // ── Persona (the brain's characters) ───────────────────────────────────────
 interface BrainCharacter {
-  id: string; name: string; character_prompt: string; verbosity: string
-  humor_level: number; voice_id: string; interruptibility: string
+  // Field names and vocab are the brain's (/setup/characters): display_name,
+  // and verbosity/humor_level are WORDS (brief/normal/detailed, none..high),
+  // not numbers — the first D2 pass guessed both and rendered blank selects.
+  id: string; display_name: string; character_prompt: string; verbosity: string
+  humor_level: string; voice_id: string; interruptibility: string
   learned_traits: string; voice_engine?: string
 }
 const brainCharacters = ref<BrainCharacter[]>([])

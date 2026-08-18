@@ -140,7 +140,7 @@ async function fetchPersonas(): Promise<void> {
   try {
     const r = await fetch(`${BRAIN_URL}/setup/characters`)
     const data = await r.json()
-    personas.value = (data.characters ?? []).map((c: { id: string; name: string }) => ({ id: c.id, name: c.name }))
+    personas.value = (data.characters ?? []).map((c: { id: string; display_name?: string }) => ({ id: c.id, name: c.display_name ?? c.id }))
   } catch { personas.value = [] }
   // The backend modes are personas too — offer them even without characters.
   for (const m of ['home', 'work', 'presentation']) {
