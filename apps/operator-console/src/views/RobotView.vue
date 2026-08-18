@@ -182,11 +182,12 @@
             <p class="char-sample" :style="{ borderLeftColor: preview.hue }">{{ preview.sample }}</p>
             <div class="char-traits">
               <span v-for="t in preview.traits.split(' · ')" :key="t" class="trait-chip">{{ t }}</span>
+              <span class="trait-chip trait-chip--move mono" :title="preview.move.why">move: {{ preview.move.id }}</span>
             </div>
           </div>
           <div class="char-preview-actions">
             <button class="d2-ghost-btn" title="Hear a sample line — watch how he speaks" @click="demoSpeak">▶ Hear him</button>
-            <button class="d2-ghost-btn" title="Run this character's signature move on the robot" @click="demoMove">Try a move</button>
+            <button class="d2-ghost-btn" :title="`His signature move: ${preview.move.id} — ${preview.move.why}`" @click="demoMove">Try a move</button>
           </div>
         </div>
 
@@ -479,29 +480,36 @@ async function hearSample(): Promise<void> {
 }
 
 // ── Archetype demos ────────────────────────────────────────────────────────
+// Both demos use the archetype's OWN signature move — id, speed and
+// amplitude — so Grump shakes his head slowly and Buddy bounces. Before this
+// every character sent the same 'gesture' and the traits were only words.
 function demoSpeak(): void {
   characterStore.demo('speak')
   fetch(`${BRAIN_URL}/robot/say`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text: preview.value.sample.replace(/^[“”]|[“”]$/g, '').slice(0, 140), motion_id: 'gesture' }),
+    body: JSON.stringify({
+      text: preview.value.sample.replace(/^[“”]|[“”]$/g, '').slice(0, 140),
+      motion_id: preview.value.move.id,
+    }),
   }).catch(() => {})
 }
 function demoMove(): void {
   characterStore.demo('move')
-  act('gesture')
+  const m = preview.value.move
+  act(m.id, m.speed, m.amplitude)
 }
 
 // ── Ask him to… ────────────────────────────────────────────────────────────
 const acting = ref(false)
 const actError = ref('')
-async function act(motionId: string): Promise<void> {
+async function act(motionId: string, speed = 1.0, amplitude = 0.6): Promise<void> {
   acting.value = true
   actError.value = ''
   try {
     const resp = await fetch(`${BRAIN_URL}/robot/motion`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       // manual → the robot pauses follow-me so the move is fully visible (U137).
-      body: JSON.stringify({ motion_id: motionId, speed: 1.0, amplitude: 0.6, manual: true }),
+      body: JSON.stringify({ motion_id: motionId, speed, amplitude, manual: true }),
     })
     if (!resp.ok) actError.value = 'Robot unreachable — is it switched on?'
   } catch { actError.value = 'Robot unreachable — is it switched on?' } finally { acting.value = false }
@@ -752,6 +760,7 @@ onUnmounted(() => clearInterval(statusTimer))
   font-size: 11.5px; font-weight: 600; padding: 3px 10px; border-radius: 999px;
   background: var(--surface); border: 1px solid var(--line); color: var(--ink-2);
 }
+.trait-chip--move { border-style: dashed; color: var(--ink-2); }
 .char-preview-actions { display: flex; flex-direction: column; gap: 6px; flex-shrink: 0; }
 .char-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(168px, 100%), 1fr)); gap: 8px; }
 .char-card {

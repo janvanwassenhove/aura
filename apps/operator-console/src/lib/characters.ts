@@ -19,6 +19,11 @@ export interface Archetype {
   sample: string
   traits: string
   hint: string
+  /** The signature move: a REAL robot motion with the speed and amplitude
+   *  that make it read as this character. "Try a move" used to send the
+   *  same generic gesture for all ten — the traits said "reluctant motion"
+   *  and the robot moved like everyone else. */
+  move: { id: string; speed: number; amplitude: number; why: string }
   art: (px: number, act?: CharacterAct) => string
 }
 
@@ -45,6 +50,7 @@ export const CHARACTERS: Record<string, Archetype> = {
     sample: '“Morning! Three meetings today — the 11:00 still has no agenda. Want me to poke Priya about it?”',
     traits: 'warm voice · chatty · bouncy motion',
     hint: 'friendly, a bit eager, explains what it is doing',
+    move: { id: 'wave', speed: 1.15, amplitude: 0.8, why: 'bouncy — a quick, big wave' },
     art: (px, act = 'idle') => SVG(px, `<g>${act === 'move' ? AT('rotate', '-4 32 40;4 32 40;-4 32 40', '1.1s') : ''}
       <g stroke="var(--ink)" stroke-width="1.9" stroke-linecap="round"><path d="M18 26 L13 6"></path><path d="M46 26 L52 8"></path></g>
       <circle cx="13" cy="5" r="2.4" fill="#1f6f46">${act !== 'idle' ? A('r', '2.4;3.6;2.4', '0.9s') : ''}</circle>
@@ -61,6 +67,7 @@ export const CHARACTERS: Record<string, Archetype> = {
     sample: '“Three meetings. The 11:00 has no agenda. Recommend a nudge.”',
     traits: 'flat voice · terse · minimal motion',
     hint: 'answers in one line, no small talk, states confidence',
+    move: { id: 'nod', speed: 0.85, amplitude: 0.35, why: 'minimal — one small nod, nothing more' },
     art: (px, act = 'idle') => SVG(px, `<rect x="6" y="20" width="52" height="24" rx="6" fill="#1a1a1d" stroke="var(--ink)" stroke-width="2.2"></rect>
       <rect x="12" y="30" width="40" height="4" rx="2" fill="#3a1512"></rect>
       ${act === 'speak'
@@ -74,6 +81,7 @@ export const CHARACTERS: Record<string, Archetype> = {
     sample: '“Three meetings. Two could have been an email. Humour setting: 70%.”',
     traits: 'low voice · dry humour · deliberate motion',
     hint: 'humour and honesty are sliders you set yourself',
+    move: { id: 'look_around', speed: 0.7, amplitude: 0.6, why: 'deliberate — a slow, full look around' },
     art: (px, act = 'idle') => SVG(px, `<g>${act === 'move' ? AT('translate', '0 0;3 -2;0 0;-3 -2;0 0', '1.6s') : ''}
       <rect x="20" y="6" width="24" height="18" rx="3" fill="var(--surface-2)" stroke="var(--ink)" stroke-width="2.2">${act === 'move' ? AT('translate', '0 0;5 0;0 0', '1.6s') : ''}</rect>
       <rect x="20" y="24" width="24" height="16" rx="3" fill="var(--surface-2)" stroke="var(--ink)" stroke-width="2.2"></rect>
@@ -88,6 +96,7 @@ export const CHARACTERS: Record<string, Archetype> = {
     sample: '“Three meetings today, and a long stretch in the middle. Shall I hold twenty minutes for a break?”',
     traits: 'gentle voice · patient · slow motion',
     hint: 'asks how you are, keeps answers calm and short',
+    move: { id: 'nod', speed: 0.6, amplitude: 0.5, why: 'slow, patient — an unhurried nod' },
     art: (px, act = 'idle') => SVG(px, `<ellipse cx="32" cy="34" rx="24" ry="21" fill="var(--surface)" stroke="var(--ink)" stroke-width="2.4">${act !== 'idle' ? A('ry', '21;22.4;21', act === 'move' ? '2s' : '3.2s') + A('rx', '24;23;24', act === 'move' ? '2s' : '3.2s') : ''}</ellipse>
       <circle cx="23" cy="32" r="3.4" fill="var(--ink)">${A('r', '3.4;3.4;0.6;3.4', '4.5s')}${act === 'speak' ? A('cy', '32;30.6;32', '0.9s') : ''}</circle>
       <circle cx="41" cy="32" r="3.4" fill="var(--ink)">${A('r', '3.4;3.4;0.6;3.4', '4.5s')}${act === 'speak' ? A('cy', '32;30.6;32', '0.9s') : ''}</circle>
@@ -99,6 +108,7 @@ export const CHARACTERS: Record<string, Archetype> = {
     sample: '“▪▫ chirp — whistle ▫▪”  ·  subtitle: three meetings, one missing an agenda.',
     traits: 'beeps + subtitles · playful · fast motion',
     hint: 'answers in sounds and gestures, text in the transcript',
+    move: { id: 'bop', speed: 1.4, amplitude: 0.7, why: 'fast, playful — a quick bop' },
     art: (px, act = 'idle') => SVG(px, `<g>${act === 'move' ? AT('rotate', '-7 32 44;7 32 44;-7 32 44', '1.3s') : ''}
       <g>${act !== 'idle' ? AT('rotate', '-12 32 30;12 32 30;-12 32 30', act === 'speak' ? '1.8s' : '1.1s') : ''}
         <path d="M14 30a18 18 0 0 1 36 0z" fill="var(--surface-2)" stroke="var(--ink)" stroke-width="2.2"></path>
@@ -115,6 +125,7 @@ export const CHARACTERS: Record<string, Archetype> = {
     sample: '“Three meetings. None of them will change anything. I have prepped all three anyway.”',
     traits: 'flat voice · pessimistic · reluctant motion',
     hint: 'sighs first, still does the job correctly',
+    move: { id: 'shake', speed: 0.75, amplitude: 0.4, why: 'reluctant — a small, slow head-shake, then he complies' },
     art: (px, act = 'idle') => SVG(px, `<g>${act !== 'idle' ? AT('translate', '0 0;0 2.5;0 0', act === 'move' ? '2.4s' : '3.4s') : ''}
       <rect x="10" y="18" width="44" height="34" rx="16" fill="var(--surface-2)" stroke="var(--ink)" stroke-width="2.3"></rect>
       <circle cx="23" cy="34" r="7" fill="var(--ink)"></circle><circle cx="41" cy="34" r="7" fill="var(--ink)"></circle>
@@ -128,6 +139,7 @@ export const CHARACTERS: Record<string, Archetype> = {
     sample: '“Three meetings. Agenda missing for 11:00 — drafting a request now.”',
     traits: 'synth voice · precise · floating motion',
     hint: 'anticipates the next step and states it',
+    move: { id: 'sway', speed: 0.8, amplitude: 0.55, why: 'floating — a smooth, even sway' },
     art: (px, act = 'idle') => SVG(px, `<g>${act === 'move' ? AT('translate', '0 0;0 -3;0 0', '2s') : ''}
       <ellipse cx="32" cy="56" rx="16" ry="3" fill="#00b3c8" opacity="0.25">${act !== 'idle' ? A('rx', '16;11;16', '2s') : ''}</ellipse>
       <path d="M20 14h24l6 10-6 20H20l-6-20z" fill="var(--surface-2)" stroke="#00b3c8" stroke-width="2.2"></path>
@@ -142,6 +154,7 @@ export const CHARACTERS: Record<string, Archetype> = {
     sample: '“You have school at nine! Want me to tell you a dinosaur fact while you eat?”',
     traits: 'bright voice · simple words · bouncy motion',
     hint: 'age-appropriate answers, never scary, always encouraging',
+    move: { id: 'dance', speed: 1.2, amplitude: 0.8, why: 'bouncy — the whole dance, big and bright' },
     art: (px, act = 'idle') => SVG(px, `<g>${act === 'move' ? AT('translate', '0 0;0 -4;0 1;0 0', '0.8s') : ''}
       <circle cx="32" cy="34" r="23" fill="#ffd9b8" stroke="var(--ink)" stroke-width="2.4"></circle>
       <circle cx="24" cy="31" r="6.5" fill="var(--ink)">${A('ry', '6.5;6.5;0.8;6.5', '3.6s')}</circle>
@@ -157,6 +170,7 @@ export const CHARACTERS: Record<string, Archetype> = {
     sample: '“Three meetings today — and the eleven o’clock, ladies and gentlemen, still has no agenda.”',
     traits: 'projected voice · theatrical · broad gestures',
     hint: 'built for an audience, not a desk',
+    move: { id: 'bow', speed: 1.0, amplitude: 1.0, why: 'theatrical — the full bow, arms wide' },
     art: (px, act = 'idle') => SVG(px, `<g>${act === 'move' ? AT('rotate', '-6 32 48;6 32 48;-6 32 48', '1.5s') : ''}
       <rect x="12" y="18" width="40" height="28" rx="8" fill="var(--surface-2)" stroke="var(--ink)" stroke-width="2.3"></rect>
       <circle cx="24" cy="31" r="5.4" fill="var(--ink)"></circle><circle cx="40" cy="31" r="5.4" fill="var(--ink)"></circle>
@@ -172,6 +186,7 @@ export const CHARACTERS: Record<string, Archetype> = {
     sample: '“Three today. One needs an agenda.”',
     traits: 'clear voice · sparse words · gliding motion',
     hint: 'says the minimum, shows the rest on screen',
+    move: { id: 'look_around', speed: 0.65, amplitude: 0.45, why: 'gliding — a slow, sparse turn' },
     art: (px, act = 'idle') => SVG(px, `<g>${act === 'move' ? AT('rotate', '-6 32 44;6 32 44;-6 32 44', '2.2s') : ''}
       <ellipse cx="32" cy="32" rx="21" ry="25" fill="var(--surface)" stroke="var(--ink)" stroke-width="2.3"></ellipse>
       <path d="M18 27q14 -8 28 0v6q-14 6 -28 0z" fill="#1a2430"></path>
