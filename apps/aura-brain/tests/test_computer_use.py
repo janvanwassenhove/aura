@@ -304,3 +304,62 @@ def test_scaled_backend_is_noop_on_small_screens() -> None:
     sb.click(100, 200)
     assert ("click", 100, 200, "left", 1) in inner.calls
     assert sb.screenshot() == FakeBackend.PNG  # untouched bytes
+
+
+# ---------------------------------------------------------------------------
+# U253b: which provider drives the screen
+# ---------------------------------------------------------------------------
+
+
+# The code only ever asks "is a key set?", never what it says — so the tests
+# use a placeholder rather than a credential-shaped literal. A fake sk-... in a
+# repo is a false positive for every secret scanner that will ever read it.
+_PRESENT = "set-for-this-test"
+
+
+def _build(monkeypatch, **env):
+    """create_default_agent() with a stubbed backend, so only provider CHOICE is tested."""
+    import aura_brain.computer_use as cu
+
+    for k in ("ANTHROPIC_API_KEY", "OPENAI_API_KEY",
+              "COMPUTER_USE_OPENAI_MODEL", "COMPUTER_USE_ENABLED"):
+        monkeypatch.delenv(k, raising=False)
+    monkeypatch.setenv("COMPUTER_USE_ENABLED", "true")
+    for k, v in env.items():
+        monkeypatch.setenv(k, v)
+    monkeypatch.setattr(cu, "ScaledBackend", lambda _b: object())
+    monkeypatch.setattr(cu, "PyAutoGuiBackend", lambda: object())
+    monkeypatch.setattr(cu, "ComputerUseAgent", lambda _b: "anthropic")
+    monkeypatch.setattr(cu, "OpenAIComputerAgent", lambda _b: "openai")
+    return cu.create_default_agent()
+
+
+def test_a_configured_screen_control_model_decides_the_provider(monkeypatch) -> None:
+    """The owner picked an OpenAI model in Settings; that must be what runs.
+
+    The reported failure: an ANTHROPIC_API_KEY left over in the Windows user
+    environment (never entered in AURA) beat a deliberately configured gpt-5.x,
+    and because spent credit only fails at CALL time the constructor succeeded
+    — so every screen action died with "credit balance is too low" and the
+    OpenAI path was never tried.
+    """
+    agent = _build(
+        monkeypatch,
+        ANTHROPIC_API_KEY=_PRESENT,
+        OPENAI_API_KEY=_PRESENT,
+        COMPUTER_USE_OPENAI_MODEL="gpt-5.5",
+    )
+    assert agent == "openai"
+
+
+def test_anthropic_still_drives_when_nothing_was_chosen(monkeypatch) -> None:
+    """No explicit model → the old preference stands; this is not a swap."""
+    agent = _build(monkeypatch, ANTHROPIC_API_KEY=_PRESENT, OPENAI_API_KEY=_PRESENT)
+    assert agent == "anthropic"
+
+
+def test_a_chosen_model_without_an_openai_key_does_not_strand_the_owner(monkeypatch) -> None:
+    """A model set but no OpenAI key: Anthropic is better than nothing."""
+    agent = _build(monkeypatch, ANTHROPIC_API_KEY=_PRESENT,
+                   COMPUTER_USE_OPENAI_MODEL="gpt-5.5")
+    assert agent == "anthropic"

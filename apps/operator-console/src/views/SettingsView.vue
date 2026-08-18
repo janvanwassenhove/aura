@@ -441,15 +441,28 @@ async function securePassphrase(): Promise<void> {
   securing.value = false
 }
 
+// Every section loads INDEPENDENTLY. They used to sit in one arrow function,
+// so the first line that threw took the other six with it — a single wrong
+// method name left Connections, Capabilities, the vault state and the voice
+// prefs all silently empty, which reads as "the backend is down" rather than
+// "one call is wrong". A section that cannot load is one grey row, not six.
 onMounted(() => {
-  settingsStore.fetchConfig().then(() => settingsStore.fetchModels(settingsStore.provider))
-  fetchModelRoles()
-  connections.fetchStatus()
-  connections.fetchIdentityStatus()
-  caps.fetchCapabilities()
-  caps.fetchAutoApprovals()
-  knowledge.fetchTier()
-  prefs.fetchPrefs()
+  const load: [string, () => unknown][] = [
+    ['llm', () => settingsStore.fetchConfig().then(() => settingsStore.fetchModels(settingsStore.provider))],
+    ['model roles', fetchModelRoles],
+    // refreshAllStatuses does connector health AND identity in one pass; the
+    // two halves are not exported separately.
+    ['connections', () => connections.refreshAllStatuses()],
+    ['capabilities', () => caps.fetchCapabilities()],
+    ['auto-approvals', () => caps.fetchAutoApprovals()],
+    ['vault', () => knowledge.fetchTier()],
+    ['prefs', () => prefs.fetchPrefs()],
+  ]
+  for (const [what, fn] of load) {
+    try {
+      Promise.resolve(fn()).catch(e => console.warn(`settings: ${what} failed`, e))
+    } catch (e) { console.warn(`settings: ${what} failed`, e) }
+  }
 })
 watch(() => themeStore.theme, () => { /* persisted by the store's own watcher */ })
 </script>

@@ -498,7 +498,23 @@ def create_default_agent():
     except Exception as exc:  # noqa: BLE001 — pyautogui/display missing
         logger.warning("Computer Use enabled but backend unavailable (%s) — disabled.", exc)
         return None
-    if os.environ.get("ANTHROPIC_API_KEY", "").strip():
+    # U253b: the OWNER'S CHOICE decides the provider, not which keys happen to
+    # exist. Settings > Screen control model writes COMPUTER_USE_OPENAI_MODEL,
+    # so a value there means "drive the screen with OpenAI". The old order
+    # asked only whether an Anthropic key existed *anywhere* in the process
+    # environment — and on Windows that includes keys the owner set years ago
+    # for something else entirely. Measured on a live setup: an inherited
+    # ANTHROPIC_API_KEY shadowed a deliberately configured gpt-5.x, and since
+    # a spent-credit failure happens at CALL time the constructor succeeded,
+    # so there was nothing left to fall back FROM: every single screen action
+    # returned "credit balance is too low" and the OpenAI path below was never
+    # reached. An explicit choice that the code silently overrules is worse
+    # than no setting at all.
+    chose_openai = bool(
+        os.environ.get("COMPUTER_USE_OPENAI_MODEL", "").strip()
+        and os.environ.get("OPENAI_API_KEY", "").strip()
+    )
+    if os.environ.get("ANTHROPIC_API_KEY", "").strip() and not chose_openai:
         try:
             return ComputerUseAgent(backend)
         except ModuleNotFoundError:

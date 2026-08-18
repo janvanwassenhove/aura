@@ -105,7 +105,14 @@ export const useConnectionsStore = defineStore('connections', () => {
   async function refreshAllStatuses(): Promise<void> {
     // Reset to unknown so stale ok/unauthenticated values are replaced
     for (const ps of providers.value) ps.status = 'unknown'
-    await Promise.all([fetchStatus(), fetchIdentityStatus()])
+    // SEQUENTIAL on purpose. fetchIdentityStatus() skips anything connector
+    // health already answered ("already known from connector-service"), and
+    // that skip only works if health has actually landed. Run in parallel and
+    // identity overwrites the verdict: m365 is `mock` (running on canned data)
+    // but was reported as `unauthenticated` (not connected) — two different
+    // messages to the owner, decided by a race.
+    await fetchStatus()
+    await fetchIdentityStatus()
   }
 
   // ------------------------------------------------------------------
