@@ -48,8 +48,14 @@ class FakeMini:
     def start_head_tracking(self, weight: float = 1.0) -> None:
         self.calls.append(("start_head_tracking", {"weight": weight}))
 
+    # U253: `face_ts` is the daemon's tracker clock. None → no ts attribute
+    # (older daemons); a number → returned as-is, so a test can freeze it.
+    face_ts: float | None = None
+
     def get_tracked_face(self, wait: bool = True, timeout: float = 5.0):
-        return types.SimpleNamespace(detected=False)
+        if self.face_ts is None:
+            return types.SimpleNamespace(detected=False)
+        return types.SimpleNamespace(detected=False, ts=self.face_ts)
 
     def set_automatic_body_yaw(self, enabled: bool) -> None:
         self.calls.append(("set_automatic_body_yaw", {"enabled": enabled}))
@@ -58,7 +64,12 @@ class FakeMini:
         self.calls.append(("set_target_body_yaw", {"yaw": yaw}))
 
     def release_media(self) -> None:
+        self.calls.append(("release_media", {}))
         self.media_released = True
+
+    def acquire_media(self) -> None:
+        self.calls.append(("acquire_media", {}))
+        self.media_released = False
 
 
 @pytest.fixture()
@@ -555,3 +566,55 @@ async def test_status_reports_whether_a_face_is_in_view(adapter) -> None:
     mini = adapter._created[0]
     mini.get_tracked_face = lambda wait=True, timeout=5.0: types.SimpleNamespace(detected=True)
     assert (await adapter.get_status()).face_visible is True
+
+
+async def test_watchdog_rebuilds_media_when_tracker_stalls(adapter, monkeypatch) -> None:
+    """U253: "follow me doesn't follow" with tracking=True and face_visible=False.
+
+    Diagnosed live on the wireless daemon 1.9.0: its FaceTracker had stalled —
+    face_target.ts frozen at the same value for minutes — and enable/disable
+    (what the U126 watchdog re-asserts) no longer revived it. Only a media
+    release+acquire did. So a frozen ts must trigger that rebuild; a ts that
+    still advances (nobody in view, tracker fine) must not.
+    """
+    import asyncio
+
+    monkeypatch.setenv("HEAD_TRACKING", "false")
+    monkeypatch.setenv("TRACKING_WATCHDOG_S", "0.02")
+    monkeypatch.setattr(type(adapter), "TRACKER_STALL_S", 0.05)
+    monkeypatch.setattr(type(adapter), "MEDIA_REBUILD_MIN_GAP_S", 0.0)
+    monkeypatch.setattr(type(adapter), "MEDIA_REBUILD_SETTLE_S", (0.0, 0.0))
+    await adapter.connect()
+    mini = adapter._created[0]
+    mini.face_ts = 4786.0                       # frozen, like the real thing
+    await adapter.set_tracking(True)
+
+    await asyncio.sleep(0.5)                    # several ticks past the stall window
+    names = [n for n, _ in mini.calls]
+    assert "release_media" in names and "acquire_media" in names, names
+    # tracking is re-enabled at full weight after the rebuild
+    weights = [kw.get("weight") for n, kw in mini.calls if n == "start_head_tracking"]
+    assert weights[-1] == 1.0
+
+
+async def test_watchdog_does_not_rebuild_while_tracker_ticks(adapter, monkeypatch) -> None:
+    """A tracker that sees nobody still ticks — that is 'no face', not 'dead',
+    and a rebuild would needlessly drop camera and audio for seconds."""
+    import asyncio
+
+    monkeypatch.setenv("HEAD_TRACKING", "false")
+    monkeypatch.setenv("TRACKING_WATCHDOG_S", "0.02")
+    monkeypatch.setattr(type(adapter), "TRACKER_STALL_S", 0.05)
+    monkeypatch.setattr(type(adapter), "MEDIA_REBUILD_MIN_GAP_S", 0.0)
+    await adapter.connect()
+    mini = adapter._created[0]
+    mini.face_ts = 1.0
+    await adapter.set_tracking(True)
+
+    async def tick() -> None:
+        for _ in range(25):
+            await asyncio.sleep(0.02)
+            mini.face_ts += 1.0                 # alive
+    await tick()
+    names = [n for n, _ in mini.calls]
+    assert "release_media" not in names

@@ -87,6 +87,13 @@ class ReachyRobotAdapter(RobotAdapter):
         self._tracking_on = False
         self._body_follow = False  # U37: torso turns with the tracked face
         self._tracking_watchdog: asyncio.Task | None = None  # U126
+        # U253: the daemon's FaceTracker can stall — its face_target.ts stops
+        # advancing and enable/disable no longer revives it. Remember the last
+        # ts we saw and when it last moved, so the watchdog can tell "no face
+        # in view" (ts advances, detected=False) from "tracker dead" (ts frozen).
+        self._face_ts_last: float | None = None
+        self._face_ts_moved_at: float = 0.0
+        self._media_rebuilt_at: float = 0.0
         self._groove_files: list[str] = []  # U138: dance-music temp WAVs
         import threading
 
@@ -411,7 +418,81 @@ class ReachyRobotAdapter(RobotAdapter):
             self._host, self._connection_mode, self._media_backend,
         )
 
+    # U253: how long face_target.ts may sit still before we call the tracker
+    # dead. Measured: alive it ticks every ~2 s even with nobody in view.
+    TRACKER_STALL_S = float(os.environ.get("TRACKER_STALL_S", "30"))
+    # Don't rebuild media more often than this — a rebuild drops the camera
+    # and audio for a couple of seconds, so a flapping tracker must not turn
+    # into a flapping robot.
+    MEDIA_REBUILD_MIN_GAP_S = 120.0
+    # Settle time inside the rebuild (release→acquire→enable). Class attrs so
+    # tests can shrink them; the real daemon needs a couple of seconds.
+    MEDIA_REBUILD_SETTLE_S = (1.5, 2.0)
+
+    def _tracker_stalled(self) -> bool:
+        """U253: has the daemon's tracker stopped producing frames?
+
+        `face_visible` (U165) reads `detected`; that goes False both when
+        nobody is in view AND when the tracker has silently died. Only the
+        timestamp separates the two: alive, it advances every couple of
+        seconds regardless of detection; dead, it freezes — and, measured on
+        the wireless daemon 1.9.0, start_head_tracking() then no longer
+        revives it. Only a media release/acquire does.
+        """
+        import time
+
+        try:
+            target = self._mini.get_tracked_face(wait=False)
+        except Exception:  # noqa: BLE001
+            return False
+        ts = getattr(target, "ts", None) if target is not None else None
+        now = time.monotonic()
+        if ts is None:
+            return False                       # between frames — say nothing
+        if ts != self._face_ts_last:
+            self._face_ts_last = ts
+            self._face_ts_moved_at = now
+            return False
+        if self._face_ts_moved_at == 0.0:
+            self._face_ts_moved_at = now       # first sample: start the clock
+            return False
+        return (now - self._face_ts_moved_at) > self.TRACKER_STALL_S
+
+    async def _rebuild_media_for_tracker(self) -> None:
+        """U253: release + re-acquire the SDK media so the daemon rebuilds its
+        camera pipeline and FaceTracker. Verified by hand: after this the
+        face_target.ts starts advancing again."""
+        import time
+
+        mini = self._mini
+        if mini is None:
+            return
+        logger.warning(
+            "face tracker stalled (face_target.ts frozen for >%.0fs) — rebuilding media",
+            self.TRACKER_STALL_S,
+        )
+
+        settle_release, settle_acquire = self.MEDIA_REBUILD_SETTLE_S
+
+        def _rebuild() -> None:
+            mini.start_head_tracking(0.0)
+            mini.release_media()
+            time.sleep(settle_release)
+            mini.acquire_media()
+            time.sleep(settle_acquire)
+            mini.start_head_tracking(1.0)
+            if self._body_follow:
+                mini.set_automatic_body_yaw(True)
+
+        async with self._motion_lock:
+            await asyncio.to_thread(_rebuild)
+        self._media_rebuilt_at = time.monotonic()
+        self._face_ts_last = None
+        self._face_ts_moved_at = 0.0
+
     async def _tracking_watchdog_loop(self) -> None:
+        import time
+
         interval = float(os.environ.get("TRACKING_WATCHDOG_S", "5"))
         if interval <= 0:
             return
@@ -422,9 +503,26 @@ class ReachyRobotAdapter(RobotAdapter):
             if not self._tracking_on or self._mini is None or self._motion_lock.locked():
                 continue
             try:
-                await asyncio.to_thread(self._mini.start_head_tracking)
-                if self._body_follow:
-                    await asyncio.to_thread(self._mini.set_automatic_body_yaw, True)
+                # U253: a re-assert cannot wake a dead tracker — check the pulse
+                # first and rebuild media when it has stopped.
+                stalled = await asyncio.to_thread(self._tracker_stalled)
+                if not self._tracking_on:      # flipped off while we checked
+                    continue
+                if stalled and time.monotonic() - self._media_rebuilt_at > self.MEDIA_REBUILD_MIN_GAP_S:
+                    await self._rebuild_media_for_tracker()
+                    continue
+
+                def _reassert() -> None:
+                    # Re-check INSIDE the thread: set_tracking(False) may land
+                    # between the guard above and this call, and re-enabling
+                    # then would silently undo the operator's Manual switch.
+                    if not self._tracking_on or self._mini is None:
+                        return
+                    self._mini.start_head_tracking()
+                    if self._body_follow:
+                        self._mini.set_automatic_body_yaw(True)
+
+                await asyncio.to_thread(_reassert)
             except Exception as exc:  # noqa: BLE001 — best-effort re-assert
                 logger.debug("tracking watchdog re-assert failed: %s", exc)
 
