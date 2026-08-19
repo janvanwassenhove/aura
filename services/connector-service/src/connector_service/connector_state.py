@@ -91,6 +91,19 @@ class _Known:
     requires: tuple[tuple[str, str], ...] = ()   # (settings attr, env var name)
     #: Where the owner registers the OAuth app, when credentials are missing.
     register_at: str = ""
+    #: U254b: the cheapest READ that proves this connector really works, and
+    #: the noun to count in the answer. It MUST be a call the connector
+    #: actually implements: the probe used to ask everything for today's
+    #: calendar, so GitHub and Slack — which deliberately refuse calendar and
+    #: do repos and channels instead — could never pass their own Test button.
+    probe: tuple[str, str] = ("list_calendar_events_today", "calendar event")
+    #: True when the credential is only fetched at CALL time (a keyring token,
+    #: an identity lookup) rather than needed to construct the connector. Such
+    #: a connector builds happily with no account at all, so "it constructed"
+    #: says nothing — and reporting that as `connected` is the exact lie this
+    #: section's own header warns against ("a green badge means a real call
+    #: worked"). For these, green has to be EARNED by a successful probe.
+    verifies_at_call_time: bool = False
 
 
 # Registered here rather than discovered, because "which connectors exist" is
@@ -114,11 +127,15 @@ KNOWN: tuple[_Known, ...] = (
         key="github", label="GitHub",
         domains=("repos",),
         register_at="https://github.com/settings/developers",
+        probe=("list_assigned_issues", "assigned issue"),
+        verifies_at_call_time=True,
     ),
     _Known(
         key="slack", label="Slack",
         domains=("chat",),
         register_at="https://api.slack.com/apps",
+        probe=("list_channels", "channel"),
+        verifies_at_call_time=True,
     ),
 )
 
@@ -129,10 +146,17 @@ def _mock_m365(settings: ConnectorServiceSettings) -> bool:
     return getattr(settings, "m365_connector", "mock") == "mock"
 
 
+def probe_for(key: str) -> tuple[str, str] | None:
+    """(method name, noun) that proves this connector works, or None."""
+    known = _BY_KEY.get(key)
+    return known.probe if known else None
+
+
 def describe(
     settings: ConnectorServiceSettings | None = None,
     registry: ConnectorRegistry | None = None,
     enabled: set[str] | None = None,
+    signed_in: set[str] | None = None,
 ) -> list[ConnectorInfo]:
     """Describe every known connector, enabled or not.
 
@@ -146,7 +170,7 @@ def describe(
 
     out: list[ConnectorInfo] = []
     for known in KNOWN:
-        out.append(_describe_one(known, s, on, built))
+        out.append(_describe_one(known, s, on, built, signed_in))
     return out
 
 
@@ -155,6 +179,7 @@ def _describe_one(
     s: ConnectorServiceSettings,
     on: set[str],
     built: dict[str, str],
+    signed_in: set[str] | None = None,
 ) -> ConnectorInfo:
     def info(status: str, detail: str, next_step: str = "",
              missing: tuple[str, ...] = ()) -> ConnectorInfo:
@@ -191,6 +216,19 @@ def _describe_one(
         )
 
     status = built.get(known.key)
+    # U254b: a connector whose credential is only read at call time constructs
+    # fine with no account whatsoever, so "it built" proves nothing. GitHub and
+    # Slack both reported `connected — real calls are going out` while holding
+    # no token at all. Ask whether a token actually exists; when we cannot ask,
+    # say "not signed in" rather than claim a connection.
+    if status == OK and known.verifies_at_call_time:
+        if signed_in is None or known.key not in signed_in:
+            return info(
+                UNAUTHENTICATED,
+                "Switched on, but no token is stored — so there is no account "
+                "to ask.",
+                "Press Connect (or paste a token), then Test to prove it.",
+            )
     if status in (OK, MOCK):
         return info(
             status,

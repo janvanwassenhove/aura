@@ -64,6 +64,12 @@ def _require_connector() -> M365Connector:
 # ------------------------------------------------------------------
 
 
+# U254b: connectors whose credential is only read at call time are reported as
+# connected ONLY after a probe really worked. That is what this section has
+# always promised the owner: a green badge means a real call worked.
+_PROVEN: set[str] = set()
+
+
 @router.get("/health")
 async def health() -> JSONResponse:
     connectors: dict[str, str] = {} if _registry is None else dict(_registry.health())
@@ -75,7 +81,8 @@ async def health() -> JSONResponse:
     # connector AURA knows how to speak, including the off ones, each with its
     # own next step. The flat map stays for older consoles.
     infos = connector_state.describe(registry=_registry,
-                                     enabled=connector_prefs.enabled_keys())
+                                     enabled=connector_prefs.enabled_keys(),
+                                     signed_in=set(_PROVEN))
     for info in infos:
         connectors.setdefault(info.key, info.status)
     return JSONResponse({
@@ -106,7 +113,8 @@ async def enable_connector(key: str, body: dict | None = None) -> JSONResponse:
             set_connector(primary)
     _notify_change()
     infos = connector_state.describe(registry=_registry,
-                                     enabled=connector_prefs.enabled_keys())
+                                     enabled=connector_prefs.enabled_keys(),
+                                     signed_in=set(_PROVEN))
     return JSONResponse({
         "key": key, "enabled": enabled,
         "details": [i.as_dict() for i in infos],
@@ -128,12 +136,26 @@ async def test_connector(key: str) -> JSONResponse:
             return JSONResponse({"key": key, "ok": False,
                                  "detail": "not connected — authenticate first"})
         is_mock = getattr(connector, "is_mock", False) or type(connector).__name__.startswith("Mock")
-        events = await connector.list_calendar_events_today()
-        detail = f"reachable — {len(events)} calendar event(s) today"
+        # U254b: probe with a call this connector actually implements. Asking
+        # everything for today's calendar meant GitHub and Slack answered their
+        # own Test button with "does not expose calendar" — the connector being
+        # right and the probe being wrong, reported as if the connection failed.
+        method, noun = connector_state.probe_for(key) or (
+            "list_calendar_events_today", "calendar event")
+        call = getattr(connector, method, None)
+        if call is None:
+            return JSONResponse({"key": key, "ok": False,
+                                 "detail": f"no probe available for {key}"})
+        items = await call()
+        n = len(items) if hasattr(items, "__len__") else 1
+        detail = f"reachable — {n} {noun}(s)"
         if is_mock:
             detail += " (MOCK data, not a real account)"
+        else:
+            _PROVEN.add(key)          # green is earned here, and only here
         return JSONResponse({"key": key, "ok": not is_mock, "detail": detail})
     except Exception as exc:  # noqa: BLE001 — a probe must report, not 500
+        _PROVEN.discard(key)
         return JSONResponse({"key": key, "ok": False, "detail": f"probe failed: {exc}"})
 
 

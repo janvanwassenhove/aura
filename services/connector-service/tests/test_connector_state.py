@@ -95,3 +95,56 @@ def test_live_domains_are_only_the_ones_that_can_answer() -> None:
     by = _by_key(infos)
     assert by["google"].status == connector_state.NO_CREDENTIALS
     assert "repos" not in domains     # github is off entirely
+
+
+# ---------------------------------------------------------------------------
+# U254b: the Test button, and what "connected" is allowed to mean
+# ---------------------------------------------------------------------------
+
+
+def test_each_connector_is_probed_with_a_call_it_actually_implements() -> None:
+    """Reported as "errors slack and github": both answered their own Test
+    button with "does not expose calendar".
+
+    That was the connector being RIGHT — GitHub does repos, Slack does
+    channels, and both deliberately refuse calendar — and the probe being
+    wrong, then reported to the owner as a failed connection.
+    """
+    assert connector_state.probe_for("github")[0] == "list_assigned_issues"
+    assert connector_state.probe_for("slack")[0] == "list_channels"
+    assert connector_state.probe_for("m365")[0] == "list_calendar_events_today"
+
+
+def test_a_call_time_connector_is_not_called_connected_until_it_proves_it() -> None:
+    """GitHub and Slack build fine with no token — the credential is only read
+    when a call is made. Both were reporting "Connected — real calls are going
+    out" while holding nothing at all, which is precisely the lie this
+    section's header warns about: a green badge means a real call worked.
+    """
+    infos = _by_key(connector_state.describe(
+        _s(enabled_connectors="m365,github"),
+        registry=_FakeRegistry({"github": connector_state.OK}),
+        enabled={"m365", "github"},
+        signed_in=set(),                       # nothing has proven itself
+    ))
+    assert infos["github"].status == connector_state.UNAUTHENTICATED
+    assert not infos["github"].live            # and so it grants no domains
+
+
+def test_a_proven_connector_is_connected() -> None:
+    infos = _by_key(connector_state.describe(
+        _s(enabled_connectors="m365,github"),
+        registry=_FakeRegistry({"github": connector_state.OK}),
+        enabled={"m365", "github"},
+        signed_in={"github"},                  # a probe really worked
+    ))
+    assert infos["github"].status == connector_state.OK
+    assert "repos" in connector_state.live_domains(list(infos.values()))
+
+
+class _FakeRegistry:
+    def __init__(self, built: dict[str, str]) -> None:
+        self._built = built
+
+    def health(self) -> dict[str, str]:
+        return dict(self._built)
