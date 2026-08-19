@@ -28,6 +28,8 @@ export interface PolicyGroup {
   detail: string
   state: PolicyState
   source: 'default' | 'override'
+  /** U254: the mode allows it, but no connected account can serve it. */
+  unreachable?: boolean
   tools: string[]
 }
 

@@ -135,8 +135,11 @@ def _save(data: dict) -> None:
 
 
 def reset_cache_for_tests() -> None:
-    global _cache, _cache_path
+    global _cache, _cache_path, _live_domains
     _cache, _cache_path = None, None
+    # U254: connector availability is process-wide too, so a test that made a
+    # domain dead would otherwise leak into every test after it.
+    _live_domains = None
 
 
 # ── Derivation ─────────────────────────────────────────────────────────────
@@ -199,6 +202,57 @@ def set_group_state(mode: str, group_id: str, state: str) -> tuple[str, str]:
 
 # ── Enforcement ────────────────────────────────────────────────────────────
 
+# ---------------------------------------------------------------------------
+# U254: what a LIVE CONNECTION changes about what he can do
+# ---------------------------------------------------------------------------
+#
+# Tools that cannot work without a connector behind them, by the domain that
+# connector serves. Todos and reminders are deliberately absent: those are
+# memory-service, local to this laptop, and gating them on a Microsoft account
+# would break the one part that works with no account at all.
+#
+# The point is honesty in both directions. With no mail connector, offering
+# get_unread_mail means the assistant promises to read mail and then explains
+# a 503 — U248's lesson, one layer down. And switching Google ON has to change
+# what he can do in the same breath, or "connected" is just a green badge.
+_CONNECTOR_TOOLS: dict[str, frozenset[str]] = {
+    "mail": frozenset({"get_unread_mail", "send_mail"}),
+    "calendar": frozenset({
+        "list_calendar_events_today", "create_calendar_event", "delete_calendar_event",
+    }),
+    "chat": frozenset({"post_teams_message"}),
+    "tasks": frozenset({"list_tasks", "create_task", "delete_task"}),
+    "files": frozenset({"list_onedrive_files"}),
+}
+
+# None means NOT KNOWN — and then nothing is filtered. Only the brain, which
+# owns both halves, can say; every other caller (tests, a bare orchestrator,
+# an older deployment) keeps the previous behaviour exactly. Same rule as the
+# derived mode states: a layer that is unsure must not take capabilities away.
+_live_domains: set[str] | None = None
+
+
+def set_live_domains(domains: set[str] | None) -> None:
+    """Tell the policy which connector domains can actually answer right now."""
+    global _live_domains
+    _live_domains = None if domains is None else set(domains)
+
+
+def live_domains() -> set[str] | None:
+    return None if _live_domains is None else set(_live_domains)
+
+
+def _tools_without_a_connector() -> frozenset[str]:
+    """Connector-backed tools whose domain has nothing live behind it."""
+    if _live_domains is None:
+        return frozenset()
+    dead: set[str] = set()
+    for domain, tools in _CONNECTOR_TOOLS.items():
+        if domain not in _live_domains:
+            dead |= tools
+    return frozenset(dead)
+
+
 def allowed_tools(mode: str) -> frozenset[str]:
     """The mode's tool set with the owner's overrides applied."""
     base = set(MODE_TOOL_MAP.get(mode, frozenset()))
@@ -212,7 +266,10 @@ def allowed_tools(mode: str) -> frozenset[str]:
             base -= tools
         else:  # allows / asks — the group is available either way
             base |= tools
-    return frozenset(base)
+    # U254: last word — a mode may allow mail, but with no mail account there
+    # is nothing to allow. Subtracted AFTER the overrides so an owner cannot
+    # accidentally re-enable a tool that has nothing behind it.
+    return frozenset(base - _tools_without_a_connector())
 
 
 def requires_approval(tool_name: str, mode: str) -> bool:
@@ -309,12 +366,23 @@ def describe(active_mode: str) -> dict:
     modes: dict[str, dict] = {}
     for mode in UI_MODES:
         groups = []
+        dead = _tools_without_a_connector()
         for gid, label, detail, tools in TOOL_GROUPS:
             state, source = group_state(mode, gid)
+            # U254: a group whose tools all need an account that is not
+            # connected is not "allowed" in any useful sense. The chip says so
+            # rather than promising something the first question would expose.
+            unreachable = bool(tools) and tools <= dead
             groups.append({
                 "id": gid, "label": label, "detail": detail,
                 "state": state, "source": source,
                 "tools": sorted(tools),
+                "unreachable": unreachable,
             })
         modes[mode] = {"groups": groups, "behaviour": behaviour(mode)}
-    return {"active_mode": active_mode, "states": list(STATES), "modes": modes}
+    return {
+        "active_mode": active_mode, "states": list(STATES), "modes": modes,
+        # None means "not known" — the console then says nothing about
+        # reachability rather than guessing (same rule as the gate itself).
+        "live_domains": None if _live_domains is None else sorted(_live_domains),
+    }

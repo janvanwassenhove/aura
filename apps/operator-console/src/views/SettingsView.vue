@@ -82,53 +82,54 @@
         </header>
         <div v-for="p in providers" :key="p.id" class="row">
           <div class="row-text">
-            <div class="row-title">{{ p.label }}</div>
-            <div class="row-sub">{{ p.sub }}</div>
+            <div class="row-title">
+              {{ p.label }}
+              <span v-if="p.state.domains?.length" class="mono dom">{{ p.state.domains.join(' · ') }}</span>
+            </div>
+            <!-- The brain composes this sentence, so the page and the assistant
+                 can never disagree about what is true. -->
+            <div class="row-sub">{{ p.state.detail || p.sub }}</div>
+            <div v-if="p.state.nextStep && p.state.status !== 'ok'" class="row-next">
+              → {{ p.state.nextStep }}
+            </div>
             <div v-if="p.state.deviceCode" class="device-code">
               Enter <strong class="mono">{{ p.state.deviceCode }}</strong> at
               <a :href="p.state.verificationUri ?? '#'" target="_blank" rel="noopener">{{ p.state.verificationUri }}</a>
               — he waits and completes on his own.
             </div>
+            <div v-if="p.state.error" class="sec-error">{{ p.state.error }}</div>
           </div>
           <span class="row-val" :class="statusClass(p.state.status)">{{ statusLabel(p.state.status) }}</span>
-          <button v-if="p.state.status !== 'ok'" class="d2-ghost-btn" :disabled="p.state.authPending" @click="p.connect()">
-            {{ p.state.authPending ? 'Waiting…' : 'Connect' }}
-          </button>
-          <template v-else>
-            <button class="d2-ghost-btn" title="One real call, so a green badge means something" @click="connections.testProvider(p.id)">Test</button>
-            <button class="d2-ghost-btn" title="Revoke the stored token" @click="connections.disconnect(p.id)">Disconnect</button>
+          <!-- Switching on is the FIRST step and belongs on every row, so an
+               off connector is one click from being reachable. -->
+          <button
+            class="switch" :class="{ on: p.state.enabled !== false }"
+            :aria-pressed="p.state.enabled !== false" :aria-label="`Use ${p.label}`"
+            :title="p.state.enabled === false ? `Switch ${p.label} on` : `Switch ${p.label} off — he stops using it`"
+            @click="connections.setEnabled(p.id, p.state.enabled === false)"
+          ><span class="knob" /></button>
+          <template v-if="p.state.enabled !== false && !p.state.missing?.length">
+            <template v-if="p.tokenField && p.state.status !== 'ok'">
+              <input v-model="tokens[p.id]" type="password" class="d2-field row-field"
+                     :placeholder="p.tokenField.placeholder" autocomplete="off"
+                     :aria-label="`${p.label} token`">
+              <button class="d2-ghost-btn" :disabled="!tokens[p.id]?.trim() || p.state.authPending"
+                      @click="saveToken(p.id)">{{ p.state.authPending ? 'Saving…' : 'Save' }}</button>
+            </template>
+            <button v-else-if="p.state.status !== 'ok'" class="d2-ghost-btn" :disabled="p.state.authPending" @click="p.connect()">
+              {{ p.state.authPending ? 'Waiting…' : 'Connect' }}
+            </button>
+            <template v-else>
+              <button class="d2-ghost-btn" title="One real call, so a green badge means something" @click="connections.testProvider(p.id)">Test</button>
+              <button class="d2-ghost-btn" title="Revoke the stored token" @click="connections.disconnect(p.id)">Disconnect</button>
+            </template>
           </template>
         </div>
-        <!-- Slack is a pasted bot token, not a device code. -->
-        <div class="row">
-          <div class="row-text">
-            <div class="row-title">Slack</div>
-            <div class="row-sub">
-              Messages and channels ·
-              <a href="https://api.slack.com/apps" target="_blank" rel="noopener">create an app</a>,
-              install it to the workspace, paste the Bot User OAuth Token.
-            </div>
-          </div>
-          <span class="row-val" :class="statusClass(slackState.status)">{{ statusLabel(slackState.status) }}</span>
-          <template v-if="slackState.status !== 'ok'">
-            <input v-model="slackToken" type="password" class="d2-field row-field" placeholder="xoxb-…"
-                   autocomplete="off" aria-label="Slack bot token">
-            <button class="d2-ghost-btn" :disabled="!slackToken.trim() || slackState.authPending"
-                    @click="saveSlack">{{ slackState.authPending ? 'Saving…' : 'Save' }}</button>
-          </template>
-          <template v-else>
-            <button class="d2-ghost-btn" title="One real call, so a green badge means something" @click="connections.testProvider('slack')">Test</button>
-            <button class="d2-ghost-btn" title="Revoke the stored token" @click="connections.disconnect('slack')">Disconnect</button>
-          </template>
-        </div>
-        <p v-if="slackState.testResult" class="sec-note">Slack: {{ slackState.testResult }}</p>
-        <div class="row">
-          <div class="row-text">
-            <div class="row-title">Spotify / Sonos</div>
-            <div class="row-sub">Running on canned data until a token is set — playback needs the connection.</div>
-          </div>
-          <span class="row-val" :class="musicState === 'ok' ? 'ok' : 'warn'">{{ musicState }}</span>
-        </div>
+        <p v-if="connections.liveDomains.length" class="sec-note">
+          He can currently answer about:
+          <strong>{{ connections.liveDomains.join(', ') }}</strong>.
+          Anything else he will say he cannot reach, instead of trying and failing.
+        </p>
         <p v-for="p in providers.filter(x => x.state.testResult)" :key="p.id + '-test'" class="sec-note">
           {{ p.label }}: {{ p.state.testResult }}
         </p>
@@ -404,25 +405,45 @@ const providers = computed(() => [
     state: connections.providers.find(p => p.provider === 'github') ?? blank(),
     connect: () => connections.startGitHubAuth(),
   },
+  {
+    // Slack signs in with a pasted bot token rather than a device code, so the
+    // row shows a field instead of a Connect button — one list, one shape.
+    id: 'slack' as const, label: 'Slack', sub: 'Messages and channels',
+    state: connections.providers.find(p => p.provider === 'slack') ?? blank(),
+    connect: () => {},
+    tokenField: { placeholder: 'xoxb-…' },
+  },
 ])
 function blank() {
   return { provider: 'microsoft', label: '', status: 'unknown', authPending: false } as never
 }
 const musicState = computed(() =>
   connections.providers.find(p => p.provider === 'music')?.status ?? 'unknown')
-const slackState = computed(() =>
-  connections.providers.find(p => p.provider === 'slack')
-  ?? ({ status: 'unknown', authPending: false, testResult: '' } as never))
-const slackToken = ref('')
-async function saveSlack(): Promise<void> {
-  await connections.saveToken('slack', slackToken.value.trim())
-  slackToken.value = ''
+// Token-based connectors (Slack today) hold their pasted secret here only
+// until it is sent; it is never read back from the brain.
+const tokens = ref<Record<string, string>>({})
+async function saveToken(id: 'github' | 'slack'): Promise<void> {
+  const value = (tokens.value[id] ?? '').trim()
+  if (!value) return
+  await connections.saveToken(id, value)
+  tokens.value[id] = ''
+  await connections.refreshAllStatuses()
+}
+const STATUS_LABELS: Record<string, string> = {
+  ok: 'connected',
+  mock: 'canned data',
+  unauthenticated: 'not signed in',
+  not_enabled: 'off',
+  no_credentials: 'needs an app',
+  unavailable: 'failed to start',
 }
 function statusLabel(s: string): string {
-  return s === 'ok' ? 'connected' : s === 'mock' ? 'canned data' : s === 'unauthenticated' ? 'not connected' : s
+  return STATUS_LABELS[s] ?? s
 }
 function statusClass(s: string): string {
-  return s === 'ok' ? 'ok' : s === 'unknown' ? '' : 'warn'
+  if (s === 'ok') return 'ok'
+  if (s === 'not_enabled' || s === 'unknown') return ''   // off is not a fault
+  return 'warn'
 }
 
 // ── Privacy ────────────────────────────────────────────────────────────────
@@ -488,6 +509,11 @@ watch(() => themeStore.theme, () => { /* persisted by the store's own watcher */
 .sec-note { margin: 0; padding: 8px 16px 12px; font-size: 12.5px; color: var(--ink-2); }
 .sec-error { margin: 0; padding: 8px 16px 12px; font-size: 12.5px; color: var(--danger); }
 
+.dom {
+  font-size: 10px; color: var(--ink-3); margin-left: 7px;
+  text-transform: uppercase; letter-spacing: 0.04em;
+}
+.row-next { font-size: 12px; color: var(--info); margin-top: 3px; }
 .device-code {
   margin-top: 6px; font-size: 12.5px; color: var(--info);
   background: var(--info-wash); border-radius: 8px; padding: 6px 10px;

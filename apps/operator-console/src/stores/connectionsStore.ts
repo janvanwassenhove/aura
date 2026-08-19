@@ -6,7 +6,12 @@ import { BRAIN_URL } from '../lib/endpoints'
 const IDENTITY_URL = BRAIN_URL
 const CONNECTOR_URL = BRAIN_URL
 
-export type ConnectorStatus = 'ok' | 'mock' | 'unauthenticated' | 'unavailable' | 'unknown'
+// U254: `not_enabled` and `no_credentials` used to arrive as `unknown`, which
+// is the one status an owner cannot act on: switching a connector on and
+// registering an OAuth app are completely different jobs.
+export type ConnectorStatus =
+  'ok' | 'mock' | 'unauthenticated' | 'unavailable' | 'unknown'
+  | 'not_enabled' | 'no_credentials'
 
 export type Provider = 'microsoft' | 'google' | 'github' | 'slack' | 'music'
 
@@ -26,6 +31,16 @@ export interface ProviderState {
   /** U52: result of the last per-connector probe (Test button) */
   testResult?: string
   testing?: boolean
+  /** U254: what is true now, and what the owner would do next — from the brain,
+   *  never composed here, so the console and the assistant cannot disagree. */
+  detail?: string
+  nextStep?: string
+  /** Env vars still missing before a sign-in is even possible. */
+  missing?: string[]
+  /** What this connection would let him answer (mail, calendar, …). */
+  domains?: string[]
+  /** Switched on by the owner — independent of whether it is signed in. */
+  enabled?: boolean
 }
 
 export const useConnectionsStore = defineStore('connections', () => {
@@ -47,6 +62,33 @@ export const useConnectionsStore = defineStore('connections', () => {
 
   const userId = ref<string>('default')
   const loading = ref<boolean>(false)
+  /** U254: what the connections together let him answer right now. */
+  const liveDomains = ref<string[]>([])
+
+  /** Switch a connector on or off. The brain rebuilds and republishes what he
+   *  may do, so this changes his capabilities in the same request — a setting
+   *  that needs a restart reads as broken. */
+  async function setEnabled(p: Provider, enabled: boolean): Promise<void> {
+    const ps = _ps(p)
+    ps.error = undefined
+    try {
+      const resp = await fetch(`${CONNECTOR_URL}/connector/enable/${connectorKey[p]}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled }),
+      })
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
+      await refreshAllStatuses()
+      // The brain has already republished what he may do; the chip row reads
+      // that from the policy, so it has to be refetched in the same breath.
+      // Without this the switch says "connected" while the header still says
+      // "no account" — two truths on one screen, which is the bug this whole
+      // unit is about.
+      const { useModeStore } = await import('./modeStore')
+      await useModeStore().fetchPolicy()
+    } catch (err: unknown) {
+      ps.error = err instanceof Error ? err.message : 'could not change it'
+    }
+  }
 
   // server-side flow_id returned by /start; used by /poll
   const _msPendingFlowId = ref<string | null>(null)
@@ -69,11 +111,31 @@ export const useConnectionsStore = defineStore('connections', () => {
     try {
       const resp = await fetch(`${CONNECTOR_URL}/connector/health`)
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
-      const data = await resp.json() as { connectors?: Record<string, string> }
+      const data = await resp.json() as {
+        connectors?: Record<string, string>
+        details?: {
+          key: string; status: string; detail?: string; next_step?: string
+          missing?: string[]; domains?: string[]; live?: boolean
+        }[]
+        live_domains?: string[]
+      }
       const connectors = data.connectors ?? {}
       for (const ps of providers.value) {
         const key = connectorKey[ps.provider]
         if (key in connectors) ps.status = connectors[key] as ConnectorStatus
+      }
+      // U254: the rich per-connector answer, when the brain is new enough to
+      // send it. An older brain still works — it just has less to say.
+      liveDomains.value = data.live_domains ?? []
+      for (const d of data.details ?? []) {
+        const ps = providers.value.find(p => connectorKey[p.provider] === d.key)
+        if (!ps) continue
+        ps.status = d.status as ConnectorStatus
+        ps.detail = d.detail
+        ps.nextStep = d.next_step
+        ps.missing = d.missing ?? []
+        ps.domains = d.domains ?? []
+        ps.enabled = d.status !== 'not_enabled'
       }
     } catch {
       // connector-service offline — leave statuses as-is
@@ -86,6 +148,7 @@ export const useConnectionsStore = defineStore('connections', () => {
   async function fetchIdentityStatus(): Promise<void> {
     for (const ps of providers.value) {
       if (ps.status !== 'unknown') continue // already known from connector-service
+      if (ps.enabled === false) continue    // U254: off — nothing to sign in to
       if (ps.provider === 'music') continue // music status comes from connector health only
       try {
         // U221: ask whether it's connected, don't fetch the live access token.
@@ -398,6 +461,8 @@ export const useConnectionsStore = defineStore('connections', () => {
     providers,
     userId,
     loading,
+    liveDomains,
+    setEnabled,
     testProvider,
     refreshAllStatuses,
     startMicrosoftAuth,

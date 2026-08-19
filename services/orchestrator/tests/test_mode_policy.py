@@ -220,3 +220,56 @@ def test_describe_covers_the_three_ui_modes_with_sources() -> None:
     assert [g["id"] for g in groups] == [g[0] for g in mode_policy.TOOL_GROUPS]
     assert all(g["state"] in mode_policy.STATES for g in groups)
     assert all(g["source"] in ("default", "override") for g in groups)
+
+
+# ---------------------------------------------------------------------------
+# U254: a connection that is live changes what he may do
+# ---------------------------------------------------------------------------
+
+
+def test_without_a_mail_connector_he_is_not_offered_mail_tools() -> None:
+    """"deze kunnen nog niet door robot gebruikt worden" — the other half of
+    that sentence. A mode may allow mail, but with no mail account behind it
+    there is nothing to allow, and offering the tool means promising to read
+    mail and then explaining a 503 (U248, one layer down)."""
+    mode_policy.set_live_domains({"calendar"})          # calendar only
+    tools = mode_policy.allowed_tools("work")
+    assert "get_unread_mail" not in tools
+    assert "send_mail" not in tools
+    assert "list_calendar_events_today" in tools
+
+
+def test_switching_the_account_on_gives_the_tools_back() -> None:
+    """The point of the whole unit: connecting an account has to change what
+    he can do, not just what a badge says."""
+    mode_policy.set_live_domains({"calendar"})
+    assert "get_unread_mail" not in mode_policy.allowed_tools("work")
+
+    mode_policy.set_live_domains({"calendar", "mail"})
+    assert "get_unread_mail" in mode_policy.allowed_tools("work")
+
+
+def test_local_things_never_depend_on_an_account() -> None:
+    """Todos and reminders are memory-service, on this laptop. Gating those on
+    a Microsoft account would break the part that works with no account at all.
+    """
+    mode_policy.set_live_domains(set())                 # nothing connected
+    tools = mode_policy.allowed_tools("home")
+    assert "create_reminder" in tools
+    assert "list_todos" in tools
+
+
+def test_not_knowing_takes_nothing_away() -> None:
+    """Same rule as the derived mode states (U252): a layer that is unsure must
+    not remove capabilities. Only the brain can say, and until it does the
+    behaviour is exactly what it was before connections were modelled."""
+    mode_policy.set_live_domains(None)
+    assert "get_unread_mail" in mode_policy.allowed_tools("work")
+
+
+def test_an_owner_override_cannot_conjure_an_account() -> None:
+    """Allowing the mail group in a mode does not create a mailbox; the
+    subtraction is deliberately last."""
+    mode_policy.set_group_state("home", "mail", "allows")
+    mode_policy.set_live_domains(set())
+    assert "get_unread_mail" not in mode_policy.allowed_tools("home")

@@ -204,6 +204,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         connector_routes.set_connector(primary)
     connector_routes.set_registry(connector_registry)
     ctx.connector_registry = connector_registry
+    # U254: tell the tool policy what the connections can actually answer, so
+    # a live account CHANGES what he may do and a missing one stops him
+    # offering it. The brain is the only place that owns both halves.
+    _publish_live_domains(connector_registry)
+    connector_routes.set_on_change(
+        lambda: _publish_live_domains(connector_registry))
 
     # --- U4: conversation module (shares ctx.bus) ---
     # Default to the lightweight null STT/TTS in-process; real transport (Realtime)
@@ -905,6 +911,26 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     await _robot_api.shutdown_camera()
     await ctx.bus.stop()
+
+
+
+def _publish_live_domains(registry) -> None:
+    """Push connector availability into the orchestrator's tool policy.
+
+    Best-effort by design: if this fails the assistant keeps the behaviour he
+    had before connections were modelled at all (every tool offered), which is
+    strictly better than a startup that dies over a status refresh.
+    """
+    try:
+        from connector_service import connector_prefs, connector_state
+        from orchestrator import mode_policy
+
+        infos = connector_state.describe(
+            registry=registry, enabled=connector_prefs.enabled_keys())
+        mode_policy.set_live_domains(connector_state.live_domains(infos))
+    except Exception as exc:  # noqa: BLE001 — never fatal
+        logging.getLogger(__name__).warning(
+            "could not publish connector domains to the policy: %s", exc)
 
 
 def create_app() -> FastAPI:

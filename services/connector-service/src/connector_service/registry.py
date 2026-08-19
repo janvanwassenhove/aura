@@ -59,8 +59,17 @@ class ConnectorRegistry:
         self._entries: dict[str, ConnectorEntry] = {}
 
     def build(self) -> None:
-        """Instantiate all enabled connectors. Missing credentials → UNAUTHENTICATED."""
-        for key in self._settings.enabled_connector_list:
+        """Instantiate all enabled connectors. Missing credentials → UNAUTHENTICATED.
+
+        U254: the enabled set is the CONFIGURED list plus whatever the owner
+        switched on in Settings. Before that, enabling Google meant editing an
+        env file the desktop app writes and restarting — so the console's
+        Connect buttons pointed at connectors that could never come to exist.
+        """
+        from connector_service import connector_prefs
+
+        self._entries.clear()
+        for key in sorted(connector_prefs.enabled_keys(self._settings)):
             entry = self._build_one(key)
             self._entries[key] = entry
             logger.info("Connector %r registered — status=%s", key, entry.status.value)

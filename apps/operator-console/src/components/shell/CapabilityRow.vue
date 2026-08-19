@@ -8,8 +8,8 @@
     <span class="cap-mode mono">{{ MODE_META[modeStore.mode].label }}</span>
     <span
       v-for="g in modeStore.activeGroups" :key="g.id"
-      class="cap-chip" :class="g.state" :title="chipHint(g)"
-    >{{ g.state === 'asks' ? `${g.id} · asks` : g.id }}</span>
+      class="cap-chip" :class="[g.state, { unreachable: g.unreachable }]" :title="chipHint(g)"
+    >{{ chipText(g) }}</span>
     <span class="cap-spacer" />
     <span class="cap-edit">
       {{ canEdit ? 'Edit boundaries' : 'Set by the owner' }}
@@ -44,7 +44,19 @@ function onClick(): void {
   // Non-owners keep the tooltip explanation; the row does not navigate.
 }
 
+// U254: a group can be allowed by the mode and still have nothing behind it —
+// no mail account means no mail, whatever the boundary says. Saying "no
+// account" is the honest word; a green chip there is a promise he cannot keep.
+function chipText(g: PolicyGroup): string {
+  if (g.unreachable) return `${g.id} · no account`
+  return g.state === 'asks' ? `${g.id} · asks` : g.id
+}
+
 function chipHint(g: PolicyGroup): string {
+  if (g.unreachable) {
+    return `${g.label} — ${g.detail}. This mode allows it, but no account is `
+      + 'connected for it, so he cannot. Connect one in Settings › Connections.'
+  }
   const base = g.state === 'allows'
     ? 'Runs without asking'
     : g.state === 'asks'
@@ -75,6 +87,10 @@ function chipHint(g: PolicyGroup): string {
 }
 .cap-chip.allows { background: var(--ok-wash); color: var(--ok); border: 1px solid transparent; }
 .cap-chip.asks { background: var(--warn-wash); color: var(--warn); border: 1px solid transparent; }
+.cap-chip.unreachable {
+  background: var(--sunken); color: var(--ink-3);
+  border: 1px dashed var(--line-strong); text-decoration: none;
+}
 .cap-chip.blocked {
   background: transparent; color: var(--ink-3);
   border: 1px dashed var(--line-strong); text-decoration: line-through;

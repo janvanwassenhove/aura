@@ -152,8 +152,11 @@ def test_correcting_keeps_the_owners_switches(tmp_path, monkeypatch) -> None:
     assert got.person == "jan"
 
 
-def test_a_deleted_builtin_stays_deleted(tmp_path) -> None:
-    """Unchanged contract, re-pinned: the updater must not resurrect it."""
+def test_the_updater_does_not_resurrect_a_deleted_builtin(tmp_path) -> None:
+    """The correction pass walks the STORE, so a deleted skill is simply not
+    there to correct — but the contract is worth its own test, because a
+    future version that walked BUILTIN_SKILLS instead would quietly undo
+    every deletion the owner ever made."""
     store = SkillStore(str(tmp_path))
     seed_builtin_skills(store)
     store.delete("desktop-ai-assistants")
