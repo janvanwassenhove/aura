@@ -22,9 +22,11 @@ behalf.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import os
+from dataclasses import replace
 from pathlib import Path
 
 from orchestrator.skills import Skill, SkillStore
@@ -146,10 +148,15 @@ When this is useful: the owner explicitly wants a second opinion, or wants the
 answer to land in that app's own history. For anything you can answer yourself,
 just answer — do not bounce the question sideways.
 
-1. launch_app('claude') or launch_app('chatgpt'). If the name is not in the
-   allow-list, say so and point at Capabilities — never route around the
-   allow-list with run_powershell. That list is the reason AURA cannot start
-   arbitrary programs.
+1. Call launch_app('claude') or launch_app('chatgpt'). ALWAYS call it — you
+   cannot know what is registered without asking, and the tool names the
+   registered apps when it refuses. Do not tell the owner an app is
+   unavailable unless a real launch_app result said so; a refusal you invented
+   describes a boundary that may not exist, and it hides the one call that
+   would have proved it either way.
+   If the tool DOES refuse, repeat its reason and point at Capabilities —
+   never route around the allow-list with run_powershell. That list is the
+   reason AURA cannot start arbitrary programs.
 2. Wait for the window, then use_computer: click the message box, type the
    owner's question verbatim, press Enter.
 3. Wait for the reply to finish streaming before reading it — a screenshot
@@ -169,12 +176,89 @@ def _marker_path(store: SkillStore) -> Path:
     return Path(directory) / _MARKER_NAME
 
 
+def _seeded_fingerprints(store: SkillStore) -> dict[str, str]:
+    """Body fingerprints recorded when we last wrote each built-in."""
+    try:
+        data = json.loads(_marker_path(store).read_text(encoding="utf-8"))
+        fps = data.get("fingerprints") or {}
+        return {str(k): str(v) for k, v in fps.items()} if isinstance(fps, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
 def _already_seeded(store: SkillStore) -> set[str]:
     try:
         data = json.loads(_marker_path(store).read_text(encoding="utf-8"))
         return set(data.get("seeded", []))
     except (OSError, ValueError):
         return set()
+
+
+def _fingerprint(body: str) -> str:
+    """Content hash of a skill body, blind to line endings and trailing space.
+
+    The store round-trips text through a file and a JSON API; CRLF/LF and
+    stripped trailing spaces must not read as "the owner edited this".
+    """
+    # splitlines() already treats CRLF, CR and LF as one break, which is
+    # exactly the equivalence we want and one fewer escape to get wrong.
+    norm = chr(10).join(line.rstrip() for line in body.splitlines()).strip()
+    return hashlib.sha256(norm.encode("utf-8")).hexdigest()
+
+
+# U253c: bodies AURA itself shipped BEFORE fingerprints were recorded. A stored
+# skill matching one of these was written by us and never touched by the owner,
+# so a correction may replace it. Without this list, installs that predate the
+# mechanism could never receive a fix to a built-in — and the bug that prompted
+# it (a skill telling the model to announce "not in the allow-list" before ever
+# calling the tool) would have stayed on every existing machine forever.
+_PRIOR_BUILTIN_FINGERPRINTS: dict[str, set[str]] = {
+    "desktop-ai-assistants": {
+        "0d19dbb8de7f71c00f880b4ab385e1cb24f300f31100f26c7f8e0c56f15d1446",
+    },
+}
+
+
+def _update_untouched_builtins(
+    store: SkillStore, seen_fps: dict[str, str],
+) -> tuple[list[str], dict[str, str]]:
+    """Replace built-ins the owner never edited; leave edited ones alone.
+
+    The seeding rule stays intact — a default that reinstates itself after
+    deletion is not a default, and an owner's rewrite is theirs. This is the
+    third case, which had no answer: OUR text, unchanged, and wrong. Leaving
+    that alone is not respect for the owner, it is shipping a known bug to
+    exactly the people who trusted the default.
+    """
+    updated: list[str] = []
+    fps = dict(seen_fps)
+    by_name = {s.name: s for s in BUILTIN_SKILLS}
+    for stored in store.all():
+        builtin = by_name.get(stored.name)
+        if builtin is None:
+            continue                       # the owner's own skill
+        current = _fingerprint(stored.body)
+        if current == _fingerprint(builtin.body):
+            fps[stored.name] = current     # already up to date
+            continue
+        known = {seen_fps[stored.name]} if stored.name in seen_fps else set()
+        known |= _PRIOR_BUILTIN_FINGERPRINTS.get(stored.name, set())
+        if current not in known:
+            continue                       # the owner edited it — hands off
+        try:
+            # Keep the owner's own switches; only the procedure is ours.
+            replacement = replace(
+                builtin,
+                enabled=stored.enabled,
+                person=stored.person,
+                personas=stored.personas,
+            )
+            store.save(replacement)
+            fps[stored.name] = _fingerprint(builtin.body)
+            updated.append(stored.name)
+        except OSError as exc:
+            logger.warning("built-in skill %s not updated: %s", stored.name, exc)
+    return updated, fps
 
 
 def seed_builtin_skills(store: SkillStore) -> list[str]:
@@ -187,6 +271,9 @@ def seed_builtin_skills(store: SkillStore) -> list[str]:
     """
     present = {s.name for s in store.all()}
     seen = _already_seeded(store)
+    # U253c: correct built-ins the owner never edited, before deciding what to
+    # add — a stale body is not "already present and therefore fine".
+    updated, fps = _update_untouched_builtins(store, _seeded_fingerprints(store))
     added: list[str] = []
     for skill in BUILTIN_SKILLS:
         if skill.name in present or skill.name in seen:
@@ -197,14 +284,20 @@ def seed_builtin_skills(store: SkillStore) -> list[str]:
         except OSError as exc:
             logger.warning("built-in skill %s not written: %s", skill.name, exc)
 
-    if added or not seen:
+    for name in added:
+        skill = next((x for x in BUILTIN_SKILLS if x.name == name), None)
+        if skill is not None:
+            fps[name] = _fingerprint(skill.body)
+
+    if added or updated or not seen or fps != _seeded_fingerprints(store):
         # Record every built-in name we know about, not just the ones added, so
         # a skill introduced in a LATER release still seeds once on the boot
         # that first ships it (its name won't be in the old marker).
         all_names = sorted({s.name for s in BUILTIN_SKILLS} | seen)
         try:
             _marker_path(store).write_text(
-                json.dumps({"seeded": all_names}), encoding="utf-8")
+                json.dumps({"seeded": all_names, "fingerprints": fps}),
+                encoding="utf-8")
         except OSError as exc:
             logger.warning("could not write built-in skill marker: %s", exc)
     if added:

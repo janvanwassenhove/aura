@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 from orchestrator.builtin_skills import BUILTIN_SKILLS, seed_builtin_skills
 from orchestrator.skills import Skill, SkillStore
 
@@ -80,3 +82,85 @@ def test_builtins_are_not_scoped_to_a_person_or_persona() -> None:
         assert skill.person == "", skill.name
         assert skill.personas == [], skill.name
         assert skill.enabled is True, skill.name
+
+
+# ---------------------------------------------------------------------------
+# U253c: correcting a built-in the owner never touched
+# ---------------------------------------------------------------------------
+
+
+def _ai_skill() -> Skill:
+    return next(s for s in BUILTIN_SKILLS if s.name == "desktop-ai-assistants")
+
+
+def _with_new_body(monkeypatch, name: str, body: str) -> None:
+    """Simulate the NEXT release shipping a corrected body for `name`."""
+    import orchestrator.builtin_skills as bs
+
+    patched = tuple(replace(s, body=body) if s.name == name else s
+                    for s in bs.BUILTIN_SKILLS)
+    monkeypatch.setattr(bs, "BUILTIN_SKILLS", patched)
+
+
+def test_a_stale_untouched_builtin_is_corrected(tmp_path, monkeypatch) -> None:
+    """The reported bug shipped inside a skill body, so a code fix alone
+    could never reach the machines running it.
+
+    `desktop-ai-assistants` told the model: "If the name is not in the
+    allow-list, say so." The model said so — about an app that WAS in the
+    list — without ever calling launch_app. Seeding is once-only by design,
+    so every existing install would have kept that text forever.
+
+    Untouched means OUR text, unchanged: safe to replace.
+    """
+    store = SkillStore(str(tmp_path))
+    seed_builtin_skills(store)                       # ships the old text
+    old_body = _stored(store).body
+
+    _with_new_body(monkeypatch, "desktop-ai-assistants", "CALL the tool first.")
+    seed_builtin_skills(store)                       # the next release boots
+
+    assert _stored(store).body == "CALL the tool first."
+    assert _stored(store).body != old_body
+
+
+def test_an_owner_edited_builtin_is_still_never_corrected(tmp_path) -> None:
+    """The correction must not become a licence to overwrite. Their text wins,
+    stale or not — that is the whole point of the seeding rule."""
+    store = SkillStore(str(tmp_path))
+    seed_builtin_skills(store)
+
+    mine = replace(_ai_skill(), body="Ask Claude the way I like it.")
+    store.save(mine)
+    seed_builtin_skills(store)
+    assert _stored(store).body == "Ask Claude the way I like it."
+
+
+def test_correcting_keeps_the_owners_switches(tmp_path, monkeypatch) -> None:
+    """Only the procedure is ours. If they disabled it or scoped it to one
+    person, a correction that silently re-enables it is a bug of its own."""
+    store = SkillStore(str(tmp_path))
+    seed_builtin_skills(store)
+
+    store.save(replace(_stored(store), enabled=False, person="jan"))
+    _with_new_body(monkeypatch, "desktop-ai-assistants", "corrected procedure")
+    seed_builtin_skills(store)
+
+    got = _stored(store)
+    assert got.body == "corrected procedure"   # corrected
+    assert got.enabled is False           # but still theirs
+    assert got.person == "jan"
+
+
+def test_a_deleted_builtin_stays_deleted(tmp_path) -> None:
+    """Unchanged contract, re-pinned: the updater must not resurrect it."""
+    store = SkillStore(str(tmp_path))
+    seed_builtin_skills(store)
+    store.delete("desktop-ai-assistants")
+
+    seed_builtin_skills(store)
+    assert all(s.name != "desktop-ai-assistants" for s in store.all())
+
+
+def _stored(store: SkillStore) -> Skill:
+    return next(s for s in store.all() if s.name == "desktop-ai-assistants")

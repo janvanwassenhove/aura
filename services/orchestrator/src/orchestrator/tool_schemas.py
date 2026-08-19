@@ -11,7 +11,11 @@ handled elsewhere and are simply not advertised to the connector LLM.
 
 from __future__ import annotations
 
+import copy
+
 _NO_ARGS = {"type": "object", "properties": {}, "additionalProperties": False}
+
+
 
 
 def _fn(name: str, description: str, parameters: dict) -> dict:
@@ -342,9 +346,45 @@ LADDER_NOTE = (
 )
 
 
+def _launch_app_spec() -> dict:
+    """launch_app, with the REAL registered names in its description.
+
+    U253c: the static description said "e.g. 'vscode', 'spotify'" and nothing
+    else, so the model had no way to know what is actually registered — it had
+    to guess. Asked to open Claude it guessed wrong, answered "Claude is not in
+    my list of approved apps", and never called the tool at all. Claude WAS in
+    the list. A refusal invented instead of measured is worse than a failed
+    call: the owner is told a boundary exists where there is none, and the tool
+    that would have corrected it is exactly the one that was skipped.
+
+    The list is read per turn, so registering an app in Capabilities is visible
+    to the very next sentence rather than after a restart.
+    """
+    import os
+
+    spec = copy.deepcopy(TOOL_SCHEMAS["launch_app"])
+    names = sorted(
+        pair.split("=", 1)[0].strip().lower()
+        for pair in os.environ.get("ALLOWED_APPS", "").split(";")
+        if "=" in pair
+    )
+    registered = ", ".join(f"'{n}'" for n in names) if names else "(none registered yet)"
+    spec["function"]["description"] = (
+        "Launch an allow-listed desktop app on the owner's laptop by its "
+        f"registered name. Registered right now: {registered}. Each launch "
+        "asks the owner for approval. If you believe the app the owner wants "
+        "is not in that list, CALL THIS TOOL ANYWAY and let it answer — never "
+        "tell the owner an app is unavailable without having tried."
+    )
+    return spec
+
+
 def build_tool_specs(allowed_tools: frozenset[str]) -> list[dict]:
     """Return OpenAI function schemas for the allowed tools that have one.
 
     Order is stable (sorted) for deterministic prompts/tests.
     """
-    return [TOOL_SCHEMAS[name] for name in sorted(allowed_tools) if name in TOOL_SCHEMAS]
+    return [
+        _launch_app_spec() if name == "launch_app" else TOOL_SCHEMAS[name]
+        for name in sorted(allowed_tools) if name in TOOL_SCHEMAS
+    ]
