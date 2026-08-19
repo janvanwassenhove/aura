@@ -971,7 +971,36 @@ class OrchestratorPipeline:
                 logger.warning("Offline local LLM unavailable (%s); using regex fallback", exc)
         return await self._fallback.handle(text, session_id)
 
+    async def _call_mcp(self, tool_name: str, arguments: dict) -> str:
+        """Run one tool on the MCP server that offers it.
+
+        Failures are returned as text rather than raised: a third-party server
+        that is down, slow or wrong should read to the model as a tool that did
+        not work — which it can say out loud — not as a crashed turn.
+        """
+        from orchestrator import mcp_client, mcp_servers
+
+        routed = mcp_servers.route(tool_name)
+        if routed is None:
+            return (f"[{tool_name}: that added tool is not available — its "
+                    f"server was removed or switched off.]")
+        server, tool = routed
+        try:
+            return await mcp_client.call_tool(
+                server.url, tool, arguments,
+                auth_type=server.auth_type,
+                auth_value=mcp_servers.get_secret(server.name),
+            )
+        except Exception as exc:  # noqa: BLE001 — report, never crash the turn
+            logger.warning("MCP call failed: %s → %s", tool_name, exc)
+            return f"[{tool_name}: the {server.name} server could not run it — {exc}]"
+
     async def _call_connector(self, tool_name: str, arguments: dict) -> str:
+        # U255: an added MCP tool is served by its own server, not by the
+        # connector service. Checked first because its name can never collide
+        # with a built-in route (the mcp__ prefix is reserved).
+        if tool_name.startswith("mcp__"):
+            return await self._call_mcp(tool_name, arguments)
         route = _TOOL_ROUTES.get(tool_name)
         if route is None:
             return f"(no connector route for {tool_name!r})"

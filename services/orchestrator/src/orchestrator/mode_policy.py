@@ -55,6 +55,10 @@ UI_MODES = ("home", "work", "presentation")
 # itself, not a tool call — it exists so the chip row can say so.
 TOOL_GROUPS: list[tuple[str, str, str, frozenset[str]]] = [
     ("conversation", "Conversation", "talking, answering, remembering", frozenset()),
+    # U255: tools an MCP server brought in. Its members are DYNAMIC (whatever
+    # the owner added and switched on), so the frozenset is empty here and the
+    # live names come from mcp_servers — see `_mcp_tools()`.
+    ("mcp tools", "Added tools", "tools you added from an MCP server", frozenset()),
     ("calendar", "Calendar", "read your agenda, add and move events", frozenset({
         "list_calendar_events_today", "create_calendar_event", "delete_calendar_event",
     })),
@@ -84,6 +88,8 @@ TOOL_GROUPS: list[tuple[str, str, str, frozenset[str]]] = [
         "speak", "execute_motion", "load_presentation", "advance_slide",
     })),
 ]
+
+MCP_GROUP = "mcp tools"
 
 _GROUP_BY_ID = {gid: (label, detail, tools) for gid, label, detail, tools in TOOL_GROUPS}
 _GROUP_OF_TOOL: dict[str, str] = {
@@ -150,6 +156,8 @@ def default_state(mode: str, group_id: str) -> str:
     No tool of the group in the mode's set → blocked. Any in-mode tool that
     stops at the approval gate → the group asks. Otherwise it allows.
     """
+    if group_id == MCP_GROUP:
+        return _mcp_default_state(mode)
     _label, _detail, tools = _GROUP_BY_ID[group_id]
     if not tools:  # conversation — the turn itself
         return ALLOWS
@@ -253,15 +261,43 @@ def _tools_without_a_connector() -> frozenset[str]:
     return frozenset(dead)
 
 
+def _mcp_tools() -> frozenset[str]:
+    """Tool names of every ENABLED MCP server, or empty when there are none."""
+    try:
+        from orchestrator import mcp_servers
+
+        return mcp_servers.enabled_tool_names()
+    except Exception:  # noqa: BLE001 — a broken add-on must not break the gate
+        return frozenset()
+
+
+def tools_in_group(group_id: str) -> frozenset[str]:
+    """Group membership, with the MCP group resolved live."""
+    if group_id == MCP_GROUP:
+        return _mcp_tools()
+    entry = _GROUP_BY_ID.get(group_id)
+    return entry[2] if entry else frozenset()
+
+
 def allowed_tools(mode: str) -> frozenset[str]:
     """The mode's tool set with the owner's overrides applied."""
     base = set(MODE_TOOL_MAP.get(mode, frozenset()))
+    # U255: tools from an MCP server the owner added and switched on. They are
+    # not in MODE_TOOL_MAP (nothing here wrote them), so they are added by the
+    # fact of being enabled — and removed again the moment the group is
+    # blocked, below. Present mode is the exception: a talk locks down to the
+    # things a stage needs, and a third-party tool firing mid-presentation is
+    # the last thing anyone wants.
+    mcp = _mcp_tools()
+    if mcp and mode != "presentation":
+        base |= mcp
     overrides = _load()["overrides"].get(mode) or {}
     for group_id, state in overrides.items():
-        entry = _GROUP_BY_ID.get(group_id)
-        if entry is None or state not in STATES:
+        if group_id not in _GROUP_BY_ID:
             continue
-        tools = entry[2]
+        if state not in STATES:
+            continue
+        tools = tools_in_group(group_id)
         if state == BLOCKED:
             base -= tools
         else:  # allows / asks — the group is available either way
@@ -270,6 +306,18 @@ def allowed_tools(mode: str) -> frozenset[str]:
     # is nothing to allow. Subtracted AFTER the overrides so an owner cannot
     # accidentally re-enable a tool that has nothing behind it.
     return frozenset(base - _tools_without_a_connector())
+
+
+def _mcp_default_state(mode: str) -> str:
+    """`asks` whenever there is anything to ask about, `blocked` otherwise.
+
+    Built-in tools were written and reviewed in this repo; an MCP server's were
+    not. That difference is worth one approval click per call until the owner
+    decides otherwise — and in Present mode they are simply out.
+    """
+    if not _mcp_tools():
+        return BLOCKED
+    return BLOCKED if mode == "presentation" else ASKS
 
 
 def requires_approval(tool_name: str, mode: str) -> bool:
@@ -282,6 +330,13 @@ def requires_approval(tool_name: str, mode: str) -> bool:
     the group without it. Ungrouped tools keep the APPROVAL_REQUIRED baseline
     and can never be loosened from here.
     """
+    # U255: an added tool is not in _GROUP_OF_TOOL (its members are dynamic),
+    # and it has no APPROVAL_REQUIRED baseline either — nothing here wrote it.
+    # So the gate is explicit: it asks unless the owner said `allows`. The
+    # no-baseline case is exactly where "unknown means allowed" would be worst.
+    if tool_name.startswith("mcp__"):
+        state, source = group_state(mode, MCP_GROUP)
+        return not (source == "override" and state == ALLOWS)
     group_id = _GROUP_OF_TOOL.get(tool_name)
     if group_id is None:
         return tool_name in APPROVAL_REQUIRED

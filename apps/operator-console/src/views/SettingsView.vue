@@ -135,6 +135,70 @@
         </p>
       </section>
 
+      <!-- ═══ Added tools (MCP) ═══ -->
+      <section class="d2-card sec">
+        <header class="sec-head">
+          <h3>Added tools</h3>
+          <span class="mono sec-meta">MCP servers · adding is not switching on</span>
+        </header>
+
+        <div v-for="srv in mcp.servers" :key="srv.name" class="row">
+          <div class="row-text">
+            <div class="row-title">
+              {{ srv.name }}
+              <span class="mono dom">{{ srv.tools.length }} tool{{ srv.tools.length === 1 ? '' : 's' }}</span>
+            </div>
+            <div class="row-sub mono">{{ srv.url }}</div>
+            <div v-if="srv.last_error" class="sec-error">{{ srv.last_error }}</div>
+            <div v-else-if="!srv.tools.length" class="row-next">
+              → Nothing discovered yet. Press Refresh to ask the server what it offers.
+            </div>
+            <!-- Show WHAT you are switching on, before you switch it on. -->
+            <div v-else class="tool-list">
+              <span v-for="t in srv.tools" :key="t.name" class="tool-pill mono" :title="t.description">{{ t.name }}</span>
+            </div>
+          </div>
+          <span class="row-val" :class="srv.enabled ? 'ok' : ''">{{ srv.enabled ? 'on' : 'off' }}</span>
+          <button
+            class="switch" :class="{ on: srv.enabled }" :aria-pressed="srv.enabled"
+            :disabled="!srv.tools.length"
+            :aria-label="`Use ${srv.name}`"
+            :title="srv.tools.length ? `Switch ${srv.name} on — its tools stop for your approval` : 'Discover its tools first'"
+            @click="mcp.setEnabled(srv.name, !srv.enabled)"
+          ><span class="knob" /></button>
+          <button class="d2-ghost-btn" :disabled="mcp.busy" @click="mcp.refresh(srv.name)">Refresh</button>
+          <button class="d2-ghost-btn" title="Remove this server and its tools" @click="removeServer(srv.name)">Remove</button>
+        </div>
+
+        <div class="row">
+          <div class="row-text">
+            <div class="row-title">Add a server</div>
+            <div class="row-sub">
+              Any MCP server with an HTTP endpoint. Its tools are discovered first;
+              you decide afterwards whether he may use them.
+            </div>
+          </div>
+          <input v-model="draft.name" class="d2-field row-field" placeholder="name (e.g. wiki)" aria-label="Server name">
+          <input v-model="draft.url" class="d2-field row-field" placeholder="https://…/mcp" aria-label="Server URL">
+          <select v-model="draft.authType" class="d2-field row-field" aria-label="Authentication">
+            <option value="none">no auth</option>
+            <option value="bearer">bearer token</option>
+            <option value="api_key">API key</option>
+          </select>
+          <input v-if="draft.authType !== 'none'" v-model="draft.secret" type="password"
+                 class="d2-field row-field" placeholder="token" autocomplete="off" aria-label="Token">
+          <button class="d2-primary-btn" :disabled="!draft.name.trim() || !draft.url.trim() || mcp.busy"
+                  @click="addServer">{{ mcp.busy ? 'Asking…' : 'Add' }}</button>
+        </div>
+
+        <p v-if="mcp.error" class="sec-error">{{ mcp.error }}</p>
+        <p class="sec-note">
+          Added tools always stop for your approval before they run — they were
+          written by someone else. Change that per mode under
+          <strong>Modes › {{ mcp.group }}</strong>.
+        </p>
+      </section>
+
       <!-- ═══ Capabilities — permissions are settings ═══ -->
       <section class="d2-card sec">
         <header class="sec-head">
@@ -287,6 +351,7 @@ import { useConnectionsStore } from '../stores/connectionsStore'
 import { useKnowledgeStore } from '../stores/knowledgeStore'
 import { LANGUAGES, usePrefsStore, type Language } from '../stores/prefsStore'
 import { useSettingsStore, type LLMProvider } from '../stores/settingsStore'
+import { useMcpStore } from '../stores/mcpStore'
 import { useThemeStore } from '../stores/themeStore'
 
 const settingsStore = useSettingsStore()
@@ -295,6 +360,18 @@ const caps = useCapabilitiesStore()
 const knowledge = useKnowledgeStore()
 const prefs = usePrefsStore()
 const themeStore = useThemeStore()
+const mcp = useMcpStore()
+
+// ── Added tools (MCP) ──────────────────────────────────────────────────────
+const draft = ref({ name: '', url: '', authType: 'none', secret: '' })
+async function addServer(): Promise<void> {
+  const ok = await mcp.add(draft.value.name, draft.value.url,
+                           draft.value.authType, draft.value.secret)
+  if (ok) draft.value = { name: '', url: '', authType: 'none', secret: '' }
+}
+function removeServer(name: string): void {
+  if (window.confirm(`Remove ${name}? Its tools disappear with it.`)) mcp.remove(name)
+}
 
 const TTS_VOICES = ['alloy', 'ash', 'ballad', 'coral', 'echo', 'fable', 'onyx', 'nova', 'sage', 'shimmer', 'verse']
 
@@ -478,6 +555,7 @@ onMounted(() => {
     ['auto-approvals', () => caps.fetchAutoApprovals()],
     ['vault', () => knowledge.fetchTier()],
     ['prefs', () => prefs.fetchPrefs()],
+    ['added tools', () => mcp.fetchServers()],
   ]
   for (const [what, fn] of load) {
     try {
@@ -512,6 +590,11 @@ watch(() => themeStore.theme, () => { /* persisted by the store's own watcher */
 .dom {
   font-size: 10px; color: var(--ink-3); margin-left: 7px;
   text-transform: uppercase; letter-spacing: 0.04em;
+}
+.tool-list { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 5px; }
+.tool-pill {
+  font-size: 10.5px; padding: 2px 8px; border-radius: 999px;
+  background: var(--sunken); color: var(--ink-2); border: 1px solid var(--line);
 }
 .row-next { font-size: 12px; color: var(--info); margin-top: 3px; }
 .device-code {

@@ -684,3 +684,110 @@ async def list_webhooks() -> JSONResponse:
     })
 
 
+
+
+# ------------------------------------------------------------------
+# U255: MCP servers — add tools, look at them, then switch them on
+# ------------------------------------------------------------------
+
+
+def _mcp_payload() -> dict:
+    from orchestrator import mcp_servers, mode_policy
+
+    servers = [s.as_dict() for s in mcp_servers.all_servers()]
+    return {
+        "servers": servers,
+        # The group the added tools land in, so the console can point at the
+        # one switch that governs all of them rather than inventing a rule.
+        "group": mode_policy.MCP_GROUP,
+        "enabled_tools": sorted(mcp_servers.enabled_tool_names()),
+    }
+
+
+@router.get("/mcp/servers")
+async def list_mcp_servers() -> JSONResponse:
+    return JSONResponse(_mcp_payload())
+
+
+@router.post("/mcp/servers")
+async def add_mcp_server(body: dict) -> JSONResponse:
+    """Add a server and immediately ask it what it offers.
+
+    Adding does NOT enable it: the owner should see the tool list before any
+    of it becomes something the assistant may do.
+    """
+    from orchestrator import mcp_client, mcp_servers
+
+    try:
+        server = mcp_servers.add(
+            name=str(body.get("name", "")),
+            url=str(body.get("url", "")),
+            auth_type=str(body.get("auth_type", "none")),
+            secret=str(body.get("secret", "")),
+        )
+    except ValueError as exc:
+        return JSONResponse({"error": str(exc)}, status_code=422)
+
+    error = ""
+    try:
+        tools = await mcp_client.list_tools(
+            server.url, server.auth_type, mcp_servers.get_secret(server.name))
+        mcp_servers.record_tools(
+            server.name,
+            [mcp_servers.McpToolSpec(t.name, t.description, t.input_schema)
+             for t in tools],
+        )
+    except Exception as exc:  # noqa: BLE001 — a bad server is an answer, not a 500
+        error = str(exc)
+        mcp_servers.record_tools(server.name, [], error=error)
+
+    payload = _mcp_payload()
+    payload["added"] = server.name
+    payload["discovery_error"] = error
+    return JSONResponse(payload)
+
+
+@router.post("/mcp/servers/{name}/refresh")
+async def refresh_mcp_server(name: str) -> JSONResponse:
+    """Ask the server again what it offers — tools change between versions."""
+    from orchestrator import mcp_client, mcp_servers
+
+    server = mcp_servers.get(name)
+    if server is None:
+        return JSONResponse({"error": f"no MCP server named {name!r}"}, status_code=404)
+    error = ""
+    try:
+        tools = await mcp_client.list_tools(
+            server.url, server.auth_type, mcp_servers.get_secret(name))
+        mcp_servers.record_tools(
+            name, [mcp_servers.McpToolSpec(t.name, t.description, t.input_schema)
+                   for t in tools])
+    except Exception as exc:  # noqa: BLE001
+        error = str(exc)
+        mcp_servers.record_tools(name, [], error=error)
+    payload = _mcp_payload()
+    payload["discovery_error"] = error
+    return JSONResponse(payload)
+
+
+@router.post("/mcp/servers/{name}/enabled")
+async def enable_mcp_server(name: str, body: dict | None = None) -> JSONResponse:
+    from orchestrator import mcp_servers
+
+    enabled = True if body is None else bool(body.get("enabled", True))
+    try:
+        server = mcp_servers.set_enabled(name, enabled)
+    except ValueError as exc:
+        return JSONResponse({"error": str(exc)}, status_code=422)
+    if server is None:
+        return JSONResponse({"error": f"no MCP server named {name!r}"}, status_code=404)
+    return JSONResponse(_mcp_payload())
+
+
+@router.delete("/mcp/servers/{name}")
+async def delete_mcp_server(name: str) -> JSONResponse:
+    from orchestrator import mcp_servers
+
+    if not mcp_servers.remove(name):
+        return JSONResponse({"error": f"no MCP server named {name!r}"}, status_code=404)
+    return JSONResponse(_mcp_payload())

@@ -384,7 +384,24 @@ def build_tool_specs(allowed_tools: frozenset[str]) -> list[dict]:
 
     Order is stable (sorted) for deterministic prompts/tests.
     """
-    return [
+    specs = [
         _launch_app_spec() if name == "launch_app" else TOOL_SCHEMAS[name]
         for name in sorted(allowed_tools) if name in TOOL_SCHEMAS
     ]
+    # U255: tools from MCP servers the owner added and switched on. They have
+    # no entry in TOOL_SCHEMAS — the server describes them — so they are
+    # appended from the live registry, filtered by the same allowed set that
+    # governs everything else. A tool the policy did not allow never reaches
+    # the model, whoever supplied it.
+    try:
+        from orchestrator import mcp_servers
+
+        specs.extend(
+            spec for spec in mcp_servers.enabled_tool_specs()
+            if spec["function"]["name"] in allowed_tools
+        )
+    except Exception as exc:  # noqa: BLE001 — an add-on must not break the turn
+        import logging
+
+        logging.getLogger(__name__).warning("MCP tool specs unavailable: %s", exc)
+    return specs

@@ -42,9 +42,15 @@ def test_every_group_state_is_derived_from_the_real_policy() -> None:
     for mode in mode_policy.UI_MODES:
         for gid, _label, _detail, tools in mode_policy.TOOL_GROUPS:
             state = mode_policy.default_state(mode, gid)
-            if not tools:
+            if gid == "conversation":
                 assert state == "allows", "conversation is the turn itself"
                 continue
+            if gid == mode_policy.MCP_GROUP:
+                # U255: membership is dynamic (whatever MCP servers the owner
+                # added), so with none added there is nothing to allow.
+                assert state == "blocked", "no added tools yet"
+                continue
+            assert tools, f"group {gid!r} has no tools and no rule of its own"
             in_mode = tools & MODE_TOOL_MAP[mode]
             if not in_mode:
                 assert state == "blocked", (mode, gid)
