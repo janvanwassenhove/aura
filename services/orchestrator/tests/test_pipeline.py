@@ -157,3 +157,65 @@ async def test_the_turn_pipeline_still_uses_it(
     pipeline.set_active_person("jan")
     await pipeline.orchestrate("hello", "session-note")
     assert seen.get("asked") == "jan"
+
+
+# ---------------------------------------------------------------------------
+# U257: "hallo" is not a language
+# ---------------------------------------------------------------------------
+
+
+def test_auto_language_names_a_fallback_for_ambiguous_input(monkeypatch) -> None:
+    """Reported as: "waarop begint hij in duits te praten?"
+
+    The owner typed "hallo" and got "Hallo! Wie kann ich dir heute helfen?".
+    Nothing was broken — on `auto` the only instruction was "reply in the
+    language the user is using", and "hallo" is equally Dutch, German and
+    English. With nothing to go on, German is the most common training-set
+    answer to a bare "hallo". So give it something to go on.
+    """
+    from orchestrator.pipeline import _identity_prefix
+
+    monkeypatch.setenv("ASSISTANT_LANGUAGE", "auto")
+    monkeypatch.setenv("LANGUAGE_FALLBACK", "nl")
+    prefix = _identity_prefix()
+    assert "language the user is using" in prefix   # still matches a real sentence
+    assert "reply in Dutch" in prefix               # but a word does not coin-flip
+    assert "switch as soon as they make it clear" in prefix
+
+
+def test_an_explicit_language_is_still_absolute(monkeypatch) -> None:
+    """Choosing a language in Settings must not become a suggestion."""
+    from orchestrator.pipeline import _identity_prefix
+
+    monkeypatch.setenv("ASSISTANT_LANGUAGE", "fr")
+    monkeypatch.setenv("LANGUAGE_FALLBACK", "nl")
+    prefix = _identity_prefix()
+    assert "Always reply in French." in prefix
+    assert "too short to tell" not in prefix
+
+
+def test_the_fallback_prefers_a_real_locale_over_a_useless_one(monkeypatch) -> None:
+    """`locale.getlocale()` answers "C" on an untouched process — truthy and
+    useless. Taking the first non-empty source hid the real locale behind it.
+    """
+    import locale as _locale
+
+    from orchestrator import pipeline
+
+    monkeypatch.delenv("LANGUAGE_FALLBACK", raising=False)
+    monkeypatch.setattr(_locale, "getlocale", lambda *a, **k: ("C", None))
+    monkeypatch.setattr(_locale, "getdefaultlocale", lambda *a, **k: ("nl_BE", "cp1252"))
+    assert pipeline._house_language() == "nl"
+
+
+def test_an_unknown_locale_falls_back_to_english(monkeypatch) -> None:
+    import locale as _locale
+
+    from orchestrator import pipeline
+
+    monkeypatch.delenv("LANGUAGE_FALLBACK", raising=False)
+    monkeypatch.delenv("LANG", raising=False)
+    monkeypatch.delenv("LC_ALL", raising=False)
+    monkeypatch.setattr(_locale, "getlocale", lambda *a, **k: (None, None))
+    monkeypatch.setattr(_locale, "getdefaultlocale", lambda *a, **k: ("xx_YY", None))
+    assert pipeline._house_language() == "en"

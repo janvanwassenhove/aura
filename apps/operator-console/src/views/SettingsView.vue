@@ -312,6 +312,23 @@
             <option v-for="l in LANGUAGES" :key="l.id" :value="l.id">{{ l.label }}</option>
           </select>
         </div>
+        <!-- U257: "hallo" is equally Dutch, German and English. On Automatic a
+             one-word greeting used to be a coin flip; this is the tiebreaker. -->
+        <div v-if="prefs.language === 'auto'" class="row">
+          <div class="row-text">
+            <div class="row-title">When a message is too short to tell</div>
+            <div class="row-sub">
+              A bare “hallo” fits several languages. This is the one he picks
+              until you make it clear — he switches the moment you do.
+            </div>
+          </div>
+          <select :value="prefs.languageFallback" class="d2-field row-field"
+                  aria-label="Fallback language"
+                  @change="prefs.save({ language_fallback: ($event.target as HTMLSelectElement).value })">
+            <option value="">this machine ({{ prefs.languageFallbackEffective || 'en' }})</option>
+            <option v-for="l in LANGUAGES.filter(x => x.id !== 'auto')" :key="l.id" :value="l.id">{{ l.label }}</option>
+          </select>
+        </div>
       </section>
 
       <!-- ═══ Appearance ═══ -->

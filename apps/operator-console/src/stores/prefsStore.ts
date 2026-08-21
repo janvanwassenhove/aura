@@ -37,6 +37,10 @@ export function densityForRole(role: string | null | undefined): Density {
 export const usePrefsStore = defineStore('prefs', () => {
   const assistantName = ref('AURA')
   const language = ref<Language>('auto')
+  /** U257: which language wins when a message is too short to tell. Empty =
+   *  work it out from this machine's locale; `Effective` is what that became. */
+  const languageFallback = ref<string>('')
+  const languageFallbackEffective = ref<string>('')
   const voiceMode = ref<VoiceMode>('off')
   const voiceEngine = ref<VoiceEngine>('pipeline')
   const wakeWord = ref('AURA')
@@ -75,6 +79,8 @@ export const usePrefsStore = defineStore('prefs', () => {
         const data = await resp.json()
         assistantName.value = data.assistant_name ?? 'AURA'
         language.value = (data.language ?? 'auto') as Language
+        languageFallback.value = data.language_fallback ?? ''
+        languageFallbackEffective.value = data.language_fallback_effective ?? ''
         voiceMode.value = (data.voice_mode ?? 'off') as VoiceMode
         voiceEngine.value = (data.voice_engine ?? 'pipeline') as VoiceEngine
         wakeWord.value = data.wake_word
@@ -84,7 +90,7 @@ export const usePrefsStore = defineStore('prefs', () => {
   }
 
   async function save(fields: {
-    assistant_name?: string; language?: Language;
+    assistant_name?: string; language?: Language; language_fallback?: string;
     voice_mode?: VoiceMode; voice_engine?: VoiceEngine; wake_word?: string; tts_voice?: string
   }): Promise<boolean> {
     saving.value = true
@@ -102,6 +108,10 @@ export const usePrefsStore = defineStore('prefs', () => {
       }
       assistantName.value = data.assistant_name
       language.value = data.language
+      if (typeof data.language_fallback === 'string') languageFallback.value = data.language_fallback
+      if (typeof data.language_fallback_effective === 'string') {
+        languageFallbackEffective.value = data.language_fallback_effective
+      }
       voiceMode.value = data.voice_mode
       voiceEngine.value = data.voice_engine ?? voiceEngine.value
       wakeWord.value = data.wake_word
@@ -116,7 +126,8 @@ export const usePrefsStore = defineStore('prefs', () => {
   }
 
   return {
-    assistantName, language, voiceMode, voiceEngine, wakeWord, ttsVoice, saving, error,
+    assistantName, language, languageFallback, languageFallbackEffective,
+    voiceMode, voiceEngine, wakeWord, ttsVoice, saving, error,
     density, densityTouched, railCollapsed,
     setDensity, followPerson, resetDensityTouch, toggleRail,
     fetchPrefs, save,

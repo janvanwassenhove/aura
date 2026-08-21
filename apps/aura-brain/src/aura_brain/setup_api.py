@@ -260,6 +260,16 @@ async def discover() -> JSONResponse:
     return JSONResponse({"found": found, "scanned": len(unique)})
 
 
+def _effective_fallback() -> str:
+    """What `auto` will actually reach for — resolved, not just configured."""
+    try:
+        from orchestrator.pipeline import _house_language
+
+        return _house_language()
+    except Exception:  # noqa: BLE001
+        return "en"
+
+
 # ── Assistant preferences (U36h): call name + reply language ──────────
 
 _ALLOWED_LANGUAGES = {"auto", "en", "nl", "fr", "de"}  # U130: + German
@@ -273,6 +283,10 @@ def _prefs_snapshot() -> dict:
     return {
         "assistant_name": os.environ.get("ASSISTANT_NAME", "AURA"),
         "language": os.environ.get("ASSISTANT_LANGUAGE", "auto"),
+        # Empty means "work it out from this machine's locale" — the console
+        # shows what that resolved to, so the answer is never a mystery.
+        "language_fallback": os.environ.get("LANGUAGE_FALLBACK", ""),
+        "language_fallback_effective": _effective_fallback(),
         "voice_mode": os.environ.get("VOICE_MODE", "off"),
         "voice_engine": os.environ.get("VOICE_ENGINE", "pipeline"),  # U132
         "wake_word": os.environ.get("WAKE_WORD", os.environ.get("ASSISTANT_NAME", "AURA")),
@@ -331,6 +345,17 @@ async def set_prefs(body: dict) -> JSONResponse:
                 status_code=422,
             )
         updates["ASSISTANT_LANGUAGE"] = language
+    # U257: which language wins when a message is too short to tell. Only
+    # consulted while `language` is auto; an explicit choice stays absolute.
+    fallback = (body or {}).get("language_fallback")
+    if fallback is not None:
+        fallback = fallback.strip().lower()
+        if fallback and fallback not in _ALLOWED_LANGUAGES - {"auto"}:
+            return JSONResponse(
+                {"error": "language_fallback must be a concrete language"},
+                status_code=422,
+            )
+        updates["LANGUAGE_FALLBACK"] = fallback
     voice_mode = (body or {}).get("voice_mode")
     if voice_mode is not None:
         voice_mode = voice_mode.strip().lower()

@@ -79,6 +79,55 @@ def _strip_speaker_label(reply: str) -> str:
     return text
 
 
+def _house_language() -> str:
+    """The language to fall back on when a message cannot settle the question.
+
+    U257: on `auto` the only instruction was "reply in the language the user is
+    using", which is fine for a sentence and useless for a word. Asked "hallo"
+    — a greeting that is equally Dutch, German and English — the model
+    answered "Hallo! Wie kann ich dir heute helfen?". Nothing was broken; there
+    was simply nothing to go on, and German is the most common training-set
+    answer to a bare "hallo".
+
+    So give it something to go on. LANGUAGE_FALLBACK wins when set; otherwise
+    the machine's own locale, which is a real fact about the household rather
+    than a guess. Unknown → English, unchanged from before.
+    """
+    explicit = os.environ.get("LANGUAGE_FALLBACK", "").strip().lower()[:2]
+    if explicit in _LANGUAGE_NAMES:
+        return explicit
+    # Try every source and take the first that names a language we know.
+    # Checking only the first non-empty one returned "C" — truthy, useless, and
+    # it hid the real locale sitting right behind it.
+    try:
+        import locale
+
+        candidates = []
+        try:
+            candidates.append(locale.getlocale()[0])
+        except Exception:  # noqa: BLE001
+            pass
+        try:
+            # getdefaultlocale() is deprecated but remains the only call that
+            # reads the OS setting rather than the process's (usually "C") one.
+            # Its warning would otherwise fire on every single turn.
+            import warnings
+
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", DeprecationWarning)
+                candidates.append(locale.getdefaultlocale()[0])
+        except Exception:  # noqa: BLE001
+            pass
+        candidates += [os.environ.get("LANG"), os.environ.get("LC_ALL")]
+        for tag in candidates:
+            code = (tag or "").replace("-", "_").split("_")[0].lower()
+            if code in _LANGUAGE_NAMES:
+                return code
+    except Exception:  # noqa: BLE001 — a locale must never break a turn
+        pass
+    return "en"
+
+
 def _identity_prefix() -> str:
     """Assistant name + reply language, read per turn so the Settings panel
     changes take effect immediately (U36h)."""
@@ -87,7 +136,12 @@ def _identity_prefix() -> str:
     if lang in _LANGUAGE_NAMES:
         lang_line = f"Always reply in {_LANGUAGE_NAMES[lang]}."
     else:
-        lang_line = "Always reply in the language the user is using."
+        house = _LANGUAGE_NAMES[_house_language()]
+        lang_line = (
+            "Reply in the language the user is using. When a message is too "
+            f"short to tell — a bare greeting, a single word — reply in {house}, "
+            "and switch as soon as they make it clear."
+        )
     return (
         f"Your name is {name}, a warm, curious desk-robot companion. You respond "
         f"when addressed as {name}. Hold a natural, flowing conversation on ANY "
