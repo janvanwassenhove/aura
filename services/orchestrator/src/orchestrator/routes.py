@@ -791,3 +791,17 @@ async def delete_mcp_server(name: str) -> JSONResponse:
     if not mcp_servers.remove(name):
         return JSONResponse({"error": f"no MCP server named {name!r}"}, status_code=404)
     return JSONResponse(_mcp_payload())
+
+
+@router.post("/orchestrator/policy/quiet")
+async def set_quiet(body: dict) -> JSONResponse:
+    """Quiet hours: he answers when asked, but never speaks first.
+
+    U256: this was a localStorage flag. The chip said HUSHED and the robot
+    greeted people by name anyway, because nothing outside the browser had
+    ever heard of it.
+    """
+    from orchestrator import mode_policy
+
+    on = bool(body.get("quiet", body.get("enabled", False)))
+    return JSONResponse({"quiet": mode_policy.set_quiet(on)})

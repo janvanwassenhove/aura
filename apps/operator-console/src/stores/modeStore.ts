@@ -72,6 +72,13 @@ export const useModeStore = defineStore('mode', () => {
       policy.value = data.modes ?? {}
       const ui = TO_UI[data.active_mode]
       if (ui) mode.value = ui
+      // U256: the brain owns quiet; the browser only remembers it so the chip
+      // is right before the first fetch lands. When they disagree, the brain
+      // is what the robot will actually do.
+      if (typeof data.quiet === 'boolean') {
+        quiet.value = data.quiet
+        try { localStorage.setItem('aura-quiet', data.quiet ? '1' : '0') } catch { /* ok */ }
+      }
     } catch { /* brain offline — the header shows the last known state */ }
   }
 
@@ -128,9 +135,34 @@ export const useModeStore = defineStore('mode', () => {
     } catch { return false }
   }
 
-  function toggleQuiet(): void {
-    quiet.value = !quiet.value
-    try { localStorage.setItem('aura-quiet', quiet.value ? '1' : '0') } catch { /* session-only */ }
+  /** U256: quiet is the BRAIN's state, not a browser flag.
+   *
+   *  It used to live only in localStorage: the header chip lit up, the
+   *  presence line promised "he answers when asked and never speaks first",
+   *  and the brain — which does the greeting and the proactive speaking — was
+   *  never told. It greeted someone by name under that banner.
+   *
+   *  Optimistic so the chip answers the click, then corrected by the server's
+   *  reply; on failure it snaps back rather than lying in the other direction.
+   */
+  async function toggleQuiet(): Promise<boolean> {
+    const wanted = !quiet.value
+    quiet.value = wanted
+    try {
+      const resp = await fetch(`${BRAIN_URL}/orchestrator/policy/quiet`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ quiet: wanted }),
+      })
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
+      const body = await resp.json().catch(() => ({}))
+      quiet.value = typeof body.quiet === 'boolean' ? body.quiet : wanted
+      try { localStorage.setItem('aura-quiet', quiet.value ? '1' : '0') } catch { /* session-only */ }
+      return true
+    } catch (err: unknown) {
+      quiet.value = !wanted
+      error.value = err instanceof Error ? err.message : 'could not change quiet hours'
+      return false
+    }
   }
 
   /** The sentence an approval card or tool badge shows: which rule caused

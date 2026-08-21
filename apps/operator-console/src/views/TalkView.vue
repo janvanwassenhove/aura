@@ -35,12 +35,16 @@
         <div ref="scrollEl" role="log" class="log" :style="{ gap: (calm ? 18 : 14) + 'px', padding: calm ? '20px 22px 12px' : '14px 16px 10px' }">
           <template v-for="turn in convo.turns" :key="turn.id">
             <!-- user bubble -->
-            <div v-if="turn.role === 'user'" class="bubble-user" :style="bubbleSize">{{ turn.text }}</div>
+            <div v-if="turn.role === 'user'" class="turn-user">
+              <div class="bubble-user" :style="bubbleSize">{{ turn.text }}</div>
+              <time v-if="!calm" class="turn-time mono" :datetime="turn.timestamp" :title="fullTime(turn.timestamp)">{{ shortTime(turn.timestamp) }}</time>
+            </div>
             <!-- assistant bubble, preceded by the mark -->
             <div v-else class="bot-row">
               <span class="bot-mark" v-html="character.art(24, 'idle')" />
               <div class="bot-body">
                 <div class="bubble-bot" :style="bubbleSize">{{ turn.text }}</div>
+                <time v-if="!calm" class="turn-time mono" :datetime="turn.timestamp" :title="fullTime(turn.timestamp)">{{ shortTime(turn.timestamp) }}</time>
                 <template v-if="!calm && turn.toolCall">
                   <button
                     class="tool-badge mono" :class="{ open: openTool === turn.id }"
@@ -396,6 +400,24 @@ function send(): void {
   const text = convo.pendingText.trim()
   if (text) convo.submitTurn(text)
 }
+// U256: when a turn happened. Time only for today — the date on every line is
+// noise in a conversation you are having right now — and a date as soon as it
+// is older, because "14:32" on yesterday's message is worse than no time.
+function shortTime(iso: string): string {
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ''
+  const hhmm = d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
+  const today = new Date()
+  const sameDay = d.getFullYear() === today.getFullYear()
+    && d.getMonth() === today.getMonth() && d.getDate() === today.getDate()
+  if (sameDay) return hhmm
+  return `${d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' })} ${hhmm}`
+}
+function fullTime(iso: string): string {
+  const d = new Date(iso)
+  return Number.isNaN(d.getTime()) ? '' : d.toLocaleString()
+}
+
 const teachHint = 'Teach — turn this message into a lesson you approve'
 function teach(): void {
   const text = convo.pendingText.trim()
@@ -576,6 +598,12 @@ const nowCard = computed(() => {
 
 .log { flex: 1 1 auto; min-height: 100px; overflow-y: auto; display: flex; flex-direction: column; }
 .log-empty { font-size: 13px; color: var(--ink-3); }
+.turn-user { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; }
+.turn-time {
+  font-size: 10px; color: var(--ink-3); letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
+}
+.bot-body .turn-time { display: block; margin-top: 3px; }
 .bubble-user {
   align-self: flex-end; max-width: 78%;
   background: var(--accent); color: var(--on-accent);

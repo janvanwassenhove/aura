@@ -562,7 +562,16 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     async def _on_person_recognized(event: PersonRecognized) -> None:
         ctx.pipeline.set_active_person(event.person_id if event.known else None)
         # U100: sleep mode → recognize silently, no greeting.
-        if os.environ.get("ROBOT_ASLEEP", "false").lower() == "true":
+        # U256: quiet hours mean exactly this too — he does not START. The
+        # toggle used to live only in the browser's localStorage, so the header
+        # said HUSHED while this handler cheerfully greeted someone by name.
+        try:
+            from orchestrator import mode_policy as _mp
+
+            _hushed = _mp.quiet()
+        except Exception:  # noqa: BLE001 — never let the check silence a fault
+            _hushed = False
+        if _hushed or os.environ.get("ROBOT_ASLEEP", "false").lower() == "true":
             # Still record the sighting: an hour asleep is not an hour away, and
             # without this it would greet the moment it woke up.
             if event.known and event.person_id:

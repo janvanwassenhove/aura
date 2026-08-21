@@ -66,6 +66,16 @@ class ProactiveEngine:
             return False
         if os.environ.get("ROBOT_ASLEEP", "false").lower() == "true":
             return False
+        # U256: the owner's Quiet switch. Same meaning as the overnight window
+        # below, but on demand — reminders still fire and still land in the
+        # app; what stops is the robot opening its mouth about them.
+        try:
+            from orchestrator import mode_policy as _mp
+
+            if _mp.quiet():
+                return False
+        except Exception:  # noqa: BLE001 — a missing policy must not mute him
+            pass
         now = now or self._now()
         return not _in_quiet_hours(
             now,

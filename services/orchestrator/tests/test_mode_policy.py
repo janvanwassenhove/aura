@@ -279,3 +279,46 @@ def test_an_owner_override_cannot_conjure_an_account() -> None:
     mode_policy.set_group_state("home", "mail", "allows")
     mode_policy.set_live_domains(set())
     assert "get_unread_mail" not in mode_policy.allowed_tools("home")
+
+
+# ---------------------------------------------------------------------------
+# U256: quiet hours are the brain's state, not the browser's
+# ---------------------------------------------------------------------------
+
+
+def test_quiet_is_off_until_someone_asks_for_it() -> None:
+    assert mode_policy.quiet() is False
+    assert mode_policy.speaks_first() is True
+
+
+def test_quiet_survives_a_restart() -> None:
+    """The reported bug in one line: the switch lived in localStorage, so the
+    header said HUSHED and the brain — which does the greeting — had never
+    heard of it. Persisted state is the whole fix."""
+    mode_policy.set_quiet(True)
+    mode_policy.reset_cache_for_tests()          # simulate a restart
+    assert mode_policy.quiet() is True
+    assert mode_policy.speaks_first() is False
+
+
+def test_quiet_is_reported_to_the_console() -> None:
+    """The chip must render the brain's answer, not its own memory — when they
+    disagree, what the robot will actually do is the truth."""
+    mode_policy.set_quiet(True)
+    assert mode_policy.describe("home")["quiet"] is True
+
+
+def test_quiet_does_not_take_a_single_tool_away() -> None:
+    """He answers when asked; only starting is suppressed. A quiet assistant
+    that also stops replying is just a broken one."""
+    before = mode_policy.allowed_tools("work")
+    mode_policy.set_quiet(True)
+    assert mode_policy.allowed_tools("work") == before
+
+
+def test_quiet_composes_with_every_mode() -> None:
+    """D2's rule: it is a behaviour, never a fourth mode — so it is one flag,
+    and it does not change which mode is active."""
+    mode_policy.set_quiet(True)
+    for mode in mode_policy.UI_MODES:
+        assert mode_policy.quiet() is True, mode

@@ -114,13 +114,14 @@ def _load() -> dict:
     path = _store_path()
     if _cache is not None and _cache_path == path:
         return _cache
-    data: dict = {"overrides": {}, "behaviour": {}}
+    data: dict = {"overrides": {}, "behaviour": {}, "quiet": False}
     try:
         if path.exists():
             raw = json.loads(path.read_text(encoding="utf-8"))
             if isinstance(raw, dict):
                 data["overrides"] = raw.get("overrides") or {}
                 data["behaviour"] = raw.get("behaviour") or {}
+                data["quiet"] = bool(raw.get("quiet", False))
     except (OSError, json.JSONDecodeError) as exc:
         logger.warning("mode policy file unreadable (%s) — using defaults", exc)
     _cache, _cache_path = data, path
@@ -416,6 +417,36 @@ def apply_stored_voices() -> None:
 
 # ── The full picture, for the console ──────────────────────────────────────
 
+# ---------------------------------------------------------------------------
+# U256: quiet hours — a behaviour, not a mode
+# ---------------------------------------------------------------------------
+#
+# It composes with every mode (D2's rule: never a fourth mode), so it is one
+# flag rather than a per-mode setting. It lived ONLY in the browser's
+# localStorage: the header chip lit up, the presence line said "Awake but
+# hushed — he answers when asked and never speaks first", and the brain was
+# never told. It then greeted someone by name, unprompted, under that banner.
+#
+# What quiet means, precisely: he does not START. Answering is untouched — a
+# quiet assistant that also stops replying is just a broken one.
+
+
+def quiet() -> bool:
+    return bool(_load().get("quiet", False))
+
+
+def set_quiet(on: bool) -> bool:
+    data = _load()
+    data["quiet"] = bool(on)
+    _save(data)
+    return data["quiet"]
+
+
+def speaks_first() -> bool:
+    """May he open his mouth unprompted right now?"""
+    return not quiet()
+
+
 def describe(active_mode: str) -> dict:
     """Everything the chip row and the Modes editor render, derived live."""
     modes: dict[str, dict] = {}
@@ -440,4 +471,5 @@ def describe(active_mode: str) -> dict:
         # None means "not known" — the console then says nothing about
         # reachability rather than guessing (same rule as the gate itself).
         "live_domains": None if _live_domains is None else sorted(_live_domains),
+        "quiet": quiet(),
     }
