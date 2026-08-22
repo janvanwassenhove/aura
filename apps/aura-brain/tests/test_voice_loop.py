@@ -286,3 +286,66 @@ async def test_panic_works_without_an_active_session(monkeypatch) -> None:
     assert robot.stopped == 1
     assert result["session"] is False
     assert os.environ["VOICE_MODE"] == "off"
+
+
+# ---------------------------------------------------------------------------
+# U258: the robot woke itself by saying its own name
+# ---------------------------------------------------------------------------
+
+
+def test_the_echo_guard_outlasts_a_long_reply() -> None:
+    """Reported as: "I never said anything, still robot is talking/responding.
+    I see AURA in chat but no one was near the robot."
+
+    The guard was `min(12.0, 1 + len/15)`. A 400-character answer takes about
+    27 seconds to speak; the mic reopened after 12. For the remaining ~15
+    seconds it recorded the robot talking — about AURA, out loud, which is its
+    own wake word. It woke itself, the bare wake word opened a second listen
+    window, that recorded more of the same speech, and round it went.
+    """
+    from aura_brain.voice_loop import _speech_seconds
+
+    long_reply = "x" * 400
+    assert _speech_seconds(long_reply) > 25.0, "the mic must stay shut while it talks"
+
+
+def test_the_estimate_is_still_bounded() -> None:
+    """A cap is wanted — just above real replies, not under most of them."""
+    from aura_brain.voice_loop import _speech_seconds
+
+    assert _speech_seconds("y" * 100_000) <= 90.0
+
+
+def test_a_short_reply_is_not_over_guarded() -> None:
+    from aura_brain.voice_loop import _speech_seconds
+
+    assert _speech_seconds("Ja.") < 2.0
+
+
+def test_its_own_name_in_its_own_voice_is_not_a_wake_word(monkeypatch) -> None:
+    """"AURA?" is five characters — too short for the word-overlap guard — and
+    it is exactly what the mic hears when the robot mentions itself."""
+    import time as _t
+
+    loop = _loop(monkeypatch, wake="aura")
+    loop._speaking_until = _t.monotonic() + 5.0     # we are talking right now
+    assert loop._is_own_name_echo("AURA?") is True
+    assert loop._is_own_name_echo("aura") is True
+
+
+def test_a_real_question_is_never_mistaken_for_the_name(monkeypatch) -> None:
+    """The guard must not eat a person actually asking something."""
+    import time as _t
+
+    loop = _loop(monkeypatch, wake="aura")
+    loop._speaking_until = _t.monotonic() + 5.0
+    assert loop._is_own_name_echo("aura what is on my calendar today") is False
+
+
+def test_the_name_is_accepted_again_once_the_room_is_quiet(monkeypatch) -> None:
+    """Outside the self-hearing window it is a person, not an echo."""
+    import time as _t
+
+    loop = _loop(monkeypatch, wake="aura")
+    loop._speaking_until = _t.monotonic() - 60.0    # long since finished
+    assert loop._is_own_name_echo("AURA?") is False

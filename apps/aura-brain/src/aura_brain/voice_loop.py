@@ -92,6 +92,26 @@ def wake_word_index(text: str, wake: str) -> int:
     return -1
 
 
+def _speech_seconds(text: str) -> float:
+    """How long the robot will be talking, so the mic stays shut that long.
+
+    U258: this used to be `min(12.0, 1.0 + len(text) / 15.0)`. The rate is
+    right; the CAP was the bug. A 400-character answer takes about 27 seconds
+    to speak, the guard covered 12, and for the remaining ~15 seconds the mic
+    was wide open while the robot talked — about AURA, out loud, which is its
+    own wake word. It woke itself, the bare wake word opened a second listen
+    window (U93) that recorded more of the same speech, and that became a
+    "user" turn. Hence conversations with nobody in the room, drifting through
+    languages, billing realtime minutes.
+
+    A cap is still wanted so a freak input cannot shut the mic for an hour,
+    but it has to sit ABOVE any real reply rather than under most of them.
+    """
+    chars_per_s = float(os.environ.get("VOICE_SPEECH_CHARS_PER_S", "15") or 15)
+    cap = float(os.environ.get("VOICE_SPEECH_MAX_S", "90") or 90)
+    return min(cap, 1.0 + len(text or "") / max(1.0, chars_per_s))
+
+
 def is_plausible_command(text: str) -> bool:
     """Guard against Whisper hallucinations on ambient noise/silence.
 
@@ -236,6 +256,22 @@ class VoiceLoop:
 
         await wake()
 
+    def _is_own_name_echo(self, text: str) -> bool:
+        """A bare wake word heard while we were just speaking is our own voice.
+
+        U258: the assistant is called AURA and its replies say "AURA" out loud,
+        so its name coming back through the mic is the one echo it can never
+        afford to trust. Too short for the word-overlap guard below (which
+        needs 8 characters and shared words), and a real person saying just
+        "AURA" a second after the robot stopped is rare enough that losing it
+        costs one repeat — while getting it wrong costs a conversation with
+        nobody.
+        """
+        stripped = "".join(c for c in (text or "").lower() if c.isalnum() or c.isspace()).strip()
+        if not stripped or len(stripped.split()) > 2:
+            return False
+        return self._wake in stripped and self._in_self_hearing_cooldown()
+
     def _is_echo_of_last_reply(self, text: str) -> bool:
         """U148 (brief §6.1): True when the transcript is largely one of the
         robot's OWN recent replies bouncing back through the mic — checked
@@ -276,8 +312,7 @@ class VoiceLoop:
         chain is capped (U67) — after a few wake-word-less turns the wake word
         is required again, so ambient audio can't talk to itself forever."""
         now = time.monotonic()
-        speak_s = min(12.0, 1.0 + len(text or "") / 15.0)  # ~15 chars/sec
-        self._speaking_until = now + speak_s
+        self._speaking_until = now + _speech_seconds(text)
         # U92: FOLLOWUP_S=0 (default) → the wake word is required EVERY turn.
         # That stops room noise / Whisper gibberish from being taken as replies
         # in a no-wake-word window (the "phantom conversations"). Set FOLLOWUP_S
@@ -462,6 +497,22 @@ class VoiceLoop:
                 if in_followup and not in_barge and self._in_self_hearing_cooldown():
                     logger.info("voice loop discarded self-hearing (cooldown): %r", text[:60])
                     continue
+                # U258: the two guards above only ever ran inside a follow-up
+                # window — and FOLLOWUP_S defaults to 0, with Realtime forcing
+                # it off entirely (U149), so in the shipped configuration they
+                # were dead code. The phantom came in through the WAKE path
+                # instead: the robot says "AURA" in its own replies, the mic
+                # hears it, and its own name is the password.
+                if not in_barge and self._is_own_name_echo(text):
+                    logger.info("voice loop discarded its own name: %r", text[:60])
+                    continue
+                # Same overlap test, on every path, but only while we can still
+                # be hearing ourselves — unbounded it would reject a user who
+                # simply repeats what was just said back to them.
+                if (not in_barge and self._in_self_hearing_cooldown()
+                        and self._is_echo_of_last_reply(text)):
+                    logger.info("voice loop discarded self-echo: %r", text[:60])
+                    continue
 
                 # U128: a local-confirmed wake means the wake word WAS said even
                 # if STT dropped it — treat the transcript as command-bearing
@@ -576,6 +627,14 @@ class VoiceLoop:
 
     async def _capture_command(self) -> str:
         from aura_brain import voice
+
+        # U258: wait out our own speech first. This window accepts anything —
+        # no wake word is required, that is its whole purpose — so opening it
+        # while the robot is still talking hands it the robot's own voice at
+        # point-blank range. That is exactly how "Ančapí." became a user turn.
+        now = time.monotonic()
+        if now < self._speaking_until:
+            await asyncio.sleep(min(self._speaking_until - now, 30.0))
 
         wav, peak = await self._robot.listen(self._window_s)
         if peak < self._speech_peak:
