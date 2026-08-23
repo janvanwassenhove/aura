@@ -40,18 +40,119 @@ _MAX_CHARS = int(os.environ.get("WEB_READ_MAX_CHARS", "6000"))
 #: provider in Settings switches search too, without a second setting to keep
 #: in sync — and overridable when a newer model appears before we ship one.
 _SEARCH_MODELS: dict[str, tuple[str, tuple[str, ...]]] = {
-    # A LIST, not one name: search models are retired fast. Measured on a live
-    # account, gpt-4o-search-preview and gpt-4o-mini-search-preview were both
-    # still LISTED by the models endpoint and both answered 404 "has been
-    # deprecated". One hard-coded name turns that into "AURA cannot search any
-    # more" on a morning nobody changed anything; walking a list turns it into
-    # one wasted call.
+    # SEEDS, not the answer. The live list is discovered from the provider
+    # (see `_discover`); these are only what to try when discovery itself
+    # fails. Measured: gpt-4o-search-preview and gpt-4o-mini-search-preview
+    # are STILL LISTED by the account and both answer 404 "has been
+    # deprecated", so even a fresh listing needs the try-and-move-on loop.
     "openai": ("WEB_SEARCH_MODEL_OPENAI",
-               ("gpt-5-search-api", "gpt-4o-search-preview",
-                "gpt-4o-mini-search-preview")),
+               ("gpt-5-search-api", "gpt-4o-search-preview")),
     "gemini": ("WEB_SEARCH_MODEL_GEMINI", ("gemini-2.5-flash",)),
     "anthropic": ("WEB_SEARCH_MODEL_ANTHROPIC", ("claude-sonnet-4-5",)),
 }
+
+#: Names that mean "this model can search the web".
+_SEARCH_NAME_HINTS = ("search",)
+#: Deep-research models can also search, but they cost minutes and euros.
+#: Reaching for one to answer "when do the Red Panthers play" is wildly out of
+#: proportion, so they are never chosen automatically - only if the owner names
+#: one in WEB_SEARCH_MODEL_*.
+_EXCLUDE_HINTS = ("deep-research",)
+
+#: provider -> (candidates, when discovered). Discovery is a list call; paying
+#: it on every single search would be silly.
+_discovered: dict[str, tuple[list[str], float]] = {}
+#: provider -> the model that actually WORKED. Tried first next time, and
+#: forgotten the moment it stops working: that failure is the signal that the
+#: world moved on, which is exactly when a fresh listing is worth its cost.
+_working: dict[str, str] = {}
+_DISCOVERY_TTL_S = float(os.environ.get("WEB_SEARCH_DISCOVERY_TTL_S", "3600"))
+
+
+def _version_key(name: str) -> tuple:
+    """Sort key for a model name, best first.
+
+    The owner's point: model names move, including their version. Ranking by
+    what the NAME says lets a `gpt-6-search-...` that nobody has written down
+    yet win on the day it appears, instead of waiting for someone to edit a
+    list in this file.
+
+    Ordering, in order of importance:
+      1. higher version first           gpt-5 > gpt-4o > o3
+      2. an undated alias before its dated snapshot   (the alias tracks)
+      3. the full model before its `mini`             (search quality)
+      4. the name itself, so the choice is stable run to run
+
+    The trailing date has to be removed BEFORE reading the version, or
+    "gpt-5-search-api-2025-10-14" reads as version 2025 and every snapshot
+    outranks every alias - which is exactly what it did on the first attempt.
+    """
+    import re
+
+    low = name.lower()
+    stripped = re.sub(r"-20[0-9]{2}-[0-9]{2}-[0-9]{2}$", "", low)
+    dated = stripped != low
+    version = tuple(int(n) for n in re.findall(r"[0-9]+", stripped)) or (0,)
+    # Negate for descending without reversing the whole sort.
+    return (tuple(-v for v in version), dated, "mini" in low, low)
+
+
+def rank_search_models(names: list[str]) -> list[str]:
+    """Search-capable names from a provider listing, best candidate first."""
+    keep = [
+        n for n in names
+        if any(h in n.lower() for h in _SEARCH_NAME_HINTS)
+        and not any(x in n.lower() for x in _EXCLUDE_HINTS)
+    ]
+    return sorted(keep, key=_version_key)
+
+
+async def _discover(provider: str) -> list[str]:
+    """Ask the provider which models it has, and rank the searchable ones.
+
+    Cached for an hour: a list call per search would be silly, and the answer
+    changes on the timescale of provider releases, not conversations.
+    """
+    import time
+
+    cached = _discovered.get(provider)
+    if cached and time.monotonic() - cached[1] < _DISCOVERY_TTL_S:
+        return cached[0]
+
+    names: list[str] = []
+    try:
+        if provider == "openai":
+            from openai import AsyncOpenAI
+
+            client = AsyncOpenAI(api_key=os.environ.get("OPENAI_API_KEY", ""),
+                                 timeout=_TIMEOUT_S)
+            page = await client.models.list()
+            names = rank_search_models([m.id for m in page.data])
+        elif provider == "anthropic":
+            from anthropic import AsyncAnthropic
+
+            client = AsyncAnthropic(api_key=os.environ.get("ANTHROPIC_API_KEY", ""),
+                                    timeout=_TIMEOUT_S)
+            page = await client.models.list()
+            # Anthropic search is a TOOL any current model can use, so the
+            # searchable set is "the newest models", not names containing
+            # "search".
+            names = sorted([m.id for m in page.data], key=_version_key)[:3]
+        elif provider == "gemini":
+            from google import genai
+
+            client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY", ""))
+            listing = await client.aio.models.list()
+            # Same as Anthropic: grounding is a tool, not a special model.
+            ids = [getattr(m, "name", "").split("/")[-1] for m in listing]
+            names = sorted([n for n in ids if n], key=_version_key)[:3]
+    except Exception as exc:  # noqa: BLE001 - discovery is an optimisation
+        logger.info("could not list %s models (%s); using the seeds", provider, exc)
+        names = []
+
+    _discovered[provider] = (names, time.monotonic())
+    return names
+
 
 
 @dataclass
@@ -82,13 +183,45 @@ def _provider() -> str:
     return (os.environ.get("LLM_PROVIDER", "openai") or "openai").strip().lower()
 
 
-def _models_for(provider: str) -> list[str]:
-    """Candidate models, the owner's choice first when they made one."""
-    env, defaults = _SEARCH_MODELS.get(provider, ("", ()))
-    if not env:
-        return []
-    chosen = (os.environ.get(env, "") or "").strip()
-    return [chosen, *defaults] if chosen else list(defaults)
+def _remember(provider: str, model: str) -> None:
+    """Keep what worked, so the next search costs one call instead of three."""
+    if _working.get(provider) != model:
+        logger.info("web search on %s is using %r", provider, model)
+    _working[provider] = model
+
+
+def _forget(model: str, provider: str) -> None:
+    """A model that just failed is no longer the one that works.
+
+    Also drops the cached listing: a model disappearing IS the signal that
+    the provider moved, which is precisely when a fresh listing is worth
+    its cost rather than an hour from now.
+    """
+    if _working.get(provider) == model:
+        _working.pop(provider, None)
+        _discovered.pop(provider, None)
+
+
+async def _candidates(provider: str) -> list[str]:
+    """Everything worth trying, best first, without repeats.
+
+    Order matters and each position earns its place: what worked last time
+    (free, and almost always still right), then the owner's explicit choice,
+    then what the provider says it has today, then the seeds for when the
+    provider could not be asked at all.
+    """
+    env, seeds = _SEARCH_MODELS.get(provider, ("", ()))
+    out: list[str] = []
+    for name in [
+        _working.get(provider, ""),
+        (os.environ.get(env, "") if env else "") or "",
+        *(await _discover(provider)),
+        *seeds,
+    ]:
+        name = (name or "").strip()
+        if name and name not in out:
+            out.append(name)
+    return out
 
 
 def backend_order() -> list[str]:
@@ -117,14 +250,16 @@ async def _search_openai(query: str) -> str:
         "Be factual and brief. Name the source and its date when you can."
     )
     last: Exception = RuntimeError("no search model configured")
-    for model in _models_for("openai"):
+    for model in await _candidates("openai"):
         try:
             resp = await client.chat.completions.create(
                 model=model, messages=[{"role": "user", "content": prompt}])
         except Exception as exc:  # noqa: BLE001 - retired model, try the next
             last = exc
+            _forget(model, "openai")
             logger.info("search model %r unusable: %s", model, str(exc)[:120])
             continue
+        _remember("openai", model)
         return (resp.choices[0].message.content or "").strip()
     raise last
 
@@ -137,14 +272,23 @@ async def _search_gemini(query: str) -> str:
     if not key:
         raise RuntimeError("no Gemini key")
     client = genai.Client(api_key=key)
-    resp = await client.aio.models.generate_content(
-        model=(_models_for("gemini") or ["gemini-2.5-flash"])[0],
-        contents=f"Search the web and answer factually and briefly: {query}",
-        config=types.GenerateContentConfig(
-            tools=[types.Tool(google_search=types.GoogleSearch())],
-        ),
-    )
-    return (getattr(resp, "text", "") or "").strip()
+    last: Exception = RuntimeError("no Gemini model available")
+    for model in await _candidates("gemini"):
+        try:
+            resp = await client.aio.models.generate_content(
+                model=model,
+                contents=f"Search the web and answer briefly: {query}",
+                config=types.GenerateContentConfig(
+                    tools=[types.Tool(google_search=types.GoogleSearch())],
+                ),
+            )
+        except Exception as exc:  # noqa: BLE001 - retired model, try the next
+            last = exc
+            _forget(model, "gemini")
+            continue
+        _remember("gemini", model)
+        return (getattr(resp, "text", "") or "").strip()
+    raise last
 
 
 async def _search_anthropic(query: str) -> str:
@@ -154,16 +298,25 @@ async def _search_anthropic(query: str) -> str:
     if not key:
         raise RuntimeError("no Anthropic key")
     client = AsyncAnthropic(api_key=key, timeout=_TIMEOUT_S)
-    resp = await client.messages.create(
-        model=(_models_for("anthropic") or ["claude-sonnet-4-5"])[0],
-        max_tokens=1024,
-        tools=[{"type": "web_search_20250305", "name": "web_search",
-                "max_uses": 4}],
-        messages=[{"role": "user", "content":
-                   f"Search the web and answer factually and briefly: {query}"}],
-    )
-    parts = [b.text for b in resp.content if getattr(b, "type", "") == "text"]
-    return "\n".join(p for p in parts if p).strip()
+    last: Exception = RuntimeError("no Anthropic model available")
+    for model in await _candidates("anthropic"):
+        try:
+            resp = await client.messages.create(
+                model=model,
+                max_tokens=1024,
+                tools=[{"type": "web_search_20250305", "name": "web_search",
+                        "max_uses": 4}],
+                messages=[{"role": "user", "content":
+                           f"Search the web and answer briefly: {query}"}],
+            )
+        except Exception as exc:  # noqa: BLE001 - retired model, try the next
+            last = exc
+            _forget(model, "anthropic")
+            continue
+        _remember("anthropic", model)
+        parts = [b.text for b in resp.content if getattr(b, "type", "") == "text"]
+        return chr(10).join(p for p in parts if p).strip()
+    raise last
 
 
 async def _via_provider(query: str) -> str:

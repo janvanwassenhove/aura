@@ -202,3 +202,93 @@ def test_the_owner_can_still_overrule_that() -> None:
 def test_blocking_the_group_really_blocks_it() -> None:
     mode_policy.set_group_state("home", "web", "blocked")
     assert "web_search" not in mode_policy.allowed_tools("home")
+
+
+# ---------------------------------------------------------------------------
+# U259b: model names move, including their version
+# ---------------------------------------------------------------------------
+
+
+def test_a_newer_generation_wins_without_anyone_editing_this_file() -> None:
+    """The owner's point: "modellen veranderen, ook in versie".
+
+    A hand-kept list rots. Ranking by what the NAME says means a model nobody
+    has written down yet is preferred the day it appears.
+    """
+    today = ["gpt-4o-search-preview", "gpt-4o-mini-search-preview",
+             "gpt-5-search-api"]
+    assert web_search.rank_search_models(today)[0] == "gpt-5-search-api"
+
+    tomorrow = [*today, "gpt-6-search-api"]
+    assert web_search.rank_search_models(tomorrow)[0] == "gpt-6-search-api"
+
+
+def test_a_dated_snapshot_never_outranks_its_own_alias() -> None:
+    """First attempt got this backwards: the date was read as the version, so
+    "gpt-5-search-api-2025-10-14" looked like version 2025 and every snapshot
+    beat every alias. The alias is what tracks the current model."""
+    ranked = web_search.rank_search_models(
+        ["gpt-5-search-api-2025-10-14", "gpt-5-search-api"])
+    assert ranked == ["gpt-5-search-api", "gpt-5-search-api-2025-10-14"]
+
+
+def test_the_full_model_is_preferred_over_its_mini() -> None:
+    ranked = web_search.rank_search_models(
+        ["gpt-5-mini-search-api", "gpt-5-search-api"])
+    assert ranked[0] == "gpt-5-search-api"
+
+
+def test_deep_research_is_never_chosen_by_itself() -> None:
+    """It can search, but it costs minutes and euros. Reaching for one to
+    answer "when do the Red Panthers play" is out of all proportion."""
+    ranked = web_search.rank_search_models(
+        ["o3-deep-research", "gpt-4o-search-preview"])
+    assert ranked == ["gpt-4o-search-preview"]
+
+
+async def test_what_worked_is_tried_first_next_time(monkeypatch) -> None:
+    """Otherwise every search pays a listing call and two failures."""
+    monkeypatch.setattr(web_search, "_working", {"openai": "the-good-one"})
+    monkeypatch.setattr(web_search, "_discovered", {})
+
+    async def _fake_discover(_p):
+        return ["something-else"]
+    monkeypatch.setattr(web_search, "_discover", _fake_discover)
+
+    assert (await web_search._candidates("openai"))[0] == "the-good-one"
+
+
+async def test_a_retired_model_is_forgotten_so_the_next_one_is_found(monkeypatch) -> None:
+    """The scenario the owner described: what worked yesterday 404s today.
+    Forgetting it also drops the cached listing — a model disappearing IS the
+    signal that the provider moved."""
+    monkeypatch.setattr(web_search, "_working", {"openai": "retired-model"})
+    monkeypatch.setattr(web_search, "_discovered", {"openai": (["x"], 0.0)})
+
+    web_search._forget("retired-model", "openai")
+
+    assert "openai" not in web_search._working
+    assert "openai" not in web_search._discovered   # re-list, do not wait an hour
+
+
+async def test_the_owners_explicit_choice_still_comes_first(monkeypatch) -> None:
+    monkeypatch.setattr(web_search, "_working", {})
+    monkeypatch.setenv("WEB_SEARCH_MODEL_OPENAI", "my-model")
+
+    async def _fake_discover(_p):
+        return ["discovered-one"]
+    monkeypatch.setattr(web_search, "_discover", _fake_discover)
+
+    assert (await web_search._candidates("openai"))[0] == "my-model"
+
+
+async def test_discovery_failing_falls_back_to_the_seeds(monkeypatch) -> None:
+    """No network, no listing — search must still have something to try."""
+    monkeypatch.setattr(web_search, "_working", {})
+    monkeypatch.delenv("WEB_SEARCH_MODEL_OPENAI", raising=False)
+
+    async def _no_discovery(_p):
+        return []
+    monkeypatch.setattr(web_search, "_discover", _no_discovery)
+
+    assert "gpt-5-search-api" in await web_search._candidates("openai")
