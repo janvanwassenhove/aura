@@ -762,6 +762,9 @@ class OrchestratorPipeline:
 
     # U61: subagents — a scoped, read-only sub-loop with its own round budget.
     _SUBAGENT_TOOLS: frozenset[str] = frozenset({
+        # U259: a subagent whose whole job is "gather and verify" was the one
+        # part of the system most obviously missing the internet.
+        "web_search", "read_url",
         "read_file", "git_prepare", "list_browser_tabs",
         "list_calendar_events_today", "get_unread_mail", "list_onedrive_files",
         "list_tasks", "list_todos", "list_reminders",
@@ -1055,6 +1058,15 @@ class OrchestratorPipeline:
         # with a built-in route (the mcp__ prefix is reserved).
         if tool_name.startswith("mcp__"):
             return await self._call_mcp(tool_name, arguments)
+        # U259: the internet. Not a connector route — it has its own fallback
+        # chain (provider → MCP → the owner's browser).
+        if tool_name in ("web_search", "read_url"):
+            from orchestrator import web_search
+
+            if tool_name == "read_url":
+                return await web_search.read_url(str(arguments.get("url", "")))
+            result = await web_search.search(str(arguments.get("query", "")))
+            return result.for_model()
         route = _TOOL_ROUTES.get(tool_name)
         if route is None:
             return f"(no connector route for {tool_name!r})"

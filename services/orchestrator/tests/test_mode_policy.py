@@ -52,9 +52,13 @@ def test_every_group_state_is_derived_from_the_real_policy() -> None:
                 continue
             assert tools, f"group {gid!r} has no tools and no rule of its own"
             in_mode = tools & MODE_TOOL_MAP[mode]
+            # U259: a tool can also ask in SOME modes only (search does, in
+            # Work). The invariant still holds — the state is derived from the
+            # real policy — the policy just has one more rule in it.
+            mode_gated = in_mode & mode_policy._MODE_APPROVAL.get(mode, frozenset())
             if not in_mode:
                 assert state == "blocked", (mode, gid)
-            elif in_mode & APPROVAL_REQUIRED:
+            elif in_mode & APPROVAL_REQUIRED or mode_gated:
                 assert state == "asks", (mode, gid)
             else:
                 assert state == "allows", (mode, gid)

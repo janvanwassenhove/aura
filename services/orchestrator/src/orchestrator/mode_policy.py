@@ -59,6 +59,9 @@ TOOL_GROUPS: list[tuple[str, str, str, frozenset[str]]] = [
     # the owner added and switched on), so the frozenset is empty here and the
     # live names come from mcp_servers — see `_mcp_tools()`.
     ("mcp tools", "Added tools", "tools you added from an MCP server", frozenset()),
+    ("web", "Web", "look things up on the internet", frozenset({
+        "web_search", "read_url",
+    })),
     ("calendar", "Calendar", "read your agenda, add and move events", frozenset({
         "list_calendar_events_today", "create_calendar_event", "delete_calendar_event",
     })),
@@ -90,6 +93,20 @@ TOOL_GROUPS: list[tuple[str, str, str, frozenset[str]]] = [
 ]
 
 MCP_GROUP = "mcp tools"
+
+# U259: tools that stop for approval in SOME modes only. APPROVAL_REQUIRED is
+# global — a tool is either always gated or never — and the owner asked for
+# search to run freely except in Work, where a query can carry something
+# confidential out of the house. Shipping that as a fake "override" would have
+# put words in their mouth (an override means "the owner chose this"), so it
+# is its own, visible rule.
+_MODE_APPROVAL: dict[str, frozenset[str]] = {
+    "work": frozenset({"web_search", "read_url"}),
+}
+
+
+def _asks_in_mode(tool_name: str, mode: str) -> bool:
+    return tool_name in _MODE_APPROVAL.get(mode, frozenset())
 
 _GROUP_BY_ID = {gid: (label, detail, tools) for gid, label, detail, tools in TOOL_GROUPS}
 _GROUP_OF_TOOL: dict[str, str] = {
@@ -166,6 +183,8 @@ def default_state(mode: str, group_id: str) -> str:
     if not in_mode:
         return BLOCKED
     if in_mode & APPROVAL_REQUIRED:
+        return ASKS
+    if in_mode & _MODE_APPROVAL.get(mode, frozenset()):
         return ASKS
     return ALLOWS
 
@@ -347,7 +366,10 @@ def requires_approval(tool_name: str, mode: str) -> bool:
             return True
         if state == ALLOWS:
             return False
-    return tool_name in APPROVAL_REQUIRED  # default, or blocked (never reached)
+    # Default: the global baseline, plus the per-mode rule. An explicit
+    # override above still wins in both directions — the owner can decide that
+    # Work should not ask after all.
+    return tool_name in APPROVAL_REQUIRED or _asks_in_mode(tool_name, mode)
 
 
 def rule_for(tool_name: str, mode: str) -> str:

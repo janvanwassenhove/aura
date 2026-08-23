@@ -149,6 +149,24 @@ TOOL_SCHEMAS: dict[str, dict] = {
             "line": {"type": "integer", "description": "1-based line number (optional)."},
         }, "required": ["path"], "additionalProperties": False},
     ),
+    "web_search": _fn(
+        "web_search",
+        "Look something up on the internet. Use this whenever the answer "
+        "depends on facts you do not have — current events, opening hours, "
+        "match schedules, prices, anything that changes. Prefer searching over "
+        "telling the owner to go and look it up themselves.",
+        {"type": "object", "properties": {
+            "query": {"type": "string", "description": "What to search for."},
+        }, "required": ["query"], "additionalProperties": False},
+    ),
+    "read_url": _fn(
+        "read_url",
+        "Fetch one public web page and read its text. Use after web_search to "
+        "read a promising result, or when the owner gives you a link.",
+        {"type": "object", "properties": {
+            "url": {"type": "string", "description": "A public http(s) URL."},
+        }, "required": ["url"], "additionalProperties": False},
+    ),
     "delegate_subtask": _fn(
         "delegate_subtask",
         "Delegate a focused, self-contained subtask to a SUBAGENT with a "

@@ -131,6 +131,14 @@ MODE_TOOL_MAP: dict[str, frozenset[str]] = {
 # Every mode may ask to be unblocked — see the note above MODE_TOOL_MAP. Done
 # here rather than by repeating the name five times, so a mode added later
 # cannot forget it.
+#
+# U259: looking things up belongs in the same category. The owner asked for
+# search to work "zoals claude chat" — always, not as a capability you first
+# have to remember to switch on. Presentation included: a talk is exactly where
+# being unable to check a fact is most embarrassing. WHETHER it stops to ask is
+# a separate question, answered per mode in mode_policy (work asks).
+_ALWAYS = {"request_capability", "web_search", "read_url"}
+
 MODE_TOOL_MAP = {
-    mode: tools | {"request_capability"} for mode, tools in MODE_TOOL_MAP.items()
+    mode: tools | _ALWAYS for mode, tools in MODE_TOOL_MAP.items()
 }
