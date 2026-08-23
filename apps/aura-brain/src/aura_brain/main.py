@@ -503,7 +503,14 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         _robot, ctx.pipeline, ctx.bus, session_id=session_id,
         default_wake_word=os.environ.get("ASSISTANT_NAME", "AURA").lower(),
         manager=ctx.conversation,
-        followup_s=0.0,  # U92: wake word required every turn by default
+        # U260: the window is OPEN again. It was nailed shut in U92/U149
+        # because ambient noise and the robot's own audio kept talking to
+        # themselves in it — and U258 found why: the echo guard was capped at
+        # 12 seconds while a long reply takes ~27, so the mic sat open while
+        # the robot spoke. With that fixed, the reason for the nail is gone,
+        # and what remains is a robot that greets you and then cannot hear you
+        # answer. FOLLOWUP_S=0 still shuts it instantly if this ages badly.
+        followup_s=float(os.environ.get("FOLLOWUP_S", "9") or 9),
     )
     ctx.pipeline.set_cancel_event(session_id, ctx.conversation.llm_cancel)
     ctx._voice_loop.start()

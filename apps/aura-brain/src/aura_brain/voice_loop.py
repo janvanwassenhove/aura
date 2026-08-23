@@ -313,17 +313,21 @@ class VoiceLoop:
         is required again, so ambient audio can't talk to itself forever."""
         now = time.monotonic()
         self._speaking_until = now + _speech_seconds(text)
-        # U92: FOLLOWUP_S=0 (default) → the wake word is required EVERY turn.
-        # That stops room noise / Whisper gibberish from being taken as replies
-        # in a no-wake-word window (the "phantom conversations"). Set FOLLOWUP_S
-        # to e.g. 8 to re-enable natural "just answer" follow-ups.
-        # U149: in Realtime mode, ALWAYS require the wake word next turn. The
-        # follow-up window (wake-word-free) was letting the robot's own audio /
-        # ambient spawn phantom Realtime replies ("Waarover wil je meer horen?"
-        # with no user turn). Realtime is conversational enough that re-waking
-        # each turn is fine — and it kills the phantom at the source.
-        realtime = self._engine() == "realtime"
-        followup_s = 0.0 if realtime else self._followup_s
+        # U260: after HE speaks, listen for the answer without demanding the
+        # wake word. A greeting is a question; requiring "AURA" before you may
+        # answer it is not a conversation, it is a form.
+        #
+        # This window was closed twice, both times for phantom conversations
+        # (U92 for the pipeline, U149 for Realtime). U258 found the actual
+        # cause: the echo guard was capped at 12 seconds while a long reply
+        # takes about 27, so the mic was open while the robot talked - about
+        # AURA, which is its own wake word. With that corrected, and with the
+        # self-echo and own-name guards now running on every path, the window
+        # is defensible again. What still bounds it if something slips through:
+        # the reply must be clearly louder than ambient (FOLLOWUP_PEAK_FACTOR),
+        # and FOLLOWUP_CHAIN_MAX wake-word-less turns later the wake word is
+        # required again - so a phantom can talk to itself twice, not forever.
+        followup_s = self._followup_s
         if followup_s <= 0 or now < self._music_until:
             self._followup_until = 0.0  # wake word required
         elif self._followup_chain < self._max_followup_chain:

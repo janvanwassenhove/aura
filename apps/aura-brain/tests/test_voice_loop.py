@@ -349,3 +349,74 @@ def test_the_name_is_accepted_again_once_the_room_is_quiet(monkeypatch) -> None:
     loop = _loop(monkeypatch, wake="aura")
     loop._speaking_until = _t.monotonic() - 60.0    # long since finished
     assert loop._is_own_name_echo("AURA?") is False
+
+
+# ---------------------------------------------------------------------------
+# U260: he greets you, so he has to listen for the answer
+# ---------------------------------------------------------------------------
+
+
+def test_a_greeting_opens_a_window_to_answer_in(monkeypatch) -> None:
+    """Reported as: "wanneer hij me begroet, en ik praat terug lijkt hij me
+    niet te horen".
+
+    He greeted, the owner answered in plain Dutch, and nothing happened —
+    because the window that lets you reply without saying "AURA" was nailed
+    shut (U92, and again for Realtime in U149) after phantom conversations.
+    U258 found what actually caused those: the echo guard expired mid-sentence
+    and the mic recorded the robot itself. A greeting you may not answer is
+    not a conversation, it is a form.
+    """
+    import time as _t
+
+    loop = _loop(monkeypatch, wake="aura")
+    monkeypatch.setenv("FOLLOWUP_S", "9")
+
+    loop.note_spoken("Hey Jan! Fijn om je te zien.")
+    assert loop._followup_until > _t.monotonic(), "no window to answer in"
+
+
+def test_the_window_starts_only_after_he_stops_talking(monkeypatch) -> None:
+    """Otherwise it is U258 all over again: a wake-word-free window opened
+    while the robot is still speaking is the robot interviewing itself."""
+    loop = _loop(monkeypatch, wake="aura")
+    monkeypatch.setenv("FOLLOWUP_S", "9")
+
+    loop.note_spoken("x" * 400)                     # a long reply
+    assert loop._followup_until > loop._speaking_until
+    assert loop._speaking_until > 0
+
+
+def test_realtime_gets_the_window_too(monkeypatch) -> None:
+    """The owner is ON realtime — fixing only the pipeline path would have
+    fixed nothing for them."""
+    import time as _t
+
+    loop = _loop(monkeypatch, wake="aura")
+    monkeypatch.setenv("FOLLOWUP_S", "9")
+    monkeypatch.setenv("VOICE_ENGINE", "realtime")
+
+    loop.note_spoken("Hi Jan!")
+    assert loop._followup_until > _t.monotonic()
+
+
+def test_a_phantom_can_talk_to_itself_twice_not_forever(monkeypatch) -> None:
+    """The cap is what makes reopening this defensible: if something does slip
+    through the echo guards, it runs out of rope."""
+    loop = _loop(monkeypatch, wake="aura")
+    monkeypatch.setenv("FOLLOWUP_S", "9")
+    monkeypatch.setenv("FOLLOWUP_CHAIN_MAX", "2")
+    loop._max_followup_chain = 2
+
+    loop._followup_chain = 2                        # chain exhausted
+    loop.note_spoken("still talking")
+    assert loop._followup_until == 0.0, "the wake word must be required again"
+
+
+def test_the_owner_can_shut_it_instantly(monkeypatch) -> None:
+    """FOLLOWUP_S=0 is the off switch, unchanged, and live-read."""
+    loop = _loop(monkeypatch, wake="aura")
+    monkeypatch.setenv("FOLLOWUP_S", "0")
+
+    loop.note_spoken("Hey Jan!")
+    assert loop._followup_until == 0.0
