@@ -172,3 +172,62 @@ async def test_a_promise_after_real_work_is_left_alone(pipeline, monkeypatch) ->
 
     await pipeline.orchestrate("open chrome", "s1")
     assert calls["n"] == 2, "no pushback: something actually happened"
+
+
+# ---------------------------------------------------------------------------
+# U261: the model found a new way to promise
+# ---------------------------------------------------------------------------
+
+
+def test_the_phrasing_that_got_through() -> None:
+    """Reported: "kan je claude vragen welke projecten ik openstaan heb" ->
+    "Ik kan Claude voor je openen en hem de vraag stellen. Laat me dat even
+    doen!" - and nothing happened in the Claude app.
+
+    U248 built the guard; this sentence simply was not in its vocabulary. That
+    is the standing weakness of a word list, and the reason each escape gets
+    written down here rather than argued about.
+    """
+    assert looks_like_a_promise(
+        "Ik kan Claude voor je openen en hem de vraag stellen. "
+        "Laat me dat even doen!")
+
+
+def test_the_other_ways_it_says_it_now() -> None:
+    for reply in (
+        "Laat me dat even doen!",
+        "Ik doe dat nu voor je.",
+        "Dat ga ik even voor je opzoeken.",
+        "Let me open that for you.",
+        "I'll go ahead and check.",
+        "Komt eraan!",
+        "On it!",
+    ):
+        assert looks_like_a_promise(reply), reply
+
+
+def test_handing_the_next_step_back_is_not_a_promise() -> None:
+    """"Laat me weten" is the opposite of "laat me doen": it puts the ball in
+    the owner's court, which is a perfectly good way to end a turn."""
+    assert not looks_like_a_promise("Laat me weten of dat lukt.")
+    assert not looks_like_a_promise("Let me know if that works.")
+
+
+def test_a_promise_still_counts_when_a_let_me_know_follows_it() -> None:
+    """Excluding on "laat me weten" at the whole-reply level would have thrown
+    away the promise in front of it - which is why that exclusion lives inside
+    the pattern instead of in _OFFERS."""
+    assert looks_like_a_promise(
+        "Ik ga nu Chrome openen. Laat me weten of het lukt.")
+
+
+def test_reporting_finished_work_is_never_a_promise() -> None:
+    assert not looks_like_a_promise("Ik heb Claude geopend en de vraag gesteld.")
+    assert not looks_like_a_promise("Het antwoord is 42.")
+
+
+def test_saying_it_cannot_is_never_a_promise() -> None:
+    """Naming a limit is the behaviour U248 wanted; nagging about it would
+    teach exactly the wrong lesson."""
+    assert not looks_like_a_promise(
+        "Ik kan dat niet openen - de app staat niet in je lijst.")

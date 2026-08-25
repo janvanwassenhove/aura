@@ -40,6 +40,24 @@ _PROMISES = (
     r"\bone moment\b",
     r"\bhang on\b",
     r"\bgive me a (second|moment)\b",
+    # U261: the phrasings that got through. Reported: "kan je claude vragen
+    # welke projecten ik openstaan heb" -> "Ik kan Claude voor je openen en
+    # hem de vraag stellen. Laat me dat even doen!" and nothing happened.
+    # This is a word list, so the model can always find a new way to announce
+    # work it will not do; each one it finds gets added here.
+    #
+    # "laat me weten" / "let me know" is the OPPOSITE - it hands the next step
+    # back to the owner - so it is excluded inside the pattern rather than in
+    # _OFFERS, which would discard a whole reply that ALSO contains a real
+    # promise ("Ik ga nu X openen. Laat me weten of het lukt.").
+    r"\blaat me (?:dat |het |die |even )*(?!weten\b)\w+",
+    r"\blet me (?:just |go ahead and )*(?!know\b)\w+",
+    r"\bik doe (?:dat|het|dit)\b",
+    r"\bdat (?:ga|doe) ik\b",
+    r"\bkomt eraan\b",
+    r"\bcoming right up\b",
+    r"\bi(?:'| wi)?ll go ahead\b",
+    r"\bon it\b",
 )
 
 # A question is an offer, not a claim. "Zal ik Chrome openen?" is the honest
