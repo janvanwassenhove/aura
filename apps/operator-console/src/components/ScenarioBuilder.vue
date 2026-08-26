@@ -14,6 +14,16 @@
       <input v-model="title" class="sb-input" placeholder="My robot talk" />
     </label>
 
+    <!-- U263b: which deck this scenario belongs to. NOT a file to open - he
+         never opens anything - just the name to compare against whatever
+         slideshow is playing, so opening last month's deck says so instead of
+         firing cues on the wrong slides in front of an audience. Optional: no
+         name simply means no comparison. -->
+    <label class="sb-field">
+      <span>Deck name <em class="sb-hint">optional - so he can warn you if the wrong one is on screen</em></span>
+      <input v-model="pptx" class="sb-input" placeholder="robot-junior-dev.pptx" />
+    </label>
+
     <!-- Beats -->
     <div v-for="(b, i) in beats" :key="b._k" class="sb-beat">
       <div class="sb-beat-head">
@@ -101,6 +111,7 @@ interface FormBeat {
 
 let seq = 0
 const title = ref('')
+const pptx = ref('')
 const beats = ref<FormBeat[]>([])
 const saved = ref<{ name: string; title: string; beats: number }[]>([])
 const saveName = ref('')
@@ -134,6 +145,7 @@ function syncTrigger(b: FormBeat) {
 function toScenario(): object {
   return {
     title: title.value,
+    pptx: pptx.value.trim(),
     beats: beats.value.map(b => {
       if (b.mode === 'chime_in') b._tkind = 'keyword'
       syncTrigger(b)
@@ -164,6 +176,7 @@ async function load(name: string) {
     const sc = (await r.json()).scenario
     if (!sc) return
     title.value = sc.title ?? ''
+    pptx.value = sc.pptx ?? ''      // U263b: reloading a scenario keeps its deck
     saveName.value = name
     beats.value = (sc.beats ?? []).map((b: Record<string, unknown>) => {
       const trig = String(b.trigger ?? 'manual')
