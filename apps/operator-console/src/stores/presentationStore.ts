@@ -15,7 +15,17 @@ export interface PresentationStatus {
   manual_total?: number
   fired?: string[]
   armed_keywords?: string[]
-  powerpoint_watching?: boolean
+  /** U263: `watching` means a watcher is running; `slides_state` says whether
+   *  it has actually FOUND a slideshow. The old flag conflated the two, so
+   *  "waiting for you to start your deck" looked identical to "no slide cues
+   *  for you at all". */
+  watching?: boolean
+  slides_state?: 'off' | 'waiting' | 'live'
+  slides_app?: string
+  deck?: string
+  slide?: number
+  slide_total?: number
+  deck_warnings?: { kind: string; message: string }[]
 }
 
 export const usePresentationStore = defineStore('presentation', () => {

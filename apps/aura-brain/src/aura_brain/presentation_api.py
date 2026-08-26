@@ -160,22 +160,20 @@ async def load_scenario(body: dict) -> JSONResponse:
     _runner = ScenarioRunner(
         scenario, speak=_speak, generate=_generate, gesture=_gesture, on_event=_on_event)
 
-    # Start the PowerPoint watcher if we can; the talk still runs without it
-    # (you advance slides yourself, keyword + manual beats work regardless).
-    pptx_watching = False
+    # U263: ALWAYS start watching. The old code asked once whether a slideshow
+    # was already up and, if not, created no watcher at all - so setting the
+    # scenario up first (the natural order) silently cost you every slide cue
+    # for the whole talk. Waiting for a slideshow is a state we report, not a
+    # reason to give up before the talk has begun.
     try:
-        from aura_brain.pptx_watcher import PowerPointWatcher, powerpoint_available
+        from aura_brain.slides_watcher import SlidesWatcher
 
-        if powerpoint_available():
-            _watcher = PowerPointWatcher(on_slide=_on_slide)
-            _watcher.start()
-            pptx_watching = True
+        _watcher = SlidesWatcher(on_slide=_on_slide)
+        _watcher.start()
     except Exception as exc:  # noqa: BLE001
-        logger.debug("PowerPoint watcher not started: %s", exc)
+        logger.debug("slides watcher not started: %s", exc)
 
-    status = _runner.status()
-    status["powerpoint_watching"] = pptx_watching
-    return JSONResponse(status)
+    return JSONResponse(_status_payload())
 
 
 async def _on_slide(slide_number: int) -> None:
@@ -206,13 +204,51 @@ async def push_speech(body: dict) -> JSONResponse:
     return JSONResponse({"fired": [b.id for b in fired], "status": _runner.status()})
 
 
+def _status_payload() -> dict:
+    """Everything the Present view needs to tell the presenter where they are.
+
+    U263: the old status said `powerpoint_watching: true` as soon as a watcher
+    OBJECT existed, which is not the same as a slideshow being on screen - the
+    one thing the presenter actually needs to know before walking on stage.
+    """
+    if _runner is None:
+        return {"active": False}
+    out: dict = {"active": True, **_runner.status()}
+
+    state = _watcher.state if _watcher is not None else None
+    out["watching"] = _watcher is not None
+    out["slides_app"] = state.app if state else ""
+    out["deck"] = state.deck if state else ""
+    out["slide"] = state.slide if state else 0
+    out["slide_total"] = state.total if state else 0
+    # "waiting" is the honest middle state: we ARE watching, there is just no
+    # slideshow yet. It used to be indistinguishable from "no cues for you".
+    out["slides_state"] = (
+        "off" if _watcher is None else ("live" if state else "waiting")
+    )
+
+    warnings: list[dict] = []
+    if state is not None and _runner is not None:
+        from aura_brain import deck_check
+
+        scenario = getattr(_runner, "_scenario", None)
+        if scenario is not None:
+            warnings = [
+                {"kind": w.kind, "message": w.message}
+                for w in deck_check.check(
+                    expected_deck=getattr(scenario, "pptx", "") or "",
+                    actual_deck=state.deck,
+                    total_slides=state.total,
+                    slide_triggers=deck_check.slide_triggers(scenario),
+                )
+            ]
+    out["deck_warnings"] = warnings
+    return out
+
+
 @router.get("/status")
 async def status() -> JSONResponse:
-    if _runner is None:
-        return JSONResponse({"active": False})
-    out = {"active": True, **_runner.status()}
-    out["powerpoint_watching"] = _watcher is not None
-    return JSONResponse(out)
+    return JSONResponse(_status_payload())
 
 
 @router.delete("/scenario")

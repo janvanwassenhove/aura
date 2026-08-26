@@ -10,6 +10,38 @@
           <input ref="yamlInput" type="file" accept=".yaml,.yml" class="hidden-input" @change="importYaml">
         </div>
 
+        <!-- U263: how this works, in the order you have to do it. The trap
+             it removes: nothing said the slideshow has to be RUNNING for
+             slide cues to exist, and starting the scenario first used to
+             cost every cue for the whole talk, silently. -->
+        <!-- They stay up until he is actually FOLLOWING a deck: while the
+             status says "waiting", step 2 is precisely what the reader needs.
+             They disappear the moment they have been completed. -->
+        <ol v-if="!slidesLive" class="how-steps">
+          <li :class="{ done: !!presentation.status.title }">
+            <strong>Write the scenario</strong> - beats with a cue each:
+            <code>manual</code>, <code>slide:4</code> or <code>keyword:Java</code>.
+            Use <em>New scenario</em>, or import a YAML file.
+          </li>
+          <li :class="{ done: slidesLive }">
+            <strong>Open your deck and start the slideshow</strong> - actually
+            presenting it (F5 in PowerPoint, Play in Keynote), not just having
+            the file open. He follows the running show; a deck sitting in edit
+            mode gives him nothing to follow.
+          </li>
+          <li>
+            <strong>Then press Run.</strong> He watches from that moment on, and
+            keeps waiting if the show is not up yet - so this order is a
+            recommendation now, not a trap.
+          </li>
+          <li>
+            <strong>Click through your deck as usual.</strong> He reads the slide
+            NUMBER, so any way of advancing works - clicker, arrows, jumping
+            ahead. Animations inside one slide do not change the number, so they
+            cannot carry a cue.
+          </li>
+        </ol>
+
         <!-- Run bar: running a scenario IS switching to Present mode -->
         <div class="run-bar" :class="{ live: presenting }">
           <div class="run-text">
@@ -72,6 +104,18 @@
         </section>
 
         <!-- ═══ Builder / beats ═══ -->
+        <!-- The one thing a presenter needs at a glance before walking on. -->
+        <div v-if="presentation.status.active" class="slides-status" :class="slidesClass">
+          <span class="slides-dot" />
+          <div class="slides-text">
+            <strong>{{ slidesHeadline }}</strong>
+            <span class="slides-sub">{{ slidesDetail }}</span>
+          </div>
+        </div>
+        <div v-for="w in (presentation.status.deck_warnings ?? [])" :key="w.kind" class="deck-warning">
+          {{ w.message }}
+        </div>
+
         <ScenarioBuilder v-if="builderOpen" class="builder" @start="startScenario" />
 
         <template v-if="presenter.beats.length && !builderOpen">
@@ -113,7 +157,7 @@
       </div>
       <div class="aside-field">
         <div class="aside-k">Slide source</div>
-        <div class="aside-v">{{ presentation.status.powerpoint_watching ? 'PowerPoint · live' : 'manual — advance with the beat button' }}</div>
+          <div class="aside-v">{{ slidesHeadline }}</div>
       </div>
       <div class="aside-field">
         <div class="aside-k">Armed keywords</div>
@@ -144,6 +188,34 @@ const camera = useCameraFeed()
 const TTS_VOICES = ['alloy', 'ash', 'ballad', 'coral', 'echo', 'fable', 'onyx', 'nova', 'sage', 'shimmer', 'verse']
 
 const presenting = computed(() => presentation.status.active)
+
+// U263: where the slideshow stands, in words a presenter can act on. Three
+// states, deliberately distinct: "waiting" used to be indistinguishable from
+// "no slide cues at all", and that confusion cost a whole talk's worth of cues.
+const slidesLive = computed(() => presentation.status.slides_state === 'live')
+const slidesClass = computed(() => presentation.status.slides_state ?? 'off')
+
+const slidesHeadline = computed(() => {
+  const st = presentation.status
+  if (st.slides_state === 'live') {
+    return `Following ${st.slides_app === 'keynote' ? 'Keynote' : 'PowerPoint'}`
+  }
+  if (st.slides_state === 'waiting') return 'Waiting for your slideshow'
+  return 'Manual - advance with the beat button'
+})
+
+const slidesDetail = computed(() => {
+  const st = presentation.status
+  if (st.slides_state === 'live') {
+    const where = st.slide_total ? `slide ${st.slide} of ${st.slide_total}` : `slide ${st.slide}`
+    return `${st.deck || 'your deck'} - ${where}`
+  }
+  if (st.slides_state === 'waiting') {
+    return 'Start presenting your deck (F5 in PowerPoint, Play in Keynote) and '
+      + 'he picks it up on his own. Keyword and manual beats already work.'
+  }
+  return 'No slide cues - keyword and manual beats still work.'
+})
 const armedNote = computed(() => {
   const armed = presentation.status.armed_keywords ?? []
   return armed.length ? ` · waiting for “${armed[0]}”` : ' · waiting for you to advance'
@@ -348,4 +420,41 @@ async function saveAsideBehaviour(key: string, value: string): Promise<void> {
 .aside-field { margin-bottom: 12px; }
 .aside-k { font-size: 11.5px; color: var(--ink-3); margin-bottom: 5px; }
 .aside-v { font-size: 12.5px; color: var(--ink-2); }
+
+.how-steps {
+  margin: 0 0 14px; padding: 14px 18px 14px 34px; list-style: decimal;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 12px;
+  font-size: 13px; line-height: 1.5; color: var(--ink-2); max-width: 74ch;
+}
+.how-steps li { margin: 0 0 7px; }
+.how-steps li:last-child { margin-bottom: 0; }
+.how-steps li.done { color: var(--ink-3); }
+.how-steps li.done strong { text-decoration: line-through; }
+.how-steps strong { color: var(--ink); }
+.how-steps code {
+  font-family: var(--font-mono); font-size: 11.5px; background: var(--sunken);
+  padding: 1px 5px; border-radius: 5px;
+}
+
+.slides-status {
+  display: flex; align-items: flex-start; gap: 10px; margin: 0 0 10px;
+  padding: 10px 14px; border-radius: 11px; border: 1px solid var(--line);
+  background: var(--surface);
+}
+.slides-status.live { border-color: var(--ok); background: var(--ok-wash); }
+.slides-status.waiting { border-color: var(--warn); background: var(--warn-wash); }
+.slides-dot {
+  width: 9px; height: 9px; border-radius: 50%; margin-top: 5px; flex-shrink: 0;
+  background: var(--ink-3);
+}
+.slides-status.live .slides-dot { background: var(--ok); }
+.slides-status.waiting .slides-dot { background: var(--warn); }
+.slides-text { display: flex; flex-direction: column; gap: 2px; font-size: 13px; }
+.slides-sub { font-size: 12px; color: var(--ink-2); }
+
+.deck-warning {
+  margin: 0 0 10px; padding: 10px 14px; border-radius: 11px;
+  border: 1.5px solid var(--warn); background: var(--warn-wash);
+  color: var(--ink); font-size: 12.5px; max-width: 74ch;
+}
 </style>
