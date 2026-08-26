@@ -183,3 +183,80 @@ def test_avatar_rejects_junk_and_unknown_person() -> None:
                           json={"image": "data:text/plain;base64,aGk="}).status_code == 422
         assert client.put("/knowledge/people/ghost/avatar",
                           json={"image": _png_data_uri()}).status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# U262: correcting and removing what he believes about someone
+# ---------------------------------------------------------------------------
+
+
+def test_a_fact_can_be_corrected_in_place() -> None:
+    """Reported alongside the broken delete, and the more useful half of it.
+
+    What prompted it was a fact reading "likes colelcting jellycats" — a typo
+    the owner could neither fix nor remove, so a wrong belief about a person
+    was permanent. Editing keeps the fact's id and its provenance; delete and
+    re-add looks the same on screen and quietly loses both.
+    """
+    app = create_app()
+    with TestClient(app) as client:
+        client.put("/knowledge/people/limme", json={"display_name": "Limme", "role": "family"})
+        fact = client.post("/knowledge/people/limme/facts",
+                           json={"key": "jellycats", "value": "likes colelcting jellycats"})
+        fact_id = fact.json()["fact_id"]
+
+        fixed = client.patch(f"/knowledge/facts/{fact_id}",
+                             json={"key": "jellycats", "value": "likes collecting jellycats"})
+        assert fixed.status_code == 200
+        assert fixed.json()["fact_id"] == fact_id      # same fact, corrected
+
+        facts = client.get("/knowledge/people/limme").json()["facts"]
+        assert [f["value"] for f in facts] == ["likes collecting jellycats"]
+
+
+def test_editing_an_unknown_fact_says_so() -> None:
+    app = create_app()
+    with TestClient(app) as client:
+        resp = client.patch("/knowledge/facts/does-not-exist",
+                            json={"key": "x", "value": "y"})
+        assert resp.status_code == 404
+
+
+def test_editing_needs_both_halves() -> None:
+    app = create_app()
+    with TestClient(app) as client:
+        client.put("/knowledge/people/limme", json={"display_name": "Limme", "role": "family"})
+        fact = client.post("/knowledge/people/limme/facts", json={"key": "sport", "value": "hockey"})
+        fact_id = fact.json()["fact_id"]
+        assert client.patch(f"/knowledge/facts/{fact_id}", json={"key": "sport"}).status_code == 422
+
+
+def test_deleting_a_fact_survives_an_encrypted_vault_with_no_phone(monkeypatch) -> None:
+    """The reported bug, in one test: the cross did nothing at all.
+
+    `_require_stepup` AUTO-DENIES when STEP_UP_WEBHOOK_URL is unset, so on any
+    encrypted install without a phone webhook — the normal install — deleting a
+    fact was impossible, and silently so. U185 had already solved exactly this
+    for forgetting a PERSON with a typed confirmation; facts never got it.
+    """
+    from aura_brain import knowledge_api
+
+    app = create_app()
+    with TestClient(app) as client:
+        client.put("/knowledge/people/limme", json={"display_name": "Limme", "role": "family"})
+        fact = client.post("/knowledge/people/limme/facts", json={"key": "sport", "value": "hockey"})
+        fact_id = fact.json()["fact_id"]
+
+        # An encrypted vault, and no phone webhook anywhere.
+        monkeypatch.setattr(knowledge_api, "_omk_loaded", True)
+        monkeypatch.setattr(knowledge_api, "_stepup_gate", None)
+
+        # Without the confirmation it refuses — but SAYS so, with a status the
+        # console can act on rather than a silent nothing.
+        blocked = client.delete(f"/knowledge/facts/{fact_id}")
+        assert blocked.status_code == 428
+        assert fact_id in blocked.json()["detail"]
+
+        # With deliberate intent echoed back from the owner's own screen, it goes.
+        assert client.delete(f"/knowledge/facts/{fact_id}?confirm={fact_id}").status_code == 200
+        assert client.get("/knowledge/people/limme").json()["facts"] == []

@@ -78,6 +78,16 @@ class KnowledgeStore(ABC):
     async def get_facts(self, person_id: str) -> list[ProfileFact]: ...
     @abstractmethod
     async def delete_fact(self, fact_id: str) -> None: ...
+    @abstractmethod
+    async def update_fact(self, fact_id: str, key: str, value: str) -> ProfileFact | None:
+        """U262: correct a fact in place, keeping its id and provenance.
+
+        Delete-and-re-add would look the same on screen and lose both: the id
+        that other facts may reference through [[links]], and the record of
+        where it came from - an owner-typed fact silently becoming a fresh
+        owner-typed fact is harmless, but a LEARNED one would lose the fact
+        that he inferred it.
+        """
 
     # --- observed signals ---
     @abstractmethod
@@ -144,6 +154,14 @@ class InMemoryKnowledgeStore(KnowledgeStore):
             for f in list(facts):
                 if str(f.fact_id) == str(fact_id):
                     facts.remove(f)
+
+    async def update_fact(self, fact_id: str, key: str, value: str) -> ProfileFact | None:
+        for facts in self._facts.values():
+            for i, f in enumerate(facts):
+                if str(f.fact_id) == str(fact_id):
+                    facts[i] = f.model_copy(update={"key": key, "value": value})
+                    return facts[i]
+        return None
 
     async def record_signal(self, signal: ObservedSignal) -> ObservedSignal:
         await ensure_minor_learning_consent(self, signal.person_id)

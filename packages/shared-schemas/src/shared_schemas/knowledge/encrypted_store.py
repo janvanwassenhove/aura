@@ -158,6 +158,19 @@ class EncryptedKnowledgeStore(KnowledgeStore):
                 bundle["facts"] = kept
                 self._save(pid, bundle)
 
+    async def update_fact(self, fact_id: str, key: str, value: str) -> ProfileFact | None:
+        """U262: edit in place, keeping the id and the provenance."""
+        for pid in list(self._blobs):
+            bundle = self._load(pid)
+            for raw in bundle["facts"]:
+                if str(raw["fact_id"]) != str(fact_id):
+                    continue
+                raw["key"] = key
+                raw["value"] = value
+                self._save(pid, bundle)
+                return ProfileFact.model_validate(raw)
+        return None
+
     # ------------------------------------------------------------------
     # Signals
     # ------------------------------------------------------------------

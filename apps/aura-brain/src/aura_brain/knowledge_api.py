@@ -395,11 +395,57 @@ async def export_brain(_: None = Depends(_require_sensitive)) -> JSONResponse:
 
 
 @router.delete("/facts/{fact_id}")
-async def delete_fact(fact_id: str) -> JSONResponse:
-    """Delete a fact: step-up required (destructive, ADR-008 §9)."""
-    await _require_stepup("delete_fact", {"fact_id": fact_id})
+async def delete_fact(fact_id: str, confirm: str = "") -> JSONResponse:
+    """Delete a fact (destructive, ADR-008 §9).
+
+    U262: this was step-up-only, and `_require_stepup` AUTO-DENIES when no
+    STEP_UP_WEBHOOK_URL is configured. So on any encrypted install without a
+    phone webhook - which is the normal install - deleting a fact was simply
+    impossible, and the console's cross did nothing at all, silently.
+
+    U185 already solved exactly this for forgetting a PERSON: the phone still
+    rules when a webhook exists, and otherwise a typed confirmation from the
+    owner's own screen stands in. Facts never got that treatment. They get it
+    now, with the same reasoning: a weaker but honest gate beats a feature that
+    cannot be used - especially this one, whose entire purpose is correcting
+    what he wrongly believes about someone.
+    """
+    if _stepup_gate is not None and getattr(_stepup_gate, "_webhook_url", None):
+        await _require_stepup("delete_fact", {"fact_id": fact_id})
+    elif _omk_loaded and confirm != fact_id:
+        return JSONResponse(
+            {"error": "confirmation required",
+             "detail": f"repeat the id as ?confirm={fact_id} to delete this fact"},
+            status_code=428,   # Precondition Required
+        )
     await _require().delete_fact(fact_id)
     return JSONResponse({"deleted": fact_id})
+
+
+@router.patch("/facts/{fact_id}")
+async def update_fact(
+    fact_id: str,
+    body: dict,
+    _: None = Depends(_require_sensitive),
+) -> JSONResponse:
+    """Correct a fact in place.
+
+    U262: asked for alongside the delete fix, and it is the more useful half.
+    What prompted it was a fact reading "likes colelcting jellycats" - a typo
+    the owner could neither fix nor remove, so a wrong belief about a person
+    was simply permanent.
+
+    Editing is NOT destructive - the fact stays, it just becomes right - so it
+    needs no step-up. Correcting a mistake should be easier than living with
+    it, or people stop correcting.
+    """
+    key, value = body.get("key"), body.get("value")
+    if not key or value is None:
+        raise HTTPException(status_code=422, detail="key and value are required")
+    fact = await _require().update_fact(fact_id, str(key), str(value))
+    if fact is None:
+        raise HTTPException(status_code=404, detail=f"no fact {fact_id}")
+    return JSONResponse(fact.model_dump(mode="json"))
 
 
 @router.post("/people/{person_id}/consent")

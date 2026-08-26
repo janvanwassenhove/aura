@@ -192,13 +192,6 @@ export const useKnowledgeStore = defineStore('knowledge', () => {
     return resp ? await resp.json() : null
   }
 
-  async function updateFact(personId: string, factId: string, key: string, value: string): Promise<boolean> {
-    // No update endpoint — replace: add the new fact, then delete the old one.
-    const added = await addFact(personId, key, value)
-    if (added) await deleteFact(factId, personId)
-    return added
-  }
-
   async function renamePerson(personId: string, displayName: string, role: string): Promise<boolean> {
     const ok = await upsertPerson(personId, displayName, role)
     if (ok && detail.value?.person.person_id === personId) {
@@ -236,8 +229,30 @@ export const useKnowledgeStore = defineStore('knowledge', () => {
   }
 
   async function deleteFact(factId: string, personId: string): Promise<boolean> {
-    // Destructive — the brain requires a phone step-up when encryption is active (ADR-008 §9).
-    const resp = await _request(`/facts/${encodeURIComponent(factId)}`, { method: 'DELETE' })
+    // U262: destructive, so the brain wants a second factor. With a phone
+    // webhook configured that still rules; without one it accepts the id
+    // echoed back as deliberate intent from this screen (same fallback as
+    // forgetting a person, U185). Sending it always is harmless — the brain
+    // ignores it when the phone path applies.
+    const id = encodeURIComponent(factId)
+    const resp = await _request(`/facts/${id}?confirm=${id}`, { method: 'DELETE' })
+    if (resp) await inspectPerson(personId)
+    return resp !== null
+  }
+
+  /** U262: correct a fact instead of living with it.
+   *
+   *  Editing keeps the fact's id and where it came from — delete-and-re-add
+   *  would look identical on screen and quietly lose both.
+   */
+  async function updateFact(
+    personId: string, factId: string, key: string, value: string,
+  ): Promise<boolean> {
+    const resp = await _request(`/facts/${encodeURIComponent(factId)}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key, value }),
+    })
     if (resp) await inspectPerson(personId)
     return resp !== null
   }

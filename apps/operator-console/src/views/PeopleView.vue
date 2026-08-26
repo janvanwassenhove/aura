@@ -135,15 +135,34 @@
           <h3 class="d2-h3">What he knows about {{ detail.person.display_name }}</h3>
           <div class="facts-grid">
             <div v-for="f in profileFacts" :key="f.fact_id" class="fact-card">
-              <div class="fact-key">{{ f.key }}</div>
-              <div class="fact-value">
-                <!-- [[targets]] substituted INLINE — the sentence stays whole -->
-                <WikiText :text="f.value" @open="openTarget" />
-              </div>
-              <div v-if="full" class="mono fact-src">{{ f.source }}</div>
-              <button class="fact-x" title="Delete this fact" @click="knowledge.deleteFact(f.fact_id, detail.person.person_id)">✕</button>
+              <!-- U262: editing in place. A wrong belief about a person that
+                   you can only read is worse than one you can correct. -->
+              <template v-if="editingFact === f.fact_id">
+                <input v-model="editKey" class="d2-field fact-key-input" aria-label="Fact key"
+                       @keydown.esc="editingFact = null">
+                <input v-model="editValue" class="d2-field" aria-label="Fact value"
+                       @keydown.enter="saveEdit(f)" @keydown.esc="editingFact = null">
+                <div class="fact-actions">
+                  <button class="d2-primary-btn fact-save" :disabled="!editKey.trim() || !editValue.trim()"
+                          @click="saveEdit(f)">Save</button>
+                  <button class="d2-ghost-btn fact-save" @click="editingFact = null">Cancel</button>
+                </div>
+              </template>
+              <template v-else>
+                <div class="fact-key">{{ f.key }}</div>
+                <div class="fact-value">
+                  <!-- [[targets]] substituted INLINE — the sentence stays whole -->
+                  <WikiText :text="f.value" @open="openTarget" />
+                </div>
+                <div v-if="full" class="mono fact-src">{{ f.source }}</div>
+                <div class="fact-tools">
+                  <button class="fact-x" title="Correct this fact" @click="startEdit(f)">✎</button>
+                  <button class="fact-x" title="Delete this fact" @click="removeFact(f)">✕</button>
+                </div>
+              </template>
             </div>
           </div>
+          <p v-if="factError" class="fact-error">{{ factError }}</p>
           <p v-if="!profileFacts.length" class="empty-note">Nothing yet — add a fact above, or let him learn from conversations.</p>
 
           <template v-if="full && detail.signals.length">
@@ -340,6 +359,42 @@ const memoryText = computed(() =>
 const addingFact = ref(false)
 const factKey = ref('')
 const factValue = ref('')
+
+// ── U262: correcting and removing what he believes ─────────────────────────
+// The cross used to call the brain and, when the brain refused, nothing at all
+// happened on screen — the single most confusing outcome available. Whatever
+// goes wrong now has to be readable next to the fact it went wrong on.
+const editingFact = ref<string | null>(null)
+const editKey = ref('')
+const editValue = ref('')
+const factError = ref('')
+
+function startEdit(f: { fact_id: string; key: string; value: string }): void {
+  editingFact.value = f.fact_id
+  editKey.value = f.key
+  editValue.value = f.value
+  factError.value = ''
+}
+
+async function saveEdit(f: { fact_id: string }): Promise<void> {
+  const person = detail.value?.person.person_id
+  if (!person) return
+  factError.value = ''
+  const ok = await knowledge.updateFact(
+    person, f.fact_id, editKey.value.trim(), editValue.value.trim())
+  if (ok) editingFact.value = null
+  else factError.value = knowledge.error ?? 'Could not save that change.'
+}
+
+async function removeFact(f: { fact_id: string; key: string }): Promise<void> {
+  const person = detail.value?.person.person_id
+  if (!person) return
+  if (!window.confirm(`Forget that ${f.key}? He will no longer know it.`)) return
+  factError.value = ''
+  if (!await knowledge.deleteFact(f.fact_id, person)) {
+    factError.value = knowledge.error ?? 'Could not delete that fact.'
+  }
+}
 async function saveFact(): Promise<void> {
   if (!detail.value) return
   const ok = await knowledge.addFact(detail.value.person.person_id, factKey.value.trim(), factValue.value.trim())
@@ -620,10 +675,22 @@ function openGraph(): void { nav.go('graph') }
 .fact-value { font-size: 13px; color: var(--ink-2); }
 .fact-src { font-size: 10px; color: var(--ink-3); margin-top: 5px; }
 .fact-x {
-  position: absolute; top: 7px; right: 9px; background: none; border: none;
-  color: var(--ink-3); cursor: pointer; font-size: 11px; padding: 0; opacity: 0;
+  /* The container is positioned now (.fact-tools), so these sit side by side
+     instead of stacking on the same corner. */
+  background: none; border: none; color: var(--ink-3); cursor: pointer;
+  font-size: 12px; line-height: 1; padding: 3px 4px; border-radius: 6px;
+  opacity: 0.35;                 /* discoverable, not shouting */
 }
-.fact-card:hover .fact-x { opacity: 1; }
+.fact-card:hover .fact-tools .fact-x { opacity: 1; }
+.fact-x:hover { background: var(--sunken); }
+.fact-tools { position: absolute; top: 6px; right: 6px; display: flex; gap: 2px; }
+.fact-key-input { margin-bottom: 5px; font-size: 12px; }
+.fact-actions { display: flex; gap: 5px; margin-top: 7px; }
+.fact-save { padding: 4px 11px; font-size: 12px; }
+.fact-error {
+  margin: 8px 0 0; font-size: 12.5px; color: var(--danger);
+  background: var(--danger-wash); border-radius: 8px; padding: 7px 11px; max-width: 60ch;
+}
 .fact-x:hover { color: var(--danger); }
 
 .empty-note { font-size: 13px; color: var(--ink-3); }
