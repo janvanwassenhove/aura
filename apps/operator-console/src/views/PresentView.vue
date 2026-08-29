@@ -116,6 +116,12 @@
           {{ w.message }}
         </div>
 
+        <!-- U264: the reason it did not start belongs where the eyes are —
+             next to the button that was just pressed, not at the top of a page
+             the builder has scrolled off. -->
+        <p v-if="builderOpen && presentation.error" class="present-error builder-error">
+          {{ presentation.error }}
+        </p>
         <ScenarioBuilder v-if="builderOpen" class="builder" @start="startScenario" />
 
         <template v-if="presenter.beats.length && !builderOpen">
@@ -226,7 +232,12 @@ const builderOpen = ref(false)
 // ── Run / end ──────────────────────────────────────────────────────────────
 let modeBefore: 'home' | 'work' = 'home'
 async function startScenario(scenario: object): Promise<void> {
-  builderOpen.value = false
+  // U264: do NOT close the builder yet. It sits behind a v-if, so closing it
+  // DESTROYS it and every beat typed into it — and closing before the load
+  // was accepted meant a validation error (an empty `text` on a speak beat is
+  // the easy one) wiped the work and left "No scenario loaded" behind, with
+  // the reason scrolled off above. Reported as: "wanneer ik start presentation
+  // klik verdwijnt alles".
   const beats = ((scenario as { beats?: { id: string; mode: string; text?: string; motion?: string; trigger?: Record<string, unknown> }[] }).beats ?? [])
   presenter.setBeats(beats.map((b, i) => ({
     id: b.id ?? `beat-${i + 1}`,
@@ -237,6 +248,7 @@ async function startScenario(scenario: object): Promise<void> {
   })))
   const ok = await presentation.startScenario(scenario)
   if (ok) {
+    builderOpen.value = false          // only now: the work is safely loaded
     modeBefore = modeStore.mode === 'present' ? 'home' : modeStore.mode
     await modeStore.setMode('present')
   }
@@ -351,6 +363,7 @@ async function saveAsideBehaviour(key: string, value: string): Promise<void> {
 .present-inner { max-width: 820px; }
 .present-head { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
 .present-head h2 { margin: 0; font-size: 19px; }
+.builder-error { margin: 0 0 8px; }
 .present-error { margin: 8px 0 0; font-size: 12.5px; color: var(--danger); }
 
 .run-bar {

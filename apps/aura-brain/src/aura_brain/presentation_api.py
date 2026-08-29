@@ -154,7 +154,7 @@ async def load_scenario(body: dict) -> JSONResponse:
     try:
         scenario, _ = _scenario_from_body(body or {})
     except Exception as exc:  # noqa: BLE001 — bad YAML / failed validation
-        return JSONResponse({"error": f"invalid scenario: {exc}"}, status_code=422)
+        return JSONResponse({"error": _readable(exc)}, status_code=422)
 
     await _stop_watcher()
     _runner = ScenarioRunner(
@@ -174,6 +174,30 @@ async def load_scenario(body: dict) -> JSONResponse:
         logger.debug("slides watcher not started: %s", exc)
 
     return JSONResponse(_status_payload())
+
+
+def _readable(exc: Exception) -> str:
+    """Say what is wrong with the scenario in one line a presenter can act on.
+
+    U264: this used to hand the console the raw Pydantic dump - the field path,
+    the repr of the whole beat, `[type=value_error, ...]` and a link to the
+    pydantic docs. That is a fine thing to log and a hopeless thing to read
+    five minutes before a talk. The sentence the validators themselves raise
+    ("beat 'beat-1': speak mode needs 'text'") is already exactly right; it
+    just needs digging out of the wrapper.
+    """
+    from pydantic import ValidationError
+
+    if isinstance(exc, ValidationError):
+        lines = []
+        for err in exc.errors():
+            msg = str(err.get("msg", "")).removeprefix("Value error, ").strip()
+            if msg and msg not in lines:
+                lines.append(msg)
+        if lines:
+            return "; ".join(lines[:3])
+    text = str(exc).strip().splitlines()[0] if str(exc).strip() else "unreadable scenario"
+    return text[:200]
 
 
 async def _on_slide(slide_number: int) -> None:
