@@ -31,7 +31,11 @@ async def test_buffers_then_distills_every_n(store) -> None:
 
     async def _chat(messages, model=None):
         calls.append(messages)
-        return {"content": "- Building a [[Reachy Mini]] robot"}
+        # U281: no [[link]] here on purpose. This test is about the BUFFER
+        # (distil after N exchanges); links are resolved by _resolve_links and
+        # covered in test_person_autocreate.py, where a product name wrapped
+        # in brackets would — correctly — become a profile.
+        return {"content": "- Building a Reachy Mini robot"}
 
     pm = PersonMemory(store, _chat, every=3)
     await pm.record("jan", "I'm building a robot", "Nice!")

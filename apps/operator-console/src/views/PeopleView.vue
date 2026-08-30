@@ -50,7 +50,14 @@
           <span class="person-avatar" :class="{ noface: !hasFace(p.person_id) }">{{ initials(p.display_name) }}</span>
           <span class="person-text">
             <span class="person-name">{{ p.display_name }}</span>
-            <span class="person-sub">{{ p.role }} · {{ hasFace(p.person_id) ? 'face known' : 'no face yet' }}</span>
+            <span class="person-sub">
+              {{ p.role }} · {{ hasFace(p.person_id) ? 'face known' : 'no face yet' }}
+              <!-- U281: he may now add someone he hears about in a
+                   conversation. A household should never have to wonder where
+                   a profile came from, so his are marked as his. -->
+              <span v-if="(p as { auto_created?: boolean }).auto_created" class="added-by-him"
+                    title="He added this profile from something you said. Rename, change the role, or forget it — it is yours now.">added by him</span>
+            </span>
           </span>
           <span class="face-dot" :class="{ on: hasFace(p.person_id) }"
                 :title="hasFace(p.person_id) ? 'He can recognise this face' : 'No face taught yet — he will ask who it is'" />
@@ -823,6 +830,11 @@ function openGraph(): void { nav.go('graph') }
 .visitor-near { font-size: 0.72rem; color: var(--ink-3); display: block; margin-top: 1px; }
 .visitors-tagged { color: var(--ok, #2f7d32); }
 .memory-msg { font-size: 0.78rem; color: var(--ok, #2f7d32); align-self: center; }
+.added-by-him {
+  display: inline-block; margin-left: 0.3rem; padding: 0 0.35rem;
+  border-radius: 999px; background: var(--surface-2, rgba(127,127,127,0.12));
+  color: var(--ink-3); font-size: 0.66rem;
+}
 .memory-warn {
   background: var(--warn-wash, rgba(200, 150, 20, 0.12)); color: var(--ink-2);
   border-radius: 8px; padding: 0.6rem 0.8rem; font-size: 0.82rem; line-height: 1.5;

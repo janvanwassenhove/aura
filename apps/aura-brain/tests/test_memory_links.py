@@ -47,15 +47,15 @@ async def test_the_distiller_is_told_who_it_may_link_to(rig) -> None:
     await pm.record("jan", "Jappe wordt 13 in november", "Leuk!")
 
     prompt = chat.prompts[0]
-    assert "[[name]]" in prompt, "it has to know the syntax exists"
-    assert "jappe" in prompt, "and who it is allowed to use it for"
+    assert "[[Name]]" in prompt, "it has to know the syntax exists"
+    assert "jappe" in prompt, "and who already has a profile to link to"
 
 
 async def test_the_speaker_is_not_offered_a_link_to_themselves(rig) -> None:
     store, chat, pm = rig
     await pm.record("jan", "iets", "iets")
 
-    line = [ln for ln in chat.prompts[0].splitlines() if "already have their own profile" in ln]
+    line = [ln for ln in chat.prompts[0].splitlines() if "already have a profile" in ln]
     assert line, "the known-people line should be there"
     assert "jan" not in line[0].split(":", 1)[1], "linking a page to itself says nothing"
 
@@ -77,7 +77,7 @@ async def test_a_household_of_one_gets_no_linking_instruction(rig) -> None:
 
     await pm.record("jan", "iets", "iets")
 
-    assert "already have their own profile" not in chat.prompts[0]
+    assert "already have a profile" not in chat.prompts[0]
 
 
 async def test_the_link_survives_into_the_stored_memory(rig) -> None:

@@ -62,6 +62,11 @@ class Person(BaseModel):
     # id of a CharacterPersona, not a display name, so renaming one does not
     # orphan every profile that chose it.
     character: str = ""
+    # U281: did HE create this profile, or did the owner? He may now add a
+    # person he hears about in conversation, which is a real convenience and
+    # also a thing the owner must be able to tell apart from their own work —
+    # a household should never have to wonder where a profile came from.
+    auto_created: bool = False
     created_at: datetime = Field(default_factory=_now)
 
 

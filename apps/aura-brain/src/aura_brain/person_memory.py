@@ -17,10 +17,13 @@ preferences, recurring themes), dropping small talk. The result replaces the
 from __future__ import annotations
 
 import logging
+import re
 from collections.abc import Awaitable, Callable
 from typing import Any
 
 logger = logging.getLogger(__name__)
+
+_LINK_RE = re.compile(r"\[\[([^\]]+)\]\]")
 
 MEMORY_KEY = "memory"
 _MAX_MEMORY_CHARS = 1400
@@ -64,10 +67,32 @@ Return ONLY the updated memory text (the bullets), no preamble.
 # especially for a child, whom this app deliberately never learns about
 # passively (ADR-008 S10) - so that stays the owner's to make.
 _KNOWN_LINE = """\
-- These people already have their own profile: {names}. When the conversation
-  is about one of them, write their name as [[name]] so the two profiles
-  connect. Never use that syntax for anyone not on this list.
+- Write the name of any PERSON the conversation is about as [[Name]] - family,
+  friends, colleagues. These already have a profile: {names}; use exactly those
+  spellings for them. Someone new gets [[Their Name]] too.
+- Only real people, never places, teams, products or pets.
 """
+
+# U281: without a profile the owner may not want, and without a duplicate.
+#
+# The owner authorised him to create profiles himself ("hij mag automatisch
+# profiel maken (brain blijft lokaal binnen familie)"), with one condition:
+# "indien persoon al bestaat ... moet hij link kunnen leggen gezien context of
+# voorstellen". That condition is the whole difficulty. The model writes
+# [[Jappe]]; the profile is `jappe`; a naive create would put a second Jappe
+# beside the first and quietly split everything known about one child across
+# two pages.
+#
+# So every link is RESOLVED before anything is written, and the three outcomes
+# are deliberately different:
+#   * resolves to exactly one known person  -> rewrite to their canonical id
+#   * resolves to several (two Jans)        -> do NOT guess; drop the brackets
+#     and leave the sentence as prose, so nothing is silently attached to the
+#     wrong person
+#   * resolves to nobody                    -> create the profile, flagged as
+#     his doing, so the owner can always tell it from their own work
+_MAX_NEW_PEOPLE = 3        # one odd reply must not spawn a household
+
 
 ChatFn = Callable[..., Awaitable[dict]]
 
@@ -159,6 +184,100 @@ class PersonMemory:
         ]
         return _KNOWN_LINE.format(names=", ".join(sorted(names))) if names else ""
 
+    # -- linking ---------------------------------------------------------
+
+    @staticmethod
+    def _slug(name: str) -> str:
+        out = "".join(c if c.isalnum() else "-" for c in name.strip().lower())
+        return re.sub(r"-+", "-", out).strip("-")[:48]
+
+    async def _resolve_links(
+        self, text: str, speaker_id: str,
+    ) -> tuple[str, list[str], list[str]]:
+        """Point every [[link]] at a real profile, creating one where needed.
+
+        Returns the rewritten text, the ids he created, and the names he
+        refused to guess at. See _MAX_NEW_PEOPLE above for why this exists.
+        """
+        from shared_schemas.knowledge import Person, PersonRole  # noqa: PLC0415
+
+        names = {m.group(1).strip() for m in _LINK_RE.finditer(text)}
+        names = {n for n in names if n}
+        if not names:
+            return text, [], []
+
+        try:
+            people = await self._store.list_people()
+        except Exception as exc:  # noqa: BLE001 - never break a distillation
+            logger.debug("could not list people for linking: %s", exc)
+            return _LINK_RE.sub(r"\1", text), [], []
+
+        by_id = {p.person_id.lower(): p.person_id for p in people}
+        by_display: dict[str, list[str]] = {}
+        by_first: dict[str, list[str]] = {}
+        for p in people:
+            if str(getattr(p.role, "value", p.role)) == "demo":
+                continue          # fiction is never a link target
+            by_display.setdefault(p.display_name.strip().lower(), []).append(p.person_id)
+            first = p.display_name.strip().split()[0].lower() if p.display_name.strip() else ""
+            if first:
+                by_first.setdefault(first, []).append(p.person_id)
+
+        mapping: dict[str, str] = {}
+        created: list[str] = []
+        ambiguous: list[str] = []
+        for name in sorted(names):
+            key = name.strip().lower()
+            if key == speaker_id.lower():
+                ambiguous.append(name)      # a page linking to itself says nothing
+                continue
+            hit = by_id.get(key)
+            if hit is None:
+                for table in (by_display, by_first):
+                    found = table.get(key, [])
+                    if len(found) == 1:
+                        hit = found[0]
+                        break
+                    if len(found) > 1:
+                        # Two people share this name. Guessing would attach a
+                        # child's birthday to the wrong profile.
+                        hit = None
+                        ambiguous.append(name)
+                        break
+            if hit is not None:
+                mapping[name] = hit
+                continue
+            if name in ambiguous:
+                continue
+            if len(created) >= _MAX_NEW_PEOPLE:
+                ambiguous.append(name)
+                continue
+            new_id = self._slug(name)
+            if not new_id or new_id in by_id:
+                ambiguous.append(name)
+                continue
+            try:
+                await self._store.upsert_person(Person(
+                    person_id=new_id, display_name=name.strip(),
+                    role=PersonRole.GUEST, auto_created=True))
+            except Exception as exc:  # noqa: BLE001 - a profile is not worth a turn
+                logger.debug("could not create %r: %s", new_id, exc)
+                ambiguous.append(name)
+                continue
+            by_id[new_id] = new_id
+            mapping[name] = new_id
+            created.append(new_id)
+            logger.info("U281: created profile %r from a conversation", new_id)
+
+        def _rewrite(m):
+            raw = m.group(1).strip()
+            target = mapping.get(raw)
+            # No target -> keep the words, drop the wiring. An unresolved
+            # [[link]] on the canvas is a node pointing at nobody.
+            return f"[[{target}]]" if target else raw
+
+        return _LINK_RE.sub(_rewrite, text), created, ambiguous
+
     # -- distillation ----------------------------------------------------
 
     async def _distill(self, person_id: str, exchanges: list[tuple[str, str]]) -> dict | None:
@@ -180,6 +299,10 @@ class PersonMemory:
         new_memory = (resp.get("content") or "").strip()
         if not new_memory or new_memory.startswith("[echo]"):
             return None
+        new_memory, created, unresolved = await self._resolve_links(new_memory, person_id)
         await self.set_memory(person_id, new_memory)
         return {"person_id": person_id, "memory": new_memory[:_MAX_MEMORY_CHARS],
-                "folded": len(exchanges)}
+                "folded": len(exchanges),
+                # U281: what he did to the household while distilling, so it is
+                # reportable rather than something the owner discovers later.
+                "created_people": created, "unresolved_names": unresolved}
