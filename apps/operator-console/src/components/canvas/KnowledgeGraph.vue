@@ -8,7 +8,7 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref, watch } from 'vue'
 import type { PersonDetail } from '../../stores/knowledgeStore'
-import { memoryGraph, memoryLabel } from '../../lib/memoryGraph'
+import { MEMORY_COLOUR, memoryGraph, memoryLabel } from '../../lib/memoryGraph'
 
 /** Obsidian-style knowledge graph, drawn from one person's REAL profile.
  *
@@ -109,7 +109,11 @@ function buildGraph(): Graph | null {
   // share become their own nodes — so you can see at a glance that three
   // separate things he remembers are all about the same subject. That is the
   // difference between a list and a graph.
-  const note = d.facts.find(f => f.key === 'memory')?.value ?? ''
+  // U279: the NEWEST note. Saving used to append (U278), so a store can hold
+  // several — the owner's had eight — and first-match would graph the oldest,
+  // which is the very note they had already corrected.
+  const notes = d.facts.filter(f => f.key === 'memory')
+  const note = notes.length ? notes[notes.length - 1].value : ''
   const { lines, shared } = memoryGraph(note, [d.person.display_name, pid])
   const sharedIdx: Record<string, number> = {}
   for (const w of shared) sharedIdx[w] = add(`k${w}`, w, 'topic', 10)
@@ -226,8 +230,9 @@ function draw(): void {
     line: css('--line'), surface: css('--surface'),
     accent: css('--accent'), info: css('--info'), warn: css('--warn'), present: css('--present'),
     // U272: memory has no token of its own — a soft violet, distinct from the
-    // fact blue and the skill green in both themes.
-    memory: '#8b6fc9',
+    // fact blue and the skill green in both themes. U279: shared with the
+    // legend that names it.
+    memory: MEMORY_COLOUR,
   }
   // U272: memory gets its own colour so "what he was told" and "what he
   // worked out about you over time" never read as the same thing.

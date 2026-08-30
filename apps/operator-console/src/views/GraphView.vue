@@ -24,6 +24,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import KnowledgeGraph from '../components/canvas/KnowledgeGraph.vue'
+import { MEMORY_COLOUR } from '../lib/memoryGraph'
 import { useKnowledgeStore } from '../stores/knowledgeStore'
 import { useNavStore } from '../stores/navStore'
 
@@ -37,6 +38,9 @@ const graphRef = ref<InstanceType<typeof KnowledgeGraph> | null>(null)
 const LEGEND = [
   { label: 'People', color: 'var(--accent)' },
   { label: 'Facts', color: 'var(--info)' },
+  // U279: memory nodes have had their own colour since U272 and nothing said
+  // so — asked for as "pas styling aan wanneer het memory item betreft".
+  { label: 'Memory', color: MEMORY_COLOUR },
   { label: 'Skills', color: 'var(--present)' },
   { label: 'Topics', color: 'var(--warn)' },
 ]

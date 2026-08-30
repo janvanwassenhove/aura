@@ -44,6 +44,11 @@ const STOPWORDS = new Set([
   'would', 'you', 'your',
 ])
 
+/** U279: the colour a memory node is drawn in. Lives here, beside the code
+ *  that builds those nodes, so the canvas and the legend that explains it
+ *  cannot drift apart — a colour nothing names is not styling, it is noise. */
+export const MEMORY_COLOUR = '#8b6fc9'
+
 export interface MemoryLine {
   /** Stable within one note, so nodes keep their identity across renders. */
   id: string
