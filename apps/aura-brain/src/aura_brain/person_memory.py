@@ -87,11 +87,21 @@ class PersonMemory:
 
     # -- store helpers ---------------------------------------------------
 
+    async def _memory_facts(self, person_id: str) -> list:
+        """EVERY fact carrying the memory key — normally one.
+
+        U278: the console's "Save memory" used to POST a NEW fact instead of
+        replacing the note, so a store could end up with several. Both readers
+        take the first, which is the OLDEST — so a correction was written,
+        never shown, and never reached the model either. Returning them all is
+        what lets a duplicated store heal itself on the next save.
+        """
+        return [f for f in await self._store.get_facts(person_id) if f.key == MEMORY_KEY]
+
     async def _current_memory_fact(self, person_id: str):
-        for f in await self._store.get_facts(person_id):
-            if f.key == MEMORY_KEY:
-                return f
-        return None
+        facts = await self._memory_facts(person_id)
+        # The LAST one is the most recently written — the one the owner meant.
+        return facts[-1] if facts else None
 
     async def get_memory(self, person_id: str) -> str:
         fact = await self._current_memory_fact(person_id)
@@ -101,8 +111,10 @@ class PersonMemory:
         from shared_schemas.knowledge import ProfileFact
 
         text = text.strip()[:_MAX_MEMORY_CHARS]
-        old = await self._current_memory_fact(person_id)
-        if old is not None:
+        # U278: delete ALL of them, not just the first. A store that already
+        # collected duplicates is repaired by the next save rather than
+        # accumulating another one.
+        for old in await self._memory_facts(person_id):
             await self._store.delete_fact(str(old.fact_id))
         if text:
             await self._store.add_fact(ProfileFact(person_id=person_id, key=MEMORY_KEY, value=text))

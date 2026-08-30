@@ -246,6 +246,7 @@
             <textarea v-model="memoryDraft" rows="9" aria-label="Memory" class="memory-area" />
             <div class="memory-actions">
               <button class="d2-ghost-btn" @click="saveMemory">Save memory</button>
+              <span v-if="memoryMsg" class="memory-msg">{{ memoryMsg }}</span>
               <button class="d2-danger-btn" @click="clearMemory">Clear all memory</button>
             </div>
           </template>
@@ -438,8 +439,14 @@ const profileFacts = computed(() =>
   (detail.value?.facts ?? []).filter(f => f.key !== 'memory' && !f.key.startsWith('source:')))
 const sourceFacts = computed(() =>
   (detail.value?.facts ?? []).filter(f => f.key.startsWith('source:')))
-const memoryText = computed(() =>
-  (detail.value?.facts ?? []).find(f => f.key === 'memory')?.value ?? '')
+// U278: the LAST memory fact, not the first. Saving used to append, so a
+// store can already hold several — and first-match showed the oldest, which
+// is precisely why a correction looked like it had not saved. The next save
+// collapses them back to one; until then, show what the owner wrote last.
+const memoryText = computed(() => {
+  const notes = (detail.value?.facts ?? []).filter(f => f.key === 'memory')
+  return notes.length ? notes[notes.length - 1].value : ''
+})
 
 const addingFact = ref(false)
 const factKey = ref('')
@@ -653,10 +660,18 @@ async function createPerson(): Promise<void> {
 // ── Memory tab ─────────────────────────────────────────────────────────────
 const memoryDraft = ref('')
 watch(memoryText, (t) => { memoryDraft.value = t }, { immediate: true })
+const memoryMsg = ref('')
 async function saveMemory(): Promise<void> {
   if (!detail.value) return
-  await knowledge.addFact(detail.value.person.person_id, 'memory', memoryDraft.value.trim())
-  await knowledge.inspectPerson(detail.value.person.person_id)
+  // U278: REPLACE, don't append. addFact() posted a second fact with the same
+  // key while every reader — this view and the brain both — takes the first,
+  // so a correction was stored, never shown, and never reached the model.
+  memoryMsg.value = ''
+  const ok = await knowledge.saveMemory(
+    detail.value.person.person_id, memoryDraft.value.trim())
+  memoryMsg.value = ok
+    ? 'Saved — this is what he reads from now on.'
+    : knowledge.error ?? 'Could not save that.'
 }
 async function clearMemory(): Promise<void> {
   if (!detail.value) return
@@ -807,6 +822,7 @@ function openGraph(): void { nav.go('graph') }
 
 .visitor-near { font-size: 0.72rem; color: var(--ink-3); display: block; margin-top: 1px; }
 .visitors-tagged { color: var(--ok, #2f7d32); }
+.memory-msg { font-size: 0.78rem; color: var(--ok, #2f7d32); align-self: center; }
 .memory-warn {
   background: var(--warn-wash, rgba(200, 150, 20, 0.12)); color: var(--ink-2);
   border-radius: 8px; padding: 0.6rem 0.8rem; font-size: 0.82rem; line-height: 1.5;

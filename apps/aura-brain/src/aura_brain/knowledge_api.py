@@ -434,6 +434,47 @@ async def import_chats(
     return JSONResponse(result)
 
 
+@router.put("/people/{person_id}/memory")
+async def put_memory(person_id: str, body: dict,
+                     _: None = Depends(_require_sensitive)) -> JSONResponse:
+    """REPLACE this person's long-term memory note.
+
+    U278: "bij memory, wanneer ik aanpassing (correctie) maak lijkt hij niet te
+    saven". It saved — as a SECOND fact. The console's Save button called
+    `addFact(person, "memory", text)`, which appends; both the console and the
+    brain read the memory with a first-match lookup, so they kept returning the
+    OLD note. The correction was stored, never displayed, and never reached the
+    model — which is the worst of the three, because correcting something wrong
+    about yourself is exactly when it has to take.
+
+    Replacing is a different operation from adding, so it gets its own route
+    rather than a fact POST that happens to use a reserved key.
+    """
+    store = _require()
+    if await store.get_person(person_id) is None:
+        raise HTTPException(status_code=404, detail=f"Unknown person {person_id!r}")
+    text = str((body or {}).get("memory", "")).strip()
+
+    # Always against THIS router's store. Routing it through
+    # ctx.person_memory instead would write to whatever store that module was
+    # built with — the same one in production, but "usually the same object"
+    # is not a thing to depend on, and the full test suite proved it by
+    # writing the note into a different store than the one being read.
+    from shared_schemas.knowledge import ProfileFact  # noqa: PLC0415
+
+    # Delete ALL of them: a store that already collected duplicates (every
+    # press of the old Save button added one) is repaired here rather than
+    # growing by one more.
+    for f in await store.get_facts(person_id):
+        if f.key == "memory":
+            await store.delete_fact(str(f.fact_id))
+    if text:
+        await store.add_fact(ProfileFact(person_id=person_id, key="memory", value=text))
+    kept = [f.value for f in await store.get_facts(person_id) if f.key == "memory"]
+    return JSONResponse({"person_id": person_id, "memory": kept[0] if kept else "",
+                         "notes": len(kept)})
+
+
 @router.post("/people/{person_id}/memory/flush")
 async def flush_memory(
     person_id: str,

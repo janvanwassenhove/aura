@@ -140,6 +140,19 @@ export const useKnowledgeStore = defineStore('knowledge', () => {
     return resp !== null
   }
 
+  /** U278: REPLACE the memory note. The Save button used to call addFact,
+   *  which appends — so a correction became a second fact while every reader
+   *  took the first (the old one). Saved, never shown, never used. */
+  async function saveMemory(personId: string, memory: string): Promise<boolean> {
+    const resp = await _request(`/people/${encodeURIComponent(personId)}/memory`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ memory }),
+    })
+    if (resp) await inspectPerson(personId)
+    return resp !== null
+  }
+
   async function fetchSnapshots(personId: string): Promise<{ snapshot_id: string; seen_at: number; confidence: number; image: string }[]> {
     // U127: recent recognition snapshots of this person (gated SENSITIVE).
     const resp = await _request(`/people/${encodeURIComponent(personId)}/snapshots`)
@@ -504,7 +517,7 @@ export const useKnowledgeStore = defineStore('knowledge', () => {
     speaker, speakerSource, selectedPerson, personTab,
     setSpeaker, noteNoFace, noteFaceSeen,
     fetchTier, fetchPeople, inspectPerson, upsertPerson, saveDescription,
-    addFact, updateFact, deleteFact, ingestSources, importChats, exportBrain, fetchSnapshots, flagSnapshotWrong, renamePerson, setPersonPrefs, mergePerson, forgetPerson, setConsent, lock,
+    addFact, saveMemory, updateFact, deleteFact, ingestSources, importChats, exportBrain, fetchSnapshots, flagSnapshotWrong, renamePerson, setPersonPrefs, mergePerson, forgetPerson, setConsent, lock,
     fetchRecognition, secure, teachFace, remembering, fetchSpeaker, recognitionThreshold,
     fetchSightings, sightingImageUrl, tagSighting, dismissSighting,
     clearDetail, $reset,
