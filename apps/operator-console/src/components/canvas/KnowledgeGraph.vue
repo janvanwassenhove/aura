@@ -8,7 +8,7 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref, watch } from 'vue'
 import type { PersonDetail } from '../../stores/knowledgeStore'
-import { MEMORY_COLOUR, memoryGraph, memoryLabel } from '../../lib/memoryGraph'
+import { MEMORY_COLOUR, memoryGraph, memoryLabel, memoryText } from '../../lib/memoryGraph'
 
 /** Obsidian-style knowledge graph, drawn from one person's REAL profile.
  *
@@ -118,10 +118,22 @@ function buildGraph(): Graph | null {
   const sharedIdx: Record<string, number> = {}
   for (const w of shared) sharedIdx[w] = add(`k${w}`, w, 'topic', 10)
   for (const line of lines) {
-    const i = add(line.id, memoryLabel(line), 'memory', 8, undefined, line.text)
+    const i = add(line.id, memoryLabel(line), 'memory', 8, undefined, memoryText(line))
     links.push([root, i, 0.85])
     for (const w of line.keywords) {
       if (sharedIdx[w] !== undefined) links.push([i, sharedIdx[w], 0.7])
+    }
+    // U280: a remembered line that NAMES someone he knows becomes an edge to
+    // that person, reusing the same shared node the facts link to. Without
+    // this the distiller's [[jappe]] was just characters inside a sentence,
+    // and two people in one household stayed unconnected on the canvas.
+    for (const name of line.refs) {
+      if (topicIdx[name] === undefined) {
+        const isPerson = props.peopleIds.includes(name)
+        topicIdx[name] = add(`t${name}`, name, isPerson ? 'person' : 'topic',
+                             isPerson ? 14 : 11, isPerson ? name : undefined)
+      }
+      links.push([i, topicIdx[name], 0.9])
     }
   }
   // Cross-links so it reads as a web, not a star.

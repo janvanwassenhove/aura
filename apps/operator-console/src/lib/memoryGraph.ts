@@ -56,6 +56,11 @@ export interface MemoryLine {
   text: string
   /** The words that distinguish this line, most telling first. */
   keywords: string[]
+  /** U280: people this line explicitly names as [[links]]. The distiller
+   *  writes those for anyone who already has a profile, so a remembered
+   *  relationship becomes a real edge between two people instead of a
+   *  sentence that merely happens to contain a name. */
+  refs: string[]
 }
 
 /** Split the stored note into the lines it is actually made of.
@@ -104,6 +109,8 @@ export function memoryGraph(
   const lines: MemoryLine[] = raw.map((text, i) => ({
     id: `m${i}`,
     text,
+    // U280: [[jappe]] in a remembered line is a link to that person's profile.
+    refs: [...text.matchAll(/\[\[([^\]]+)\]\]/g)].map(m => m[1].trim()).filter(Boolean),
     // Rank by reach first (a word tying lines together is the interesting
     // one), then by length as a plain tiebreak. Order within the line is
     // preserved for equal scores, so labels read the way the sentence does.
@@ -122,6 +129,11 @@ export function memoryGraph(
 }
 
 /** What a memory node says on the canvas: its keywords, or a short fallback. */
+/** The sentence with its link markup removed - what a reader should see. */
+export function memoryText(line: MemoryLine): string {
+  return line.text.replace(/\[\[([^\]]+)\]\]/g, '$1')
+}
+
 export function memoryLabel(line: MemoryLine): string {
   if (line.keywords.length) return line.keywords.join(' · ')
   return line.text.slice(0, 28)

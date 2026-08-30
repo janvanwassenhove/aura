@@ -44,8 +44,29 @@ Update the memory:
 - Merge — do not just append; revise stale points, keep it tight.
 - A concise bullet list, at most ~10 bullets, {max_chars} characters max.
 - Same language as the exchanges.
-
+{known_line}
 Return ONLY the updated memory text (the bullets), no preamble.
+"""
+
+# U280: the link half. Asked as "kan hij vandaag al linken leggen tussen
+# personas? bv. als ik praat als jan, over jappe, dan kan hij ook kennis
+# opbouwen over jappe op dat ogenblik".
+#
+# He already REMEMBERED Jappe - "relationships" is in the keep-list above, so
+# "Jan's son Jappe is 13" lands in Jan's memory. What he never did was CONNECT
+# them: the graph turns [[name]] into a shared node, and a name it recognises
+# as a person into a clickable person node, but the distiller had never been
+# told that syntax exists. So two people the owner had both created sat in one
+# household with nothing between them.
+#
+# Only names he ALREADY knows get linked. Inventing a profile for every name
+# overheard in a conversation is a different decision with a different weight -
+# especially for a child, whom this app deliberately never learns about
+# passively (ADR-008 S10) - so that stays the owner's to make.
+_KNOWN_LINE = """\
+- These people already have their own profile: {names}. When the conversation
+  is about one of them, write their name as [[name]] so the two profiles
+  connect. Never use that syntax for anyone not on this list.
 """
 
 ChatFn = Callable[..., Awaitable[dict]]
@@ -119,6 +140,25 @@ class PersonMemory:
         if text:
             await self._store.add_fact(ProfileFact(person_id=person_id, key=MEMORY_KEY, value=text))
 
+    async def _known_people_line(self, speaker_id: str) -> str:
+        """U280: the other people he already knows, so mentions become links.
+
+        Everyone except the speaker (linking Jan's own page to itself says
+        nothing) and except the demo profile, which is fiction and must never
+        be woven into a real household.
+        """
+        try:
+            people = await self._store.list_people()
+        except Exception as exc:  # noqa: BLE001 - never break a distillation
+            logger.debug("could not list people for linking: %s", exc)
+            return ""
+        names = [
+            p.person_id for p in people
+            if p.person_id != speaker_id
+            and getattr(p.role, "value", p.role) != "demo"
+        ]
+        return _KNOWN_LINE.format(names=", ".join(sorted(names))) if names else ""
+
     # -- distillation ----------------------------------------------------
 
     async def _distill(self, person_id: str, exchanges: list[tuple[str, str]]) -> dict | None:
@@ -130,6 +170,7 @@ class PersonMemory:
         prompt = _DISTILL_PROMPT.format(
             name=person.display_name, memory=current or "(none yet)",
             exchanges=convo, max_chars=_MAX_MEMORY_CHARS,
+            known_line=await self._known_people_line(person_id),
         )
         try:
             resp = await self._chat([{"role": "user", "content": prompt}], model=self._model_getter())

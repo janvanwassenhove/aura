@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { memoryGraph, memoryLabel, splitMemory } from '../../src/lib/memoryGraph'
+import { memoryGraph, memoryLabel, memoryText, splitMemory } from '../../src/lib/memoryGraph'
 
 /** U272: "is graph only taking skills into account or also showing memory?"
  *  followed by "currently memory is single bullet in graph".
@@ -76,5 +76,32 @@ describe('U272 — memory becomes a web, not one bullet', () => {
   it('falls back to the text when a line has no usable keywords', () => {
     const { lines } = memoryGraph('- hij is er', [])
     expect(memoryLabel(lines[0])).toContain('hij is er')
+  })
+})
+
+describe('U280 — a remembered relationship links two people', () => {
+  it('picks up the [[links]] the distiller writes', () => {
+    const { lines } = memoryGraph("- Jan's son [[jappe]] turns 13 in November", ['Jan'])
+    expect(lines[0].refs).toEqual(['jappe'])
+  })
+
+  it('shows the sentence without its markup', () => {
+    const { lines } = memoryGraph('- his son [[jappe]] plays football', [])
+    // The canvas must read as prose; the brackets are wiring, not writing.
+    expect(memoryText(lines[0])).toBe('his son jappe plays football')
+    expect(memoryText(lines[0])).not.toContain('[[')
+  })
+
+  it('leaves a line with no links alone', () => {
+    const { lines } = memoryGraph('- he likes running', [])
+    expect(lines[0].refs).toEqual([])
+  })
+
+  it('keeps a linked name available as a keyword too', () => {
+    // The link is an edge to a person; the name is still what the line is
+    // about, so it may also earn its place on the label.
+    const { lines } = memoryGraph('- [[jappe]] speelt voetbal en houdt van muziek', ['Jan'])
+    expect(lines[0].refs).toContain('jappe')
+    expect(lines[0].keywords.length).toBeGreaterThan(0)
   })
 })
