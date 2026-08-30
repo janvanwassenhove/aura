@@ -115,9 +115,21 @@ class EmbeddingMatcher:
     def sample_count(self, person_id: str) -> int:
         return len(self._enrolled.get(person_id, []))
 
-    def identify(self, embedding: list[float]) -> tuple[str | None, float]:
-        """Return (person_id, confidence) for the best match over ALL of each
-        person's samples, or (None, score) if nothing clears the threshold."""
+    @property
+    def threshold(self) -> float:
+        """The bar a match must clear. U277: shown beside a near-miss, so
+        "0.34" means something instead of being a bare number."""
+        return self._threshold
+
+    def closest(self, embedding: list[float]) -> tuple[str | None, float]:
+        """The best match over ALL samples, WITHOUT applying the threshold.
+
+        U277: `identify` deliberately answers "nobody" below the bar, which is
+        right for recognition and useless for explaining it. A face that lands
+        in unknown visitors did come closest to SOMEONE, and that is the whole
+        answer to "why is my own face a stranger?" — so it is available
+        separately rather than folded into the same call.
+        """
         best_id: str | None = None
         best_score = 0.0
         for pid, blobs in self._enrolled.items():
@@ -126,6 +138,12 @@ class EmbeddingMatcher:
                 score = _cosine(embedding, ref)
                 if score > best_score:
                     best_id, best_score = pid, score
+        return best_id, best_score
+
+    def identify(self, embedding: list[float]) -> tuple[str | None, float]:
+        """Return (person_id, confidence) for the best match over ALL of each
+        person's samples, or (None, score) if nothing clears the threshold."""
+        best_id, best_score = self.closest(embedding)
         if best_id is not None and best_score >= self._threshold:
             return best_id, best_score
         return None, best_score

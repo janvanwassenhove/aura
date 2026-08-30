@@ -24,6 +24,11 @@
             <img :src="knowledge.sightingImageUrl(v.sighting_id)" alt="Unknown visitor" class="visitor-thumb">
           </button>
           <span class="visitor-seen">Seen {{ v.count }}× · {{ fmtAgo(v.last_seen) }}</span>
+          <!-- U277: why a face you HAVE taught can still land here. It scored
+               below the bar — a different angle, worse light, further away —
+               and that near-miss was computed and thrown away, so the row gave
+               no way to tell "this is you badly lit" from "this is a stranger". -->
+          <span v-if="nearMiss(v)" class="visitor-near">{{ nearMiss(v) }}</span>
           <div class="visitor-actions">
             <select :aria-label="'Tag as person'" class="visitor-select" @change="tagVisitor(v.sighting_id, $event)">
               <option value="">Tag as…</option>
@@ -32,7 +37,8 @@
             <button class="visitor-dismiss" title="Not a person / never mind" @click="knowledge.dismissSighting(v.sighting_id)">Dismiss</button>
           </div>
         </div>
-        <p class="visitors-note">Tagging moves the face onto that person — recognition keeps working and the guest profile is absorbed.</p>
+        <p class="visitors-note">Tagging adds this shot to that person's face — every angle you tag makes the next one recognisable. The guest profile is absorbed.</p>
+        <p v-if="tagMsg" class="visitors-note visitors-tagged">{{ tagMsg }}</p>
       </div>
 
       <div class="people-list">
@@ -486,6 +492,21 @@ function openTarget(target: string): void {
 }
 
 // ── Role / consent / forget ────────────────────────────────────────────────
+// ── U277: how close an unknown face came to someone he knows ──────────────
+// A face lands in "unknown visitors" because its best match scored under the
+// threshold. That number exists — `identify()` computes it — and used to be
+// discarded, so a face taught ten minutes ago showed up as a stranger with no
+// explanation. Seeing "closest: Jan (0.34 of 0.40)" turns tagging from a
+// guess into a decision, and confirms what tagging is FOR.
+function nearMiss(v: { near_person?: string; near_score?: number }): string {
+  if (!v.near_person || typeof v.near_score !== 'number') return ''
+  const name = knowledge.people.find(p => p.person_id === v.near_person)?.display_name
+    ?? v.near_person
+  return `closest: ${name} (${v.near_score.toFixed(2)} of ${knowledge.recognitionThreshold.toFixed(2)} needed)`
+}
+
+const tagMsg = ref('')
+
 // ── U274: per-person language and character ───────────────────────────────
 // The list the brain actually understands (orchestrator/_LANGUAGE_NAMES) —
 // offering a language he cannot be instructed in would be a dropdown that
@@ -580,7 +601,9 @@ function fmtAgo(ts: number): string {
 async function tagVisitor(sightingId: string, e: Event): Promise<void> {
   const personId = (e.target as HTMLSelectElement).value
   if (!personId) return
-  await knowledge.tagSighting(sightingId, personId)
+  // U277: the store returns what actually happened ("he now has 5 shots of
+  // that face") and it used to be thrown away at the call site.
+  tagMsg.value = await knowledge.tagSighting(sightingId, personId)
   knowledge.fetchSightings()
   fetchEnrolled()
 }
@@ -782,6 +805,8 @@ function openGraph(): void { nav.go('graph') }
   color: var(--ink-3); border: 1px solid var(--line-strong); border-radius: 999px; padding: 3px 10px;
 }
 
+.visitor-near { font-size: 0.72rem; color: var(--ink-3); display: block; margin-top: 1px; }
+.visitors-tagged { color: var(--ok, #2f7d32); }
 .memory-warn {
   background: var(--warn-wash, rgba(200, 150, 20, 0.12)); color: var(--ink-2);
   border-radius: 8px; padding: 0.6rem 0.8rem; font-size: 0.82rem; line-height: 1.5;

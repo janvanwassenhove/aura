@@ -94,6 +94,11 @@ class SightingLog:
             for e in self._entries
         ]
 
+    def all(self) -> list[Sighting]:
+        """The entries themselves — U277 needs the embeddings to score how
+        close each unknown face came to someone already known."""
+        return list(self._entries)
+
     def get(self, sighting_id: str) -> Sighting | None:
         return next((e for e in self._entries if e.sighting_id == sighting_id), None)
 

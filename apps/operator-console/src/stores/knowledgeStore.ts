@@ -341,12 +341,23 @@ export const useKnowledgeStore = defineStore('knowledge', () => {
 
   // ── Unknown-visitor sightings (U36f) ──
 
-  const sightings = ref<{ sighting_id: string; first_seen: number; last_seen: number; count: number }[]>([])
+  const sightings = ref<{
+    sighting_id: string; first_seen: number; last_seen: number; count: number
+    /** U277: who this face came CLOSEST to, and by how much. A face lands in
+     *  this list because it scored below the threshold — that near-miss is
+     *  the whole answer to "why is my own face a stranger?" */
+    near_person?: string; near_score?: number
+  }[]>([])
+  /** The bar a match has to clear, so a score reads as more than a number. */
+  const recognitionThreshold = ref(0.4)
 
   async function fetchSightings(): Promise<void> {
     try {
       const resp = await fetch(`${BRAIN_URL}/recognition/sightings`)
-      sightings.value = resp.ok ? (await resp.json()).sightings ?? [] : []
+      if (!resp.ok) { sightings.value = []; return }
+      const body = await resp.json()
+      sightings.value = body.sightings ?? []
+      if (typeof body.threshold === 'number') recognitionThreshold.value = body.threshold
     } catch {
       sightings.value = []
     }
@@ -366,7 +377,13 @@ export const useKnowledgeStore = defineStore('knowledge', () => {
       const body = await resp.json().catch(() => ({}))
       if (resp.ok) {
         await fetchSightings()
-        return `Tagged as ${body.tagged} — recognition improved.`
+        // U277: name the training that just happened. The owner's own reading
+        // — "tagging with the right person contributes to training" — is
+        // exactly right, and nothing on screen had ever confirmed it.
+        const n = body.samples
+        return typeof n === 'number'
+          ? `Tagged as ${body.tagged} — he now has ${n} shot${n === 1 ? '' : 's'} of that face.`
+          : `Tagged as ${body.tagged} — recognition improved.`
       }
       return body.error ?? `Tagging failed (${resp.status})`
     } catch {
@@ -488,7 +505,7 @@ export const useKnowledgeStore = defineStore('knowledge', () => {
     setSpeaker, noteNoFace, noteFaceSeen,
     fetchTier, fetchPeople, inspectPerson, upsertPerson, saveDescription,
     addFact, updateFact, deleteFact, ingestSources, importChats, exportBrain, fetchSnapshots, flagSnapshotWrong, renamePerson, setPersonPrefs, mergePerson, forgetPerson, setConsent, lock,
-    fetchRecognition, secure, teachFace, remembering, fetchSpeaker,
+    fetchRecognition, secure, teachFace, remembering, fetchSpeaker, recognitionThreshold,
     fetchSightings, sightingImageUrl, tagSighting, dismissSighting,
     clearDetail, $reset,
   }

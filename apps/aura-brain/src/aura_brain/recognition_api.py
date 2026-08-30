@@ -219,9 +219,40 @@ async def forget(person_id: str) -> JSONResponse:
 
 @router.get("/sightings")
 async def list_sightings() -> JSONResponse:
+    """Unknown visitors, each with the person it came CLOSEST to.
+
+    U277: "ik had dit gedaan maar bij unknown visitors kwam ik er ook op — ik
+    ga er vanuit dat hier een mindere mate van zekerheid is en zo bij kan
+    dragen tot trainen als ik hier tag met de juiste persoon." Both halves of
+    that are exactly right, and neither was visible anywhere.
+
+    A face lands here when its best match scores below RECOGNITION_THRESHOLD —
+    a different angle, worse light, further away. `identify()` computes that
+    near-miss score and the old code threw it away, so a face you had taught
+    ten minutes earlier turned up as a stranger with no hint why, and no way
+    to tell "this is you at a bad angle" from "this is genuinely someone else".
+
+    Scored live rather than stored, so teaching a face immediately re-scores
+    every sighting still on the list instead of leaving a stale number.
+    """
     if _sightings is None:
         return JSONResponse({"sightings": []})
-    return JSONResponse({"sightings": _sightings.list()})
+    rows = _sightings.list()
+    if _matcher is not None:
+        by_id = {r["sighting_id"]: r for r in rows}
+        for entry in _sightings.all():
+            row = by_id.get(entry.sighting_id)
+            if row is None:
+                continue
+            # closest(), not identify(): below the bar identify() answers
+            # "nobody", and WHO it nearly was is the entire point here.
+            near_id, score = _matcher.closest(entry.embedding)
+            row["near_person"] = near_id or ""
+            row["near_score"] = round(float(score), 3)
+    return JSONResponse({
+        "sightings": rows,
+        "threshold": getattr(_matcher, "threshold", None) if _matcher else None,
+    })
 
 
 @router.get("/sightings/{sighting_id}/image")
@@ -261,7 +292,15 @@ async def tag_sighting(sighting_id: str, body: dict) -> JSONResponse:
     _matcher.enroll(person_id, entry.embedding)
     # This sighting (and any others of the same face) now match → clean up.
     purged = _sightings.purge_matching(_matcher)
-    return JSONResponse({"tagged": person_id, "purged_sightings": purged})
+    # U277: say that the training actually happened. The owner's own reading
+    # of this feature — "tagging with the right person contributes to
+    # training" — is exactly right, and nothing on screen confirmed it. A
+    # sample count does: it goes up, every time, and it is the thing that
+    # makes the next angle recognisable.
+    samples = _matcher.sample_count(person_id)
+    return JSONResponse({
+        "tagged": person_id, "purged_sightings": purged, "samples": samples,
+    })
 
 
 @router.delete("/sightings/{sighting_id}")
