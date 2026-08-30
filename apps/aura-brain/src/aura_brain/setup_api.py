@@ -264,6 +264,35 @@ async def discover() -> JSONResponse:
     return JSONResponse({"found": found, "scanned": len(unique)})
 
 
+def _voice_in_use() -> dict:
+    """U273: the voice he will actually speak with, and where it came from.
+
+    Three screens each offer a "Voice" — Settings, Modes, and the persona card
+    in Robot — and nothing told the owner which one wins. It is the persona's
+    own voice, nearly always, because every built-in character ships with one:
+    Friendly Assistant is `coral`, so a Settings dropdown reading `alloy` had
+    never once been used. Rather than explain a rule, show the result.
+    """
+    from aura_brain import voice  # noqa: PLC0415
+
+    character_voice, mode = "", ""
+    try:
+        from aura_brain import main as _main  # noqa: PLC0415
+
+        _ctx = getattr(_main, "ctx", None)
+        active = getattr(_ctx, "characters", None)
+        active = active.active() if active is not None else None
+        character_voice = getattr(active, "voice_id", "") or ""
+        router = getattr(getattr(_ctx, "pipeline", None), "_router", None)
+        mode = str(getattr(router, "mode", "") or "")
+    except Exception:  # noqa: BLE001 — a status field must never 500
+        character_voice, mode = "", ""
+
+    used, source = voice.explain_voice(
+        mode=mode or None, character_voice=character_voice or None)
+    return {"voice_in_use": used, "voice_source": source}
+
+
 def _effective_fallback() -> str:
     """What `auto` will actually reach for — resolved, not just configured."""
     try:
@@ -295,6 +324,12 @@ def _prefs_snapshot() -> dict:
         "voice_engine": os.environ.get("VOICE_ENGINE", "pipeline"),  # U132
         "wake_word": os.environ.get("WAKE_WORD", os.environ.get("ASSISTANT_NAME", "AURA")),
         "tts_voice": os.environ.get("TTS_VOICE", "alloy"),
+        # U273: what he will ACTUALLY speak with, and which of the three Voice
+        # dropdowns decided it. Asked as "the default voice in settings, whats
+        # difference in between the one selected in robot?" — the honest answer
+        # is that the persona's own voice usually wins and this one never gets
+        # a turn, which no screen said anywhere.
+        **_voice_in_use(),
         # U84: conversation-layer settings
         "character": os.environ.get("ACTIVE_CHARACTER", ""),
         "interrupt_sensitivity": os.environ.get("BARGE_IN_FACTOR", "3.0"),

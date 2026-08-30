@@ -295,7 +295,20 @@
         <div class="row">
           <div class="row-text">
             <div class="row-title">Voice</div>
-            <div class="row-sub">The default voice — modes can override it in Modes.</div>
+            <!-- U273: the old line ("modes can override it in Modes") named one
+                 of the two things that outrank it and left out the one that
+                 usually decides. Three screens offer a Voice; say the order,
+                 and then say which one actually won. -->
+            <div class="row-sub">
+              The fallback voice. He uses the first of these that is set:
+              <strong>the persona's own voice</strong> (Robot → the persona card),
+              then <strong>the voice for the current mode</strong> (Modes),
+              then this one.
+            </div>
+            <div v-if="prefs.voiceInUse" class="row-sub voice-actual">
+              Right now he speaks with <strong>{{ prefs.voiceInUse }}</strong> —
+              {{ prefs.voiceSource }}.
+            </div>
           </div>
           <select :value="prefs.ttsVoice" class="d2-field row-field" aria-label="Voice"
                   @change="prefs.save({ tts_voice: ($event.target as HTMLSelectElement).value })">
@@ -597,6 +610,10 @@ watch(() => themeStore.theme, () => { /* persisted by the store's own watcher */
 .row-text { flex: 1; min-width: 200px; }
 .row-title { font-size: 13.5px; font-weight: 600; }
 .row-sub { font-size: 12px; color: var(--ink-3); margin-top: 1px; }
+/* U273: the voice he is REALLY using — regularly disagrees with the
+   dropdown beside it, which is the whole reason it is here. */
+.voice-actual { margin-top: 3px; color: var(--ink-2); }
+
 .row-field { width: auto; flex: 0 1 220px; min-width: 140px; }
 .row-val { font-size: 12.5px; font-weight: 600; color: var(--ink-3); flex-shrink: 0; }
 .row-val.ok { color: var(--ok); }

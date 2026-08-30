@@ -106,7 +106,12 @@
         <div class="pe-fields">
           <label class="pe-field">
             <span>Voice</span>
-            <select v-model="editingCharacter.voice_id" class="d2-field" aria-label="Voice">
+            <!-- U273: this is the voice that actually gets used almost every
+                 time — every built-in character ships with one — so it says so
+                 rather than letting the Settings default look like the answer. -->
+            <select v-model="editingCharacter.voice_id" class="d2-field"
+                    title="This wins over the mode voice and the default in Settings. Leave it blank to fall back to those."
+                    aria-label="Voice">
               <option v-for="v in TTS_VOICES" :key="v" :value="v">{{ v }}</option>
             </select>
           </label>

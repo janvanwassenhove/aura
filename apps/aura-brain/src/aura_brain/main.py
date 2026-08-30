@@ -434,12 +434,20 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             # CANCELLABLE task registered with the conversation manager so a
             # barge-in cuts it (and the robot playback) instantly.
             capped = text[:600]  # cap TTS cost
+            # U273: one function decides, and it can say why (explain_voice).
+            # The character's own voice still wins — every built-in ships with
+            # one, which is why the Settings dropdown looked ignored: it was.
+            # The MODE's voice is now reachable too; it used to be looked up
+            # under the persona's name, so it vanished the moment a mode
+            # stopped using the persona named after it.
+            _mode = getattr(getattr(ctx.pipeline, "_router", None), "mode", None)
             reply_voice = voice.resolve_voice(
-                str(persona_cfg.name) if persona_cfg is not None else None)
+                persona=str(persona_cfg.name) if persona_cfg is not None else None,
+                mode=str(_mode) if _mode else None,
+                character_voice=character.voice_id if character is not None else None,
+            )
             reply_speed = 1.0
             if character is not None:
-                if character.voice_id:
-                    reply_voice = character.voice_id
                 reply_speed = character.voice_speed or 1.0
 
             # Phase 0 (U140): mark the TTS + playback stages on the live trace.

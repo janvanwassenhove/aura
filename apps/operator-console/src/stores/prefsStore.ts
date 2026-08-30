@@ -45,6 +45,11 @@ export const usePrefsStore = defineStore('prefs', () => {
   const voiceEngine = ref<VoiceEngine>('pipeline')
   const wakeWord = ref('AURA')
   const ttsVoice = ref('alloy')
+  // U273: what he ACTUALLY speaks with, and which of the three Voice
+  // dropdowns decided it. The persona's own voice usually wins, so this
+  // field regularly disagrees with ttsVoice — which is the point.
+  const voiceInUse = ref('')
+  const voiceSource = ref('')
   const saving = ref(false)
   const error = ref<string | null>(null)
 
@@ -85,6 +90,8 @@ export const usePrefsStore = defineStore('prefs', () => {
         voiceEngine.value = (data.voice_engine ?? 'pipeline') as VoiceEngine
         wakeWord.value = data.wake_word
         ttsVoice.value = data.tts_voice ?? 'alloy'
+        voiceInUse.value = data.voice_in_use ?? ''
+        voiceSource.value = data.voice_source ?? ''
       }
     } catch { /* keep defaults */ }
   }
@@ -116,6 +123,8 @@ export const usePrefsStore = defineStore('prefs', () => {
       voiceEngine.value = data.voice_engine ?? voiceEngine.value
       wakeWord.value = data.wake_word
       ttsVoice.value = data.tts_voice ?? ttsVoice.value
+      voiceInUse.value = data.voice_in_use ?? voiceInUse.value
+      voiceSource.value = data.voice_source ?? voiceSource.value
       return true
     } catch {
       error.value = 'Could not reach the brain.'
@@ -127,7 +136,7 @@ export const usePrefsStore = defineStore('prefs', () => {
 
   return {
     assistantName, language, languageFallback, languageFallbackEffective,
-    voiceMode, voiceEngine, wakeWord, ttsVoice, saving, error,
+    voiceMode, voiceEngine, wakeWord, ttsVoice, voiceInUse, voiceSource, saving, error,
     density, densityTouched, railCollapsed,
     setDensity, followPerson, resetDensityTouch, toggleRail,
     fetchPrefs, save,

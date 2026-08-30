@@ -25,14 +25,57 @@ TTS_VOICES = ("alloy", "ash", "ballad", "coral", "echo", "fable",
 _tts_cache: dict[str, object] = {}
 
 
-def resolve_voice(persona: str | None = None) -> str:
-    """The voice for this reply: persona override -> global pref -> alloy."""
-    if persona:
-        per = os.environ.get(f"TTS_VOICE_{persona.upper()}", "").strip().lower()
-        if per in TTS_VOICES:
-            return per
-    voice = os.environ.get("TTS_VOICE", "alloy").strip().lower()
-    return voice if voice in TTS_VOICES else "alloy"
+def explain_voice(
+    persona: str | None = None,
+    mode: str | None = None,
+    character_voice: str | None = None,
+) -> tuple[str, str]:
+    """(the voice he will use, where that came from).
+
+    U273: three screens each offer a "Voice" and nothing said which one wins.
+    Asked as "the default voice in settings, whats difference in between the
+    one selected in robot? how are they used? can we make it more clearer".
+
+    They are, in order of who wins:
+
+      1. **the persona's own voice** (Robot → the persona card). Every
+         built-in character ships with one — Friendly Assistant is `coral` —
+         so in practice this is nearly always the answer, which is exactly why
+         the Settings dropdown looked ignored. It was.
+      2. **this mode's voice** (Modes → Voice), when the persona leaves its
+         own blank.
+      3. **the default voice** (Settings → Voice).
+      4. `alloy`.
+
+    The mode voice used to be looked up under the PERSONA's name — the env
+    family `TTS_VOICE_<X>` is written by Modes keyed on the mode, and read
+    here keyed on the persona. Those agree only while a mode still uses the
+    persona named after it, so the moment you gave Home the "Friendly
+    Assistant" persona, the voice you set in Modes could never be found again.
+    Both keys are consulted now, mode first.
+    """
+    def ok(v: str | None) -> str:
+        v = (v or "").strip().lower()
+        return v if v in TTS_VOICES else ""
+
+    if (chosen := ok(character_voice)):
+        return chosen, "this persona's own voice"
+    if mode and (chosen := ok(os.environ.get(f"TTS_VOICE_{mode.upper()}"))):
+        return chosen, f"the voice set for {mode} mode"
+    if persona and (chosen := ok(os.environ.get(f"TTS_VOICE_{persona.upper()}"))):
+        return chosen, f"the voice set for the {persona} persona"
+    if (chosen := ok(os.environ.get("TTS_VOICE"))):
+        return chosen, "the default voice in Settings"
+    return "alloy", "the built-in default"
+
+
+def resolve_voice(
+    persona: str | None = None,
+    mode: str | None = None,
+    character_voice: str | None = None,
+) -> str:
+    """The voice for this reply. See `explain_voice` for the order."""
+    return explain_voice(persona, mode, character_voice)[0]
 
 
 async def synthesize_b64(text: str, voice: str | None = None,

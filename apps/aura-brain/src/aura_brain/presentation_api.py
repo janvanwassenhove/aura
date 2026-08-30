@@ -87,7 +87,11 @@ async def _speak(text: str) -> None:
 
     from aura_brain import voice  # noqa: PLC0415 — optional at import time
 
-    audio_b64 = await voice.synthesize_b64(text)
+    # U273: the Present screen has its own Voice dropdown, and this call
+    # ignored it — `synthesize_b64(text)` resolves with no mode and no
+    # persona, so every beat came out in the Settings default no matter what
+    # the presenter had chosen for the talk.
+    audio_b64 = await voice.synthesize_b64(text, voice.resolve_voice(mode="presentation"))
     if audio_b64 is None:
         # Text-only reaches the robot as a log line. Saying so is the whole
         # point: "he is mute because there is no TTS key" and "he is mute

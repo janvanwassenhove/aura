@@ -184,6 +184,11 @@
       </div>
       <div class="aside-field">
         <div class="aside-k">Voice</div>
+        <!-- U273: this had no effect on beats at all — the presentation
+             synthesized with the global default and never consulted the mode.
+             It does now, unless the chosen persona carries its own voice,
+             which outranks it. -->
+        <div class="aside-hint">Used while presenting, unless the persona above carries its own voice.</div>
         <select v-model="presentBehaviourVoice" class="d2-field" aria-label="Presenter voice" @change="saveAsideBehaviour('voice', presentBehaviourVoice)">
           <option v-for="v in TTS_VOICES" :key="v" :value="v">{{ v }}</option>
         </select>
@@ -654,6 +659,7 @@ async function saveAsideBehaviour(key: string, value: string): Promise<void> {
   background: var(--warn-wash, rgba(200, 150, 20, 0.12));
   color: var(--ink-2); font-size: 12.5px; line-height: 1.45;
 }
+.aside-hint { font-size: 11.5px; color: var(--ink-3); line-height: 1.4; margin: 2px 0 4px; }
 .hud-mute {
   margin: 0 12px 10px; padding: 8px 12px; border-radius: 8px;
   background: var(--danger-wash, rgba(200, 60, 50, 0.12));
