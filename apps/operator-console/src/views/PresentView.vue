@@ -169,6 +169,40 @@
         <div class="aside-k">Armed keywords</div>
         <div class="aside-v">{{ (presentation.status.armed_keywords ?? []).join(' · ') || 'none right now' }}</div>
       </div>
+
+      <!-- ═══ U265: the overlay — him on the projector ═══ -->
+      <div class="aside-field">
+        <div class="aside-k">Overlay</div>
+        <div class="aside-v ov-help">
+          His character and subtitles of what he says, drawn over your slides.
+          The window is click-through — your clicker keeps working.
+        </div>
+        <label class="ov-row">
+          <span>Who is this screen for?</span>
+          <select v-model="overlayMode" class="d2-field" aria-label="Overlay mode" @change="saveOverlayPrefs">
+            <option value="audience">the room — character + subtitles only</option>
+            <option value="presenter">me — adds cues, timing and warnings</option>
+          </select>
+        </label>
+        <label v-if="overlayDisplays.length > 1" class="ov-row">
+          <span>On which display?</span>
+          <select v-model.number="overlayDisplay" class="d2-field" aria-label="Overlay display" @change="saveOverlayPrefs">
+            <option v-for="d in overlayDisplays" :key="d.id" :value="d.id">
+              {{ d.label }}{{ d.primary ? ' (this one)' : '' }} · {{ d.width }}×{{ d.height }}
+            </option>
+          </select>
+        </label>
+        <div class="ov-actions">
+          <button class="d2-primary-btn" :disabled="overlayShown" @click="showOverlay">
+            {{ isElectron ? 'Show overlay' : 'Open overlay window' }}
+          </button>
+          <button v-if="overlayShown" class="d2-ghost-btn" @click="hideOverlay">Hide</button>
+        </div>
+        <p v-if="!isElectron" class="ov-note">
+          In a browser this opens a normal window (drag it to the beamer and
+          press F11). The see-through, click-through version needs the desktop app.
+        </p>
+      </div>
     </aside>
   </main>
 </template>
@@ -192,6 +226,52 @@ const presenter = usePresenterStore()
 const camera = useCameraFeed()
 
 const TTS_VOICES = ['alloy', 'ash', 'ballad', 'coral', 'echo', 'fable', 'onyx', 'nova', 'sage', 'shimmer', 'verse']
+
+// ── U265: the overlay ───────────────────────────────────────────────────────
+// The setting is "who may see this screen", not "window or fullscreen" — the
+// technical shape follows from the answer. Electron draws it transparent and
+// click-through on the chosen display; a browser gets a plain window as the
+// honest fallback (drag to the beamer, F11).
+interface OverlayApi {
+  displays: () => Promise<{ id: number; label: string; primary: boolean; width: number; height: number }[]>
+  show: (opts: { mode: string; displayId: number | null; size?: number }) => Promise<{ shown: boolean }>
+  hide: () => Promise<{ shown: boolean }>
+}
+const overlayApi = (window as never as { aura?: { presentOverlay?: OverlayApi } })
+  .aura?.presentOverlay
+const isElectron = !!overlayApi
+
+const overlayMode = ref<'audience' | 'presenter'>('audience')
+const overlayDisplay = ref<number | null>(null)
+const overlayDisplays = ref<{ id: number; label: string; primary: boolean; width: number; height: number }[]>([])
+const overlayShown = ref(false)
+let overlayWindow: Window | null = null      // the browser fallback
+
+function saveOverlayPrefs(): void {
+  try {
+    localStorage.setItem('aura-overlay', JSON.stringify({
+      mode: overlayMode.value, display: overlayDisplay.value,
+    }))
+  } catch { /* session-only */ }
+}
+
+async function showOverlay(): Promise<void> {
+  if (overlayApi) {
+    await overlayApi.show({ mode: overlayMode.value, displayId: overlayDisplay.value })
+    overlayShown.value = true
+    return
+  }
+  const url = `${location.origin}${location.pathname}#overlay?mode=${overlayMode.value}`
+  overlayWindow = window.open(url, 'aura-overlay', 'width=1280,height=720')
+  overlayShown.value = overlayWindow != null
+}
+
+async function hideOverlay(): Promise<void> {
+  if (overlayApi) await overlayApi.hide()
+  overlayWindow?.close()
+  overlayWindow = null
+  overlayShown.value = false
+}
 
 const presenting = computed(() => presentation.status.active)
 
@@ -328,6 +408,12 @@ function toggleLaptopMic(): void {
 // ── Status polling while the view is open ──────────────────────────────────
 let pollTimer: ReturnType<typeof setInterval> | undefined
 onMounted(() => {
+  try {
+    const saved = JSON.parse(localStorage.getItem('aura-overlay') ?? '{}')
+    if (saved.mode === 'presenter' || saved.mode === 'audience') overlayMode.value = saved.mode
+    if (typeof saved.display === 'number') overlayDisplay.value = saved.display
+  } catch { /* defaults */ }
+  overlayApi?.displays().then(d => { overlayDisplays.value = d }).catch(() => {})
   presentation.fetchStatus()
   pollTimer = setInterval(() => presentation.fetchStatus(), 2500)
   fetchPersonas()
@@ -431,6 +517,10 @@ async function saveAsideBehaviour(key: string, value: string): Promise<void> {
 }
 .aside-lead { margin: 0 0 14px; font-size: 12.5px; color: var(--ink-2); line-height: 1.5; }
 .aside-field { margin-bottom: 12px; }
+.ov-help { margin-bottom: 8px; }
+.ov-row { display: flex; flex-direction: column; gap: 3px; margin-bottom: 8px; font-size: 12px; color: var(--ink-3); }
+.ov-actions { display: flex; gap: 6px; }
+.ov-note { margin: 7px 0 0; font-size: 11.5px; color: var(--ink-3); }
 .aside-k { font-size: 11.5px; color: var(--ink-3); margin-bottom: 5px; }
 .aside-v { font-size: 12.5px; color: var(--ink-2); }
 

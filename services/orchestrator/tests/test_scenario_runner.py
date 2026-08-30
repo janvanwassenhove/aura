@@ -113,3 +113,38 @@ async def test_status_reports_armed_keywords() -> None:
     assert r.status()["armed_keywords"] == ["agents"]
     await r.on_speech("the agents run in parallel")
     assert r.status()["armed_keywords"] == []      # disarmed after firing
+
+
+async def test_a_dead_speaker_never_eats_beat_done() -> None:
+    """U265: found live, with the owner's real 137-slide deck on screen.
+
+    The beat showed as fired, but no beat_done ever went out — because for a
+    speak beat the speaker call was unguarded, and a robot whose audio path is
+    down raises. The subtitle event is derived from beat_done, and subtitles
+    are exactly what saves the talk when the audio fails: losing them at that
+    moment is losing both channels at once.
+    """
+    from shared_schemas.presentation.models import Beat, Scenario
+
+    async def broken_speak(_text: str) -> None:
+        raise RuntimeError("robot audio is down")
+
+    async def generate(_t, _g, _e) -> str:
+        return "never used"
+
+    events: list[dict] = []
+
+    async def on_event(e: dict) -> None:
+        events.append(e)
+
+    runner = ScenarioRunner(
+        Scenario(title="t", beats=[
+            Beat(id="intro", trigger="slide:1", mode="speak", text="Hallo zaal"),
+        ]),
+        speak=broken_speak, generate=generate, on_event=on_event,
+    )
+    await runner.on_slide(1)
+
+    done = [e for e in events if e.get("type") == "beat_done"]
+    assert done, "beat_done must still be emitted when the speaker fails"
+    assert done[0]["spoken"] == "Hallo zaal", "the subtitle text must survive"

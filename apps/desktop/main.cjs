@@ -544,6 +544,61 @@ function createWindow() {
     return { action: 'deny' }
   })
 
+  // ── U265: the presentation overlay ─────────────────────────────────────
+  // A transparent, click-through, always-on-top window on a display of the
+  // owner's choosing, showing the console app at #overlay (character +
+  // subtitles; presenter mode adds cues). Same recipe as the U75 screen-
+  // control overlay, which is the one part of this already proven on this
+  // machine. ONE overlay window: on two screens the audience layer goes to
+  // the beamer and the console itself is the presenter view.
+  let presentOverlayWin = null
+
+  function hidePresentOverlay() {
+    if (presentOverlayWin) {
+      try { presentOverlayWin.close() } catch { /* already gone */ }
+      presentOverlayWin = null
+    }
+  }
+
+  ipcMain.handle('overlay:present:displays', () => {
+    const primary = screen.getPrimaryDisplay()
+    return screen.getAllDisplays().map((d, i) => ({
+      id: d.id,
+      label: d.label || `Display ${i + 1}`,
+      primary: d.id === primary.id,
+      width: d.bounds.width, height: d.bounds.height,
+    }))
+  })
+
+  ipcMain.handle('overlay:present:show', (_e, opts) => {
+    const { mode = 'audience', displayId = null, size = 120 } = opts || {}
+    hidePresentOverlay()
+    const displays = screen.getAllDisplays()
+    const target = displays.find((d) => d.id === displayId)
+      // Default: the display you are NOT working on — that is where the
+      // slides usually are. One display → that one.
+      ?? displays.find((d) => d.id !== screen.getPrimaryDisplay().id)
+      ?? screen.getPrimaryDisplay()
+    presentOverlayWin = new BrowserWindow({
+      x: target.bounds.x, y: target.bounds.y,
+      width: target.bounds.width, height: target.bounds.height,
+      frame: false, transparent: true, alwaysOnTop: true, skipTaskbar: true,
+      focusable: false, hasShadow: false, resizable: false,
+      webPreferences: { sandbox: true },
+    })
+    // Click-through: the presenter keeps clicking PowerPoint, not us.
+    presentOverlayWin.setIgnoreMouseEvents(true)
+    // 'screen-saver' outranks a fullscreen slideshow in the z-order contest —
+    // the same level the U75 overlay already wins with.
+    presentOverlayWin.setAlwaysOnTop(true, 'screen-saver')
+    presentOverlayWin.loadURL(
+      `${consoleUrl()}#overlay?mode=${encodeURIComponent(mode)}&size=${Number(size) || 120}`)
+    presentOverlayWin.on('closed', () => { presentOverlayWin = null })
+    return { shown: true, display: target.id }
+  })
+
+  ipcMain.handle('overlay:present:hide', () => { hidePresentOverlay(); return { shown: false } })
+
   // Window controls for the custom title bar (see preload.cjs).
   ipcMain.on('win:minimize', () => mainWindow?.minimize())
   ipcMain.on('win:toggleMaximize', () => {

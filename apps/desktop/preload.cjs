@@ -26,4 +26,11 @@ contextBridge.exposeInMainWorld('aura', {
   },
   installUpdate: () => ipcRenderer.invoke('aura:install-update'),
   dismissUpdate: (tag) => ipcRenderer.invoke('aura:dismiss-update', tag),
+  // U265: the presentation overlay — a transparent always-on-top window over
+  // the slides, showing the console's #overlay page.
+  presentOverlay: {
+    displays: () => ipcRenderer.invoke('overlay:present:displays'),
+    show: (opts) => ipcRenderer.invoke('overlay:present:show', opts),
+    hide: () => ipcRenderer.invoke('overlay:present:hide'),
+  },
 })

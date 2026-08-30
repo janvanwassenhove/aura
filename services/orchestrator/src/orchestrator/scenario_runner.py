@@ -127,7 +127,15 @@ class ScenarioRunner:
             pass
         elif beat.mode == "speak":
             spoken = beat.text
-            await self._speak(beat.text)
+            # U265: NEVER let a failed speaker eat beat_done. The subtitle
+            # event is derived from beat_done, and subtitles are exactly what
+            # saves the talk when the robot's audio fails — losing them at
+            # that moment is losing both channels at once. Found live: a beat
+            # showed as fired while no PresentationBeatFired ever went out.
+            try:
+                await self._speak(beat.text)
+            except Exception as exc:  # noqa: BLE001 — the show must go on
+                logger.warning("beat %r speech failed: %s", beat.id, exc)
         else:  # improvise or chime_in
             try:
                 spoken = (await self._generate(beat.topic, beat.guardrails, beat.engine)) or ""
@@ -135,7 +143,10 @@ class ScenarioRunner:
                 logger.warning("beat %r generation failed: %s", beat.id, exc)
                 spoken = ""
             if spoken:
-                await self._speak(spoken)
+                try:
+                    await self._speak(spoken)
+                except Exception as exc:  # noqa: BLE001 — same rule as above
+                    logger.warning("beat %r speech failed: %s", beat.id, exc)
 
         if beat.gesture and self._gesture is not None and beat.mode != "silent":
             try:
