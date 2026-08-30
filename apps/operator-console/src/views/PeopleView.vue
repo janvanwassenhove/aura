@@ -17,7 +17,12 @@
           <span class="mono visitors-count">{{ knowledge.sightings.length }}</span>
         </div>
         <div v-for="v in knowledge.sightings.slice(0, 3)" :key="v.sighting_id" class="visitor">
-          <img :src="knowledge.sightingImageUrl(v.sighting_id)" alt="Unknown visitor" class="visitor-thumb">
+          <!-- U271: 34×26 px, and the one thing this row asks is "who is
+               that?". Click it to see a face you can actually read. -->
+          <button class="visitor-thumb-btn" title="See this face larger"
+                  @click="zoomVisitor(v)">
+            <img :src="knowledge.sightingImageUrl(v.sighting_id)" alt="Unknown visitor" class="visitor-thumb">
+          </button>
           <span class="visitor-seen">Seen {{ v.count }}× · {{ fmtAgo(v.last_seen) }}</span>
           <div class="visitor-actions">
             <select :aria-label="'Tag as person'" class="visitor-select" @change="tagVisitor(v.sighting_id, $event)">
@@ -120,7 +125,12 @@
             <h3 class="d2-h3">Recently seen</h3>
             <div class="snapshots">
               <figure v-for="s in snapshots" :key="s.snapshot_id" class="snapshot">
-                <img :src="s.image" alt="Recognition snapshot" class="snapshot-img">
+                <!-- U271: the question here is "is this really them?", which
+                     a thumbnail cannot answer either. -->
+                <button class="snapshot-btn" title="See this shot larger"
+                        @click="zoomSnapshot(s)">
+                  <img :src="s.image" alt="Recognition snapshot" class="snapshot-img">
+                </button>
                 <button
                   class="snapshot-x"
                   title="Not this person? It goes back to unknown visitors so you can tag the right one"
@@ -260,12 +270,34 @@
         skills {{ (detail.skills ?? []).length }} bound
       </p>
     </aside>
+
+    <!-- U271: the photo, big enough to recognise. For an unknown visitor the
+         tag control comes along: you enlarged it precisely in order to decide
+         who it is, and closing the panel to hunt for the same tiny row again
+         is the annoying half of the job. -->
+    <PhotoLightbox
+      v-if="zoomed" :src="zoomed.src" :caption="zoomed.caption"
+      @close="zoomed = null"
+    >
+      <template v-if="zoomed.sightingId" #actions>
+        <select class="visitor-select" aria-label="Tag as person"
+                @change="tagFromLightbox($event)">
+          <option value="">Tag as…</option>
+          <option v-for="p in knowledge.people" :key="p.person_id" :value="p.person_id">
+            {{ p.display_name }}
+          </option>
+        </select>
+        <button class="visitor-dismiss" title="Not a person / never mind"
+                @click="dismissFromLightbox()">Dismiss</button>
+      </template>
+    </PhotoLightbox>
   </main>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import KnowledgeGraph from '../components/canvas/KnowledgeGraph.vue'
+import PhotoLightbox from '../components/PhotoLightbox.vue'
 import WikiText from '../components/WikiText.vue'
 import { BRAIN_URL } from '../lib/endpoints'
 import { useKnowledgeStore } from '../stores/knowledgeStore'
@@ -472,6 +504,37 @@ async function tagVisitor(sightingId: string, e: Event): Promise<void> {
   fetchEnrolled()
 }
 
+// ── U271: see the face ─────────────────────────────────────────────────────
+// The visitor thumbnails are 34×26 px and the row's only question is "who is
+// that?"; the snapshots ask "is this really them?". Neither is answerable at
+// that size. Reported as "photos are quite small, on click picture ad larger
+// preview to more easily recognize".
+const zoomed = ref<{ src: string; caption: string; sightingId?: string } | null>(null)
+
+function zoomVisitor(v: { sighting_id: string; count: number; last_seen: number }): void {
+  zoomed.value = {
+    src: knowledge.sightingImageUrl(v.sighting_id),
+    caption: `Unknown visitor — seen ${v.count}× · ${fmtAgo(v.last_seen)}`,
+    sightingId: v.sighting_id,
+  }
+}
+function zoomSnapshot(s: { image: string; seen_at: number; confidence: number }): void {
+  zoomed.value = { src: s.image, caption: fmtSnapshot(s) }
+}
+
+async function tagFromLightbox(e: Event): Promise<void> {
+  const id = zoomed.value?.sightingId
+  if (!id) return
+  await tagVisitor(id, e)
+  zoomed.value = null          // the decision is made; the photo has done its job
+}
+async function dismissFromLightbox(): Promise<void> {
+  const id = zoomed.value?.sightingId
+  if (!id) return
+  await knowledge.dismissSighting(id)
+  zoomed.value = null
+}
+
 // ── Add person ─────────────────────────────────────────────────────────────
 const adding = ref(false)
 const addName = ref('')
@@ -579,7 +642,12 @@ function openGraph(): void { nav.go('graph') }
 .visitors-title { font-size: 11.5px; font-weight: 700; }
 .visitors-count { font-size: 10px; color: var(--warn); }
 .visitor { display: flex; align-items: center; gap: 7px; margin-bottom: 6px; flex-wrap: wrap; }
+/* U271: the thumbnail is now a button — the face you must recognise is one
+   click from being legible. */
+.visitor-thumb-btn { padding: 0; border: 0; background: none; cursor: zoom-in; flex-shrink: 0; line-height: 0; }
 .visitor-thumb { width: 34px; height: 26px; border-radius: 6px; flex-shrink: 0; object-fit: cover; border: 1px solid var(--line); }
+.visitor-thumb-btn:hover .visitor-thumb { border-color: var(--accent); }
+.snapshot-btn { padding: 0; border: 0; background: none; cursor: zoom-in; display: block; line-height: 0; }
 .visitor-seen { flex: 1; min-width: 0; font-size: 11px; color: var(--ink-2); line-height: 1.25; }
 .visitor-actions { display: flex; gap: 5px; width: 100%; margin-bottom: 3px; }
 .visitor-select {
