@@ -297,50 +297,13 @@ jobs:
           TAG: ${{ needs.version.outputs.tag }}
           REPO: ${{ github.repository }}
         run: |
+          # U284: the page lives in scripts/release_notes.py, not in 40 lines
+          # of bash here — so it can be read, reviewed and unit-tested like the
+          # rest of the app (scripts/test_release_notes.py). The version that
+          # lived here scraped a ledger format retired around U180, so the
+          # "what's new" section had silently rendered nothing for months.
           PREV=$(git tag --list 'v*' --sort=-creatordate | head -1 || true)
-          {
-            echo "## AURA ${TAG}"
-            echo
-            # New ledger entries since the previous release — the units are the
-            # real changelog, written as each feature landed.
-            if [ -n "$PREV" ]; then
-              HIGHLIGHTS=$(git diff "$PREV"..HEAD -- docs/implementation-backlog.md \
-                | grep -oP '^\+\- \[x\] \*\*\K[^*]+' | sed 's/^/- /' || true)
-            else
-              HIGHLIGHTS=""
-            fi
-            if [ -n "$HIGHLIGHTS" ]; then
-              echo "### Nieuw in deze release"
-              echo "$HIGHLIGHTS"
-              echo
-            fi
-            if compgen -G "shots/*.png" > /dev/null; then
-              echo "### Screenshots"
-              echo "_Captured from a fresh demo instance (fictional demo profile only — no personal data)._"
-              echo
-              for f in shots/*.png; do
-                name=$(basename "$f")
-                echo "![${name}](https://github.com/${REPO}/releases/download/${TAG}/${name})"
-                echo
-              done
-            else
-              # U235: say it. This job is allowed to fail, and for weeks it did
-              # — quietly, on every release. An absence nobody can see is not a
-              # degradation, it is a blind spot.
-              echo "> _No screenshots in this release: the demo-stack capture did not complete._"
-              echo
-            fi
-            echo "### Installatie"
-            echo "| Platform | Bestand |"
-            echo "|---|---|"
-            echo "| Windows | \`AURA-*-windows-setup.exe\` |"
-            echo "| macOS (Apple Silicon) | \`AURA-*-mac-arm64.dmg\` |"
-            echo "| macOS (Intel) | \`AURA-*-mac-x64.dmg\` |"
-            echo "| Linux | \`AURA-*-linux-x86_64.AppImage\` of \`.deb\` |"
-            echo
-            echo "> macOS/Linux: eerste start installeert de Python-runtime (uv) automatisch; macOS-builds zijn niet genotariseerd — open via rechtsklik → Open."
-            echo
-          } > notes.md
+          python3 scripts/release_notes.py             --tag "$TAG" --repo "$REPO" --prev "$PREV"             --shots-dir shots --out notes.md
           cat notes.md
       - name: Publish release
         uses: softprops/action-gh-release@v2
@@ -348,7 +311,12 @@ jobs:
           tag_name: ${{ needs.version.outputs.tag }}
           target_commitish: ${{ github.sha }}
           body_path: notes.md
-          generate_release_notes: true
+          # U284: false — the page we compose IS the page. GitHub's
+          # auto-notes append a raw list of "auto(U283): ..." commits
+          # under it, which is exactly the developer-facing wall the
+          # new template replaces. The full technical history is linked
+          # from the footer instead.
+          generate_release_notes: false
           files: |
             installers/*
             shots/*.png
