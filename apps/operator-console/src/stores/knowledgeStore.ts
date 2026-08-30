@@ -417,10 +417,36 @@ export const useKnowledgeStore = defineStore('knowledge', () => {
   const GUEST_AFTER_MS = 10 * 60 * 1000
   let guestTimer: ReturnType<typeof setTimeout> | null = null
 
+  /** U276: whether the BRAIN is currently attributing anything to a person.
+   *  False means the conversation is answered and then forgotten. */
+  const remembering = ref(false)
+
   function setSpeaker(personId: string | null, source: 'face' | 'manual' = 'manual'): void {
     speaker.value = personId
     speakerSource.value = personId === null ? null : source
     if (guestTimer) { clearTimeout(guestTimer); guestTimer = null }
+    // U276: and TELL the brain. This used to set a ref in this store and
+    // nothing else — the brain's active person came from face recognition
+    // alone, so on a profile with no face taught the header said "Jan · owner"
+    // while the brain knew nobody, and long-term memory (which needs a person
+    // to attribute to) never recorded a word of the conversation.
+    void syncSpeaker(personId)
+  }
+
+  async function syncSpeaker(personId: string | null): Promise<void> {
+    const body = await _request('/speaker', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ person_id: personId }),
+    })
+    remembering.value = !!(body as { remembering?: boolean } | null)?.remembering
+  }
+
+  async function fetchSpeaker(): Promise<void> {
+    const body = await _request('/speaker')
+    if (!body) return
+    const b = body as { person_id?: string | null; remembering?: boolean }
+    remembering.value = !!b.remembering
+    if (b.person_id) { speaker.value = b.person_id; speakerSource.value = 'face' }
   }
 
   /** Called when the camera loses every face: after the grace period the
@@ -462,7 +488,7 @@ export const useKnowledgeStore = defineStore('knowledge', () => {
     setSpeaker, noteNoFace, noteFaceSeen,
     fetchTier, fetchPeople, inspectPerson, upsertPerson, saveDescription,
     addFact, updateFact, deleteFact, ingestSources, importChats, exportBrain, fetchSnapshots, flagSnapshotWrong, renamePerson, setPersonPrefs, mergePerson, forgetPerson, setConsent, lock,
-    fetchRecognition, secure, teachFace,
+    fetchRecognition, secure, teachFace, remembering, fetchSpeaker,
     fetchSightings, sightingImageUrl, tagSighting, dismissSighting,
     clearDetail, $reset,
   }

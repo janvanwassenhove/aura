@@ -226,6 +226,16 @@
         <template v-else-if="knowledge.personTab === 'Memory'">
           <h3 class="d2-h3">Memory</h3>
           <p class="tab-lead">Grown automatically from your conversations and injected into future turns. Edit or delete anything — it is your memory of you.</p>
+          <!-- U276: it only grows for the person the BRAIN believes it is
+               talking to, and that used to come from face recognition alone.
+               With no face taught, conversations were answered properly and
+               then forgotten — while this very paragraph promised otherwise. -->
+          <p v-if="!knowledge.remembering" class="memory-warn">
+            <strong>Nothing is being remembered right now.</strong>
+            He does not know who he is talking to, so this conversation is
+            answered and then dropped. Pick who you are in the header, or teach
+            him this face, and it starts growing again.
+          </p>
           <template v-if="memoryText || memoryDraft">
             <textarea v-model="memoryDraft" rows="9" aria-label="Memory" class="memory-area" />
             <div class="memory-actions">
@@ -399,6 +409,7 @@ onMounted(async () => {
   knowledge.fetchSightings()
   fetchEnrolled()
   fetchCharacters()          // U274: the "meets them as" list
+  knowledge.fetchSpeaker()   // U276: is he attributing anything to anyone?
   // [[wikilink]] requests from other views land here.
   const req = nav.knowledgeRequest
   const first = req?.personId ?? knowledge.selectedPerson ?? visiblePeople.value[0]?.person_id
@@ -771,6 +782,11 @@ function openGraph(): void { nav.go('graph') }
   color: var(--ink-3); border: 1px solid var(--line-strong); border-radius: 999px; padding: 3px 10px;
 }
 
+.memory-warn {
+  background: var(--warn-wash, rgba(200, 150, 20, 0.12)); color: var(--ink-2);
+  border-radius: 8px; padding: 0.6rem 0.8rem; font-size: 0.82rem; line-height: 1.5;
+  margin: 0 0 0.6rem;
+}
 .role-error { color: var(--danger, #e5484d); font-size: 0.8rem; margin: 0.3rem 0 0; }
 .person-prefs { display: flex; gap: 1.2rem; flex-wrap: wrap; margin: 0.5rem 0 0.2rem; }
 .pref { display: flex; flex-direction: column; gap: 0.2rem; font-size: 0.78rem; }

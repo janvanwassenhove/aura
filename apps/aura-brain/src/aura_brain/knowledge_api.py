@@ -134,6 +134,62 @@ async def list_people(_: None = Depends(_require_sensitive)) -> JSONResponse:
     return JSONResponse([p.model_dump(mode="json") for p in people])
 
 
+def _pipeline():
+    """The running pipeline, or None outside a full brain (tests)."""
+    from aura_brain import main as _main  # noqa: PLC0415 — avoids a cycle
+
+    return getattr(getattr(_main, "ctx", None), "pipeline", None)
+
+
+@router.get("/speaker")
+async def get_speaker() -> JSONResponse:
+    """Who the BRAIN thinks it is talking to — and whether it is remembering.
+
+    U276: the header has always let the owner say who is at the desk, and that
+    choice never left the browser. `setSpeaker` set a ref in a Pinia store and
+    nothing else; the brain's active person came from face recognition alone.
+    So with no face taught — which is every fresh profile, and the state the
+    owner was actually in — the console showed "Jan · owner" while the brain
+    knew nobody, and the memory hook (`if hook and self._active_person_id`)
+    never fired. Everything said in that conversation was answered properly
+    and then forgotten, silently, while a Memory tab sat there implying
+    otherwise. Reported as "ik vertel informatie, maar ik zie dat hij die niet
+    gebruikt in zijn kennisopbouw".
+
+    `remembering` is the honest bit: no person, no long-term memory, and the
+    console can finally say so instead of leaving the owner to infer it.
+    """
+    pipeline = _pipeline()
+    person_id = getattr(pipeline, "_active_person_id", None) if pipeline else None
+    display = ""
+    if person_id and _store is not None:
+        person = await _store.get_person(person_id)
+        display = person.display_name if person else ""
+    return JSONResponse({
+        "person_id": person_id,
+        "display_name": display,
+        "remembering": bool(person_id),
+    })
+
+
+@router.post("/speaker")
+async def set_speaker(body: dict, _: None = Depends(_require_sensitive)) -> JSONResponse:
+    """Tell the brain who it is talking to. `null` means nobody in particular."""
+    pipeline = _pipeline()
+    if pipeline is None:
+        return JSONResponse({"error": "no pipeline"}, status_code=503)
+    person_id = (body or {}).get("person_id")
+    if person_id in ("", "guest"):
+        person_id = None            # a guest is nobody to remember against
+    if person_id is not None:
+        store = _require()
+        if await store.get_person(str(person_id)) is None:
+            raise HTTPException(status_code=404, detail=f"Unknown person {person_id!r}")
+        person_id = str(person_id)
+    pipeline.set_active_person(person_id)
+    return await get_speaker()
+
+
 @router.get("/people/{person_id}")
 async def inspect_person(person_id: str, _: None = Depends(_require_sensitive)) -> JSONResponse:
     """Everything AURA knows about a person — facts + observed signals."""
