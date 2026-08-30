@@ -402,7 +402,12 @@ async def save_scenario(name: str, body: dict) -> JSONResponse:
         scenario, raw = _scenario_from_body(body or {})
         saved_name, scenario = _store().save(name, raw_yaml=raw, scenario=scenario)
     except Exception as exc:  # noqa: BLE001 — validation / bad name
-        return JSONResponse({"error": str(exc)}, status_code=422)
+        # U282: SAVE never got the treatment LOAD did. `_readable` was written
+        # in U264 for exactly this and wired into one route; pressing Save
+        # still returned the raw Pydantic dump — field paths, the repr of every
+        # offending beat, `[type=value_error, ...]` and a link to the pydantic
+        # docs — as a wall of red under the builder.
+        return JSONResponse({"error": _readable(exc)}, status_code=422)
     return JSONResponse({"name": saved_name, "title": scenario.title,
                          "beats": len(scenario.beats)})
 

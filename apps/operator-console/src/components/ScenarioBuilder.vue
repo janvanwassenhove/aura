@@ -25,7 +25,8 @@
     </label>
 
     <!-- Beats -->
-    <div v-for="(b, i) in beats" :key="b._k" class="sb-beat">
+    <div v-for="(b, i) in beats" :key="b._k" class="sb-beat"
+         :class="{ 'sb-beat--bad': badBeats.includes(b.id.trim()) }">
       <div class="sb-beat-head">
         <span class="sb-beat-n">{{ i + 1 }}</span>
         <input v-model="b.id" class="sb-input sb-id" placeholder="beat id" />
@@ -90,6 +91,9 @@
     <button class="sb-add" @click="addBeat">+ Add beat</button>
 
     <p v-if="error" class="sb-err">{{ error }}</p>
+    <p v-if="badBeats.length" class="sb-err-hint">
+      Marked in red above: {{ badBeats.join(', ') }}.
+    </p>
 
     <div class="sb-actions">
       <input v-model="saveName" class="sb-input sb-savename" placeholder="save as… (name)" />
@@ -103,7 +107,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { BRAIN_URL } from '../lib/endpoints'
 
 const emit = defineEmits<{ start: [scenario: object] }>()
@@ -122,6 +126,16 @@ const saved = ref<{ name: string; title: string; beats: number }[]>([])
 const saveName = ref('')
 const busy = ref(false)
 const error = ref('')
+
+/** U282: which beats the brain complained about.
+ *
+ *  The validators name them — "beat 'beat-3': speak mode needs 'text'" — and
+ *  with four beats on screen a sentence at the bottom still leaves you
+ *  counting cards to find the one that is wrong. The ids in the message point
+ *  straight at them.
+ */
+const badBeats = computed(() =>
+  [...error.value.matchAll(/beat '([^']+)'/g)].map(m => m[1]))
 
 function blankBeat(): FormBeat {
   return { _k: seq++, id: `beat-${beats.value.length + 1}`, mode: 'speak',
@@ -279,6 +293,9 @@ defineExpose({ setError: (m: string) => { error.value = m }, loadScenario })
 .sb-add { align-self: flex-start; background: transparent; border: 1px dashed var(--border-strong); border-radius: var(--radius-md); color: var(--text-muted); padding: 0.35rem 0.8rem; cursor: pointer; font-size: 0.8rem; }
 .sb-add:hover { color: var(--text); border-color: var(--accent); }
 .sb-err { color: var(--danger, #e5484d); font-size: 0.8rem; margin: 0; }
+/* U282: which card to look at, not just what is wrong with it. */
+.sb-err-hint { color: var(--danger, #e5484d); font-size: 0.76rem; margin: 0; opacity: 0.85; }
+.sb-beat--bad { border-color: var(--danger, #e5484d); }
 .sb-actions { display: flex; align-items: center; gap: 0.5rem; }
 .sb-savename { width: 10rem; }
 .sb-btn { background: transparent; border: 1px solid var(--border-strong); border-radius: var(--radius-md); color: var(--text); padding: 0.4rem 0.9rem; font-size: 0.82rem; cursor: pointer; }

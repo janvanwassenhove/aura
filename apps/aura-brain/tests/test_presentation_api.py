@@ -325,3 +325,44 @@ def test_speech_error_clears_once_he_is_heard_again(client, monkeypatch) -> None
 
     c.post("/presentation/next")                              # manual beat: works
     assert c.get("/presentation/status").json()["speech_error"] == ""
+
+
+# --------------------------------------------------------------------------- #
+# U282: a refused save has to be readable
+# --------------------------------------------------------------------------- #
+
+BAD_SCENARIO = {
+    "title": "test",
+    "beats": [
+        {"id": "beat-3", "trigger": "slide:2", "mode": "speak", "text": ""},
+        {"id": "beat-4", "trigger": "slide:3", "mode": "improvise", "topic": ""},
+    ],
+}
+
+
+def test_a_refused_save_names_the_beats_not_the_pydantic_dump(client) -> None:
+    """U264 wrote `_readable` for exactly this and wired it into LOAD only.
+    Pressing Save still returned the raw dump — field paths, the repr of every
+    offending beat, `[type=value_error, ...]` and a link to the pydantic docs —
+    as a wall of red under the builder."""
+    c, _, _ = client
+    r = c.put("/presentation/scenarios/test", json={"scenario": BAD_SCENARIO})
+
+    assert r.status_code == 422
+    err = r.json()["error"]
+    assert "pydantic.dev" not in err, "a docs link is not an error message"
+    assert "type=value_error" not in err
+    assert "input_value" not in err
+    # What it must say instead: which beat, and what it needs.
+    assert "beat-3" in err and "text" in err
+    assert "beat-4" in err and "topic" in err
+
+
+def test_a_good_scenario_still_saves(client) -> None:
+    c, _, _ = client
+    r = c.put("/presentation/scenarios/ok", json={"scenario": {
+        "title": "ok",
+        "beats": [{"id": "b1", "trigger": "manual", "mode": "speak", "text": "hi"}],
+    }})
+    assert r.status_code == 200
+    assert r.json()["beats"] == 1
