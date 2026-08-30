@@ -8,6 +8,7 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref, watch } from 'vue'
 import type { PersonDetail } from '../../stores/knowledgeStore'
+import { memoryGraph, memoryLabel } from '../../lib/memoryGraph'
 
 /** Obsidian-style knowledge graph, drawn from one person's REAL profile.
  *
@@ -32,9 +33,13 @@ const props = defineProps<{
 const emit = defineEmits<{ (e: 'open-person', id: string): void }>()
 
 interface GNode {
-  id: string; label: string; kind: 'person' | 'fact' | 'skill' | 'topic'
+  id: string; label: string; kind: 'person' | 'fact' | 'skill' | 'topic' | 'memory'
   r: number; x: number; y: number; vx: number; vy: number; fixed?: boolean
   personId?: string
+  /** U272: the full sentence behind a keyword label, shown on hover. A node
+   *  reading "sporten · hardlopen" should still be able to tell you what he
+   *  actually remembers. */
+  detail?: string
 }
 interface Graph { pid: string; nodes: GNode[]; links: [number, number, number][] }
 
@@ -60,14 +65,22 @@ function buildGraph(): Graph | null {
   const rnd = () => ((seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648)
   const nodes: GNode[] = []
   const links: [number, number, number][] = []
-  const add = (id: string, label: string, kind: GNode['kind'], r: number, personId?: string) => {
+  const add = (id: string, label: string, kind: GNode['kind'], r: number,
+               personId?: string, detail?: string) => {
     const a = rnd() * 6.28, rad = 60 + rnd() * 130
-    nodes.push({ id, label, kind, r, x: Math.cos(a) * rad, y: Math.sin(a) * rad, vx: 0, vy: 0, personId })
+    nodes.push({ id, label, kind, r, x: Math.cos(a) * rad, y: Math.sin(a) * rad,
+                 vx: 0, vy: 0, personId, detail })
     return nodes.length - 1
   }
   const root = add(pid, d.person.display_name, 'person', 22, pid)
   const topicIdx: Record<string, number> = {}
   for (const f of d.facts) {
+    // U272: long-term memory is stored as ONE fact whose value is the entire
+    // bullet list, so it arrived here as a single dot labelled
+    // "memory: - Jan is actief en geniet van…", truncated at 40 characters —
+    // everything he had learned about someone, as one bullet. It gets its own
+    // treatment below instead.
+    if (f.key === 'memory') continue
     const refs = [...f.value.matchAll(/\[\[([^\]]+)\]\]/g)].map(m => m[1])
     const clean = f.value.replace(/\[\[([^\]]+)\]\]/g, '$1')
     const i = add(`f${f.fact_id}`, `${f.key}: ${clean}`, 'fact', 9)
@@ -88,6 +101,24 @@ function buildGraph(): Graph | null {
   for (const sig of d.signals.slice(0, 8)) {
     const i = add(`g${sig.signal_id}`, `${sig.kind}: ${sig.value}`.slice(0, 40), 'topic', 8)
     links.push([root, i, 0.7])
+  }
+
+  // ── U272: what he REMEMBERS, one node per thing remembered ───────────────
+  // Each line is labelled with the words that distinguish it rather than the
+  // whole sentence (the sentence is on hover), and words that several lines
+  // share become their own nodes — so you can see at a glance that three
+  // separate things he remembers are all about the same subject. That is the
+  // difference between a list and a graph.
+  const note = d.facts.find(f => f.key === 'memory')?.value ?? ''
+  const { lines, shared } = memoryGraph(note, [d.person.display_name, pid])
+  const sharedIdx: Record<string, number> = {}
+  for (const w of shared) sharedIdx[w] = add(`k${w}`, w, 'topic', 10)
+  for (const line of lines) {
+    const i = add(line.id, memoryLabel(line), 'memory', 8, undefined, line.text)
+    links.push([root, i, 0.85])
+    for (const w of line.keywords) {
+      if (sharedIdx[w] !== undefined) links.push([i, sharedIdx[w], 0.7])
+    }
   }
   // Cross-links so it reads as a web, not a star.
   for (let i = 1; i < nodes.length; i++) {
@@ -194,8 +225,16 @@ function draw(): void {
     ink: css('--ink'), ink2: css('--ink-2'), ink3: css('--ink-3'),
     line: css('--line'), surface: css('--surface'),
     accent: css('--accent'), info: css('--info'), warn: css('--warn'), present: css('--present'),
+    // U272: memory has no token of its own — a soft violet, distinct from the
+    // fact blue and the skill green in both themes.
+    memory: '#8b6fc9',
   }
-  const colOf: Record<GNode['kind'], string> = { person: C.accent, fact: C.info, skill: C.present, topic: C.warn }
+  // U272: memory gets its own colour so "what he was told" and "what he
+  // worked out about you over time" never read as the same thing.
+  const colOf: Record<GNode['kind'], string> = {
+    person: C.accent, fact: C.info, skill: C.present, topic: C.warn,
+    memory: C.memory,
+  }
   const t = performance.now() / 1000
 
   const dpr = Math.min(devicePixelRatio || 1, 2)
@@ -274,7 +313,12 @@ function draw(): void {
       g.globalAlpha = 1
     }
     if (view.z > 0.5 && (!smallG || n.r > 9 || hovered)) {
-      const label = n.label.length > 26 && !hovered ? n.label.slice(0, 25) + '…' : n.label
+      // U272: a memory node wears its keywords ("sporten · hardlopen"), which
+      // is what makes the web readable — but hovering must still tell you what
+      // he actually remembers, so the full sentence takes over on hover.
+      const full = hovered && n.detail ? n.detail : n.label
+      const label = full.length > 26 && !hovered ? full.slice(0, 25) + '…'
+        : full.length > 64 ? full.slice(0, 63) + '…' : full
       g.font = `${n.kind === 'person' ? 600 : 400} ${(smallG ? 9 : 11) / view.z}px ${css('--font-ui') || 'sans-serif'}`
       g.textAlign = 'center'
       g.fillStyle = hovered ? C.ink : C.ink2
