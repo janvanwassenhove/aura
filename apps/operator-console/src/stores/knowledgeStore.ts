@@ -201,6 +201,23 @@ export const useKnowledgeStore = defineStore('knowledge', () => {
     return ok
   }
 
+  /** U274: how he should meet this person — their language and which of his
+   *  characters he becomes for them. Both empty means "follow the house
+   *  setting", which is what every profile starts as. */
+  async function setPersonPrefs(
+    personId: string, prefs: { language?: string; character?: string },
+  ): Promise<boolean> {
+    const resp = await _request(`/people/${encodeURIComponent(personId)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(prefs),
+    })
+    if (resp && detail.value?.person.person_id === personId) {
+      detail.value.person = { ...detail.value.person, ...prefs }
+    }
+    return resp !== null
+  }
+
   /** U189: assign an auto-created guest to a real person — their face moves
    *  across (so recognition keeps working) and the guest profile is absorbed. */
   async function mergePerson(fromPersonId: string, toPersonId: string): Promise<boolean> {
@@ -444,7 +461,7 @@ export const useKnowledgeStore = defineStore('knowledge', () => {
     speaker, speakerSource, selectedPerson, personTab,
     setSpeaker, noteNoFace, noteFaceSeen,
     fetchTier, fetchPeople, inspectPerson, upsertPerson, saveDescription,
-    addFact, updateFact, deleteFact, ingestSources, importChats, exportBrain, fetchSnapshots, flagSnapshotWrong, renamePerson, mergePerson, forgetPerson, setConsent, lock,
+    addFact, updateFact, deleteFact, ingestSources, importChats, exportBrain, fetchSnapshots, flagSnapshotWrong, renamePerson, setPersonPrefs, mergePerson, forgetPerson, setConsent, lock,
     fetchRecognition, secure, teachFace,
     fetchSightings, sightingImageUrl, tagSighting, dismissSighting,
     clearDetail, $reset,

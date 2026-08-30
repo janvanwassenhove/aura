@@ -74,6 +74,32 @@ class BrainContext:
 ctx = BrainContext()
 
 
+async def _character_for_active_person():
+    """U274: the character THIS person should meet, or the house one.
+
+    Asked as "per person, add option to select default language and default
+    robot" — the robot being which of his characters he becomes: the kids'
+    companion for a child, the terse one for the owner at work. Empty on the
+    person means "whatever is selected globally", so nobody has to fill it in
+    and nothing changes for households that do not want this.
+    """
+    store = getattr(ctx, "characters", None)
+    if store is None:
+        return None
+    pid = getattr(getattr(ctx, "pipeline", None), "_active_person_id", None)
+    if pid and ctx.knowledge_store is not None:
+        try:
+            person = await ctx.knowledge_store.get_person(pid)
+            chosen = getattr(person, "character", "") if person else ""
+            if chosen:
+                theirs = store.get(chosen)
+                if theirs is not None:
+                    return theirs
+        except Exception as exc:  # noqa: BLE001 — never break a reply over this
+            logging.getLogger(__name__).debug("person character unavailable: %s", exc)
+    return store.active()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     await ctx.bus.start()
@@ -408,7 +434,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         if not speak:
             return
         # U84: the active character shapes voice, speed and motion energy.
-        character = ctx.characters.active() if hasattr(ctx, "characters") else None
+        # U274: and it is the one THIS person chose, when they chose one.
+        character = await _character_for_active_person()
         if character is not None:
             amplitude = min(1.0, amplitude * character.motion_scale())
             if character.robot_motion_style == "still":
@@ -613,7 +640,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             # iets leuks doen?", word for word, which is the most robotic thing
             # in an app whose whole point is not sounding like one. It is passed
             # to the model as the voice to hit rather than the text to say.
-            character = ctx.characters.active() if hasattr(ctx, "characters") else None
+            character = await _character_for_active_person()
             character_note = ""
             if character is not None and character.greeting_message:
                 character_note = (

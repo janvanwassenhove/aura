@@ -128,10 +128,20 @@ def _house_language() -> str:
     return "en"
 
 
-def _identity_prefix() -> str:
+def _identity_prefix(person_language: str = "") -> str:
     """Assistant name + reply language, read per turn so the Settings panel
-    changes take effect immediately (U36h)."""
+    changes take effect immediately (U36h).
+
+    U274: `person_language` is the language of the person he is actually
+    talking to, and it beats the house setting. A household is rarely
+    monolingual, and one global choice can only ever be right for one of them.
+    Empty — the default — means "whatever the house is set to", so nobody has
+    to fill it in.
+    """
     name = os.environ.get("ASSISTANT_NAME", "AURA")
+    theirs = (person_language or "").strip().lower()[:2]
+    if theirs in _LANGUAGE_NAMES:
+        return _identity_body(name, f"Always reply in {_LANGUAGE_NAMES[theirs]}.")
     lang = os.environ.get("ASSISTANT_LANGUAGE", "auto").lower()
     if lang in _LANGUAGE_NAMES:
         lang_line = f"Always reply in {_LANGUAGE_NAMES[lang]}."
@@ -142,6 +152,10 @@ def _identity_prefix() -> str:
             f"short to tell — a bare greeting, a single word — reply in {house}, "
             "and switch as soon as they make it clear."
         )
+    return _identity_body(name, lang_line)
+
+
+def _identity_body(name: str, lang_line: str) -> str:
     return (
         f"Your name is {name}, a warm, curious desk-robot companion. You respond "
         f"when addressed as {name}. Hold a natural, flowing conversation on ANY "
@@ -439,6 +453,27 @@ class OrchestratorPipeline:
         """Inject the U19e JudgmentLayer. Called from aura_brain.main at startup."""
         self._judgment = judgment
 
+    async def person_prefs(self) -> dict:
+        """U274: how THIS person wants to be met — their language and their
+        character. Both empty by default, meaning "whatever the house is set
+        to", so a per-person setting never quietly becomes a second global one.
+
+        Read live rather than cached: the owner changes it in People and
+        expects the very next reply to obey, exactly like the Settings panel.
+        """
+        store = getattr(self._judgment, "_store", None)
+        if store is None or not self._active_person_id:
+            return {}
+        try:
+            person = await store.get_person(self._active_person_id)
+        except Exception as exc:  # noqa: BLE001 — a preference must not kill a turn
+            logger.debug("person prefs unavailable: %s", exc)
+            return {}
+        if person is None:
+            return {}
+        return {"language": getattr(person, "language", "") or "",
+                "character": getattr(person, "character", "") or ""}
+
     def set_active_person(self, person_id: str | None) -> None:
         """Update the currently-recognized person (called on PersonRecognized events)."""
         self._active_person_id = person_id
@@ -608,7 +643,10 @@ class OrchestratorPipeline:
 
         tool_list_str = await self._context.build_tool_list(allowed)
         system_prompt = self._persona.render_system_prompt(ctx_str, tool_list_str)
-        system_prompt = _identity_prefix() + system_prompt
+        # U274: the language of the person he is talking to wins over the
+        # house setting — a household is rarely monolingual.
+        _prefs = await self.person_prefs()
+        system_prompt = _identity_prefix(_prefs.get("language", "")) + system_prompt
         if allowed:  # U58: the automation ladder governs every tool choice
             system_prompt += "\n\n" + LADDER_NOTE
         # U249: the model can only ask for what it can NAME, so the catalogue

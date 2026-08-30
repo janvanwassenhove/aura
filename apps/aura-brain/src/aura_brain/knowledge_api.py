@@ -182,21 +182,29 @@ async def upsert_person(
     existing = await store.get_person(person_id)
     # Merge semantics (U63): omitted fields keep their current value so the
     # console can update just the description without resetting name/role.
-    defaults = {
-        "display_name": existing.display_name if existing else person_id,
-        "role": existing.role.value if existing else "guest",
-        "description": existing.description if existing else "",
+    # U274: build from the STORED person, not from a fresh default one. The
+    # merge comment above was only true of the three fields it listed —
+    # everything added since (the avatar, and now language and character) was
+    # silently reset to its default on any update, so changing someone's role
+    # deleted their photo. Starting from what is there cannot forget a field
+    # that gets added later.
+    base = existing.model_dump() if existing else {
+        "person_id": person_id, "display_name": person_id, "role": "guest",
     }
     try:
-        role = PersonRole(body.get("role") or defaults["role"])
+        role = PersonRole(body.get("role") or base.get("role") or "guest")
     except ValueError:
         raise HTTPException(status_code=422, detail="Invalid role")
-    person = Person(
-        person_id=person_id,
-        display_name=body.get("display_name") or defaults["display_name"],
-        role=role,
-        description=body.get("description", defaults["description"]) or "",
-    )
+    updates = {
+        "display_name": body.get("display_name") or base.get("display_name") or person_id,
+        "role": role,
+        "description": body.get("description", base.get("description", "")) or "",
+        # Empty is a real choice here — it means "follow the house setting" —
+        # so these read with a default rather than an `or`.
+        "language": str(body.get("language", base.get("language", "")) or ""),
+        "character": str(body.get("character", base.get("character", "")) or ""),
+    }
+    person = Person(**{**base, "person_id": person_id, **updates})
     await store.upsert_person(person)
     return JSONResponse(person.model_dump(mode="json"))
 

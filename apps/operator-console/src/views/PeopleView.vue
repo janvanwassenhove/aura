@@ -60,7 +60,14 @@
         <div class="add-row">
           <input v-model="addName" class="d2-field" placeholder="Name" aria-label="Name">
           <select v-model="addRole" class="d2-field" aria-label="Role">
-            <option>family</option><option>kid</option><option>guest</option><option>owner</option>
+            <option value="family">family</option>
+            <!-- U274: the brain's roles are owner/family/guest/minor/demo.
+                 This offered "kid", which every PUT rejected with 422 —
+                 silently, because a failed role change showed nothing. And
+                 it is the one role with real teeth: a minor is never learned
+                 about passively (ADR-008 §10). -->
+            <option value="minor">child — nothing learned passively</option>
+            <option value="guest">guest</option><option value="owner">owner</option>
           </select>
           <button class="d2-primary-btn" :disabled="!addName.trim()" @click="createPerson">Add</button>
           <button class="d2-ghost-btn" @click="adding = false">Cancel</button>
@@ -79,10 +86,38 @@
           <label v-if="isOwner" class="role-label">
             Role
             <select :value="detail.person.role" class="d2-field role-select" aria-label="Role" @change="changeRole">
-              <option>owner</option><option>family</option><option>kid</option><option>guest</option>
+              <option value="owner">owner</option><option value="family">family</option>
+              <option value="minor">child — nothing learned passively</option>
+              <option value="guest">guest</option>
             </select>
           </label>
           <span v-else class="role-chip">Role: {{ detail.person.role }} · set by the owner</span>
+        </div>
+
+        <!-- U274: how he should meet THIS person. Asked for as "per person,
+             add option to select default language and default robot" — the
+             robot being which of his characters he becomes. Both default to
+             "same as everyone", so a household that wants none of this sees
+             no change. -->
+        <p v-if="roleError" class="present-error role-error">{{ roleError }}</p>
+
+        <div v-if="isOwner" class="person-prefs">
+          <label class="pref">
+            <span class="pref-k">Speaks to them in</span>
+            <select :value="personLanguage" class="d2-field" aria-label="Reply language for this person"
+                    @change="savePref('language', $event)">
+              <option value="">same as everyone (Settings)</option>
+              <option v-for="l in LANGUAGES" :key="l.code" :value="l.code">{{ l.name }}</option>
+            </select>
+          </label>
+          <label class="pref">
+            <span class="pref-k">Meets them as</span>
+            <select :value="personCharacter" class="d2-field" aria-label="Character for this person"
+                    @change="savePref('character', $event)">
+              <option value="">same as everyone (Robot)</option>
+              <option v-for="c in brainCharacters" :key="c.id" :value="c.id">{{ c.display_name }}</option>
+            </select>
+          </label>
         </div>
 
         <div class="person-actions">
@@ -363,6 +398,7 @@ onMounted(async () => {
   await knowledge.fetchPeople()
   knowledge.fetchSightings()
   fetchEnrolled()
+  fetchCharacters()          // U274: the "meets them as" list
   // [[wikilink]] requests from other views land here.
   const req = nav.knowledgeRequest
   const first = req?.personId ?? knowledge.selectedPerson ?? visiblePeople.value[0]?.person_id
@@ -439,10 +475,44 @@ function openTarget(target: string): void {
 }
 
 // ── Role / consent / forget ────────────────────────────────────────────────
+// ── U274: per-person language and character ───────────────────────────────
+// The list the brain actually understands (orchestrator/_LANGUAGE_NAMES) —
+// offering a language he cannot be instructed in would be a dropdown that
+// silently does nothing.
+const LANGUAGES = [
+  { code: 'en', name: 'English' }, { code: 'nl', name: 'Nederlands' },
+  { code: 'fr', name: 'Français' }, { code: 'de', name: 'Deutsch' },
+  { code: 'es', name: 'Español' }, { code: 'it', name: 'Italiano' },
+]
+interface BrainCharacter { id: string; display_name: string }
+const brainCharacters = ref<BrainCharacter[]>([])
+async function fetchCharacters(): Promise<void> {
+  try {
+    const r = await fetch(`${BRAIN_URL}/setup/characters`)
+    if (r.ok) brainCharacters.value = (await r.json()).characters ?? []
+  } catch { /* the dropdown falls back to "same as everyone" */ }
+}
+const personLanguage = computed(() =>
+  (detail.value?.person as { language?: string } | undefined)?.language ?? '')
+const personCharacter = computed(() =>
+  (detail.value?.person as { character?: string } | undefined)?.character ?? '')
+
+async function savePref(field: 'language' | 'character', e: Event): Promise<void> {
+  if (!detail.value) return
+  const value = (e.target as HTMLSelectElement).value
+  await knowledge.setPersonPrefs(detail.value.person.person_id, { [field]: value })
+}
+
+const roleError = ref('')
 async function changeRole(e: Event): Promise<void> {
   if (!detail.value) return
   const role = (e.target as HTMLSelectElement).value
-  await knowledge.renamePerson(detail.value.person.person_id, detail.value.person.display_name, role)
+  roleError.value = ''
+  const ok = await knowledge.renamePerson(
+    detail.value.person.person_id, detail.value.person.display_name, role)
+  // U274: this failed silently for every "kid" ever chosen — the select moved,
+  // the brain said 422, and the screen showed the new value as if it had taken.
+  if (!ok) roleError.value = knowledge.error ?? 'That role was not accepted.'
   await knowledge.inspectPerson(detail.value.person.person_id)
 }
 const consentValue = computed(() => {
@@ -700,6 +770,11 @@ function openGraph(): void { nav.go('graph') }
   display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 600;
   color: var(--ink-3); border: 1px solid var(--line-strong); border-radius: 999px; padding: 3px 10px;
 }
+
+.role-error { color: var(--danger, #e5484d); font-size: 0.8rem; margin: 0.3rem 0 0; }
+.person-prefs { display: flex; gap: 1.2rem; flex-wrap: wrap; margin: 0.5rem 0 0.2rem; }
+.pref { display: flex; flex-direction: column; gap: 0.2rem; font-size: 0.78rem; }
+.pref-k { color: var(--ink-3); }
 
 .person-actions { display: flex; gap: 7px; flex-wrap: wrap; margin-bottom: 18px; align-items: center; }
 .consent-label { display: inline-flex; align-items: center; gap: 7px; font-size: 12.5px; color: var(--ink-3); }

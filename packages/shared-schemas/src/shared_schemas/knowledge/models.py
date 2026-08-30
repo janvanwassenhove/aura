@@ -48,6 +48,20 @@ class Person(BaseModel):
     # bundle like everything else; empty -> the console falls back to initials,
     # so old persisted data loads unchanged.
     avatar: str = ""
+    # U274: how he should meet THIS person, asked for as "per person, add
+    # option to select default language and default robot". Both empty by
+    # default, and empty means "whatever the house is set to" — a per-person
+    # setting must never quietly become a second global one.
+    #
+    # `language`: a BCP-47 tag ("nl", "fr-BE") he replies in when this person
+    # is the one being spoken to. A household is rarely monolingual, and the
+    # global setting can only ever be right for one of them.
+    language: str = ""
+    # `character`: which of his characters he becomes for this person — the
+    # kids' companion for a child, the terse one for the owner at work. The
+    # id of a CharacterPersona, not a display name, so renaming one does not
+    # orphan every profile that chose it.
+    character: str = ""
     created_at: datetime = Field(default_factory=_now)
 
 
