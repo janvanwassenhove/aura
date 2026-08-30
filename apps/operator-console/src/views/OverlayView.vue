@@ -108,6 +108,9 @@ const slidesLine = computed(() => {
     const total = st.slide_total ? ` / ${st.slide_total}` : ''
     return `${st.deck || 'deck'} — slide ${st.slide}${total}`
   }
+  // U266: this line was telling the presenter to press F5 while their deck was
+  // full-screen behind it. He was never waiting — he could not look at all.
+  if (st.slides_blocker) return 'he cannot read your slides on this install'
   if (st.slides_state === 'waiting') return 'waiting for your slideshow (F5 / Play)'
   return 'manual beats only'
 })

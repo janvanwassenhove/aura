@@ -198,7 +198,13 @@ function hasUv() {
 //       recognition extra failed to build (no insightface AND no Pillow), the
 //       person avatar / "Take a photo" broke too. Re-sync so the fallback plain
 //       sync still lands Pillow even when the heavy extra can't build.
-const BOOTSTRAP_REV = '4'   // U246: + the computeruse extra
+//   5 = U266: + the `presentation` extra. pywin32 is how he reads which slide
+//       PowerPoint is on, and it was never asked for — so `uv sync` pruned it
+//       and slide detection was inert in EVERY installed build, while working
+//       perfectly in the dev tree where it was tested. On screen it read as an
+//       eternal "waiting for your slideshow (F5 / Play)" with the slideshow
+//       running in front of it.
+const BOOTSTRAP_REV = '5'
 
 /** U218: is face recognition actually usable in the packaged environment?
  *
@@ -230,6 +236,17 @@ function computerUseInstalled() {
   return fs.existsSync(path.join(sitePackagesDir(), 'pyautogui'))
 }
 
+// U266: pywin32 is how he reads which slide PowerPoint is on. It was never
+// asked for, so every install had it pruned and slide cues could not fire —
+// invisibly, because "cannot look" and "found no slideshow" printed the same
+// sentence. Only Windows can have it; elsewhere its absence is correct.
+// NOTE: `pywin32_ctypes` in site-packages is a keyring dependency and is NOT
+// this — the directory that proves the real thing is `win32com`.
+function presentationInstalled() {
+  if (process.platform !== 'win32') return true
+  return fs.existsSync(path.join(sitePackagesDir(), 'win32com'))
+}
+
 async function ensureBootstrap(splashWindow) {
   if (!IS_PACKAGED) return
   const marker = path.join(app.getPath('userData'), '.bootstrap-done')
@@ -238,7 +255,8 @@ async function ensureBootstrap(splashWindow) {
   // Re-run when the revision changed OR when the environment lost the
   // recognition stack (post-update venv rebuild, or a failed earlier attempt).
   if (doneRev === BOOTSTRAP_REV && hasUv()
-      && recognitionInstalled() && computerUseInstalled()) return
+      && recognitionInstalled() && computerUseInstalled()
+      && presentationInstalled()) return
 
   const say = (msg) => {
     if (splashWindow && !splashWindow.isDestroyed()) {
@@ -282,11 +300,17 @@ async function ensureBootstrap(splashWindow) {
   // thing" step. It is asked for FIRST, but a wheel that will not build there
   // must not cost the recognition stack as well, so the middle rung drops only
   // the extra that failed rather than falling all the way to a bare sync.
+  // U266: `presentation` (pywin32) rides along on every rung. It is a small,
+  // always-available wheel on Windows and a no-op elsewhere, so unlike the
+  // heavy stacks above it has no reason to be dropped on the way down — and
+  // dropping it is what made slide detection dead on arrival in every build.
   const SYNCS = fails < 2
-    ? ['uv sync --all-packages --extra recognition --extra computeruse',
-       'uv sync --all-packages --extra recognition',
+    ? ['uv sync --all-packages --extra recognition --extra computeruse --extra presentation',
+       'uv sync --all-packages --extra recognition --extra presentation',
+       'uv sync --all-packages --extra presentation',
        'uv sync --all-packages']
-    : ['uv sync --all-packages --extra computeruse',
+    : ['uv sync --all-packages --extra computeruse --extra presentation',
+       'uv sync --all-packages --extra presentation',
        'uv sync --all-packages']
   for (const [i, cmd] of SYNCS.entries()) {
     try {
@@ -552,12 +576,20 @@ function createWindow() {
   // machine. ONE overlay window: on two screens the audience layer goes to
   // the beamer and the console itself is the presenter view.
   let presentOverlayWin = null
+  // U266: the window outlives the console view that opened it. PresentView is
+  // behind a v-if, so switching to Talk and back re-creates it with a fresh
+  // `overlayShown = false` — the Hide button vanished while the overlay was
+  // still on the beamer, and nothing in the app could take it down again.
+  // Reported as "ik kan overlay ook niet terug desactiveren". The main
+  // process is the only thing that actually knows; it now says so.
+  let presentOverlayState = { shown: false, mode: 'audience', displayId: null }
 
   function hidePresentOverlay() {
     if (presentOverlayWin) {
       try { presentOverlayWin.close() } catch { /* already gone */ }
       presentOverlayWin = null
     }
+    presentOverlayState = { ...presentOverlayState, shown: false }
   }
 
   ipcMain.handle('overlay:present:displays', () => {
@@ -593,11 +625,22 @@ function createWindow() {
     presentOverlayWin.setAlwaysOnTop(true, 'screen-saver')
     presentOverlayWin.loadURL(
       `${consoleUrl()}#overlay?mode=${encodeURIComponent(mode)}&size=${Number(size) || 120}`)
-    presentOverlayWin.on('closed', () => { presentOverlayWin = null })
-    return { shown: true, display: target.id }
+    presentOverlayWin.on('closed', () => {
+      presentOverlayWin = null
+      presentOverlayState = { ...presentOverlayState, shown: false }
+    })
+    presentOverlayState = { shown: true, mode, displayId: target.id }
+    return { ...presentOverlayState, display: target.id }
   })
 
-  ipcMain.handle('overlay:present:hide', () => { hidePresentOverlay(); return { shown: false } })
+  ipcMain.handle('overlay:present:hide', () => { hidePresentOverlay(); return { ...presentOverlayState } })
+
+  // U266: what is ACTUALLY on the beamer right now, for a view that has just
+  // been re-created and knows nothing.
+  ipcMain.handle('overlay:present:state', () => ({
+    ...presentOverlayState,
+    shown: presentOverlayState.shown && !!presentOverlayWin,
+  }))
 
   // Window controls for the custom title bar (see preload.cjs).
   ipcMain.on('win:minimize', () => mainWindow?.minimize())

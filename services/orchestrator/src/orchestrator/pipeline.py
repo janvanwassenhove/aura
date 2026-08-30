@@ -1026,7 +1026,23 @@ class OrchestratorPipeline:
                     return resp["content"]
             except Exception as exc:
                 logger.warning("Offline local LLM unavailable (%s); using regex fallback", exc)
-        return await self._fallback.handle(text, session_id)
+        reply = await self._fallback.handle(text, session_id)
+        return f"{reply} {self._offline_reason()}".strip()
+
+    def _offline_reason(self) -> str:
+        """Which signal made him refuse — named, not implied.
+
+        U266: "Other requests require connectivity" was the whole explanation
+        for a reply that never touched the network, and it sent the owner
+        looking at API keys and models while the real answer was a robot off
+        WiFi. Whatever is actually down gets named, so the next person to read
+        this sentence knows where to look.
+        """
+        failing = list(getattr(self._heartbeat, "failing", []) or [])
+        if not failing:
+            return ""
+        which = " and ".join(failing)
+        return f"(I cannot reach: {which}.)"
 
     async def _call_mcp(self, tool_name: str, arguments: dict) -> str:
         """Run one tool on the MCP server that offers it.

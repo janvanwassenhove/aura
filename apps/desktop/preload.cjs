@@ -32,5 +32,8 @@ contextBridge.exposeInMainWorld('aura', {
     displays: () => ipcRenderer.invoke('overlay:present:displays'),
     show: (opts) => ipcRenderer.invoke('overlay:present:show', opts),
     hide: () => ipcRenderer.invoke('overlay:present:hide'),
+    // U266: the overlay window outlives the view that opened it — ask what is
+    // really on screen instead of assuming it is off.
+    state: () => ipcRenderer.invoke('overlay:present:state'),
   },
 })

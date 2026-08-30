@@ -1,0 +1,113 @@
+import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { mount, flushPromises } from '@vue/test-utils'
+import { setActivePinia, createPinia } from 'pinia'
+import PresentView from '../../src/views/PresentView.vue'
+
+/** U266: two ways Present mode did nothing and said nothing about it.
+ *
+ *  1. "Start presentation is not doing anything." The builder writes a beat's
+ *     cue as a STRING — "manual", "slide:4", "keyword:Java" — and the brain
+ *     parses it as one. This view read it as an OBJECT, and
+ *     `'keyword' in 'manual'` is not a false test but a TypeError. It threw
+ *     while mapping the first beat, BEFORE the scenario was ever POSTed, so
+ *     the green button produced no request, no error, and no change on screen.
+ *
+ *  2. "Ik kan overlay ook niet terug desactiveren." The Hide button rendered
+ *     only while this view believed the overlay was up — a belief that resets
+ *     every time the view is re-created, while the Electron overlay window
+ *     happily stays on the beamer.
+ *
+ *  There is no vue-tsc step here (esbuild strips types unchecked), so the
+ *  wrong annotation in (1) compiled cleanly and only failed at runtime, in a
+ *  click handler, in front of a deck. Mounting is the only thing that sees it.
+ */
+
+const OK = (body: unknown) => Promise.resolve({
+  ok: true, status: 200, json: () => Promise.resolve(body),
+} as Response)
+
+function stubFetch(): { url: string; body: unknown }[] {
+  const posts: { url: string; body: unknown }[] = []
+  vi.stubGlobal('fetch', (url: string, init?: RequestInit) => {
+    const u = String(url)
+    if (init?.method === 'POST') {
+      posts.push({ url: u, body: JSON.parse(String(init.body ?? '{}')) })
+    }
+    if (u.includes('/presentation/scenarios')) return OK({ scenarios: [] })
+    if (u.includes('/presentation/scenario')) {
+      return OK({ active: true, title: 'test', manual_pos: 0, manual_total: 1 })
+    }
+    if (u.includes('/presentation/status')) return OK({ active: false })
+    if (u.includes('/personas')) return OK({ personas: [] })
+    return OK({})
+  })
+  return posts
+}
+
+beforeEach(() => {
+  vi.unstubAllGlobals()
+  setActivePinia(createPinia())
+})
+
+describe('U266 — Present mode does what its buttons say', () => {
+  it('a manual beat starts the presentation instead of throwing', async () => {
+    const posts = stubFetch()
+    const w = mount(PresentView)
+    await flushPromises()
+
+    // Open the builder ("New scenario") and fill the one beat it starts with.
+    const openers = w.findAll('button').filter(b => b.text().includes('New scenario'))
+    expect(openers.length).toBe(1)
+    await openers[0].trigger('click')
+    await flushPromises()
+
+    const text = w.find('textarea.sb-text')
+    expect(text.exists()).toBe(true)
+    await text.setValue('tell a joke')
+
+    const start = w.findAll('button').filter(b => b.text() === 'Start presentation')
+    expect(start.length).toBe(1)
+    await start[0].trigger('click')
+    await flushPromises()
+
+    // The whole bug: before the fix this list was empty — the handler died on
+    // `'keyword' in 'manual'` and the brain never heard a thing.
+    const load = posts.filter(p => p.url.includes('/presentation/scenario'))
+    expect(load.length).toBe(1)
+    const sent = (load[0].body as { scenario: { beats: { trigger: string; text: string }[] } }).scenario
+    expect(sent.beats[0].trigger).toBe('manual')
+    expect(sent.beats[0].text).toBe('tell a joke')
+  })
+
+  it('slide and keyword cues survive the same mapping', async () => {
+    const posts = stubFetch()
+    const w = mount(PresentView)
+    await flushPromises()
+    await w.findAll('button').filter(b => b.text().includes('New scenario'))[0].trigger('click')
+    await flushPromises()
+
+    // Switch the beat's cue to a slide number — the other shape of the string.
+    const kind = w.find('select.sb-tkind')
+    await kind.setValue('slide')
+    await w.find('input.sb-tnum').setValue(4)
+    await w.find('textarea.sb-text').setValue('here we go')
+    await w.findAll('button').filter(b => b.text() === 'Start presentation')[0].trigger('click')
+    await flushPromises()
+
+    const load = posts.filter(p => p.url.includes('/presentation/scenario'))
+    expect(load.length).toBe(1)
+    const sent = (load[0].body as { scenario: { beats: { trigger: string }[] } }).scenario
+    expect(sent.beats[0].trigger).toBe('slide:4')
+  })
+
+  it('Hide is always reachable, even when this view thinks the overlay is off', async () => {
+    stubFetch()
+    const w = mount(PresentView)
+    await flushPromises()
+
+    // Freshly mounted: nothing has been shown from THIS view. The overlay may
+    // still be on the beamer from a previous one, so the way out must be here.
+    const hide = w.findAll('button').filter(b => b.text() === 'Hide')
+    expect(hide.length).toBe(1)
+  })
+})

@@ -21,6 +21,9 @@ export interface PresentationStatus {
    *  for you at all". */
   watching?: boolean
   slides_state?: 'off' | 'waiting' | 'live'
+  /** U266: non-empty when he CANNOT read the slideshow at all (the library is
+   *  missing from this build) — which is not the same as not finding one yet. */
+  slides_blocker?: string
   slides_app?: string
   deck?: string
   slide?: number

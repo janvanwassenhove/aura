@@ -45,12 +45,30 @@ class HeartbeatMonitor:
         interval_s: float = 30.0,
         failure_threshold: int = _FAILURE_THRESHOLD,
         stability_window_s: float = _STABILITY_WINDOW_S,
+        essential: set[str] | None = None,
     ) -> None:
         self._bus = bus
         self._services = services             # e.g. {"llm": "http://llm:8000/health"}
         self._interval = interval_s
         self._threshold = failure_threshold
         self._stability_window = stability_window_s
+        # U266: which signals may declare him unable to THINK.
+        #
+        # Every registered service is still pinged and still reports — the UI
+        # wants to know the robot dropped off WiFi. But the signals do not all
+        # mean the same thing, and the brain watched exactly one: the robot's
+        # /health. A robot on WiFi blinks out for ninety seconds, the mode goes
+        # DEGRADED and then straight to OFFLINE (with a single signal, "any
+        # failing" and "all failing" are the same sentence), and from then on
+        # every turn short-circuits past the LLM into the regex fallback —
+        # "I'm operating in limited offline mode…" — while the key, the network
+        # and the model were all fine. Reported from the middle of a talk.
+        #
+        # A body that is not plugged in is not a mind that cannot think.
+        # An empty set means nothing can degrade him, which is the honest
+        # default when no upstream health URL is configured: make the call and
+        # report the real error, rather than refusing up front on a guess.
+        self._essential = set(essential) if essential is not None else set(services)
 
         self._failures: dict[str, int] = defaultdict(int)
         self._mode: RobotMode = RobotMode.ONLINE
@@ -102,16 +120,23 @@ class HeartbeatMonitor:
             for name, url in self._services.items():
                 results[name] = await self._check(client, name, url)
 
-        all_healthy = all(results.values())
-        any_degraded = any(
-            self._failures[n] >= self._threshold for n in self._services
-        )
+        # U266: only the essential signals move the mode. The rest are pinged
+        # and reported — the console still shows a robot that fell off WiFi —
+        # but they no longer decide whether he is allowed to think.
+        watched = self._essential
+        all_healthy = all(results[n] for n in watched if n in results)
+        any_degraded = any(self._failures[n] >= self._threshold for n in watched)
         # All monitored signals (e.g. brain↔robot link AND upstream internet) down.
-        all_failing = bool(self._services) and all(
-            self._failures[n] >= self._threshold for n in self._services
+        all_failing = bool(watched) and all(
+            self._failures[n] >= self._threshold for n in watched
         )
 
         await self._transition(all_healthy, any_degraded, all_failing)
+
+    @property
+    def failing(self) -> list[str]:
+        """Signals currently over the failure threshold — the reason, by name."""
+        return sorted(n for n in self._services if self._failures[n] >= self._threshold)
 
     async def _check(self, client: httpx.AsyncClient, name: str, url: str) -> bool:
         """Ping one service; emit heartbeat event; return True if healthy."""

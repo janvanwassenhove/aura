@@ -37,6 +37,7 @@ import shutil
 import subprocess
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
+from functools import lru_cache
 
 logger = logging.getLogger(__name__)
 
@@ -147,6 +148,38 @@ def read_state() -> SlideState | None:
 def available() -> bool:
     """Is a slideshow running right now?"""
     return read_state() is not None
+
+
+@lru_cache(maxsize=1)
+def read_blocker() -> str:
+    """Why he CANNOT look — as opposed to finding nothing to look at.
+
+    U266: `_read_powerpoint` returns None for "no slideshow up" and for "the
+    library that reads PowerPoint is not installed", and the UI rendered both
+    as "waiting for your slideshow (F5 / Play)". The second one is not a wait,
+    it is a dead end: the packaged app's bootstrap never asked for the
+    `presentation` extra, so pywin32 was pruned out of every install and slide
+    cues could never fire — while the dev tree, where this was tested, had it.
+    Reported with the slideshow visibly running behind the message.
+
+    Empty string means nothing is blocking; he simply has not found a show.
+    """
+    system = platform.system()
+    if system == "Windows":
+        try:
+            import win32com.client  # noqa: F401, PLC0415 — probe, not a use
+        except Exception:  # noqa: BLE001 — any import failure is the same wall
+            return (
+                "He cannot read PowerPoint on this install (pywin32 is "
+                "missing). Restart AURA so it can finish setting itself up. "
+                "Manual and keyword beats work regardless."
+            )
+    elif system == "Darwin" and not shutil.which("osascript"):
+        return (
+            "He cannot read Keynote on this Mac (osascript is unavailable). "
+            "Manual and keyword beats work regardless."
+        )
+    return ""
 
 
 # ---------------------------------------------------------------------------

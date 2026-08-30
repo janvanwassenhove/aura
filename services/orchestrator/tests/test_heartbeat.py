@@ -262,3 +262,67 @@ async def test_all_signals_down_goes_offline_then_recovers(bus):
         await monitor._run_once()
         await asyncio.sleep(0)
         assert monitor.mode == RobotMode.RECOVERING
+
+
+# --------------------------------------------------------------------------- #
+# U266: a robot off WiFi is not a mind that cannot think
+# --------------------------------------------------------------------------- #
+
+def _dead_client():
+    """An httpx.AsyncClient stand-in whose every GET fails."""
+    client = AsyncMock()
+    client.get = AsyncMock(side_effect=Exception("down"))
+    client.__aenter__ = AsyncMock(return_value=client)
+    client.__aexit__ = AsyncMock(return_value=False)
+    return client
+
+
+async def test_a_non_essential_signal_never_degrades_him(bus):
+    """The reported bug, as a test.
+
+    The brain watched exactly one signal — the robot's /health — so a robot
+    that dropped off WiFi drove the mode to DEGRADED and, being the only
+    signal, straight on to OFFLINE. From there the pipeline short-circuited
+    every turn into the regex FallbackAgent: "I'm operating in limited offline
+    mode. I can help with: current time, setting reminders, and system
+    status." — with the API key, the network and the model all working, and
+    the owner mid-presentation from a laptop.
+    """
+    monitor = HeartbeatMonitor(
+        bus,
+        services={"robot": "http://robot/health"},
+        interval_s=999,
+        failure_threshold=1,
+        stability_window_s=0.0,
+        essential=set(),            # nothing here may say he cannot think
+    )
+
+    with patch("httpx.AsyncClient") as mock_cls:
+        mock_cls.return_value = _dead_client()
+        for _ in range(5):
+            await monitor._run_once()
+            await asyncio.sleep(0)
+
+    assert monitor.mode == RobotMode.ONLINE
+    # ...but the failure is still observed and still reportable.
+    assert monitor.failing == ["robot"]
+
+
+async def test_an_essential_signal_still_degrades_him(bus):
+    """The other half: a real upstream outage must still take him offline."""
+    monitor = HeartbeatMonitor(
+        bus,
+        services={"robot": "http://robot/health", "upstream": "http://api/health"},
+        interval_s=999,
+        failure_threshold=1,
+        stability_window_s=0.0,
+        essential={"upstream"},
+    )
+
+    with patch("httpx.AsyncClient") as mock_cls:
+        mock_cls.return_value = _dead_client()
+        await monitor._run_once()
+        await asyncio.sleep(0)
+
+    assert monitor.mode == RobotMode.DEGRADED
+    assert monitor.failing == ["robot", "upstream"]

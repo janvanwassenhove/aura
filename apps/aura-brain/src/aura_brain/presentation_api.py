@@ -250,6 +250,16 @@ def _status_payload() -> dict:
     out["slides_state"] = (
         "off" if _watcher is None else ("live" if state else "waiting")
     )
+    # U266: "waiting" assumes he is able to look. When the library that reads
+    # the slideshow is missing he never can, and an endless "waiting for your
+    # slideshow" while the slideshow is up is a lie the presenter can do
+    # nothing with. Say which of the two it is.
+    if state:
+        out["slides_blocker"] = ""
+    else:
+        from aura_brain.slides_watcher import read_blocker  # noqa: PLC0415
+
+        out["slides_blocker"] = read_blocker()
 
     warnings: list[dict] = []
     if state is not None and _runner is not None:

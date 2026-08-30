@@ -196,7 +196,12 @@
           <button class="d2-primary-btn" :disabled="overlayShown" @click="showOverlay">
             {{ isElectron ? 'Show overlay' : 'Open overlay window' }}
           </button>
-          <button v-if="overlayShown" class="d2-ghost-btn" @click="hideOverlay">Hide</button>
+          <!-- U266: Hide is ALWAYS here. It used to appear only while this view
+               believed the overlay was up, and that belief resets every time the
+               view is re-created — leaving a live overlay on the beamer with no
+               button anywhere to take it down. A Hide that hides nothing costs
+               nothing; an overlay you cannot close costs a talk. -->
+          <button class="d2-ghost-btn" @click="hideOverlay">Hide</button>
         </div>
         <p v-if="!isElectron" class="ov-note">
           In a browser this opens a normal window (drag it to the beamer and
@@ -236,6 +241,8 @@ interface OverlayApi {
   displays: () => Promise<{ id: number; label: string; primary: boolean; width: number; height: number }[]>
   show: (opts: { mode: string; displayId: number | null; size?: number }) => Promise<{ shown: boolean }>
   hide: () => Promise<{ shown: boolean }>
+  /** U266: added later — an older desktop shell will not have it. */
+  state?: () => Promise<{ shown: boolean; mode?: string; displayId?: number | null }>
 }
 const overlayApi = (window as never as { aura?: { presentOverlay?: OverlayApi } })
   .aura?.presentOverlay
@@ -268,9 +275,26 @@ async function showOverlay(): Promise<void> {
 
 async function hideOverlay(): Promise<void> {
   if (overlayApi) await overlayApi.hide()
-  overlayWindow?.close()
+  // U266: the browser fallback loses its handle the same way — re-opening the
+  // window by NAME hands back the existing one, which can then be closed.
+  const win = overlayWindow ?? window.open('', 'aura-overlay')
+  try { win?.close() } catch { /* already gone */ }
   overlayWindow = null
   overlayShown.value = false
+}
+
+/** U266: adopt whatever is really on the beamer, so a re-created view offers
+ *  the right button instead of a confident lie. */
+async function syncOverlayState(): Promise<void> {
+  if (!overlayApi?.state) return
+  try {
+    const s = await overlayApi.state()
+    overlayShown.value = !!s?.shown
+    if (s?.shown) {
+      if (s.mode === 'presenter' || s.mode === 'audience') overlayMode.value = s.mode
+      if (typeof s.displayId === 'number') overlayDisplay.value = s.displayId
+    }
+  } catch { /* older shell: leave the local guess */ }
 }
 
 const presenting = computed(() => presentation.status.active)
@@ -286,6 +310,10 @@ const slidesHeadline = computed(() => {
   if (st.slides_state === 'live') {
     return `Following ${st.slides_app === 'keynote' ? 'Keynote' : 'PowerPoint'}`
   }
+  // U266: "waiting" presumes he is able to look. When he is not, waiting is
+  // not what is happening and telling the presenter to press F5 again is the
+  // worst possible advice — they already did, twice.
+  if (st.slides_blocker) return 'He cannot see your slides'
   if (st.slides_state === 'waiting') return 'Waiting for your slideshow'
   return 'Manual - advance with the beat button'
 })
@@ -296,6 +324,7 @@ const slidesDetail = computed(() => {
     const where = st.slide_total ? `slide ${st.slide} of ${st.slide_total}` : `slide ${st.slide}`
     return `${st.deck || 'your deck'} - ${where}`
   }
+  if (st.slides_blocker) return st.slides_blocker
   if (st.slides_state === 'waiting') {
     return 'Start presenting your deck (F5 in PowerPoint, Play in Keynote) and '
       + 'he picks it up on his own. Keyword and manual beats already work.'
@@ -311,6 +340,33 @@ const builderOpen = ref(false)
 
 // ── Run / end ──────────────────────────────────────────────────────────────
 let modeBefore: 'home' | 'work' = 'home'
+interface DraftBeat { id?: string; mode?: string; text?: string; motion?: string; trigger?: unknown }
+
+/** The cue a beat waits for, as the builder actually writes it.
+ *
+ * U266: this is a STRING — "manual", "slide:4", "keyword:Java" — and always
+ * was; `ScenarioBuilder.toScenario()` joins it that way and the brain parses
+ * it that way. The code here read it as an OBJECT, and `'keyword' in 'manual'`
+ * is not a false test, it is a `TypeError: Cannot use 'in' operator to search
+ * for 'keyword' in manual`. It threw on the first beat, before the scenario
+ * was ever POSTed — so "Start presentation" did precisely nothing, said
+ * nothing, and left "No scenario loaded" on screen. Reported twice:
+ * "start presentation is not doing anything".
+ *
+ * There is no vue-tsc step in this app, so the wrong type annotation compiled
+ * happily and only ever failed at runtime, in a click handler, in front of a
+ * deck. Hence the tolerant read below AND the catch in startScenario.
+ */
+function triggerOf(b: DraftBeat): string {
+  return typeof b.trigger === 'string' ? b.trigger : 'manual'
+}
+function cueOf(b: DraftBeat, i: number): string {
+  const t = triggerOf(b)
+  if (t.startsWith('keyword:')) return `“${t.slice('keyword:'.length)}”`
+  if (t.startsWith('slide:')) return `Slide ${t.slice('slide:'.length)}`
+  return `Beat ${i + 1}`
+}
+
 async function startScenario(scenario: object): Promise<void> {
   // U264: do NOT close the builder yet. It sits behind a v-if, so closing it
   // DESTROYS it and every beat typed into it — and closing before the load
@@ -318,26 +374,27 @@ async function startScenario(scenario: object): Promise<void> {
   // the easy one) wiped the work and left "No scenario loaded" behind, with
   // the reason scrolled off above. Reported as: "wanneer ik start presentation
   // klik verdwijnt alles".
-  const beats = ((scenario as { beats?: { id: string; mode: string; text?: string; motion?: string; trigger?: Record<string, unknown> }[] }).beats ?? [])
-  presenter.setBeats(beats.map((b, i) => ({
-    id: b.id ?? `beat-${i + 1}`,
-    cue: cueOf(b, i),
-    kind: b.trigger && 'keyword' in (b.trigger ?? {}) ? 'keyword' : 'slide',
-    say: b.text ?? '',
-    do: b.motion ?? b.mode ?? '',
-  })))
-  const ok = await presentation.startScenario(scenario)
-  if (ok) {
-    builderOpen.value = false          // only now: the work is safely loaded
-    modeBefore = modeStore.mode === 'present' ? 'home' : modeStore.mode
-    await modeStore.setMode('present')
+  try {
+    const beats = ((scenario as { beats?: DraftBeat[] }).beats ?? [])
+    presenter.setBeats(beats.map((b, i) => ({
+      id: b.id ?? `beat-${i + 1}`,
+      cue: cueOf(b, i),
+      kind: triggerOf(b).startsWith('keyword:') ? 'keyword' : 'slide',
+      say: b.text ?? '',
+      do: b.motion ?? b.mode ?? '',
+    })))
+    const ok = await presentation.startScenario(scenario)
+    if (ok) {
+      builderOpen.value = false        // only now: the work is safely loaded
+      modeBefore = modeStore.mode === 'present' ? 'home' : modeStore.mode
+      await modeStore.setMode('present')
+    }
+  } catch (err) {
+    // U266: a green button that swallows its own crash is the worst outcome
+    // of the three — the presenter clicks again, and again, learning nothing.
+    // Whatever went wrong, it goes where they are already looking.
+    presentation.error = `Could not start: ${(err as Error)?.message ?? err}`
   }
-}
-function cueOf(b: { trigger?: Record<string, unknown> }, i: number): string {
-  const t = b.trigger ?? {}
-  if ('keyword' in t) return `“${t.keyword}”`
-  if ('slide' in t) return `Slide ${t.slide}`
-  return `Beat ${i + 1}`
 }
 async function toggleRun(): Promise<void> {
   if (presenting.value) {
@@ -414,6 +471,7 @@ onMounted(() => {
     if (typeof saved.display === 'number') overlayDisplay.value = saved.display
   } catch { /* defaults */ }
   overlayApi?.displays().then(d => { overlayDisplays.value = d }).catch(() => {})
+  void syncOverlayState()      // U266: the beamer, not this view, is the truth
   presentation.fetchStatus()
   pollTimer = setInterval(() => presentation.fetchStatus(), 2500)
   fetchPersonas()

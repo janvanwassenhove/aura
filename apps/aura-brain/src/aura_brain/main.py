@@ -846,7 +846,16 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         upstream = os.environ.get("UPSTREAM_HEALTH_URL")  # e.g. the LLM/API endpoint
         if upstream:
             hb_services["upstream"] = upstream
-        ctx._heartbeat = HeartbeatMonitor(ctx.bus, hb_services)
+        # U266: the robot link is watched and reported, but it does not get to
+        # decide whether he can think. It was the ONLY watched signal, so a
+        # robot that dropped off WiFi for ninety seconds sent every reply
+        # through the regex fallback ("I'm operating in limited offline
+        # mode…") with a working key and a working network — including in
+        # front of an audience, presenting from a laptop the robot was never
+        # part of. Only a configured upstream can say the thinking is gone.
+        ctx._heartbeat = HeartbeatMonitor(
+            ctx.bus, hb_services, essential={"upstream"} if upstream else set()
+        )
         ctx._heartbeat.start()
         ctx.pipeline.set_heartbeat_monitor(ctx._heartbeat)
 

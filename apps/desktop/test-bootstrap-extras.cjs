@@ -26,6 +26,10 @@ const pyproject = fs.readFileSync(
 const REQUIRED_EXTRAS = [
   { extra: 'recognition', proves: 'insightface', why: 'face recognition' },
   { extra: 'computeruse', proves: 'pyautogui', why: 'use_computer drives the screen' },
+  // U266: fourth time. pywin32 reads which slide PowerPoint is on; unasked
+  // for, it was pruned from every install, so slide cues never fired in a
+  // shipped build while working in the dev tree where they were tested.
+  { extra: 'presentation', proves: 'win32com', why: 'reading the live slide number' },
 ]
 
 // --- the extras exist where we think they do -------------------------------
@@ -61,9 +65,12 @@ for (const { proves, why } of REQUIRED_EXTRAS) {
 }
 const skipCheck = main.split('\n').find((l) => l.includes('doneRev === BOOTSTRAP_REV'))
 assert.ok(skipCheck, 'the bootstrap must have a skip-if-done check')
-const skipBlock = main.slice(main.indexOf(skipCheck), main.indexOf(skipCheck) + 200)
-assert.ok(skipBlock.includes('recognitionInstalled()') && skipBlock.includes('computerUseInstalled()'),
-  'the skip check must verify every extra actually landed, not just the marker')
+const skipBlock = main.slice(main.indexOf(skipCheck), main.indexOf(skipCheck) + 300)
+for (const probe of ['recognitionInstalled()', 'computerUseInstalled()', 'presentationInstalled()']) {
+  assert.ok(skipBlock.includes(probe),
+    `the skip check must call ${probe} — verifying every extra actually landed, `
+    + 'not just that the marker file says so')
+}
 console.log('ok  the skip-if-done check verifies every extra')
 
 console.log('bootstrap-extras tests passed')
