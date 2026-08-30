@@ -122,7 +122,7 @@ describe('U266 — Present mode does what its buttons say', () => {
     const beats = w.findAll('.beat-kind')
     expect(beats.length).toBe(1)
     expect(beats[0].text()).toBe('manual')
-    expect(w.find('.beat-cue').text()).toBe('You press Next')
+    expect(w.find('.beat-cue').text()).toBe('You press Advance beat')
   })
 
   it('a slide beat says which slide it waits for', async () => {

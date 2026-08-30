@@ -47,9 +47,14 @@
           <span class="sb-lbl">When</span>
           <select v-model="b._tkind" class="sb-input sb-tkind" :disabled="b.mode === 'chime_in'"
                   @change="syncTrigger(b)">
-            <option value="manual">I press Next (nothing happens on its own)</option>
-            <option value="slide">I reach a slide (fires by itself)</option>
-            <option value="keyword">I say a word (fires by itself)</option>
+            <!-- U269: "I press Next" read as "when I go to the next slide",
+                 which is the opposite of what it does. Asked as: "not clear
+                 -> when going to next (clicking mouse/advance in
+                 presentation?)". It is the AURA button, not the clicker, so
+                 it now names the button. -->
+            <option value="manual">I click “Advance beat” in AURA (your clicker will NOT fire it)</option>
+            <option value="slide">I reach a slide in my deck (fires by itself)</option>
+            <option value="keyword">I say a word out loud (fires by itself)</option>
           </select>
           <input v-if="b._tkind === 'slide'" v-model.number="b._tslide" type="number" min="1"
                  class="sb-input sb-tnum" placeholder="slide #" @input="syncTrigger(b)" />

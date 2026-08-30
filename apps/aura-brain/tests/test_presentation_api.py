@@ -256,3 +256,72 @@ def test_status_reports_the_size_of_the_whole_show(client) -> None:
     st = c.get("/presentation/status").json()
     assert st["manual_total"] == 1        # one manual beat...
     assert st["beats_total"] == 3         # ...in a show of three
+
+
+# --------------------------------------------------------------------------- #
+# U269: a beat nobody heard must not look like a beat that was spoken
+# --------------------------------------------------------------------------- #
+
+def test_a_beat_is_synthesized_not_sent_as_bare_text(client, monkeypatch) -> None:
+    """`_robot.speak(text)` with no audio reaches the robot as a LOG LINE — it
+    plays nothing and answers ok:true. Every other speaking path in the app
+    synthesizes first; the presentation was the one that never did, so beats
+    fired, the console said "all beats done", nothing errored, and the room
+    heard silence. Reported as "he never said anything"."""
+    from aura_brain import voice
+
+    async def fake_tts(text, *a, **kw):
+        return "AAAA"                      # stand-in base64 PCM
+    monkeypatch.setattr(voice, "synthesize_b64", fake_tts)
+
+    heard: list[tuple[str, str | None]] = []
+    c, robot, _ = client
+
+    async def recording_speak(text, audio_b64=None):
+        heard.append((text, audio_b64))
+        return True
+    robot.speak = recording_speak
+
+    c.post("/presentation/scenario", json={"yaml": SCENARIO_YAML})
+    c.post("/presentation/next")
+
+    assert heard == [("Tot slot.", "AAAA")]            # audio, not bare text
+    assert c.get("/presentation/status").json()["speech_error"] == ""
+
+
+def test_a_silent_beat_says_why_it_was_silent(client, monkeypatch) -> None:
+    """The show goes on when speech fails (U265) — but going on SILENTLY is
+    what made a mute robot indistinguishable from a working one."""
+    from aura_brain import voice
+
+    async def no_tts(text, *a, **kw):
+        return None                        # no key / provider down
+    monkeypatch.setattr(voice, "synthesize_b64", no_tts)
+
+    c, robot, _ = client
+    c.post("/presentation/scenario", json={"yaml": SCENARIO_YAML})
+    c.post("/presentation/next")
+
+    assert robot.said == []                            # nothing was played
+    st = c.get("/presentation/status").json()
+    assert st["fired"] == ["outro"]                    # the show went on...
+    assert "synthesi" in st["speech_error"]            # ...and says why
+
+
+def test_speech_error_clears_once_he_is_heard_again(client, monkeypatch) -> None:
+    from aura_brain import voice
+
+    calls = {"n": 0}
+
+    async def flaky(text, *a, **kw):
+        calls["n"] += 1
+        return None if calls["n"] == 1 else "AAAA"
+    monkeypatch.setattr(voice, "synthesize_b64", flaky)
+
+    c, _, _ = client
+    c.post("/presentation/scenario", json={"yaml": SCENARIO_YAML})
+    c.post("/presentation/speech", json={"text": "agents"})   # keyword beat: fails
+    assert c.get("/presentation/status").json()["speech_error"]
+
+    c.post("/presentation/next")                              # manual beat: works
+    assert c.get("/presentation/status").json()["speech_error"] == ""

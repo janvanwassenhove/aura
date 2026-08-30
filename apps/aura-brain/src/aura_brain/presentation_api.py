@@ -66,8 +66,36 @@ async def feed_speech(text: str) -> None:
 # ------------------------------------------------------------------
 
 async def _speak(text: str) -> None:
-    if _robot is not None and text:
-        await _robot.speak(text)
+    """Say a beat OUT LOUD.
+
+    U269: this called `_robot.speak(text)` with no audio, and the robot's
+    speak route treats a text-only request as a LOG LINE — it plays nothing
+    and answers `ok: true`. Every other speaking path in the app (the voice
+    loop, /robot/say, the streaming replies) synthesizes first and passes
+    `audio_b64`; the presentation was the one that never did. So beats fired,
+    the console filled in "all beats done", nothing errored anywhere, and the
+    room heard silence. Reported as "he never said anything".
+
+    Failures RAISE, so the runner records them and the console can say what
+    went wrong. The show still goes on — that guard is U265's and it stays —
+    but a silent robot must never again look like a successful beat.
+    """
+    if not text:
+        return
+    if _robot is None:
+        raise RuntimeError("no robot is connected, so nothing could be said out loud")
+
+    from aura_brain import voice  # noqa: PLC0415 — optional at import time
+
+    audio_b64 = await voice.synthesize_b64(text)
+    if audio_b64 is None:
+        # Text-only reaches the robot as a log line. Saying so is the whole
+        # point: "he is mute because there is no TTS key" and "he is mute
+        # because the robot is off" need different fixes.
+        raise RuntimeError(
+            "speech could not be synthesized (no TTS key or the provider "
+            "failed), so the robot had nothing to play")
+    await _robot.speak(text, audio_b64=audio_b64)
 
 
 async def _gesture(name: str) -> None:

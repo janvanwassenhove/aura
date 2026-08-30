@@ -88,6 +88,13 @@
             <strong>Rehearsal</strong> — beats fire and you see every line here,
             but he stays silent and still. The room hears nothing.
           </div>
+          <!-- U269: a beat fired and nobody heard it. That used to look
+               identical to a beat that was spoken. -->
+          <div v-else-if="presentation.status.speech_error" class="hud-mute">
+            <strong>He was not heard</strong> — {{ presentation.status.speech_error }}.
+            Turn on <em>Laptop audio</em> below to read his lines through this
+            machine instead.
+          </div>
           <div class="hud-body">
             <div v-if="!cameraOff" class="hud-cam">
               <img v-if="camera.frameSrc.value" :src="camera.frameSrc.value" alt="Audience camera" class="hud-cam-img">
@@ -204,6 +211,13 @@
             <option value="presenter">me — adds cues, timing and warnings</option>
           </select>
         </label>
+        <!-- U269: asked for directly. Off by default and never implied:
+             projecting a live view of a room back at that room is a decision,
+             not a detail. -->
+        <label class="ov-row ov-check">
+          <input v-model="overlayCamera" type="checkbox" @change="applyOverlayCamera">
+          <span>Show what he sees (his camera, small, in the corner)</span>
+        </label>
         <label v-if="overlayDisplays.length > 1" class="ov-row">
           <span>On which display?</span>
           <select v-model.number="overlayDisplay" class="d2-field" aria-label="Overlay display" @change="saveOverlayPrefs">
@@ -236,6 +250,7 @@
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import ScenarioBuilder from '../components/ScenarioBuilder.vue'
 import { BRAIN_URL } from '../lib/endpoints'
+import { toRows, type RawBeat } from '../lib/beats'
 import { useCameraFeed } from '../composables/useCameraFeed'
 import {
   cancelLaptopSpeech, createMic, laptopAudioSupported, laptopMicSupported, speakOnLaptop,
@@ -259,7 +274,7 @@ const TTS_VOICES = ['alloy', 'ash', 'ballad', 'coral', 'echo', 'fable', 'onyx', 
 // honest fallback (drag to the beamer, F11).
 interface OverlayApi {
   displays: () => Promise<{ id: number; label: string; primary: boolean; width: number; height: number }[]>
-  show: (opts: { mode: string; displayId: number | null; size?: number }) => Promise<{ shown: boolean }>
+  show: (opts: { mode: string; displayId: number | null; size?: number; camera?: boolean }) => Promise<{ shown: boolean }>
   hide: () => Promise<{ shown: boolean }>
   /** U266: added later — an older desktop shell will not have it. */
   state?: () => Promise<{ shown: boolean; mode?: string; displayId?: number | null }>
@@ -272,23 +287,36 @@ const overlayMode = ref<'audience' | 'presenter'>('audience')
 const overlayDisplay = ref<number | null>(null)
 const overlayDisplays = ref<{ id: number; label: string; primary: boolean; width: number; height: number }[]>([])
 const overlayShown = ref(false)
+const overlayCamera = ref(false)   // U269: opt-in, never implied
 let overlayWindow: Window | null = null      // the browser fallback
 
 function saveOverlayPrefs(): void {
   try {
     localStorage.setItem('aura-overlay', JSON.stringify({
       mode: overlayMode.value, display: overlayDisplay.value,
+      camera: overlayCamera.value,
     }))
   } catch { /* session-only */ }
 }
 
+/** U269: toggling the camera re-shows the overlay so the change lands on the
+ *  projector immediately, instead of at the next talk. */
+async function applyOverlayCamera(): Promise<void> {
+  saveOverlayPrefs()
+  if (overlayShown.value) await showOverlay()
+}
+
 async function showOverlay(): Promise<void> {
   if (overlayApi) {
-    await overlayApi.show({ mode: overlayMode.value, displayId: overlayDisplay.value })
+    await overlayApi.show({
+      mode: overlayMode.value, displayId: overlayDisplay.value,
+      camera: overlayCamera.value,
+    })
     overlayShown.value = true
     return
   }
   const url = `${location.origin}${location.pathname}#overlay?mode=${overlayMode.value}`
+    + `&camera=${overlayCamera.value ? 1 : 0}`
   overlayWindow = window.open(url, 'aura-overlay', 'width=1280,height=720')
   overlayShown.value = overlayWindow != null
 }
@@ -390,46 +418,6 @@ const builderRef = ref<{ loadScenario: (sc: Record<string, unknown>) => void } |
 
 // ── Run / end ──────────────────────────────────────────────────────────────
 let modeBefore: 'home' | 'work' = 'home'
-interface DraftBeat { id?: string; mode?: string; text?: string; motion?: string; trigger?: unknown }
-
-/** The cue a beat waits for, as the builder actually writes it.
- *
- * U266: this is a STRING — "manual", "slide:4", "keyword:Java" — and always
- * was; `ScenarioBuilder.toScenario()` joins it that way and the brain parses
- * it that way. The code here read it as an OBJECT, and `'keyword' in 'manual'`
- * is not a false test, it is a `TypeError: Cannot use 'in' operator to search
- * for 'keyword' in manual`. It threw on the first beat, before the scenario
- * was ever POSTed — so "Start presentation" did precisely nothing, said
- * nothing, and left "No scenario loaded" on screen. Reported twice:
- * "start presentation is not doing anything".
- *
- * There is no vue-tsc step in this app, so the wrong type annotation compiled
- * happily and only ever failed at runtime, in a click handler, in front of a
- * deck. Hence the tolerant read below AND the catch in startScenario.
- */
-function triggerOf(b: DraftBeat): string {
-  return typeof b.trigger === 'string' ? b.trigger : 'manual'
-}
-function cueOf(b: DraftBeat, i: number): string {
-  const t = triggerOf(b)
-  if (t.startsWith('keyword:')) return `“${t.slice('keyword:'.length)}”`
-  if (t.startsWith('slide:')) return `Slide ${t.slice('slide:'.length)}`
-  // U267: "Beat 3" named the row, not the cue — so a hand-advanced beat gave
-  // the presenter no hint that it was waiting for THEM. Asked as "do i need
-  // to advance beat? should be triggered automatically."
-  void i
-  return 'You press Next'
-}
-/** U267: three cue kinds, not two. Every beat that was not a keyword was
- *  labelled SLIDE — including hand-advanced ones — so a beat that would never
- *  move on its own wore the badge of one that would. */
-function kindOf(b: DraftBeat): 'manual' | 'slide' | 'keyword' {
-  const t = triggerOf(b)
-  if (t.startsWith('keyword:')) return 'keyword'
-  if (t.startsWith('slide:')) return 'slide'
-  return 'manual'
-}
-
 async function startScenario(scenario: object): Promise<void> {
   // U264: do NOT close the builder yet. It sits behind a v-if, so closing it
   // DESTROYS it and every beat typed into it — and closing before the load
@@ -438,14 +426,13 @@ async function startScenario(scenario: object): Promise<void> {
   // the reason scrolled off above. Reported as: "wanneer ik start presentation
   // klik verdwijnt alles".
   try {
-    const beats = ((scenario as { beats?: DraftBeat[] }).beats ?? [])
-    presenter.setBeats(beats.map((b, i) => ({
-      id: b.id ?? `beat-${i + 1}`,
-      cue: cueOf(b, i),
-      kind: kindOf(b),
-      say: b.text ?? '',
-      do: b.motion ?? b.mode ?? '',
-    })))
+    // U266: the builder writes a beat's cue as a STRING ("manual", "slide:4",
+    // "keyword:Java"); this view read it as an OBJECT, and `'keyword' in
+    // 'manual'` is a TypeError, not a false test. It threw on the first beat,
+    // BEFORE the POST, so Start presentation sent nothing and said nothing.
+    // U269: the mapping now lives in lib/beats so the overlay reads a cue the
+    // same way this window does.
+    presenter.setBeats(toRows((scenario as { beats?: RawBeat[] }).beats))
     const ok = await presentation.startScenario(scenario)
     if (ok) {
       builderOpen.value = false        // only now: the work is safely loaded
@@ -555,6 +542,7 @@ onMounted(() => {
     const saved = JSON.parse(localStorage.getItem('aura-overlay') ?? '{}')
     if (saved.mode === 'presenter' || saved.mode === 'audience') overlayMode.value = saved.mode
     if (typeof saved.display === 'number') overlayDisplay.value = saved.display
+    overlayCamera.value = !!saved.camera
   } catch { /* defaults */ }
   overlayApi?.displays().then(d => { overlayDisplays.value = d }).catch(() => {})
   void syncOverlayState()      // U266: the beamer, not this view, is the truth
@@ -664,6 +652,11 @@ async function saveAsideBehaviour(key: string, value: string): Promise<void> {
 .hud-rehearsal {
   margin: 0 12px 10px; padding: 8px 12px; border-radius: 8px;
   background: var(--warn-wash, rgba(200, 150, 20, 0.12));
+  color: var(--ink-2); font-size: 12.5px; line-height: 1.45;
+}
+.hud-mute {
+  margin: 0 12px 10px; padding: 8px 12px; border-radius: 8px;
+  background: var(--danger-wash, rgba(200, 60, 50, 0.12));
   color: var(--ink-2); font-size: 12.5px; line-height: 1.45;
 }
 

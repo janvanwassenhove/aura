@@ -13,6 +13,23 @@
       <div v-for="w in presentation.status.deck_warnings ?? []" :key="w.kind" class="ov-warning">
         {{ w.message }}
       </div>
+      <!-- U269: a beat that fired but was never heard. The console said "all
+           beats done" while the room heard silence, and nothing anywhere said
+           why — so it says it here too, where the presenter is looking. -->
+      <div v-if="presentation.status.speech_error" class="ov-warning">
+        He could not be heard: {{ presentation.status.speech_error }}
+      </div>
+    </div>
+
+    <!-- ═══ U269: what he is actually looking at ═══
+         Asked for directly: "can we integrate camera in overlay (like what
+         robot is actually seeing?) add as choice to do so". Presenter-only by
+         default and never on the audience layer unless it is asked for —
+         pointing a live camera at a room and projecting it back at them is a
+         decision, not a detail. -->
+    <div v-if="showCamera && camera.frameSrc.value" class="ov-cam">
+      <img :src="camera.frameSrc.value" alt="What he sees" class="ov-cam-img">
+      <span class="ov-cam-tag">what he sees</span>
     </div>
 
     <!-- ═══ The audience layer: him, and what he says ═══ -->
@@ -50,32 +67,40 @@
  */
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useCharacterStore } from '../stores/characterStore'
+import { useCameraFeed } from '../composables/useCameraFeed'
 import { useEventBusWs } from '../composables/useEventBusWs'
 import { usePresentationStore } from '../stores/presentationStore'
 import { usePresenterStore } from '../stores/presenterStore'
+import { toRows, type RawBeat } from '../lib/beats'
 
 const presentation = usePresentationStore()
 const presenter = usePresenterStore()
 const characterStore = useCharacterStore()
+const camera = useCameraFeed()
 const { connect } = useEventBusWs()
 
 // U265: read LIVE on every hash change. A hash-only navigation does not
 // reload the page, so reading once at setup left the overlay stuck in
 // whatever mode it was first opened with — found when switching a window
 // from presenter to audience changed the URL and nothing else.
-function readHash(): { mode: 'audience' | 'presenter'; size: number } {
+function readHash(): { mode: 'audience' | 'presenter'; size: number; camera: boolean } {
   const params = new URLSearchParams(window.location.hash.split('?')[1] ?? '')
   return {
     mode: params.get('mode') === 'presenter' ? 'presenter' : 'audience',
     size: Math.max(48, Math.min(220, Number(params.get('size') ?? 120))),
+    // U269: the camera is opt-in and off unless asked for. Projecting a live
+    // view of a room back at that room is a decision someone has to make.
+    camera: params.get('camera') === '1',
   }
 }
 const mode = ref<'audience' | 'presenter'>(readHash().mode)
 const avatarPx = ref(readHash().size)
+const showCamera = ref(readHash().camera)
 function onHashChange(): void {
   const h = readHash()
   mode.value = h.mode
   avatarPx.value = h.size
+  showCamera.value = h.camera
 }
 
 const character = computed(() => characterStore.current)
@@ -90,7 +115,11 @@ const now = ref(Date.now())
 let clock: ReturnType<typeof setInterval> | undefined
 
 watch(() => presentation.subtitle, (text) => {
-  if (text) speakUntil.value = Date.now() + Math.min(20_000, 1500 + text.length * 66)
+  // U269: the floor used to be 1.5s + reading time, so a short beat ("tell a
+  // joke") flashed by in under three seconds — and with the robot mute there
+  // was no sound to tell anyone to look up. A subtitle nobody can catch is
+  // the same as no subtitle: reported as "nor did i see subtitles".
+  if (text) speakUntil.value = Date.now() + Math.min(20_000, 3_500 + text.length * 66)
 })
 
 const act = computed(() =>
@@ -119,11 +148,22 @@ const nextCue = computed(() => {
   return beat ? `${beat.cue} — ${beat.say || beat.do || beat.id}` : ''
 })
 
+/** U269: the overlay is its OWN window with its OWN Pinia store, so the beat
+ *  list that `PresentView.startScenario` fills was always empty here and the
+ *  "next" row could never render. Ask the brain, which both windows share.
+ *  Re-read whenever the loaded title changes — a different talk, a new list. */
+async function loadBeats(): Promise<void> {
+  const sc = await presentation.fetchScenario()
+  presenter.setBeats(toRows((sc as { beats?: RawBeat[] } | null)?.beats))
+}
+watch(() => presentation.status.title, () => { void loadBeats() })
+
 // ── Lifecycle ───────────────────────────────────────────────────────────────
 let poll: ReturnType<typeof setInterval> | undefined
 onMounted(() => {
   connect()
   presentation.fetchStatus()
+  void loadBeats()
   poll = setInterval(() => presentation.fetchStatus(), 1_500)
   clock = setInterval(() => { now.value = Date.now() }, 250)
   window.addEventListener('hashchange', onHashChange)
@@ -186,5 +226,20 @@ onUnmounted(() => {
 .ov-warning {
   border-top: 1px solid rgba(255, 255, 255, 0.15); padding-top: 6px;
   color: #fcd34d; font-size: 12.5px;
+}
+
+/* ── U269: what he sees, opposite corner from him, deliberately small ── */
+.ov-cam {
+  position: absolute; left: 24px; bottom: 24px;
+  border-radius: 10px; overflow: hidden;
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+}
+.ov-cam-img { display: block; width: 220px; height: auto; }
+.ov-cam-tag {
+  position: absolute; left: 6px; bottom: 5px;
+  background: rgba(10, 14, 12, 0.78); color: #e9e7df;
+  font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase;
+  padding: 2px 6px; border-radius: 5px;
 }
 </style>

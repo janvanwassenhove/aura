@@ -19,6 +19,9 @@ export interface PresentationStatus {
   beats_total?: number
   /** U267: the brain is mute for voice and motion while this is true. */
   rehearsing?: boolean
+  /** U269: why the last beat was not heard, if it was not. A beat that fires
+   *  into silence used to be indistinguishable from one that was spoken. */
+  speech_error?: string
   fired?: string[]
   armed_keywords?: string[]
   /** U263: `watching` means a watcher is running; `slides_state` says whether
@@ -103,7 +106,14 @@ export const usePresentationStore = defineStore('presentation', () => {
   }
 
   /** U267: the scenario that is loaded, so the builder can EDIT it instead of
-   *  making you retype a talk to change one line. */
+   *  making you retype a talk to change one line.
+   *
+   *  U269: and so the OVERLAY can know the show at all. The beat list used to
+   *  live only in the Pinia store of the window that pressed Start — and the
+   *  overlay is a separate window with a separate store, so its "next cue"
+   *  row was reading an array that is always empty there and never rendered.
+   *  Reported as "nor for the overlay did i see cues". The brain is the one
+   *  thing both windows can agree on. */
   async function fetchScenario(): Promise<Record<string, unknown> | null> {
     try {
       const r = await fetch(`${BRAIN_URL}/presentation/scenario`)

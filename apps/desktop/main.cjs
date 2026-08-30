@@ -603,7 +603,7 @@ function createWindow() {
   })
 
   ipcMain.handle('overlay:present:show', (_e, opts) => {
-    const { mode = 'audience', displayId = null, size = 120 } = opts || {}
+    const { mode = 'audience', displayId = null, size = 120, camera = false } = opts || {}
     hidePresentOverlay()
     const displays = screen.getAllDisplays()
     const target = displays.find((d) => d.id === displayId)
@@ -624,7 +624,9 @@ function createWindow() {
     // the same level the U75 overlay already wins with.
     presentOverlayWin.setAlwaysOnTop(true, 'screen-saver')
     presentOverlayWin.loadURL(
-      `${consoleUrl()}#overlay?mode=${encodeURIComponent(mode)}&size=${Number(size) || 120}`)
+      `${consoleUrl()}#overlay?mode=${encodeURIComponent(mode)}&size=${Number(size) || 120}`
+      // U269: "show what he sees" — opt-in, so it is absent unless asked for.
+      + `&camera=${camera ? 1 : 0}`)
     presentOverlayWin.on('closed', () => {
       presentOverlayWin = null
       presentOverlayState = { ...presentOverlayState, shown: false }

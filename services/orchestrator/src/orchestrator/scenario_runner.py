@@ -62,6 +62,9 @@ class ScenarioRunner:
         # (the line is the thing you most want to read beforehand). Only the
         # two outputs that reach the room — voice and motion — are held back.
         self.rehearsing = False
+        # U269: why the last line was not heard, if it was not. Empty means
+        # the last thing he tried to say actually left the speaker.
+        self.last_speech_error = ""
 
     # -- state ---------------------------------------------------------
 
@@ -87,6 +90,7 @@ class ScenarioRunner:
             # are separate fields now.
             "beats_total": len(self._scenario.beats),
             "rehearsing": self.rehearsing,
+            "speech_error": self.last_speech_error,
             "fired": sorted(self._fired),
             "armed_keywords": [
                 b.trigger_value for b in self._scenario.beats
@@ -178,8 +182,13 @@ class ScenarioRunner:
             return
         try:
             await self._speak(text)
+            self.last_speech_error = ""
         except Exception as exc:  # noqa: BLE001 — the show must go on
             logger.warning("beat %r speech failed: %s", beat_id, exc)
+            # U269: going on is right; going on SILENTLY is not. The console
+            # said "all beats done" while the room heard nothing, and nothing
+            # anywhere said why. The reason now rides along in the status.
+            self.last_speech_error = str(exc) or exc.__class__.__name__
 
     async def _emit(self, event: dict) -> None:
         if self._on_event is not None:
