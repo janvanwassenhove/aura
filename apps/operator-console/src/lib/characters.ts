@@ -35,6 +35,30 @@ const A = (attr: string, values: string, dur: string, extra = '') =>
 const AT = (type: string, values: string, dur: string) =>
   `<animateTransform attributeName="transform" type="${type}" values="${values}" dur="${dur}" repeatCount="indefinite" />`
 
+/** U268: idle is not "off".
+ *
+ * Almost every archetype gated its motion behind `act !== 'idle'`, so a robot
+ * that simply was not talking sat perfectly frozen. Beside a live slideshow on
+ * a projector that does not read as calm, it reads as a window that has hung.
+ * Worse, the two characters that DID try to blink animated `ry` on a
+ * `<circle>` — which has no `ry` — so the default character, the one actually
+ * on screen, had never blinked once. Asked as "the overlay robot should be
+ * animated like eyes rolling/moving, when speaking clear speaking animation".
+ *
+ * The rhythms are per archetype, because that is where the personality lives:
+ * Buddy's gaze roams wide and often, Host works the room, Grump barely moves.
+ */
+const BLINK = (r: number, dur: string) =>
+  A('r', `${r};${r};${r * 0.1};${r}`, dur)
+
+/** A wandering gaze. The whole eye GROUP drifts, so pupils and highlights stay
+ *  together — moving an eye and leaving its highlight behind looks broken, not
+ *  alive. Smaller while speaking: attention is on the room, not the ceiling. */
+const GAZE = (act: CharacterAct, drift: number, dur: string) => {
+  const d = act === 'speak' ? +(drift * 0.35).toFixed(2) : drift
+  return AT('translate', `0 0;${d} 0;0 0;${-d} -0.6;0 0`, dur)
+}
+
 /** Voice bars: only while speaking, so silence looks like silence. */
 const VOICE = (act: CharacterAct, hue: string, y = 58) => act !== 'speak' ? '' :
   [0, 1, 2, 3, 4].map(i =>
@@ -53,12 +77,16 @@ export const CHARACTERS: Record<string, Archetype> = {
     move: { id: 'wave', speed: 1.15, amplitude: 0.8, why: 'bouncy — a quick, big wave' },
     art: (px, act = 'idle') => SVG(px, `<g>${act === 'move' ? AT('rotate', '-4 32 40;4 32 40;-4 32 40', '1.1s') : ''}
       <g stroke="var(--ink)" stroke-width="1.9" stroke-linecap="round"><path d="M18 26 L13 6"></path><path d="M46 26 L52 8"></path></g>
-      <circle cx="13" cy="5" r="2.4" fill="#1f6f46">${act !== 'idle' ? A('r', '2.4;3.6;2.4', '0.9s') : ''}</circle>
-      <circle cx="52.4" cy="7" r="2.4" fill="#1f6f46">${act !== 'idle' ? A('r', '2.4;3.6;2.4', '0.9s', 'begin="0.3s"') : ''}</circle>
+      <circle cx="13" cy="5" r="2.4" fill="#1f6f46">${
+        A('r', '2.4;3.6;2.4', act === 'idle' ? '3.8s' : '0.9s')}</circle>
+      <circle cx="52.4" cy="7" r="2.4" fill="#1f6f46">${
+        A('r', '2.4;3.6;2.4', act === 'idle' ? '3.8s' : '0.9s', 'begin="0.3s"')}</circle>
       <rect x="8" y="21" width="48" height="31" rx="14" fill="var(--surface-2)" stroke="var(--ink)" stroke-width="2.3"></rect>
-      <circle cx="22.5" cy="36" r="8.4" fill="var(--ink)">${A('ry', '8.4;8.4;1;8.4', '5s')}</circle>
-      <circle cx="41.5" cy="36" r="8.4" fill="var(--ink)">${A('ry', '8.4;8.4;1;8.4', '5s')}</circle>
-      <circle cx="25.6" cy="32.6" r="2.4" fill="var(--surface)"></circle><circle cx="44.6" cy="32.6" r="2.4" fill="var(--surface)"></circle>
+      <g>${GAZE(act, 2.2, '6.4s')}
+        <circle cx="22.5" cy="36" r="8.4" fill="var(--ink)">${BLINK(8.4, '5s')}</circle>
+        <circle cx="41.5" cy="36" r="8.4" fill="var(--ink)">${BLINK(8.4, '5s')}</circle>
+        <circle cx="25.6" cy="32.6" r="2.4" fill="var(--surface)"></circle><circle cx="44.6" cy="32.6" r="2.4" fill="var(--surface)"></circle>
+      </g>
     </g>${VOICE(act, '#1f6f46')}`, act === 'idle'),
   },
   sentinel: {
@@ -86,7 +114,10 @@ export const CHARACTERS: Record<string, Archetype> = {
       <rect x="20" y="6" width="24" height="18" rx="3" fill="var(--surface-2)" stroke="var(--ink)" stroke-width="2.2">${act === 'move' ? AT('translate', '0 0;5 0;0 0', '1.6s') : ''}</rect>
       <rect x="20" y="24" width="24" height="16" rx="3" fill="var(--surface-2)" stroke="var(--ink)" stroke-width="2.2"></rect>
       <rect x="20" y="40" width="24" height="18" rx="3" fill="var(--surface-2)" stroke="var(--ink)" stroke-width="2.2">${act === 'move' ? AT('translate', '0 0;-5 0;0 0', '1.6s') : ''}</rect>
-      <rect x="26" y="12" width="12" height="6" rx="1.5" fill="#5a6572">${act === 'speak' ? A('opacity', '0.4;1;0.4', '0.55s') : ''}</rect>
+      <rect x="26" y="12" width="12" height="6" rx="1.5" fill="#5a6572">${act === 'speak'
+        ? A('opacity', '0.4;1;0.4', '0.55s')
+        // U268: deliberate, not dead — a slow ember while he waits.
+        : A('opacity', '0.55;0.9;0.55', '5.5s')}</rect>
       <path d="M26 46h12" stroke="#5a6572" stroke-width="2.4" stroke-linecap="round"></path>
     </g>${VOICE(act, '#5a6572', 62)}`, act === 'idle'),
   },
@@ -98,8 +129,10 @@ export const CHARACTERS: Record<string, Archetype> = {
     hint: 'asks how you are, keeps answers calm and short',
     move: { id: 'nod', speed: 0.6, amplitude: 0.5, why: 'slow, patient — an unhurried nod' },
     art: (px, act = 'idle') => SVG(px, `<ellipse cx="32" cy="34" rx="24" ry="21" fill="var(--surface)" stroke="var(--ink)" stroke-width="2.4">${act !== 'idle' ? A('ry', '21;22.4;21', act === 'move' ? '2s' : '3.2s') + A('rx', '24;23;24', act === 'move' ? '2s' : '3.2s') : ''}</ellipse>
-      <circle cx="23" cy="32" r="3.4" fill="var(--ink)">${A('r', '3.4;3.4;0.6;3.4', '4.5s')}${act === 'speak' ? A('cy', '32;30.6;32', '0.9s') : ''}</circle>
-      <circle cx="41" cy="32" r="3.4" fill="var(--ink)">${A('r', '3.4;3.4;0.6;3.4', '4.5s')}${act === 'speak' ? A('cy', '32;30.6;32', '0.9s') : ''}</circle>
+      <g>${GAZE(act, 1.5, '8.2s')}
+        <circle cx="23" cy="32" r="3.4" fill="var(--ink)">${BLINK(3.4, '4.5s')}${act === 'speak' ? A('cy', '32;30.6;32', '0.9s') : ''}</circle>
+        <circle cx="41" cy="32" r="3.4" fill="var(--ink)">${BLINK(3.4, '4.5s')}${act === 'speak' ? A('cy', '32;30.6;32', '0.9s') : ''}</circle>
+      </g>
       <path d="M26.4 32h11.2" stroke="var(--ink)" stroke-width="2.2" stroke-linecap="round"></path>${VOICE(act, '#3d7fb8', 60)}`, act === 'idle'),
   },
   astro: {
@@ -116,7 +149,8 @@ export const CHARACTERS: Record<string, Archetype> = {
       </g>
       <rect x="14" y="30" width="36" height="26" rx="4" fill="var(--surface)" stroke="var(--ink)" stroke-width="2.2"></rect>
       <path d="M20 38h8M20 46h20" stroke="var(--ink)" stroke-width="1.8" stroke-linecap="round"></path>
-      <circle cx="42" cy="38" r="3" fill="#2f7fd0">${act !== 'idle' ? A('opacity', '0.3;1;0.3', '0.45s') : ''}</circle>
+      <circle cx="42" cy="38" r="3" fill="#2f7fd0">${
+        A('opacity', '0.3;1;0.3', act === 'idle' ? '3.6s' : '0.45s')}</circle>
     </g>${act === 'speak' ? `<g fill="#2f7fd0"><circle cx="52" cy="20" r="1.8">${A('cy', '20;10', '1.2s')}${A('opacity', '1;0', '1.2s')}</circle><circle cx="57" cy="24" r="1.4">${A('cy', '24;14', '1.2s', 'begin="0.4s"')}${A('opacity', '1;0', '1.2s', 'begin="0.4s"')}</circle></g>` : ''}`, act === 'idle'),
   },
   grump: {
@@ -128,7 +162,10 @@ export const CHARACTERS: Record<string, Archetype> = {
     move: { id: 'shake', speed: 0.75, amplitude: 0.4, why: 'reluctant — a small, slow head-shake, then he complies' },
     art: (px, act = 'idle') => SVG(px, `<g>${act !== 'idle' ? AT('translate', '0 0;0 2.5;0 0', act === 'move' ? '2.4s' : '3.4s') : ''}
       <rect x="10" y="18" width="44" height="34" rx="16" fill="var(--surface-2)" stroke="var(--ink)" stroke-width="2.3"></rect>
-      <circle cx="23" cy="34" r="7" fill="var(--ink)"></circle><circle cx="41" cy="34" r="7" fill="var(--ink)"></circle>
+      <g>${GAZE(act, 1.1, '9.5s')}
+        <circle cx="23" cy="34" r="7" fill="var(--ink)">${BLINK(7, '6.5s')}</circle>
+        <circle cx="41" cy="34" r="7" fill="var(--ink)">${BLINK(7, '6.5s')}</circle>
+      </g>
       <path d="M14 27q9 -5 18 0M32 27q9 -5 18 0" stroke="var(--ink)" stroke-width="2.6" stroke-linecap="round">${act === 'speak' ? A('d', 'M14 27q9 -5 18 0M32 27q9 -5 18 0;M14 29q9 -5 18 0M32 29q9 -5 18 0;M14 27q9 -5 18 0M32 27q9 -5 18 0', '2.2s') : ''}</path>
       <path d="M24 46q8 -4 16 0" stroke="#7a6a8f" stroke-width="2.2" stroke-linecap="round"></path>
     </g>${VOICE(act, '#7a6a8f', 60)}`, false),
@@ -141,7 +178,10 @@ export const CHARACTERS: Record<string, Archetype> = {
     hint: 'anticipates the next step and states it',
     move: { id: 'sway', speed: 0.8, amplitude: 0.55, why: 'floating — a smooth, even sway' },
     art: (px, act = 'idle') => SVG(px, `<g>${act === 'move' ? AT('translate', '0 0;0 -3;0 0', '2s') : ''}
-      <ellipse cx="32" cy="56" rx="16" ry="3" fill="#00b3c8" opacity="0.25">${act !== 'idle' ? A('rx', '16;11;16', '2s') : ''}</ellipse>
+      <!-- U268: a hologram that hangs perfectly still is a picture of one.
+           The shadow keeps breathing even when he has nothing to say. -->
+      <ellipse cx="32" cy="56" rx="16" ry="3" fill="#00b3c8" opacity="0.25">${
+        A('rx', '16;11;16', act === 'idle' ? '4.4s' : '2s')}</ellipse>
       <path d="M20 14h24l6 10-6 20H20l-6-20z" fill="var(--surface-2)" stroke="#00b3c8" stroke-width="2.2"></path>
       <path d="M22 26h20" stroke="#00b3c8" stroke-width="3" stroke-linecap="round">${act === 'speak' ? A('opacity', '1;0.25;1', '0.5s') : ''}</path>
       <path d="M25 34h14" stroke="#00b3c8" stroke-width="1.6" stroke-linecap="round" opacity="0.6"></path>
@@ -157,9 +197,11 @@ export const CHARACTERS: Record<string, Archetype> = {
     move: { id: 'dance', speed: 1.2, amplitude: 0.8, why: 'bouncy — the whole dance, big and bright' },
     art: (px, act = 'idle') => SVG(px, `<g>${act === 'move' ? AT('translate', '0 0;0 -4;0 1;0 0', '0.8s') : ''}
       <circle cx="32" cy="34" r="23" fill="#ffd9b8" stroke="var(--ink)" stroke-width="2.4"></circle>
-      <circle cx="24" cy="31" r="6.5" fill="var(--ink)">${A('ry', '6.5;6.5;0.8;6.5', '3.6s')}</circle>
-      <circle cx="40" cy="31" r="6.5" fill="var(--ink)">${A('ry', '6.5;6.5;0.8;6.5', '3.6s')}</circle>
-      <circle cx="26" cy="28.6" r="2.2" fill="#fff"></circle><circle cx="42" cy="28.6" r="2.2" fill="#fff"></circle>
+      <g>${GAZE(act, 2.8, '4.4s')}
+        <circle cx="24" cy="31" r="6.5" fill="var(--ink)">${BLINK(6.5, '3.6s')}</circle>
+        <circle cx="40" cy="31" r="6.5" fill="var(--ink)">${BLINK(6.5, '3.6s')}</circle>
+        <circle cx="26" cy="28.6" r="2.2" fill="#fff"></circle><circle cx="42" cy="28.6" r="2.2" fill="#fff"></circle>
+      </g>
       <path d="M25 43q7 ${act === 'speak' ? 8 : 5} 14 0" stroke="var(--ink)" stroke-width="2.4" stroke-linecap="round" fill="none">${act === 'speak' ? A('d', 'M25 43q7 8 14 0;M25 43q7 3 14 0;M25 43q7 8 14 0', '0.6s') : ''}</path>
       <circle cx="12" cy="34" r="4" fill="#e07b39"></circle><circle cx="52" cy="34" r="4" fill="#e07b39"></circle>
     </g>${VOICE(act, '#e07b39', 62)}`, act === 'idle'),
@@ -173,7 +215,10 @@ export const CHARACTERS: Record<string, Archetype> = {
     move: { id: 'bow', speed: 1.0, amplitude: 1.0, why: 'theatrical — the full bow, arms wide' },
     art: (px, act = 'idle') => SVG(px, `<g>${act === 'move' ? AT('rotate', '-6 32 48;6 32 48;-6 32 48', '1.5s') : ''}
       <rect x="12" y="18" width="40" height="28" rx="8" fill="var(--surface-2)" stroke="var(--ink)" stroke-width="2.3"></rect>
-      <circle cx="24" cy="31" r="5.4" fill="var(--ink)"></circle><circle cx="40" cy="31" r="5.4" fill="var(--ink)"></circle>
+      <g>${GAZE(act, 2.9, '5.2s')}
+        <circle cx="24" cy="31" r="5.4" fill="var(--ink)">${BLINK(5.4, '4.2s')}</circle>
+        <circle cx="40" cy="31" r="5.4" fill="var(--ink)">${BLINK(5.4, '4.2s')}</circle>
+      </g>
       <path d="M22 40h20" stroke="#6d4fa1" stroke-width="2.6" stroke-linecap="round">${act === 'speak' ? A('d', 'M22 40h20;M26 40h12;M22 40h20', '0.5s') : ''}</path>
       <path d="M20 18l-6-8M44 18l6-8" stroke="var(--ink)" stroke-width="2" stroke-linecap="round"></path>
       <path d="M18 50q14 8 28 0" stroke="#6d4fa1" stroke-width="2.4" stroke-linecap="round" fill="none"></path>
@@ -191,7 +236,11 @@ export const CHARACTERS: Record<string, Archetype> = {
       <ellipse cx="32" cy="32" rx="21" ry="25" fill="var(--surface)" stroke="var(--ink)" stroke-width="2.3"></ellipse>
       <path d="M18 27q14 -8 28 0v6q-14 6 -28 0z" fill="#1a2430"></path>
       <path d="M24 30l4 3M40 30l-4 3" stroke="#4aa3c7" stroke-width="2.4" stroke-linecap="round">${act === 'speak' ? A('opacity', '1;0.35;1', '0.8s') : ''}</path>
-      ${act !== 'idle' ? `<rect x="16" y="27" width="7" height="10" fill="#4aa3c7" opacity="0.25">${A('x', '16;41;16', '2.8s')}</rect>` : ''}
+      <!-- U268: "watches before it speaks" is this one's whole character, so
+           the scan is exactly what it should be doing when it is NOT talking.
+           It used to stop the moment he fell silent. -->
+      <rect x="16" y="27" width="7" height="10" fill="#4aa3c7" opacity="0.25">${
+        A('x', '16;41;16', act === 'idle' ? '5.2s' : '2.8s')}</rect>
     </g>${VOICE(act, '#4aa3c7', 62)}`, act === 'idle'),
   },
 }
