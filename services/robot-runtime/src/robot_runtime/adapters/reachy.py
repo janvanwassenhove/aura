@@ -72,6 +72,9 @@ class ReachyRobotAdapter(RobotAdapter):
         media_backend: str | None = None,
     ) -> None:
         self._host = host or os.environ.get("REACHY_HOST", "localhost")
+        # U270: does this robot have a battery? Asked once — the wireless flag
+        # cannot change under a running daemon, and status is polled forever.
+        self._has_battery: bool | None = None
         self._connection_mode = connection_mode or os.environ.get(
             "REACHY_CONNECTION", "auto"
         )
@@ -656,11 +659,53 @@ class ReachyRobotAdapter(RobotAdapter):
             return None
         return bool(getattr(target, "detected", False))
 
+    def _read_hardware(self) -> tuple[bool | None, float | None]:
+        """(has_battery, battery_pct) as the DAEMON reports them.
+
+        U270: this used to be `battery_pct=100.0` with the note "SDK exposes
+        no battery reading yet" — an invented full battery, printed as fact in
+        the setup wizard. Asking the daemon directly settles both halves of
+        the owner's question ("indien versie met batterij"):
+
+          * ``wireless_version`` tells us whether there IS a battery. The
+            wired version has none, and a battery meter on a robot that runs
+            off the wall is noise.
+          * A charge reading does NOT exist. Firmware 1.9.0 answers 93 routes
+            and not one of them mentions battery, power or charge; even
+            ``/api/state/full`` carries pose and nothing else. So the level
+            stays None — "nobody has told us" — until a firmware does, and
+            this function starts returning it without anything else changing.
+
+        Cached: the wireless flag cannot change under a running daemon, and
+        status is polled continuously.
+        """
+        if self._has_battery is not None:
+            return self._has_battery, None
+        import json
+        import urllib.request
+
+        try:
+            with urllib.request.urlopen(
+                f"http://{self._host}:8000/api/daemon/status", timeout=2.0
+            ) as resp:
+                data = json.loads(resp.read())
+        except Exception as exc:  # noqa: BLE001 — diagnostics never break status
+            logger.debug("daemon status unavailable: %s", exc)
+            return None, None
+        wireless = data.get("wireless_version")
+        self._has_battery = bool(wireless) if wireless is not None else None
+        # If a future firmware grows a reading, it lands here and the whole
+        # chain — schema, API, console — already carries it.
+        level = data.get("battery_pct", data.get("battery_level"))
+        return self._has_battery, float(level) if isinstance(level, int | float) else None
+
     async def get_status(self) -> RobotState:
+        has_battery, battery_pct = await asyncio.to_thread(self._read_hardware)
         return RobotState(
             mode=self._mode,
             behavior_state=self._behavior_state,
-            battery_pct=100.0,  # SDK exposes no battery reading yet
+            battery_pct=battery_pct,
+            has_battery=has_battery,
             connected=self._mini is not None,
             adapter_name="reachy",
             tracking=self._tracking_on,  # U126: is follow-me actually on?

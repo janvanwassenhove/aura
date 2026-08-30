@@ -26,7 +26,18 @@ class BehaviorState(StrEnum):
 class RobotState(BaseModel):
     mode: RobotMode = RobotMode.OFFLINE
     behavior_state: BehaviorState = BehaviorState.IDLE
-    battery_pct: float = 100.0
+    # U270: None = nobody has told us. It used to default to 100.0, and the
+    # Reachy adapter hard-coded 100.0 with the note "SDK exposes no battery
+    # reading yet" — so the setup wizard cheerfully printed "battery 100%"
+    # about a robot whose charge nothing had ever measured. A full battery is
+    # the single most reassuring thing a status line can say, which makes it
+    # the worst thing to invent. Asked as "kunnen we batterij status
+    # toevoegen (indien versie met batterij)".
+    battery_pct: float | None = None
+    # Does this robot HAVE a battery? True on the wireless version, False when
+    # it runs off the wire, None when we could not find out. The three cases
+    # need three different things on screen, so they stay three values.
+    has_battery: bool | None = None
     connected: bool = False
     adapter_name: str = "unknown"
     tracking: bool = False  # U126: follow-me head tracking currently active?

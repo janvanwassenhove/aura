@@ -88,6 +88,9 @@ class FakeRobotAdapter(RobotAdapter):
             mode=self._mode,
             behavior_state=self._behavior_state,
             battery_pct=self._battery_pct,
+            # U270: a fake robot may honestly claim a fake battery — it is a
+            # simulation and says so. Only the REAL adapter was inventing one.
+            has_battery=True,
             connected=self._connected,
             adapter_name=self._adapter_name,
         )

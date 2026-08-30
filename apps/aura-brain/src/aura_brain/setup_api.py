@@ -202,8 +202,12 @@ async def _probe_robot(url: str, timeout: float = 2.5) -> dict:
             resp = await client.get(f"{url}/robot/status")
             resp.raise_for_status()
             data = resp.json()
+        # U270: battery_pct is None until a firmware actually measures it —
+        # the wizard used to print "battery 100%" about a robot nothing had
+        # ever asked. has_battery says whether there is one to ask about.
         return {"url": url, "ok": True, "mode": data.get("mode"),
-                "battery_pct": data.get("battery_pct")}
+                "battery_pct": data.get("battery_pct"),
+                "has_battery": data.get("has_battery")}
     except Exception as exc:  # noqa: BLE001 — probe reports, never raises
         return {"url": url, "ok": False, "error": type(exc).__name__}
 

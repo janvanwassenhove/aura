@@ -35,6 +35,24 @@ export const useRobotStore = defineStore('robot', () => {
   // same either way, which is what made "follow-me doesn't work" so hard to
   // pin down. null = unknown / not following.
   const faceVisible = ref<boolean | null>(null)
+
+  // ── U270: battery, in the three states it can actually be in ─────────────
+  // Asked as "kunnen we batterij status toevoegen (indien versie met
+  // batterij)". The "indien" is the whole problem: the Reachy adapter used to
+  // hard-code 100.0 with the comment "SDK exposes no battery reading yet", so
+  // the setup wizard printed "battery 100%" about a charge nothing had ever
+  // measured. A full battery is the most reassuring thing a status line can
+  // say, which makes it the worst thing to invent.
+  const batteryPct = ref<number | null>(null)     // null = nobody measured it
+  const hasBattery = ref<boolean | null>(null)    // null = we don't know
+
+  /** One line that is true in every case, including the ones with no number. */
+  const batteryLine = computed(() => {
+    if (batteryPct.value != null) return `${Math.round(batteryPct.value)}%`
+    if (hasBattery.value === false) return 'mains powered — no battery'
+    if (hasBattery.value === true) return 'battery fitted · level not reported by this firmware'
+    return 'unknown'
+  })
   // U175: bumped on every WebSocket (re)connect. An MJPEG <img> that loses
   // its server (brain restart, update) stalls SILENTLY — no error event, no
   // retry — so the camera looked dead until a full page reload. Watchers on
@@ -113,10 +131,19 @@ export const useRobotStore = defineStore('robot', () => {
   // missed if the robot connected before the console opened or during a network
   // blip, leaving the title bar wrongly "offline" while the camera streams fine.
   function syncFromStatus(
-    s: { connected?: boolean; mode?: string; tracking?: boolean; face_visible?: boolean | null } | null,
+    s: {
+      connected?: boolean; mode?: string; tracking?: boolean
+      face_visible?: boolean | null
+      /** U270: null = nobody measured it. It is NOT 100. */
+      battery_pct?: number | null
+      /** U270: does this robot even have one? The wired version does not. */
+      has_battery?: boolean | null
+    } | null,
   ): void {
     if (!s) return
     connected.value = s.connected === true
+    batteryPct.value = typeof s.battery_pct === 'number' ? s.battery_pct : null
+    hasBattery.value = typeof s.has_battery === 'boolean' ? s.has_battery : null
     if (s.mode) mode.value = s.mode
     // U162: the robot is the source of truth — a motion or the follow-me
     // watchdog can change tracking without the console asking.
@@ -157,5 +184,5 @@ export const useRobotStore = defineStore('robot', () => {
     wsGeneration.value = 0
   }
 
-  return { mode, behaviorState, isSpeaking, currentTranscript, uptime, connected, motionLog, lastRecognized, tracking, faceVisible, wsGeneration, noteWsOpen, statusBadgeClass, applyEvent, syncFromStatus, setTracking, $reset }
+  return { batteryPct, hasBattery, batteryLine, mode, behaviorState, isSpeaking, currentTranscript, uptime, connected, motionLog, lastRecognized, tracking, faceVisible, wsGeneration, noteWsOpen, statusBadgeClass, applyEvent, syncFromStatus, setTracking, $reset }
 })

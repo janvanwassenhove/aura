@@ -101,7 +101,7 @@
               <h2 class="w-h2">Found on your network</h2>
               <button v-for="f in okRobots" :key="f.url" class="found-row" :class="{ chosen: robotUrl === f.url }" @click="robotUrl = f.url">
                 <span class="mono found-url">{{ f.url }}</span>
-                <span class="found-meta">{{ f.mode ?? 'idle' }}{{ f.battery_pct != null ? ` · battery ${f.battery_pct}%` : '' }}</span>
+                <span class="found-meta">{{ f.mode ?? 'idle' }}{{ batteryNote(f) }}</span>
               </button>
             </template>
 
@@ -124,9 +124,9 @@
                 <button class="w-secondary" :disabled="testingRobot" @click="doTestRobot">{{ testingRobot ? 'Testing…' : 'Test' }}</button>
               </div>
               <p v-if="robotResult" class="w-result" :class="{ ok: robotResult.ok }">
-                {{ robotResult.ok ? `Connected — ${robotResult.mode ?? 'idle'}${robotResult.battery_pct != null ? ` (battery ${robotResult.battery_pct}%)` : ''}` : `Not reachable (${robotResult.error})` }}
+                {{ robotResult.ok ? `Connected — ${robotResult.mode ?? 'idle'}${batteryNote(robotResult)}` : `Not reachable (${robotResult.error})` }}
               </p>
-              <p v-else class="w-hint">A successful test reports the robot's mode and battery level.</p>
+              <p v-else class="w-hint">A successful test reports the robot's mode, and its battery if the firmware measures one.</p>
             </template>
 
             <!-- Continuing without a robot is a real choice, sized like one -->
@@ -315,6 +315,19 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+
+/** U270: what to say about the battery, which is usually nothing.
+ *
+ *  This used to print " · battery 100%" whenever a number came back — and a
+ *  number ALWAYS came back, because the Reachy adapter hard-coded 100.0 next
+ *  to the comment "SDK exposes no battery reading yet". So the very first
+ *  thing a new owner read about their robot was an invented full charge.
+ *  Now: a number only when something measured one, and silence otherwise —
+ *  a first-run screen is not the place to explain a firmware limitation.
+ */
+function batteryNote(r: { battery_pct?: number | null }): string {
+  return typeof r?.battery_pct === 'number' ? ` · battery ${Math.round(r.battery_pct)}%` : ''
+}
 import {
   Bot, Check, CircleStop, Copy, Info, Laptop, LoaderCircle, MessageCircle, Search, Shield,
   Sparkles, TriangleAlert, Users,

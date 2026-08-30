@@ -232,6 +232,16 @@
             <div class="conn-k">Following</div>
             <div class="conn-v">{{ robot.tracking ? (robot.faceVisible ? 'a face' : 'nothing to follow') : 'off' }}</div>
           </div>
+          <!-- U270: three states, three sentences — a number when one was
+               measured, "no battery" for the wired version, and the honest
+               "the firmware does not report it" for the wireless one, which
+               is what it says today. Never an invented 100%. -->
+          <div class="conn-fact">
+            <div class="conn-k">Power</div>
+            <div class="conn-v" :class="{ low: robot.batteryPct != null && robot.batteryPct <= 20 }">
+              {{ robot.batteryLine }}
+            </div>
+          </div>
         </div>
         <div class="conn-edit">
           <input v-model="robotAddr" class="d2-field mono conn-addr" placeholder="http://192.168.1.42:8001 · or reachy.local"
@@ -789,6 +799,9 @@ onUnmounted(() => clearInterval(statusTimer))
 .conn-fact { min-width: 140px; }
 .conn-k { font-size: 11.5px; color: var(--ink-3); }
 .conn-v { font-size: 13.5px; font-weight: 600; }
+/* U270: a real, low reading is the one case worth shouting about. The
+   "not reported" case stays quiet — it is a fact, not an alarm. */
+.conn-v.low { color: var(--danger, #e5484d); }
 .conn-edit { display: flex; gap: 8px; flex-wrap: wrap; }
 .conn-addr { flex: 1; min-width: 220px; width: auto; }
 .conn-found { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
