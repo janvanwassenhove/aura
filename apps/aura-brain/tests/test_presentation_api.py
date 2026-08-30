@@ -58,6 +58,19 @@ def client(monkeypatch):
         return f"[improv: {topic}]"
     monkeypatch.setattr(presentation_api, "_generate", fake_generate)
 
+    # U283: and deterministic SPEECH. U269 made _speak synthesize for real and
+    # raise when it cannot — correct behaviour, but it turned these tests into
+    # tests of whether the machine running them happens to hold an OPENAI_API
+    # _KEY. On the author's laptop it did, so the suite passed (while quietly
+    # making real TTS calls); on CI it did not, so three tests failed and every
+    # push since U269 was red — which is why no release had been built for six
+    # hours. A test that needs an ambient credential is not a test.
+    from aura_brain import voice
+
+    async def fake_tts(text, voice_id=None, speed=1.0):
+        return "AAAA"          # stand-in base64 PCM; no network, no cost
+    monkeypatch.setattr(voice, "synthesize_b64", fake_tts)
+
     app = FastAPI()
     app.include_router(presentation_api.router)
     yield TestClient(app), robot, bus
