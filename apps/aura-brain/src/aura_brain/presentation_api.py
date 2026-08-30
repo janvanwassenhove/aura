@@ -220,6 +220,39 @@ async def next_beat() -> JSONResponse:
     })
 
 
+@router.post("/rehearse")
+async def set_rehearsing(body: dict) -> JSONResponse:
+    """U267: rehearsal, which up to now existed only as a label in the browser.
+
+    The console's Rehearse button promised "beats fire, but nothing is sent"
+    while the robot said every line out loud — nothing here had ever heard of
+    rehearsal. Now it does: beats fire and emit exactly as in the real show,
+    and only the two outputs that reach the room, voice and motion, are held.
+    """
+    if _runner is None:
+        return JSONResponse({"error": "no presentation loaded"}, status_code=409)
+    _runner.rehearsing = bool((body or {}).get("on", False))
+    return JSONResponse(_status_payload())
+
+
+@router.get("/scenario")
+async def active_scenario() -> JSONResponse:
+    """The scenario that is loaded, so it can be EDITED rather than retyped.
+
+    U267: "New scenario" opened an empty builder and there was no other way
+    in, so changing one line of a loaded talk meant typing the whole thing
+    again — asked as "how to edit presentation".
+    """
+    if _runner is None:
+        return JSONResponse({"error": "no presentation loaded"}, status_code=409)
+    scenario = getattr(_runner, "_scenario", None)
+    if scenario is None:
+        return JSONResponse({"error": "no presentation loaded"}, status_code=409)
+    # Same shape the saved-scenario endpoint hands back, so the builder has
+    # exactly one thing to load.
+    return JSONResponse({"scenario": scenario.model_dump(mode="json", exclude_none=True)})
+
+
 @router.post("/speech")
 async def push_speech(body: dict) -> JSONResponse:
     if _runner is None:

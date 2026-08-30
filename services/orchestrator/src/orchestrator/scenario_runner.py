@@ -50,6 +50,18 @@ class ScenarioRunner:
         self._manual_pos = 0
         self._current_slide: int | None = None
         self._fired: set[str] = set()      # beat ids that have run (once-guard)
+        # U267: rehearsal — walk the whole show with the robot MUTE.
+        #
+        # The console has had a "Rehearse" button since D2, and it promised
+        # "beats fire, but nothing is sent". Nothing of the sort existed here:
+        # the flag lived in the browser, changed a label, and the robot spoke
+        # every line out loud anyway. Asked as "not clear what rehearsal is
+        # doing" — because it was doing nothing.
+        #
+        # Beats still fire, still emit, still generate their improvised lines
+        # (the line is the thing you most want to read beforehand). Only the
+        # two outputs that reach the room — voice and motion — are held back.
+        self.rehearsing = False
 
     # -- state ---------------------------------------------------------
 
@@ -68,6 +80,13 @@ class ScenarioRunner:
             "current_slide": self._current_slide,
             "manual_pos": self._manual_pos,
             "manual_total": len(self._manual_order),
+            # U267: the console counted "beat N of M" from manual_pos/manual_total,
+            # which only ever described the HAND-ADVANCED beats. One manual beat
+            # in a scenario, fire it, and the HUD read "beat 2 of 1". The whole
+            # show's size and how much of it has run are separate facts, so they
+            # are separate fields now.
+            "beats_total": len(self._scenario.beats),
+            "rehearsing": self.rehearsing,
             "fired": sorted(self._fired),
             "armed_keywords": [
                 b.trigger_value for b in self._scenario.beats
@@ -127,15 +146,7 @@ class ScenarioRunner:
             pass
         elif beat.mode == "speak":
             spoken = beat.text
-            # U265: NEVER let a failed speaker eat beat_done. The subtitle
-            # event is derived from beat_done, and subtitles are exactly what
-            # saves the talk when the robot's audio fails — losing them at
-            # that moment is losing both channels at once. Found live: a beat
-            # showed as fired while no PresentationBeatFired ever went out.
-            try:
-                await self._speak(beat.text)
-            except Exception as exc:  # noqa: BLE001 — the show must go on
-                logger.warning("beat %r speech failed: %s", beat.id, exc)
+            await self._say(beat.id, beat.text)
         else:  # improvise or chime_in
             try:
                 spoken = (await self._generate(beat.topic, beat.guardrails, beat.engine)) or ""
@@ -143,18 +154,32 @@ class ScenarioRunner:
                 logger.warning("beat %r generation failed: %s", beat.id, exc)
                 spoken = ""
             if spoken:
-                try:
-                    await self._speak(spoken)
-                except Exception as exc:  # noqa: BLE001 — same rule as above
-                    logger.warning("beat %r speech failed: %s", beat.id, exc)
+                await self._say(beat.id, spoken)
 
-        if beat.gesture and self._gesture is not None and beat.mode != "silent":
+        if beat.gesture and self._gesture is not None and beat.mode != "silent" \
+                and not self.rehearsing:
             try:
                 await self._gesture(beat.gesture)
             except Exception as exc:  # noqa: BLE001
                 logger.debug("gesture %r failed: %s", beat.gesture, exc)
 
         await self._emit({"type": "beat_done", "beat": beat.id, "spoken": spoken})
+
+    async def _say(self, beat_id: str, text: str) -> None:
+        """Speak a line — unless this is a rehearsal, when the room hears nothing.
+
+        U265: NEVER let a failed speaker eat beat_done. The subtitle event is
+        derived from beat_done, and subtitles are exactly what saves the talk
+        when the robot's audio fails — losing them at that moment is losing
+        both channels at once. Found live: a beat showed as fired while no
+        PresentationBeatFired ever went out.
+        """
+        if self.rehearsing:
+            return
+        try:
+            await self._speak(text)
+        except Exception as exc:  # noqa: BLE001 — the show must go on
+            logger.warning("beat %r speech failed: %s", beat_id, exc)
 
     async def _emit(self, event: dict) -> None:
         if self._on_event is not None:

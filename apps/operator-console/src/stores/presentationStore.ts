@@ -13,6 +13,12 @@ export interface PresentationStatus {
   current_slide?: number | null
   manual_pos?: number
   manual_total?: number
+  /** U267: the size of the WHOLE scenario. `manual_total` counts only the
+   *  hand-advanced beats, and using it as the denominator produced "beat 2
+   *  of 1" the moment a single manual beat had fired. */
+  beats_total?: number
+  /** U267: the brain is mute for voice and motion while this is true. */
+  rehearsing?: boolean
   fired?: string[]
   armed_keywords?: string[]
   /** U263: `watching` means a watcher is running; `slides_state` says whether
@@ -82,6 +88,30 @@ export const usePresentationStore = defineStore('presentation', () => {
     } finally { busy.value = false }
   }
 
+  /** U267: rehearsal now reaches the brain, which is the only thing that can
+   *  actually keep the robot quiet. */
+  async function setRehearsing(on: boolean): Promise<void> {
+    try {
+      const r = await fetch(`${BRAIN_URL}/presentation/rehearse`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ on }),
+      })
+      const body = await r.json().catch(() => null)
+      if (r.ok && body) status.value = body
+      else error.value = body?.error ?? 'Could not switch rehearsal.'
+    } catch { error.value = 'The brain did not respond.' }
+  }
+
+  /** U267: the scenario that is loaded, so the builder can EDIT it instead of
+   *  making you retype a talk to change one line. */
+  async function fetchScenario(): Promise<Record<string, unknown> | null> {
+    try {
+      const r = await fetch(`${BRAIN_URL}/presentation/scenario`)
+      if (!r.ok) return null
+      return (await r.json()).scenario ?? null
+    } catch { return null }
+  }
+
   async function next(): Promise<void> {
     busy.value = true
     try {
@@ -113,5 +143,6 @@ export const usePresentationStore = defineStore('presentation', () => {
   }
 
   return { status, subtitle, lastBeat, lastMode, busy, error,
-           applyEvent, fetchStatus, start, startScenario, next, pushSpeech, stop }
+           applyEvent, fetchStatus, start, startScenario, next, pushSpeech, stop,
+           setRehearsing, fetchScenario }
 })

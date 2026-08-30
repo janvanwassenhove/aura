@@ -148,3 +148,70 @@ async def test_a_dead_speaker_never_eats_beat_done() -> None:
     done = [e for e in events if e.get("type") == "beat_done"]
     assert done, "beat_done must still be emitted when the speaker fails"
     assert done[0]["spoken"] == "Hallo zaal", "the subtitle text must survive"
+
+
+# --------------------------------------------------------------------------- #
+# U267: rehearsal — the whole show, with the robot mute
+# --------------------------------------------------------------------------- #
+
+async def test_rehearsal_fires_every_beat_but_the_room_hears_nothing() -> None:
+    """The console has had a Rehearse button since D2 promising "beats fire,
+    but nothing is sent". Nothing here had ever heard of rehearsal: the flag
+    lived in the browser, changed a label, and the robot said every line out
+    loud. Asked as "not clear what rehearsal is doing" — because it wasn't.
+    """
+    rig = _Rig()
+    r = rig.runner(Scenario(beats=[
+        Beat(id="a", trigger="manual", mode="speak", text="one", gesture="wave"),
+        Beat(id="s", trigger="slide:4", mode="improvise", topic="robots"),
+    ]))
+    r.rehearsing = True
+
+    assert (await r.next()).id == "a"
+    assert [b.id for b in await r.on_slide(4)] == ["s"]
+
+    # Nothing reached the room...
+    assert rig.said == []
+    assert rig.gestured == []
+    # ...but the show ran in full, and every line is readable on the console:
+    # a rehearsal you cannot read is just a silence.
+    assert r.status()["fired"] == ["a", "s"]
+    done = {e["beat"]: e["spoken"] for e in rig.events if e["type"] == "beat_done"}
+    assert done["a"] == "one"
+    assert done["s"] == "[about robots]"
+
+
+async def test_leaving_rehearsal_gives_him_his_voice_back() -> None:
+    rig = _Rig()
+    r = rig.runner(Scenario(beats=[
+        Beat(id="a", trigger="manual", mode="speak", text="one", gesture="wave"),
+        Beat(id="b", trigger="manual", mode="speak", text="two", gesture="nod"),
+    ]))
+    r.rehearsing = True
+    await r.next()
+    r.rehearsing = False
+    await r.next()
+
+    assert rig.said == ["two"]
+    assert rig.gestured == ["nod"]
+
+
+async def test_status_counts_the_whole_show_not_just_the_manual_beats() -> None:
+    """"beat 2 of 1": the console read its position out of manual_pos and its
+    total out of manual_total, which describe only the hand-advanced beats.
+    Fire the one manual beat in a scenario and the counter walked past its own
+    end. The size of the show is a separate fact and is reported separately.
+    """
+    rig = _Rig()
+    r = rig.runner(Scenario(beats=[
+        Beat(id="a", trigger="manual", mode="speak", text="one"),
+        Beat(id="s1", trigger="slide:2", mode="speak", text="two"),
+        Beat(id="s2", trigger="slide:3", mode="speak", text="three"),
+    ]))
+    assert r.status()["manual_total"] == 1
+    assert r.status()["beats_total"] == 3
+
+    await r.next()
+    st = r.status()
+    assert st["manual_pos"] == 1 and st["manual_total"] == 1   # the old numbers
+    assert len(st["fired"]) == 1 and st["beats_total"] == 3    # the honest ones

@@ -47,9 +47,9 @@
           <span class="sb-lbl">When</span>
           <select v-model="b._tkind" class="sb-input sb-tkind" :disabled="b.mode === 'chime_in'"
                   @change="syncTrigger(b)">
-            <option value="manual">I press Next</option>
-            <option value="slide">a slide shows</option>
-            <option value="keyword">I say a word</option>
+            <option value="manual">I press Next (nothing happens on its own)</option>
+            <option value="slide">I reach a slide (fires by itself)</option>
+            <option value="keyword">I say a word (fires by itself)</option>
           </select>
           <input v-if="b._tkind === 'slide'" v-model.number="b._tslide" type="number" min="1"
                  class="sb-input sb-tnum" placeholder="slide #" @input="syncTrigger(b)" />
@@ -169,27 +169,33 @@ async function fetchSaved() {
   } catch { /* offline: no saved list */ }
 }
 
+/** Fill the form from a scenario object — from a saved file, or (U267) from
+ *  the one that is currently loaded, so it can be edited rather than retyped. */
+function loadScenario(sc: Record<string, unknown>, name = '') {
+  if (!sc) return
+  title.value = String(sc.title ?? '')
+  pptx.value = String(sc.pptx ?? '')   // U263b: reloading a scenario keeps its deck
+  if (name) saveName.value = name
+  beats.value = ((sc.beats as Record<string, unknown>[]) ?? []).map((b) => {
+    const trig = String(b.trigger ?? 'manual')
+    const kind = trig.split(':')[0]
+    return {
+      _k: seq++, id: String(b.id ?? ''), mode: String(b.mode ?? 'speak'),
+      _tkind: kind, _tslide: kind === 'slide' ? Number(trig.split(':')[1]) : 1,
+      _tword: kind === 'keyword' ? trig.split(':').slice(1).join(':') : '',
+      trigger: trig, text: String(b.text ?? ''), topic: String(b.topic ?? ''),
+      guardrails: String(b.guardrails ?? ''), gesture: (b.gesture as string) ?? null,
+      engine: String(b.engine ?? ''),
+    }
+  })
+}
+
 async function load(name: string) {
   try {
     const r = await fetch(`${BRAIN_URL}/presentation/scenarios/${name}`)
     if (!r.ok) return
     const sc = (await r.json()).scenario
-    if (!sc) return
-    title.value = sc.title ?? ''
-    pptx.value = sc.pptx ?? ''      // U263b: reloading a scenario keeps its deck
-    saveName.value = name
-    beats.value = (sc.beats ?? []).map((b: Record<string, unknown>) => {
-      const trig = String(b.trigger ?? 'manual')
-      const kind = trig.split(':')[0]
-      return {
-        _k: seq++, id: String(b.id ?? ''), mode: String(b.mode ?? 'speak'),
-        _tkind: kind, _tslide: kind === 'slide' ? Number(trig.split(':')[1]) : 1,
-        _tword: kind === 'keyword' ? trig.split(':').slice(1).join(':') : '',
-        trigger: trig, text: String(b.text ?? ''), topic: String(b.topic ?? ''),
-        guardrails: String(b.guardrails ?? ''), gesture: (b.gesture as string) ?? null,
-        engine: String(b.engine ?? ''),
-      }
-    })
+    if (sc) loadScenario(sc, name)
   } catch { /* ignore */ }
 }
 
@@ -222,7 +228,7 @@ function slug(s: string): string {
 }
 
 onMounted(() => { fetchSaved(); if (!beats.value.length) addBeat() })
-defineExpose({ setError: (m: string) => { error.value = m } })
+defineExpose({ setError: (m: string) => { error.value = m }, loadScenario })
 </script>
 
 <style scoped>

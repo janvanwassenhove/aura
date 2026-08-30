@@ -195,3 +195,64 @@ async def test_non_pipeline_beat_uses_the_plain_llm(monkeypatch) -> None:
     out = await pa._generate("de toekomst", "", "")
     assert out == "Een vlotte zin."
     assert called["pipeline"] is False
+
+
+# --------------------------------------------------------------------------- #
+# U267: rehearsal, and editing what is loaded
+# --------------------------------------------------------------------------- #
+
+def test_rehearsal_runs_the_show_without_the_robot_saying_anything(client) -> None:
+    """The Rehearse button promised "beats fire, but nothing is sent" while the
+    robot said every line out loud — nothing behind the API had ever heard of
+    rehearsal. Asked as "not clear what rehearsal is doing"."""
+    c, robot, _ = client
+    c.post("/presentation/scenario", json={"yaml": SCENARIO_YAML})
+
+    assert c.post("/presentation/rehearse", json={"on": True}).json()["rehearsing"] is True
+    c.post("/presentation/next")                       # the "outro" manual beat
+
+    assert robot.said == []                            # the room heard nothing
+    assert robot.motions == []
+    assert c.get("/presentation/status").json()["fired"] == ["outro"]   # it ran
+
+
+def test_leaving_rehearsal_gives_him_his_voice_back(client) -> None:
+    c, robot, _ = client
+    c.post("/presentation/scenario", json={"yaml": SCENARIO_YAML})
+    c.post("/presentation/rehearse", json={"on": True})
+    assert c.post("/presentation/rehearse", json={"on": False}).json()["rehearsing"] is False
+
+    c.post("/presentation/next")
+    assert robot.said == ["Tot slot."]
+
+
+def test_rehearse_without_a_presentation_says_so(client) -> None:
+    c, _, _ = client
+    assert c.post("/presentation/rehearse", json={"on": True}).status_code == 409
+
+
+def test_the_loaded_scenario_can_be_read_back_for_editing(client) -> None:
+    """U267: "New scenario" opened an EMPTY builder and was the only door in,
+    so changing one line of a loaded talk meant retyping the whole thing."""
+    c, _, _ = client
+    assert c.get("/presentation/scenario").status_code == 409      # nothing loaded
+
+    c.post("/presentation/scenario", json={"yaml": SCENARIO_YAML})
+    sc = c.get("/presentation/scenario").json()["scenario"]
+
+    assert sc["title"] == "Demo"
+    assert sc["pptx"] == "demo.pptx"
+    # The triggers come back in the STRING shape the builder writes and reads,
+    # so a round trip through the form changes nothing it did not mean to.
+    assert [b["trigger"] for b in sc["beats"]] == ["slide:1", "keyword:agents", "manual"]
+    assert sc["beats"][0]["gesture"] == "wave"
+
+
+def test_status_reports_the_size_of_the_whole_show(client) -> None:
+    """"beat 2 of 1" — the console's denominator was manual_total, which counts
+    only the hand-advanced beats."""
+    c, _, _ = client
+    c.post("/presentation/scenario", json={"yaml": SCENARIO_YAML})
+    st = c.get("/presentation/status").json()
+    assert st["manual_total"] == 1        # one manual beat...
+    assert st["beats_total"] == 3         # ...in a show of three

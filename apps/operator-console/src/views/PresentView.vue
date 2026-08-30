@@ -48,16 +48,23 @@
             <div class="run-title">{{ presenting ? `Presenting — ${presentation.status.title ?? 'scenario'}` : (presentation.status.title ?? 'No scenario loaded') }}</div>
             <div class="run-sub">
               <template v-if="presenting">
-                {{ presenter.rehearsing
-                  ? `Rehearsal: beat ${presenter.beatIdx + 1} of ${presenter.total || '?'} — beats fire, but nothing is sent.`
-                  : `Beat ${presenter.beatIdx + 1} of ${presenter.total || '?'}${armedNote}` }}
+                {{ progressLine }}{{ presenter.rehearsing ? '' : armedNote }}
               </template>
               <template v-else>
                 Running a scenario switches him to Present mode and locks mail, dev tools and screen control.
               </template>
             </div>
           </div>
-          <button v-if="presenting" class="d2-ghost-btn" @click="presenter.rehearsing = !presenter.rehearsing">
+          <!-- U267: editing what is loaded. "New scenario" opened an EMPTY
+               builder and was the only way in, so changing one line meant
+               typing the whole talk again. -->
+          <button v-if="presentation.status.title && !builderOpen" class="d2-ghost-btn"
+                  title="Open this scenario in the builder" @click="editScenario">Edit</button>
+          <button v-if="presenting" class="d2-ghost-btn"
+                  :title="presenter.rehearsing
+                    ? 'Back to the real thing — he speaks and moves again'
+                    : 'Walk the whole show with the robot muted: beats fire and you see every line, but nothing is spoken and nothing moves'"
+                  @click="toggleRehearsal">
             {{ presenter.rehearsing ? 'Stop rehearsal' : 'Rehearse' }}
           </button>
           <button class="run-btn" :class="{ end: presenting }" :disabled="presentation.busy" @click="toggleRun">
@@ -72,7 +79,14 @@
             <span class="hud-dot" />
             <strong class="hud-live">Live</strong>
             <span class="spacer" />
-            <span class="mono hud-counter">beat {{ presenter.beatIdx + 1 }} of {{ presenter.total || '?' }}{{ presenter.rehearsing ? ' · rehearsing' : elapsed ? ` · ${elapsed} elapsed` : '' }}</span>
+            <span class="mono hud-counter">{{ progressLine }}{{ presenter.rehearsing ? '' : elapsed ? ` · ${elapsed} elapsed` : '' }}</span>
+          </div>
+          <!-- U267: rehearsal is a real state in the brain now, and it changes
+               what the room experiences, so it says so where it cannot be
+               missed rather than as a word in a counter. -->
+          <div v-if="presenter.rehearsing" class="hud-rehearsal">
+            <strong>Rehearsal</strong> — beats fire and you see every line here,
+            but he stays silent and still. The room hears nothing.
           </div>
           <div class="hud-body">
             <div v-if="!cameraOff" class="hud-cam">
@@ -84,10 +98,16 @@
               <p class="hud-saying">{{ presentation.subtitle || presenter.currentBeat?.say || '—' }}</p>
               <p class="hud-doing">{{ presenter.currentBeat?.do || '' }}</p>
               <div class="mono hud-label">Next cue</div>
-              <p class="hud-next">{{ presenter.nextBeat ? presenter.nextBeat.cue : 'the end — he bows and hands back to you' }}</p>
+              <p class="hud-next">{{ nextCueLine }}</p>
             </div>
             <div class="hud-transport">
-              <button class="d2-ghost-btn" title="Fire the next beat now" :disabled="presentation.busy" @click="presentation.next()">Advance beat ⏭</button>
+              <!-- U267: this button only ever fires HAND-ADVANCED beats. When
+                   the next one waits for a slide or a word it does nothing,
+                   silently — which is why "should be triggered automatically"
+                   and "do i need to advance beat?" were the same question. -->
+              <button class="d2-ghost-btn" :title="advanceHint"
+                      :disabled="presentation.busy || !hasManualBeats"
+                      @click="presentation.next()">Advance beat ⏭</button>
               <button class="d2-ghost-btn" title="Cut him off mid-word" @click="pauseRobot">Pause the robot</button>
             </div>
           </div>
@@ -122,7 +142,7 @@
         <p v-if="builderOpen && presentation.error" class="present-error builder-error">
           {{ presentation.error }}
         </p>
-        <ScenarioBuilder v-if="builderOpen" class="builder" @start="startScenario" />
+        <ScenarioBuilder v-if="builderOpen" ref="builderRef" class="builder" @start="startScenario" />
 
         <template v-if="presenter.beats.length && !builderOpen">
           <div class="beats-head">
@@ -134,7 +154,7 @@
             v-for="(b, i) in presenter.beats" :key="b.id"
             class="beat-row" :class="{ current: presenting && i === presenter.beatIdx }"
           >
-            <span class="mono beat-cue">{{ b.cue }}</span>
+            <span class="mono beat-cue" :class="b.kind">{{ b.cue }}</span>
             <div class="beat-text">
               <div class="beat-say">{{ b.say || '—' }}</div>
               <div class="beat-do">{{ b.do }}</div>
@@ -213,7 +233,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import ScenarioBuilder from '../components/ScenarioBuilder.vue'
 import { BRAIN_URL } from '../lib/endpoints'
 import { useCameraFeed } from '../composables/useCameraFeed'
@@ -336,7 +356,37 @@ const armedNote = computed(() => {
   return armed.length ? ` · waiting for “${armed[0]}”` : ' · waiting for you to advance'
 })
 
+// ── U267: what has actually happened, and what he is actually waiting for ──
+/** "beat 2 of 1" was the old line: the numerator counted hand-advanced beats
+ *  and the denominator counted them too, so firing the only manual beat in a
+ *  scenario put the position past the end. Both halves describe the WHOLE
+ *  show now, and finishing says so instead of counting past itself. */
+const progressLine = computed(() => {
+  const prefix = presenter.rehearsing ? 'rehearsing · ' : ''
+  if (!presenter.total) return `${prefix}no beats`
+  if (presenter.finished) return `${prefix}all ${presenter.total} beats done`
+  return `${prefix}beat ${presenter.done + 1} of ${presenter.total}`
+})
+
+/** The next cue, said as the thing the presenter must DO to reach it. */
+const nextCueLine = computed(() => {
+  const beat = presenter.nextBeat
+  if (!beat) return 'the end — he bows and hands back to you'
+  if (beat.kind === 'manual') return `${beat.cue} — he waits for you`
+  if (beat.kind === 'keyword') return `${beat.cue} — fires when you say it`
+  return `${beat.cue} — fires when you reach it`
+})
+
+const hasManualBeats = computed(() =>
+  presenter.beats.some(b => b.kind === 'manual'))
+
+const advanceHint = computed(() => hasManualBeats.value
+  ? 'Fire the next hand-advanced beat now'
+  : 'Every beat in this scenario fires on a slide or a keyword, so there is '
+    + 'nothing here to advance by hand — just present your deck.')
+
 const builderOpen = ref(false)
+const builderRef = ref<{ loadScenario: (sc: Record<string, unknown>) => void } | null>(null)
 
 // ── Run / end ──────────────────────────────────────────────────────────────
 let modeBefore: 'home' | 'work' = 'home'
@@ -364,7 +414,20 @@ function cueOf(b: DraftBeat, i: number): string {
   const t = triggerOf(b)
   if (t.startsWith('keyword:')) return `“${t.slice('keyword:'.length)}”`
   if (t.startsWith('slide:')) return `Slide ${t.slice('slide:'.length)}`
-  return `Beat ${i + 1}`
+  // U267: "Beat 3" named the row, not the cue — so a hand-advanced beat gave
+  // the presenter no hint that it was waiting for THEM. Asked as "do i need
+  // to advance beat? should be triggered automatically."
+  void i
+  return 'You press Next'
+}
+/** U267: three cue kinds, not two. Every beat that was not a keyword was
+ *  labelled SLIDE — including hand-advanced ones — so a beat that would never
+ *  move on its own wore the badge of one that would. */
+function kindOf(b: DraftBeat): 'manual' | 'slide' | 'keyword' {
+  const t = triggerOf(b)
+  if (t.startsWith('keyword:')) return 'keyword'
+  if (t.startsWith('slide:')) return 'slide'
+  return 'manual'
 }
 
 async function startScenario(scenario: object): Promise<void> {
@@ -379,7 +442,7 @@ async function startScenario(scenario: object): Promise<void> {
     presenter.setBeats(beats.map((b, i) => ({
       id: b.id ?? `beat-${i + 1}`,
       cue: cueOf(b, i),
-      kind: triggerOf(b).startsWith('keyword:') ? 'keyword' : 'slide',
+      kind: kindOf(b),
       say: b.text ?? '',
       do: b.motion ?? b.mode ?? '',
     })))
@@ -398,17 +461,40 @@ async function startScenario(scenario: object): Promise<void> {
 }
 async function toggleRun(): Promise<void> {
   if (presenting.value) {
+    // U267: rehearsal lives in the brain and dies with the runner, so there
+    // is nothing to reset here any more.
     await presentation.stop()
-    presenter.rehearsing = false
     await modeStore.setMode(modeBefore)
   } else if (presenter.beats.length) {
-    // Re-run the loaded beats.
+    // U267: re-running used to REBUILD the scenario out of the display rows —
+    // `{id, mode:'speak', text: say}` — which silently threw away every
+    // trigger, every topic and every gesture: a deck full of slide cues came
+    // back as a pile of hand-advanced speak beats. Ask the brain for the real
+    // one instead; fall back to the rows only if it has none.
     builderOpen.value = false
-    const ok = await presentation.startScenario({ title: presentation.status.title ?? 'Scenario', beats: presenter.beats.map(b => ({ id: b.id, mode: 'speak', text: b.say })) })
+    const real = await presentation.fetchScenario()
+    const scenario = real ?? {
+      title: presentation.status.title ?? 'Scenario',
+      beats: presenter.beats.map(b => ({ id: b.id, mode: 'speak', text: b.say })),
+    }
+    const ok = await presentation.startScenario(scenario)
     if (ok) await modeStore.setMode('present')
   } else {
     builderOpen.value = true
   }
+}
+
+/** U267: edit what is loaded, instead of retyping a talk to change one line.
+ *  "New scenario" opened an empty builder and was the only door in. */
+async function editScenario(): Promise<void> {
+  const scenario = await presentation.fetchScenario()
+  builderOpen.value = true
+  await nextTick()
+  if (scenario) builderRef.value?.loadScenario(scenario)
+}
+
+async function toggleRehearsal(): Promise<void> {
+  await presentation.setRehearsing(!presenter.rehearsing)
 }
 async function pauseRobot(): Promise<void> {
   await fetch(`${BRAIN_URL}/voice/panic`, { method: 'POST' }).catch(() => {})
@@ -558,7 +644,10 @@ async function saveAsideBehaviour(key: string, value: string): Promise<void> {
   border: 1px solid var(--line); border-radius: 11px; background: var(--surface); margin-bottom: 7px;
 }
 .beat-row.current { border-color: var(--present); background: var(--present-wash); }
-.beat-cue { font-size: 11.5px; color: var(--ink-3); width: 62px; flex-shrink: 0; padding-top: 2px; }
+/* U267: the cue column is wider because it now says the cue ("Slide 12",
+   "You press Next") rather than the row number ("Beat 3"). */
+.beat-cue { font-size: 11.5px; color: var(--ink-3); width: 96px; flex-shrink: 0; padding-top: 2px; }
+.beat-cue.manual { color: var(--ink-2); }
 .beat-text { flex: 1; min-width: 0; }
 .beat-say { font-size: 13.5px; line-height: 1.45; }
 .beat-do { font-size: 12px; color: var(--ink-3); margin-top: 3px; }
@@ -568,6 +657,15 @@ async function saveAsideBehaviour(key: string, value: string): Promise<void> {
   background: var(--present-wash); color: var(--present);
 }
 .beat-kind.keyword { background: var(--info-wash); color: var(--info); }
+/* U267: a hand-advanced beat used to wear the SLIDE badge, promising it would
+   fire on its own. Its own badge, and a quiet one — it is the kind that waits. */
+.beat-kind.manual { background: var(--surface-2); color: var(--ink-3); }
+
+.hud-rehearsal {
+  margin: 0 12px 10px; padding: 8px 12px; border-radius: 8px;
+  background: var(--warn-wash, rgba(200, 150, 20, 0.12));
+  color: var(--ink-2); font-size: 12.5px; line-height: 1.45;
+}
 
 .present-aside {
   width: 262px; flex-shrink: 0; background: var(--surface);

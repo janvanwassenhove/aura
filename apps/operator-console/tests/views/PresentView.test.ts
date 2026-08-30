@@ -26,7 +26,9 @@ const OK = (body: unknown) => Promise.resolve({
   ok: true, status: 200, json: () => Promise.resolve(body),
 } as Response)
 
-function stubFetch(): { url: string; body: unknown }[] {
+function stubFetch(
+  opts: { status?: unknown; active?: unknown; loaded?: unknown } = {},
+): { url: string; body: unknown }[] {
   const posts: { url: string; body: unknown }[] = []
   vi.stubGlobal('fetch', (url: string, init?: RequestInit) => {
     const u = String(url)
@@ -35,9 +37,12 @@ function stubFetch(): { url: string; body: unknown }[] {
     }
     if (u.includes('/presentation/scenarios')) return OK({ scenarios: [] })
     if (u.includes('/presentation/scenario')) {
-      return OK({ active: true, title: 'test', manual_pos: 0, manual_total: 1 })
+      // GET returns the loaded scenario (U267 Edit); POST loads a new one.
+      if (init?.method !== 'POST') return OK({ scenario: opts.active ?? null })
+      return OK(opts.loaded
+        ?? { active: true, title: 'test', manual_pos: 0, manual_total: 1, beats_total: 1 })
     }
-    if (u.includes('/presentation/status')) return OK({ active: false })
+    if (u.includes('/presentation/status')) return OK(opts.status ?? { active: false })
     if (u.includes('/personas')) return OK({ personas: [] })
     return OK({})
   })
@@ -98,6 +103,90 @@ describe('U266 — Present mode does what its buttons say', () => {
     expect(load.length).toBe(1)
     const sent = (load[0].body as { scenario: { beats: { trigger: string }[] } }).scenario
     expect(sent.beats[0].trigger).toBe('slide:4')
+  })
+
+  it('a hand-advanced beat is not badged as one that fires by itself', async () => {
+    stubFetch()
+    const w = mount(PresentView)
+    await flushPromises()
+    await w.findAll('button').filter(b => b.text().includes('New scenario'))[0].trigger('click')
+    await flushPromises()
+    await w.find('textarea.sb-text').setValue('tell a joke')
+    await w.findAll('button').filter(b => b.text() === 'Start presentation')[0].trigger('click')
+    await flushPromises()
+
+    // U267: every non-keyword beat used to be labelled SLIDE, so a beat that
+    // waits for the presenter promised it would fire on its own — which is
+    // exactly why "should be triggered automatically" was asked about a beat
+    // whose cue was "I press Next".
+    const beats = w.findAll('.beat-kind')
+    expect(beats.length).toBe(1)
+    expect(beats[0].text()).toBe('manual')
+    expect(w.find('.beat-cue').text()).toBe('You press Next')
+  })
+
+  it('a slide beat says which slide it waits for', async () => {
+    stubFetch()
+    const w = mount(PresentView)
+    await flushPromises()
+    await w.findAll('button').filter(b => b.text().includes('New scenario'))[0].trigger('click')
+    await flushPromises()
+    await w.find('select.sb-tkind').setValue('slide')
+    await w.find('input.sb-tnum').setValue(12)
+    await w.find('textarea.sb-text').setValue('here we go')
+    await w.findAll('button').filter(b => b.text() === 'Start presentation')[0].trigger('click')
+    await flushPromises()
+
+    expect(w.find('.beat-kind').text()).toBe('slide')
+    expect(w.find('.beat-cue').text()).toBe('Slide 12')
+  })
+
+  it('the counter never walks past the end of the show', async () => {
+    // The reported "beat 2 of 1": one manual beat, fired. The position came
+    // from manual_pos and the total from manual_total — both describing only
+    // the hand-advanced beats — so firing the only one put it past the end.
+    stubFetch({
+      loaded: {
+        active: true, title: 'test', manual_pos: 1, manual_total: 1,
+        beats_total: 1, fired: ['beat-1'],
+      },
+    })
+    const w = mount(PresentView)
+    await flushPromises()
+    await w.findAll('button').filter(b => b.text().includes('New scenario'))[0].trigger('click')
+    await flushPromises()
+    await w.find('textarea.sb-text').setValue('tell a joke')
+    await w.findAll('button').filter(b => b.text() === 'Start presentation')[0].trigger('click')
+    await flushPromises()
+
+    const hud = w.find('.hud-counter').text()
+    expect(hud).not.toMatch(/beat 2 of 1/)
+    expect(hud).toContain('all 1 beats done')
+  })
+
+  it('Edit opens the builder on the scenario that is loaded', async () => {
+    // U267: "New scenario" opened an EMPTY builder and was the only door in,
+    // so changing one line meant retyping the talk. Asked as "how to edit
+    // presentation".
+    stubFetch({
+      status: { active: true, title: 'my talk', beats_total: 1, fired: [] },
+      active: {
+        title: 'my talk', pptx: 'deck.pptx',
+        beats: [{ id: 'beat-1', trigger: 'slide:7', mode: 'speak', text: 'the line' }],
+      },
+    })
+    const w = mount(PresentView)
+    await flushPromises()
+
+    const edit = w.findAll('button').filter(b => b.text() === 'Edit')
+    expect(edit.length).toBe(1)
+    await edit[0].trigger('click')
+    await flushPromises()
+
+    // The builder came up filled in, not blank.
+    expect((w.find('input.sb-input').element as HTMLInputElement).value).toBe('my talk')
+    expect((w.find('textarea.sb-text').element as HTMLTextAreaElement).value).toBe('the line')
+    expect((w.find('select.sb-tkind').element as HTMLSelectElement).value).toBe('slide')
   })
 
   it('Hide is always reachable, even when this view thinks the overlay is off', async () => {
