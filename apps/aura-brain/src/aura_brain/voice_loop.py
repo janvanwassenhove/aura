@@ -177,6 +177,13 @@ class VoiceLoop:
         # U128: local wake-word — detect "Richie" on-device instead of
         # transcribing every window over the network. None → keep the existing
         # transcribe-then-fuzzy path (graceful fallback).
+        # U275: a running account of what the mic hears and what becomes of it,
+        # so "he does not answer" can be read instead of guessed at.
+        self._stat: dict = {
+            "last_peak": 0.0, "windows": 0, "turns": 0,
+            "last_text": "", "last_skipped": "", "last_heard_ago_s": None,
+        }
+        self._last_heard_at = 0.0
         try:
             from aura_brain.wakeword import build_detector
             self._wake_detector = build_detector()
@@ -197,6 +204,44 @@ class VoiceLoop:
         return os.environ.get("BARGE_IN", "true").lower() == "true"
 
     # -- lifecycle -----------------------------------------------------
+
+    # -- U275: is anyone actually listening? ---------------------------
+    #
+    # Reported as "ik roep robot 'hey richie' met wakeword, maar krijg geen
+    # reactie". Diagnosing it was guesswork from outside: the loop has no
+    # status, its only log lines are INFO (the packaged app logs at WARNING,
+    # so they never appear), and a task started with `create_task` that dies
+    # takes its exception to the grave. "He does not answer" and "the loop
+    # stopped three hours ago" looked identical from every screen.
+    #
+    # So it keeps a running account of what it hears and what it does with it:
+    # every window's loudness against the gate that discards it, the last
+    # thing it transcribed, and the reason the last utterance went nowhere.
+    def status(self) -> dict:
+        task = self._task
+        alive = task is not None and not task.done()
+        crashed = ""
+        if task is not None and task.done() and not task.cancelled():
+            exc = task.exception()
+            if exc is not None:
+                crashed = f"{type(exc).__name__}: {exc}"
+        return {
+            "running": alive,
+            "mode": self._mode,
+            "wake_word": self._wake,
+            "listening": alive and self._mode == "wake_word",
+            "crashed": crashed,
+            # The gate that silently eats a too-quiet room, and the loudest
+            # thing heard recently, so "speak up" is a measurement not a guess.
+            "speech_peak_gate": self._speech_peak,
+            **self._stat,
+            "last_heard_ago_s": (
+                round(time.monotonic() - self._last_heard_at, 1)
+                if self._last_heard_at else None),
+        }
+
+    def _note(self, **fields) -> None:
+        self._stat.update(fields)
 
     def start(self) -> None:
         if self._task is None:
@@ -435,7 +480,14 @@ class VoiceLoop:
                 else:
                     _t_cap_start = time.monotonic()
                     wav, peak = await self._robot.listen(self._window_s)
+                    # U275: the gate that most often explains "he never
+                    # answers" — a room quieter than VOICE_SPEECH_PEAK is
+                    # discarded here, before STT, with nothing said anywhere.
+                    self._stat["windows"] += 1
+                    self._stat["last_peak"] = round(float(peak), 4)
                     if peak < self._speech_peak:
+                        self._stat["last_skipped"] = (
+                            f"too quiet ({peak:.4f} < {self._speech_peak:.4f})")
                         continue  # silence — cheap skip, no STT
 
                 in_followup = in_barge or time.monotonic() < self._followup_until
@@ -450,6 +502,7 @@ class VoiceLoop:
                         logger.debug("wake detect failed, falling back to STT: %s", exc)
                         wake_confirmed = True  # let STT+fuzzy decide instead
                     if not wake_confirmed:
+                        self._stat["last_skipped"] = "no wake word (local detector)"
                         continue  # no wake word heard → skip STT entirely
                 # U91: a follow-up window accepts speech WITHOUT the wake word,
                 # so ambient noise/TV/echo can hallucinate a "command". Require
@@ -471,9 +524,16 @@ class VoiceLoop:
                     _mk["stt_final"] = time.monotonic()
                 else:
                     _mk["stt_final"] = _mono  # barge transcript already in hand
+                # U275: what it actually heard, whatever happens to it next.
+                if text:
+                    self._stat["last_text"] = text[:120]
+                    self._last_heard_at = time.monotonic()
                 if not is_plausible_command(text):
                     if text:
                         logger.debug("voice loop ignored implausible transcript: %r", text)
+                    self._stat["last_skipped"] = (
+                        f"not a plausible command: {text[:60]!r}" if text
+                        else "nothing transcribed")
                     continue
 
                 # U206: while a co-presenter scenario is active, every plausible
@@ -538,13 +598,26 @@ class VoiceLoop:
                 # made phantom turns). Only start a turn once we have a real
                 # command.
                 if not command:
-                    # U153: bracket the second listen window so the trace shows
-                    # it as its own `second_capture` segment instead of burying
-                    # a whole window inside `llm_queue`.
+                    # U275: SHOW that the name landed. Reported as "ik roep
+                    # robot 'hey richie' met wakeword, maar krijg geen reactie":
+                    # he heard it perfectly and opened the window below, but
+                    # gave no sign — so the owner waited for an answer while he
+                    # waited for a command, and the window closed on silence.
+                    # From the outside that is indistinguishable from deaf.
+                    #
+                    # Not a spoken "how can I help": U93 removed exactly that,
+                    # rightly, because a generic reply per stray "Richie" is the
+                    # phantom-turn bug. A gesture costs no LLM call, no audio,
+                    # and cannot become a conversational turn — it just says
+                    # "go on".
+                    self._stat["last_skipped"] = "heard the wake word — waiting for a command"
+                    await self._acknowledge_wake()
                     _mk["second_capture_start"] = time.monotonic()
                     command = await self._capture_command()
                     _mk["second_capture_end"] = time.monotonic()
                     if not is_plausible_command(command):
+                        self._stat["last_skipped"] = (
+                            "heard the wake word, but no command followed")
                         continue
 
                 # U96: a command that is ONLY the wake word (Whisper echoes the
@@ -571,6 +644,8 @@ class VoiceLoop:
                 # NOW this is a real user turn: re-arm cancel tokens and inject
                 # the interruption note as OWNER GUIDANCE (a system message,
                 # never prepended to the visible command).
+                self._stat["turns"] += 1
+                self._stat["last_skipped"] = ""
                 if self._manager is not None:
                     self._manager.begin_turn("voice")
                     self._pipeline.set_cancel_event(self._session_id,
@@ -628,6 +703,24 @@ class VoiceLoop:
             first = rest.split(None, 1)
             return (first[1] if len(first) > 1 else "").lstrip(" ,.!?-").strip()
         return None  # no wake word, not in follow-up → ignore
+
+    async def _acknowledge_wake(self) -> None:
+        """A small nod: "I heard my name, go on."
+
+        U275. Silent and cheap on purpose — WAKE_ACK=off for anyone who wants
+        the old stillness back. Never raises: an unreachable robot must cost
+        the acknowledgement, not the turn that follows it.
+        """
+        motion = os.environ.get("WAKE_ACK", "nod").strip().lower()
+        if motion in ("", "off", "none"):
+            return
+        try:
+            from shared_schemas.robot.models import MotionCommand
+
+            await self._robot.execute_motion(MotionCommand(
+                motion_id=motion, speed=1.2, amplitude=0.35, direction=None))
+        except Exception as exc:  # noqa: BLE001 — a nod is never worth a turn
+            logger.debug("wake acknowledgement failed: %s", exc)
 
     async def _capture_command(self) -> str:
         from aura_brain import voice

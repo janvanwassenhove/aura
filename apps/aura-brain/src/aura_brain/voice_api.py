@@ -62,6 +62,25 @@ async def panic_stop() -> JSONResponse:
     return JSONResponse(result)
 
 
+@router.get("/status")
+async def voice_status() -> JSONResponse:
+    """U275: is hands-free actually listening, and what is it hearing?
+
+    Reported as "ik roep robot 'hey richie' met wakeword, maar krijg geen
+    reactie", and there was no way — from any screen, or from the log, which
+    the packaged app keeps at WARNING while this loop only speaks at INFO — to
+    tell apart: the loop never started, the loop died hours ago, the room is
+    below the loudness gate, the name was heard and no command followed, or he
+    is simply not listening. Five different fixes behind one silence.
+    """
+    if _voice_loop is None:
+        return JSONResponse({"running": False, "reason": "hands-free voice is not set up"})
+    try:
+        return JSONResponse(_voice_loop.status())
+    except Exception as exc:  # noqa: BLE001 — a diagnostic must never 500
+        return JSONResponse({"running": False, "reason": f"{type(exc).__name__}: {exc}"})
+
+
 @router.post("/listen")
 async def listen_turn(body: dict | None = None) -> JSONResponse:
     """Talk to the robot via ITS OWN microphone: record on the Pi → transcribe
