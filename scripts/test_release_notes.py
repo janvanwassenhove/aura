@@ -75,7 +75,10 @@ def test_the_page_is_english() -> None:
 def test_the_page_leads_with_how_much_changed() -> None:
     page = compose("v1.2.3", "o/r", ["He hears you now"], [])
     assert page.startswith("# AURA v1.2.3")
-    assert "1 improvement" in page and "1 improvements" not in page
+    # A single change must not read "1 improvement, each one from ..." — the
+    # first English release said exactly that, on the page everybody reads.
+    assert "one improvement" in page
+    assert "each one" not in page
     assert "- He hears you now" in page
 
 
@@ -104,3 +107,9 @@ def test_every_platform_can_find_its_download() -> None:
     for token in ("windows-setup.exe", "mac-arm64.dmg", "mac-x64.dmg", "AppImage"):
         assert token in page
     assert "stay exactly as they are" in page, "an upgrader needs to know their data survives"
+
+
+def test_many_changes_read_as_plural() -> None:
+    page = compose("v1.2.3", "o/r", ["a", "b", "c"], [])
+    assert "3 improvements" in page
+    assert "each one from" in page

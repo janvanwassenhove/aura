@@ -102,8 +102,12 @@ def compose(tag: str, repo: str, items: list[str], shots: list[str]) -> str:
     if n:
         # How much changed, before what changed: a reader decides in one line
         # whether this update is worth the next five minutes.
-        add(f"This release brings **{n} improvement{'s' if n != 1 else ''}**, "
-            "each one from something that went wrong or was missing in real use.")
+        if n == 1:
+            add("This release brings **one improvement**, from something that "
+                "went wrong or was missing in real use.")
+        else:
+            add(f"This release brings **{n} improvements**, each one from "
+                "something that went wrong or was missing in real use.")
     else:
         add("A maintenance release: no new features, just the latest fixes and "
             "improvements under the hood.")
