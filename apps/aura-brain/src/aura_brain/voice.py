@@ -177,6 +177,22 @@ def _language_of(tag: str | None) -> str:
     return _LOCALE_NAMES.get(head, head)
 
 
+# U288: the language of whoever is in front of the camera, when that is
+# unambiguous. Set from the recognition handler, which runs off the CAMERA and
+# so knows who is there before a word is transcribed. Empty means "the room
+# does not settle it" — nobody recognised, or several people who do not share
+# a language, in which case pinning the microphone to one of them would be a
+# guess made against the other.
+_person_language: str = ""
+
+
+def set_person_language(code: str) -> None:
+    """Who he is listening to, in one language code (or "" for nobody)."""
+    global _person_language
+    code = (code or "").strip().lower()[:2]
+    _person_language = code if code in _LATIN_LANGS else ""
+
+
 def _stt_language() -> str:
     """The language to transcribe in, or "" to let the model decide.
 
@@ -195,6 +211,13 @@ def _stt_language() -> str:
         return ""
     if lang in _LATIN_LANGS:
         return lang
+
+    # U288: the person he can SEE outranks the household default. A house is
+    # rarely monolingual, and U274 already lets the owner say which language
+    # each person is met in; until now that only shaped the reply, while the
+    # microphone kept listening in the language of the house.
+    if _person_language:
+        return _person_language
 
     # The machine's own locale before LANGUAGE_FALLBACK, because the two answer
     # DIFFERENT questions. LANGUAGE_FALLBACK (U257) means "when a message is

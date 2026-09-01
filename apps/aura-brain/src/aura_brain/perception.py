@@ -76,8 +76,39 @@ class InsightFaceEmbedder:
         if not faces:
             return None
         # Largest face in frame wins (the person actually in front of the robot).
-        face = max(faces, key=lambda f: (f.bbox[2] - f.bbox[0]) * (f.bbox[3] - f.bbox[1]))
+        face = max(faces, key=_area)
         return [float(x) for x in face.normed_embedding]
+
+    def embed_all(self, png_bytes: bytes) -> list[list[float]]:
+        """Every face in the frame, nearest first.
+
+        U288: `embed` returns only the largest, so for the whole life of the
+        app everybody except the person closest to the camera was invisible —
+        silently. Asked as "wat wanneer hij 2 personen herkent?". Knowing who
+        ELSE is in the room is what stops him pinning the microphone to one
+        housemate's language while another one is talking, and it is the
+        honest answer to a room with two people in it.
+        """
+        import io
+
+        import numpy as np
+        from PIL import Image
+
+        if self._app is None:
+            return []
+        try:
+            img = np.asarray(Image.open(io.BytesIO(png_bytes)).convert("RGB"))[:, :, ::-1]
+            faces = self._app.get(img)
+        except Exception as exc:  # noqa: BLE001 - a frame must never kill the loop
+            logger.debug("multi-face embed failed: %s", exc)
+            return []
+        return [[float(x) for x in f.normed_embedding]
+                for f in sorted(faces, key=_area, reverse=True)]
+
+
+def _area(face) -> float:  # noqa: ANN001 - insightface Face
+    """Bounding-box area: how near the camera someone is standing."""
+    return float((face.bbox[2] - face.bbox[0]) * (face.bbox[3] - face.bbox[1]))
 
 
 _HAND_MODEL_URL = (
@@ -217,6 +248,10 @@ class PerceptionLoop:
         self._gesture_cooldown = gesture_cooldown_s
         self._sightings = sighting_log
         self._gallery = gallery
+        # U288: everyone he can currently see, nearest first. He used to
+        # consider exactly one face — the largest — so a second person in
+        # the room simply did not exist.
+        self.people_present: list[str] = []
         # U210: NOT 0.0 — the cooldown check is `monotonic() - last < cooldown`,
         # and monotonic() is seconds since boot (usually large), so 0.0 made the
         # VERY FIRST gesture look "within cooldown" and get suppressed whenever
@@ -266,11 +301,25 @@ class PerceptionLoop:
         if self._gestures is not None:
             await self._detect_gesture(frame)
 
-        embedding = await asyncio.to_thread(self._embedder.embed, frame)
+        # U288: every face, nearest first. The nearest one still decides who he
+        # is talking TO (unchanged); the rest decide whether the room is
+        # unambiguous enough to listen in one person's language.
+        # The embedder is injected, so it may predate embed_all (and every test
+        # fake does). Fall back to the single-face call rather than requiring
+        # everyone to grow a method they do not need.
+        if hasattr(self._embedder, "embed_all"):
+            embeddings = await asyncio.to_thread(self._embedder.embed_all, frame)
+        else:
+            one = await asyncio.to_thread(self._embedder.embed, frame)
+            embeddings = [one] if one is not None else []
+        embedding = embeddings[0] if embeddings else None
 
         if embedding is None:
+            self._note_room([])
             await self._transition(_ABSENT, None, 0.0)
             return
+
+        self._note_room(embeddings)
 
         if self._matcher is not None:
             person_id, confidence = self._matcher.identify(embedding)
@@ -300,6 +349,52 @@ class PerceptionLoop:
             self._gallery.record(person_id, frame, confidence, embedding=embedding)
 
         await self._transition(person_id or "", person_id, confidence)
+
+    def _note_room(self, embeddings: list[list[float]]) -> None:
+        """Who ELSE he can see, and what that means for the microphone.
+
+        U288, asked as "wat wanneer hij 2 personen herkent -> moeten we dan ook
+        niet meerdere kunnen taggen?". He could only ever see one face — the
+        largest — so a second person in the room did not exist. Now everyone is
+        identified, and the consequence is deliberately conservative:
+
+          * exactly one known person → listen in THEIR language (U274);
+          * two who share a language → still theirs;
+          * two who do not, or nobody recognised → no pin, fall back to the
+            household. Choosing one person's language while the other is
+            talking is a guess made against them.
+        """
+        people: list[str] = []
+        if self._matcher is not None:
+            for emb in embeddings:
+                pid, _ = self._matcher.identify(emb)
+                if pid and pid not in people:
+                    people.append(pid)
+        self.people_present = people
+
+        try:
+            import asyncio as _asyncio
+
+            _asyncio.ensure_future(self._apply_room_language(people))
+        except Exception as exc:  # noqa: BLE001 - a hint is never worth a frame
+            logger.debug("could not set the listening language: %s", exc)
+
+    async def _apply_room_language(self, people: list[str]) -> None:
+        """Listen in one person's language only when the room agrees on one."""
+        from aura_brain import voice
+
+        langs: set[str] = set()
+        if self._store is not None:
+            for pid in people:
+                try:
+                    person = await self._store.get_person(pid)
+                except Exception as exc:  # noqa: BLE001
+                    logger.debug("person lookup failed for %r: %s", pid, exc)
+                    continue
+                lang = getattr(person, "language", "") if person else ""
+                if lang:
+                    langs.add(str(lang).lower()[:2])
+        voice.set_person_language(next(iter(langs)) if len(langs) == 1 else "")
 
     @property
     def _guest_after(self) -> int:
