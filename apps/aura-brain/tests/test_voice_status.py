@@ -93,3 +93,35 @@ def test_an_unreachable_robot_costs_the_nod_not_the_turn(loop) -> None:
 
     loop._robot = _Dead()
     asyncio.run(loop._acknowledge_wake())      # must not raise
+
+
+# --------------------------------------------------------------------------- #
+# U287: the television must not be able to say his name
+# --------------------------------------------------------------------------- #
+
+def test_ordinary_dutch_words_no_longer_wake_him() -> None:
+    """The fuzzy matcher accepted ANY token starting with the wake word's
+    first four letters, so with "Richie" the everyday Dutch words "richting"
+    and "richtlijn" counted as hearing his name — which is a television waking
+    him several times an evening. Reported as "soms wordt er op de achtergrond
+    onnozel gedaan of speelt televisie, hij zou daar niet mogen op reageren".
+    """
+    from aura_brain.voice_loop import wake_word_index
+
+    for sentence in ("we gaan die richting uit",
+                     "volgens de richtlijn mag dat niet",
+                     "hij is rich geworden"):
+        assert wake_word_index(sentence, "richie") < 0, sentence
+
+
+def test_he_still_answers_to_his_own_name_however_it_is_spelled() -> None:
+    """Whisper spells names creatively; tightening must not cost a real call.
+    "hey Richie" is what the owner actually says."""
+    from aura_brain.voice_loop import wake_word_index
+
+    for sentence in ("hey richie, hoe laat is het",
+                     "richie kom eens",
+                     "ritchie waar ben je",
+                     "richy zet muziek op",
+                     "hallo richie!"):
+        assert wake_word_index(sentence, "richie") >= 0, sentence

@@ -161,6 +161,79 @@ def _reject_reason(result) -> str | None:
     return None
 
 
+_LATIN_LANGS = {"en", "nl", "fr", "de", "es", "it", "pt", "da", "sv", "no", "fi"}
+
+# Windows spells a locale "Dutch_Belgium", POSIX spells it "nl_BE.UTF-8".
+_LOCALE_NAMES = {
+    "dutch": "nl", "flemish": "nl", "english": "en", "french": "fr",
+    "german": "de", "spanish": "es", "italian": "it", "portuguese": "pt",
+    "danish": "da", "swedish": "sv", "norwegian": "no", "finnish": "fi",
+}
+
+
+def _language_of(tag: str | None) -> str:
+    """A locale name, however the platform spells it, as a language code."""
+    head = (tag or "").replace("-", "_").split("_")[0].strip().lower()
+    return _LOCALE_NAMES.get(head, head)
+
+
+def _stt_language() -> str:
+    """The language to transcribe in, or "" to let the model decide.
+
+    U287. `multi` is the explicit opt-out for households that genuinely mix
+    languages inside one sentence; everything else resolves to a real
+    language, because "auto" was costing more than it bought.
+    """
+    explicit = os.environ.get("STT_LANGUAGE", "").strip().lower()
+    if explicit == "multi":
+        return ""
+    if explicit in _LATIN_LANGS:
+        return explicit
+
+    lang = os.environ.get("ASSISTANT_LANGUAGE", "auto").strip().lower()
+    if lang == "multi":
+        return ""
+    if lang in _LATIN_LANGS:
+        return lang
+
+    # The machine's own locale before LANGUAGE_FALLBACK, because the two answer
+    # DIFFERENT questions. LANGUAGE_FALLBACK (U257) means "when a message is
+    # too short to tell, REPLY in this"; the locale is a fact about the person
+    # sitting at this computer, which is a far better guess at what is being
+    # SPOKEN in the room. On the owner's machine those disagreed — a Dutch
+    # Belgian install with the fallback left on French — and pinning the
+    # microphone to French would have made the very complaint worse.
+    try:
+        import locale
+
+        names = [locale.getlocale()[0], os.environ.get("LANG"), os.environ.get("LC_ALL")]
+        for tag in names:
+            code = _language_of(tag)
+            if code in _LATIN_LANGS:
+                return code
+    except Exception:  # noqa: BLE001 — a locale must never break the mic
+        pass
+
+    fallback = os.environ.get("LANGUAGE_FALLBACK", "").strip().lower()[:2]
+    return fallback if fallback in _LATIN_LANGS else ""
+
+
+def _wrong_script(text: str, lang: str) -> bool:
+    """True when the transcript is written in an alphabet this language is not.
+
+    Counts LETTERS only: digits, punctuation and emoji say nothing about the
+    script, and a Dutch sentence quoting one foreign word should not be thrown
+    away — so the test is "mostly", not "any".
+    """
+    if lang not in _LATIN_LANGS:
+        return False
+    letters = [c for c in text if c.isalpha()]
+    if len(letters) < 4:
+        return False        # too short to judge; other guards handle these
+    latin = sum(1 for c in letters if c.isascii() or "\u00c0" <= c <= "\u024f")
+    return latin / len(letters) < 0.5
+
+
 async def transcribe(data: bytes, filename: str = "audio.webm") -> str | None:
     """Speech → text via OpenAI (U36e voice input). None when unavailable."""
     if not os.environ.get("OPENAI_API_KEY"):
@@ -176,12 +249,23 @@ async def transcribe(data: bytes, filename: str = "audio.webm") -> str | None:
             "file": (filename, io.BytesIO(data)),
         }
         # U130: multilingual (NL/EN/FR/DE) + code-switching. Forcing a single
-        # `language` breaks mixing Dutch and English in one sentence, so only
-        # pin it when the owner explicitly picked ONE language; otherwise let
-        # the model auto-detect (empty/"auto"/"multi" → no language pin).
-        lang = os.environ.get("ASSISTANT_LANGUAGE", "auto").lower()
-        if lang in ("en", "nl", "fr", "de", "es", "it"):
-            kwargs["language"] = lang
+        # `language` breaks mixing Dutch and English in one sentence.
+        #
+        # U287: but leaving it unpinned means the model re-guesses the language
+        # on EVERY clip, and a short or half-caught utterance is exactly where
+        # it guesses wrong — "hallo" is equally Dutch and German, and noise
+        # comes back as anything at all, including Asian scripts. Reported as
+        # "robot vangt soms maar half op wat in het Nederlands gezegd wordt en
+        # springt dan naar een andere taal zoals Duits of zelfs Aziatische
+        # talen".
+        #
+        # So `auto` now means "the language of this household" rather than "no
+        # idea": the reply language if one is set, else the fallback, else the
+        # machine's own locale. True code-switchers set ASSISTANT_LANGUAGE to
+        # `multi`, which is the only value that leaves detection wide open.
+        stt_lang = _stt_language()
+        if stt_lang:
+            kwargs["language"] = stt_lang
         # U145: the U135 hallucination gate is now OPT-IN. It swapped the auto
         # path to whisper-1 (for its verbose_json no-speech/language signals),
         # but whisper-1 is markedly worse than gpt-4o-mini-transcribe and
@@ -209,6 +293,14 @@ async def transcribe(data: bytes, filename: str = "audio.webm") -> str | None:
                 logger.info("STT discarded (%s): %r", reason, (result.text or "")[:60])
                 return None
         text = (result.text or "").strip()
+        # U287: a Dutch household does not speak in Han, Cyrillic or Arabic
+        # script. When STT returns one it is not a transcript, it is the model
+        # inventing words out of television, music or room noise — and the
+        # reply that follows is answering nobody. Cheap, deterministic, and it
+        # needs no second model.
+        if stt_lang and _wrong_script(text, stt_lang):
+            logger.info("STT discarded (foreign script for %s): %r", stt_lang, text[:60])
+            return None
         # Guard: if STT just echoed our priming words (unclear audio), discard.
         stripped = text.lower().strip(" .,!?").replace(wake.lower(), "").replace(name.lower(), "").strip()
         if not stripped:

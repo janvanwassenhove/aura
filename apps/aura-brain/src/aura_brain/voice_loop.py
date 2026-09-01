@@ -81,9 +81,22 @@ def wake_word_index(text: str, wake: str) -> int:
         token = raw.strip(".,!?;:'\"()-")
         # Longer names tolerate 2 edits ("Richy"/"Ritchie" → "richie"); short
         # ones only 1, so we don't over-match common words.
-        maxd = 2 if len(wake) >= 5 else 1
+        # U287: two edits on a six-letter name is a third of the word, which
+        # let "rich" and "riches" through. Two edits are for genuinely long
+        # names only; the prefix rule below still catches "Richy".
+        maxd = 2 if len(wake) >= 7 else 1
+        # U287: the shared-prefix rule used to accept ANY token starting with
+        # the first four letters of the name, whatever followed. With the wake
+        # word "Richie" that matched the ordinary Dutch words "richting" and
+        # "richtlijn", plus "Richard" and "riches" — so a television in the
+        # room woke him regularly. Reported as "soms wordt er op de achtergrond
+        # onnozel gedaan of speelt televisie, hij zou daar niet mogen op
+        # reageren". A spelling variant of a name is about as LONG as the name
+        # ("Richy", "Ritchie"); a different word that merely starts the same
+        # is not.
         prefix = wake[:4]
-        shared_prefix = len(wake) >= 4 and token.startswith(prefix)
+        shared_prefix = (len(wake) >= 4 and token.startswith(prefix)
+                         and abs(len(token) - len(wake)) <= 1)
         if len(wake) >= 4 and len(token) >= 3 and (
             _within_edits(token, wake, maxd) or shared_prefix
         ):
