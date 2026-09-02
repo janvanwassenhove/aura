@@ -80,6 +80,21 @@ def _resample_16k_to_24k(chunk: bytes) -> bytes:
     return np.interp(idx, np.arange(audio.size), audio).astype(np.int16).tobytes()
 
 
+def _transcription_config() -> dict:
+    """How the Realtime API should hear us: which model, and in which language.
+
+    U289. Empty language (a household set to `multi`) leaves detection open,
+    exactly as before — the key is simply omitted.
+    """
+    from aura_brain.voice import _stt_language  # noqa: PLC0415 — avoids a cycle
+
+    cfg: dict = {"model": os.environ.get("STT_MODEL", "gpt-4o-mini-transcribe")}
+    lang = _stt_language()
+    if lang:
+        cfg["language"] = lang
+    return cfg
+
+
 class RealtimeSession:
     """One open conversation: mic in → server VAD → streamed reply out."""
 
@@ -204,8 +219,16 @@ class RealtimeSession:
                         # reply became "turns" and Richie answered nothing.
                         # Low waits for a clear end-of-turn.
                         "turn_detection": _turn_detection(vad),
-                        "transcription": {"model": os.environ.get(
-                            "STT_MODEL", "gpt-4o-mini-transcribe")},
+                        # U289: pin the LANGUAGE too, not just the model.
+                        # U287 stopped the pipeline path re-guessing the
+                        # language on every clip; this path was untouched and
+                        # is the one actually in use (voice_engine=realtime),
+                        # so Dutch spoken to a daughter came back as Spanish —
+                        # transcript and reply both. The instructions below ask
+                        # the MODEL to reply in the user's language, which is a
+                        # request about the answer and does nothing about how
+                        # the audio was heard in the first place.
+                        "transcription": _transcription_config(),
                     },
                     "output": {
                         "format": {"type": "audio/pcm", "rate": 24000},
