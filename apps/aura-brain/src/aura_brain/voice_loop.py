@@ -886,7 +886,11 @@ class VoiceLoop:
             note = await self._pipeline.person_note()
         except Exception as exc:  # noqa: BLE001 — speech must never wait on this
             logger.debug("person note unavailable for the realtime path: %s", exc)
-        return build_instructions(prompt, note)
+        from aura_brain.voice import _stt_language
+
+        # U291: the language he must answer in travels with the
+        # instructions, so a persona prompt can never silently replace it.
+        return build_instructions(prompt, note, _stt_language())
 
     async def _realtime_session_turn(self, command: str) -> bool:
         """U154: open a conversation session — the robot mic streams into ONE

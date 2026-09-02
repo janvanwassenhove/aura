@@ -31,11 +31,18 @@ def test_the_character_survives() -> None:
     assert out.index(CHARACTER) < out.index("Jan (owner)"), "who it IS comes first"
 
 
-def test_nobody_recognized_changes_nothing() -> None:
+def test_nobody_recognized_adds_no_person_block() -> None:
     """Most of the time there is no note. That must not add an empty heading or
-    tell the model anything about a person who is not there."""
+    tell the model anything about a person who is not there.
+
+    U291: this used to assert `out == CHARACTER` — that a persona prompt IS the
+    whole instruction. That expectation was the bug: the only sentence about
+    language lived in the fallback the persona replaced, so picking Sentinel
+    left the speech model free to answer Dutch in Portuguese. The persona is
+    still first and still untouched; it simply no longer displaces the rest.
+    """
     out = build_instructions(CHARACTER, "")
-    assert out == CHARACTER
+    assert out.startswith(CHARACTER)
     assert "Who you are talking to" not in out
 
 
@@ -44,7 +51,12 @@ def test_a_session_never_opens_without_instructions() -> None:
     sensible — an empty instructions field makes the model invent a persona."""
     out = build_instructions("", "")
     assert "friendly robot assistant" in out
-    assert "Dutch" in out, "language guidance is part of the floor"
+    # U291: the floor still includes language guidance, but it is now its own
+    # block rather than a clause inside the fallback — so it survives a persona
+    # that replaces the fallback. With no language resolved it guides ("do not
+    # drift") instead of naming one.
+    assert "## Language" in out, "language guidance is part of the floor"
+    assert "Never switch language" in out
 
 
 def test_the_note_is_framed_as_knowledge_not_as_a_claim() -> None:

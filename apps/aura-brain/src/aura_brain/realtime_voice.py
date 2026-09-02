@@ -33,6 +33,14 @@ logger = logging.getLogger(__name__)
 # Cost meter
 # ------------------------------------------------------------------
 
+def _default_instructions() -> str:
+    """Instructions for a turn that carries no persona prompt (U291)."""
+    from aura_brain.voice import _stt_language
+    from aura_brain.voice_context import build_instructions
+
+    return build_instructions("", "", _stt_language())
+
+
 def _rate(env: str, default: float) -> float:
     try:
         return float(os.environ.get(env, default))
@@ -208,8 +216,11 @@ async def _run_realtime_turn_inner(
         await conn.session.update(session={
             "type": "realtime",
             "output_modalities": ["audio"],
-            "instructions": instructions or "You are a friendly robot assistant. "
-            "Reply in the language the user speaks (Dutch, English, French or German).",
+            # U291: same either/or as voice_context had — a persona prompt
+            # replaced the only language rule. build_instructions always
+            # appends one now, so an empty prompt is the only thing this
+            # fallback still has to cover.
+            "instructions": instructions or _default_instructions(),
             "audio": {
                 "output": {"format": {"type": "audio/pcm", "rate": 24000}, "voice": voice},
             },

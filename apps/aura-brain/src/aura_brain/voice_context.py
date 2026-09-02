@@ -18,12 +18,45 @@ goes into a speech session is exactly what the tests can read back.
 from __future__ import annotations
 
 _FALLBACK = (
-    "You are a friendly robot assistant. Reply in the language the user speaks "
-    "(Dutch, English, French or German). Keep spoken replies concise."
+    "You are a friendly robot assistant. Keep spoken replies concise."
 )
 
+# U291: the language rule is its own block now, and it is ALWAYS added.
+#
+# It used to live inside _FALLBACK, and _FALLBACK was only used when the
+# persona had no prompt of its own — so the moment the owner picked a real
+# persona (Sentinel, Host, …), the one instruction about language vanished
+# with it. The speech model was then free to answer a mis-heard Dutch sentence
+# in Spanish or Portuguese, which is exactly what it did. Reported twice, the
+# second time as "is weer in andere talen aan het spinnen".
+_LANGUAGES = {"en": "English", "nl": "Dutch", "fr": "French", "de": "German",
+              "es": "Spanish", "it": "Italian", "pt": "Portuguese"}
 
-def build_instructions(character_prompt: str, person_note: str) -> str:
+
+def _language_rule(language: str) -> str:
+    """What to say about language — named when we know it, guided when not."""
+    name = _LANGUAGES.get((language or "").strip().lower()[:2])
+    if name:
+        return (
+            f"## Language\n"
+            f"ALWAYS reply in {name}, whatever language the transcript appears "
+            f"to be in. Speech-to-text sometimes mis-detects a short or noisy "
+            f"utterance; when that happens the transcript is wrong, not the "
+            f"speaker. Never switch languages on your own. If you genuinely "
+            f"could not make out what was said, say so in {name} and ask them "
+            f"to repeat."
+        )
+    return (
+        "## Language\n"
+        "Reply in the language the user is speaking. Never switch language on "
+        "your own; if a transcript looks like a different language than the "
+        "conversation so far, treat it as a mis-hearing and stay in the "
+        "language you were using."
+    )
+
+
+def build_instructions(character_prompt: str, person_note: str,
+                       language: str = "") -> str:
     """Instructions for a realtime turn or session.
 
     Character voice first — it is the longer, more stable block, and the model
@@ -35,6 +68,9 @@ def build_instructions(character_prompt: str, person_note: str) -> str:
     from opening with no instructions at all.
     """
     parts = [character_prompt.strip()] if character_prompt.strip() else [_FALLBACK]
+    # U291: never an either/or with the persona — a character prompt says who
+    # he is, not which language he speaks.
+    parts.append(_language_rule(language))
     note = person_note.strip()
     if note:
         parts.append(
