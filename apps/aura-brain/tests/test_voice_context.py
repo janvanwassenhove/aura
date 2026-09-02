@@ -56,7 +56,10 @@ def test_a_session_never_opens_without_instructions() -> None:
     # that replaces the fallback. With no language resolved it guides ("do not
     # drift") instead of naming one.
     assert "## Language" in out, "language guidance is part of the floor"
-    assert "Never switch language" in out
+    # U292: the wording moved from "Never switch language" to "never switch to
+    # another one" when the rule was cut back to what a model that HEARS can
+    # act on. Match the meaning, not the phrasing.
+    assert "never switch" in out.lower()
 
 
 def test_the_note_is_framed_as_knowledge_not_as_a_claim() -> None:

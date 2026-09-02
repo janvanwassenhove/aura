@@ -34,24 +34,38 @@ _LANGUAGES = {"en": "English", "nl": "Dutch", "fr": "French", "de": "German",
 
 
 def _language_rule(language: str) -> str:
-    """What to say about language — named when we know it, guided when not."""
+    """The language he answers in — said in the fewest words that can carry it.
+
+    U292: U291's version explained that "speech-to-text sometimes mis-detects a
+    short or noisy utterance; when that happens the transcript is wrong, not
+    the speaker", and closed with "if you genuinely could not make out what was
+    said, say so and ask them to repeat".
+
+    That was written for a model READING a transcript. This one HEARS. Told
+    that a transcript exists and might be wrong, it concluded there was a
+    transcription step it could redo — and narrated it, over and over:
+
+        "Laat me even naar het fragment luisteren."
+        "Momentje, ik haal de transcriptie op."
+        "Sorry, ik ga nu echt de transcriptie uitvoeren."
+
+    twenty-odd times, before finally producing my scripted apology almost
+    verbatim. Two lessons, both in the text below: never describe machinery to
+    a model that cannot reach it, and never hand it a sentence to fall back on
+    — it will look for reasons to use it.
+
+    So: what language, that it must not drift, and that it must not announce
+    what it is about to do. Nothing about how it hears.
+    """
     name = _LANGUAGES.get((language or "").strip().lower()[:2])
-    if name:
-        return (
-            f"## Language\n"
-            f"ALWAYS reply in {name}, whatever language the transcript appears "
-            f"to be in. Speech-to-text sometimes mis-detects a short or noisy "
-            f"utterance; when that happens the transcript is wrong, not the "
-            f"speaker. Never switch languages on your own. If you genuinely "
-            f"could not make out what was said, say so in {name} and ask them "
-            f"to repeat."
-        )
+    spoken = f"Speak {name}." if name else "Speak the language the person is speaking."
     return (
-        "## Language\n"
-        "Reply in the language the user is speaking. Never switch language on "
-        "your own; if a transcript looks like a different language than the "
-        "conversation so far, treat it as a mis-hearing and stay in the "
-        "language you were using."
+        "## Language and delivery\n"
+        f"{spoken} Stay in that language for the whole conversation; never "
+        "switch to another one on your own.\n"
+        "Answer directly. Never announce, narrate or promise what you are "
+        "about to do, and never apologise for taking time — say the answer "
+        "instead. If you did not catch something, ask once, briefly."
     )
 
 
