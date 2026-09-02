@@ -354,7 +354,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import KnowledgeGraph from '../components/canvas/KnowledgeGraph.vue'
 import PhotoLightbox from '../components/PhotoLightbox.vue'
 import WikiText from '../components/WikiText.vue'
@@ -418,12 +418,22 @@ async function fetchEnrolled(): Promise<void> {
   } catch { /* recognition off */ }
 }
 
+let speakerTimer: ReturnType<typeof setInterval> | undefined
+onUnmounted(() => clearInterval(speakerTimer))
+
 onMounted(async () => {
   await knowledge.fetchPeople()
   knowledge.fetchSightings()
   fetchEnrolled()
   fetchCharacters()          // U274: the "meets them as" list
   knowledge.fetchSpeaker()   // U276: is he attributing anything to anyone?
+  // U290: and keep asking. This was fetched ONCE on mount, so if the brain
+  // learned who was there a moment later — a face recognised, the header
+  // switched from another screen — the answer stayed "nobody" for the rest of
+  // the session, and the Memory tab kept insisting nothing was being
+  // remembered while the brain was happily remembering. Reported with a
+  // screenshot showing "Jan · owner" in the header and that banner below it.
+  speakerTimer = setInterval(() => knowledge.fetchSpeaker(), 4000)
   // [[wikilink]] requests from other views land here.
   const req = nav.knowledgeRequest
   const first = req?.personId ?? knowledge.selectedPerson ?? visiblePeople.value[0]?.person_id
@@ -665,6 +675,12 @@ async function createPerson(): Promise<void> {
 }
 
 // ── Memory tab ─────────────────────────────────────────────────────────────
+// U290: the banner is about a live state, so re-check it the moment the tab
+// that shows it is opened, rather than trusting what was true on mount.
+watch(() => knowledge.personTab, (tab) => {
+  if (tab === 'Memory') knowledge.fetchSpeaker()
+})
+
 const memoryDraft = ref('')
 watch(memoryText, (t) => { memoryDraft.value = t }, { immediate: true })
 const memoryMsg = ref('')

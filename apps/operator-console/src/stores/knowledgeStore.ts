@@ -463,20 +463,42 @@ export const useKnowledgeStore = defineStore('knowledge', () => {
     void syncSpeaker(personId)
   }
 
+  /** The parsed body of a `_request`, or null.
+   *
+   *  U290: `_request` returns a Response. U276 read `.remembering` straight
+   *  off that object, where it is forever `undefined` — so the "nothing is
+   *  being remembered" banner could never switch off, however loudly the
+   *  brain said otherwise. Reported with a screenshot of the header naming
+   *  Jan and that banner directly beneath it. */
+  async function _json(resp: Response | null): Promise<Record<string, unknown> | null> {
+    if (!resp) return null
+    try { return await resp.json() } catch { return null }
+  }
+
   async function syncSpeaker(personId: string | null): Promise<void> {
-    const body = await _request('/speaker', {
+    const body = await _json(await _request('/speaker', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ person_id: personId }),
-    })
-    remembering.value = !!(body as { remembering?: boolean } | null)?.remembering
+    }))
+    remembering.value = !!body?.remembering
   }
 
   async function fetchSpeaker(): Promise<void> {
-    const body = await _request('/speaker')
+    const body = await _json(await _request('/speaker'))
     if (!body) return
     const b = body as { person_id?: string | null; remembering?: boolean }
     remembering.value = !!b.remembering
-    if (b.person_id) { speaker.value = b.person_id; speakerSource.value = 'face' }
+    if (b.person_id) {
+      speaker.value = b.person_id
+      speakerSource.value = speakerSource.value ?? 'face'
+      return
+    }
+    // U290: reconcile the OTHER way too. The brain forgets who is there when
+    // it restarts, while this tab keeps showing the person in the header — so
+    // the screen said "Jan · owner" and the brain attributed nothing to
+    // anybody. Whoever the owner picked here is still the answer; tell it
+    // again rather than quietly disagreeing.
+    if (speaker.value && speaker.value !== 'guest') void syncSpeaker(speaker.value)
   }
 
   /** Called when the camera loses every face: after the grace period the
