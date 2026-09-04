@@ -136,7 +136,12 @@
             :disabled="convo.isProcessing"
             @keydown.enter.prevent="send"
           >
-          <button v-if="!calm" class="round-btn" :title="teachHint" @click="teach">
+          <!-- U296: pressing this with an empty box used to do nothing at all
+               and say nothing about why ("werkt teach nog? lijkt niks te
+               doen"). A disabled button explains itself. -->
+          <button v-if="!calm" class="round-btn" :title="teachHint"
+                  :disabled="!convo.pendingText.trim() || convo.isProcessing"
+                  @click="teach">
             <GraduationCap :size="15" />
           </button>
           <button
@@ -418,7 +423,11 @@ function fullTime(iso: string): string {
   return Number.isNaN(d.getTime()) ? '' : d.toLocaleString()
 }
 
-const teachHint = 'Teach — turn this message into a lesson you approve'
+// U296: the hint has to work as an instruction too, because an empty composer
+// is the state this button is most often pressed in.
+const teachHint = computed(() => convo.pendingText.trim()
+  ? 'Teach — turn this message into a lesson you approve'
+  : 'Teach — write the lesson in the box first, then press this')
 function teach(): void {
   const text = convo.pendingText.trim()
   if (!text) return
@@ -720,6 +729,7 @@ const nowCard = computed(() => {
   background: var(--surface-2); border: 1.5px solid var(--line);
   color: var(--ink-2); cursor: pointer; flex-shrink: 0;
 }
+.round-btn:disabled { opacity: 0.45; cursor: not-allowed; }
 .talk-btn {
   display: inline-flex; align-items: center; gap: 7px; padding: 0 16px;
   border-radius: 999px; background: var(--accent); color: var(--on-accent);

@@ -166,19 +166,48 @@ BRAIN_URL
     }).catch(() => {})
   }
 
-  async function teach(text: string): Promise<void> {
-    if (!text.trim() || isProcessing.value) return
+  /** U296: teaching him something always leaves a visible trace.
+   *
+   *  Reported as "werkt teach nog? lijkt niks te doen" — and it could do
+   *  nothing at all in three different ways, none of them visible:
+   *    * the composer was empty, so this returned before anything happened
+   *      and the only clue was a tooltip nobody hovers;
+   *    * a turn was still running — the same silent return;
+   *    * the POST came back 503 ("pipeline not ready") or 422. `fetch` does
+   *      not throw on those, so the catch never fired; the reply was expected
+   *      to arrive over the WebSocket instead, and when it did not the
+   *      transcript kept the owner's "🎓 …" line with nothing after it.
+   *
+   *  The route already returns the reply. An ordinary turn renders it from
+   *  the response and dedupes against the event that may beat it (U26); this
+   *  one threw it away. Now it does the same thing, and a failure says so
+   *  rather than looking like a button that is not wired up.
+   */
+  async function teach(text: string): Promise<string> {
+    if (!text.trim() || isProcessing.value) return ''
     isProcessing.value = true
     addTurn({ id: crypto.randomUUID(), role: 'user', text: `🎓 ${text}`,
               timestamp: new Date().toISOString() })
+    const say = (reply: string): string => {
+      if (reply && !isRecentDuplicate('assistant', reply)) {
+        addTurn({ id: crypto.randomUUID(), role: 'assistant', text: reply,
+                  timestamp: new Date().toISOString() })
+      }
+      return reply
+    }
     try {
-      // The reply arrives as a ResponseDrafted event over the WebSocket.
-      await fetch(`${orchestratorUrl}/orchestrator/agent/feedback`, {
+      const resp = await fetch(`${orchestratorUrl}/orchestrator/agent/feedback`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text, session_id: sessionId.value ?? 'console' }),
       })
-    } catch { /* brain offline */ } finally {
+      const data = await resp.json().catch(() => ({}))
+      return say(resp.ok
+        ? String(data.reply ?? '')
+        : `[could not teach that: ${data.error ?? `HTTP ${resp.status}`}]`)
+    } catch {
+      return say('[could not teach that: the brain did not answer]')
+    } finally {
       isProcessing.value = false
     }
   }

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 import { useConversationStore } from '../../src/stores/conversationStore'
 
@@ -89,5 +89,61 @@ describe('conversationStore — clear (U187)', () => {
     expect(store.turns).toEqual([])
     expect(store.lastLatency).toBeNull()
     expect(store.sessionId).toBe('sess-1')   // the assistant still remembers
+  })
+})
+
+describe('U296 — teach leaves a visible trace, always', () => {
+  beforeEach(() => setActivePinia(createPinia()))
+
+  /** Reported as "werkt teach nog? lijkt niks te doen". The route answered
+   *  fine; the console threw the answer away and waited for a WebSocket event
+   *  that may never come. */
+  it('shows the reply the route already returned', async () => {
+    const store = useConversationStore()
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true, json: async () => ({ reply: 'Saved as a skill.' }),
+    }))
+    await store.teach('always answer in Dutch')
+    expect(store.turns.map(t => t.text)).toEqual([
+      '🎓 always answer in Dutch', 'Saved as a skill.',
+    ])
+  })
+
+  it('does not repeat a reply the WebSocket already delivered', async () => {
+    const store = useConversationStore()
+    vi.stubGlobal('fetch', vi.fn().mockImplementation(async () => {
+      // The event beats the response back, which is the normal race.
+      store.applyEvent({ event_type: 'ResponseDrafted', response_text: 'Got it.' })
+      return { ok: true, json: async () => ({ reply: 'Got it.' }) }
+    }))
+    await store.teach('be brief')
+    expect(store.turns.filter(t => t.text === 'Got it.')).toHaveLength(1)
+  })
+
+  it('says so when the brain refuses — fetch does not throw on a 503', async () => {
+    const store = useConversationStore()
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: false, status: 503, json: async () => ({ error: 'pipeline not ready' }),
+    }))
+    await store.teach('remember this')
+    expect(store.turns).toHaveLength(2)
+    expect(store.turns[1].text).toContain('pipeline not ready')
+  })
+
+  it('says so when the brain is unreachable', async () => {
+    const store = useConversationStore()
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')))
+    await store.teach('remember this')
+    expect(store.turns[1].text).toContain('did not answer')
+    expect(store.isProcessing).toBe(false)
+  })
+
+  it('an empty lesson is not sent at all', async () => {
+    const store = useConversationStore()
+    const f = vi.fn()
+    vi.stubGlobal('fetch', f)
+    await store.teach('   ')
+    expect(f).not.toHaveBeenCalled()
+    expect(store.turns).toHaveLength(0)
   })
 })
