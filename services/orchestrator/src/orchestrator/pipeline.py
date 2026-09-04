@@ -852,6 +852,7 @@ class OrchestratorPipeline:
         # U259: a subagent whose whole job is "gather and verify" was the one
         # part of the system most obviously missing the internet.
         "web_search", "read_url",
+        "look_up_person",          # U294: knowing who is being discussed
         "read_file", "git_prepare", "list_browser_tabs",
         "list_calendar_events_today", "get_unread_mail", "list_onedrive_files",
         "list_tasks", "list_todos", "list_reminders",
@@ -1155,12 +1156,68 @@ class OrchestratorPipeline:
             logger.warning("MCP call failed: %s → %s", tool_name, exc)
             return f"[{tool_name}: the {server.name} server could not run it — {exc}]"
 
+    async def _look_up_person(self, name: str) -> str:
+        """What he is allowed to know about one person (U294).
+
+        Deliberately routed through the JUDGMENT LAYER rather than reading the
+        store: that is where the role rules live, so a guest yields a name and
+        nothing else and a minor yields explicit facts and never observed
+        signals (ADR-008 §10). A tool that bypassed it would be a hole in the
+        consent model dressed up as a convenience.
+
+        Name resolution is U281's: id, display name, then an unambiguous first
+        name. Two people who share a name are reported as two, never guessed
+        between — attaching one person's life to another is worse than saying
+        "which one?".
+        """
+        name = (name or "").strip()
+        if not name:
+            return "Ask for a name first."
+        store = getattr(self._judgment, "_store", None)
+        if store is None or self._judgment is None:
+            return "I cannot reach what I know about people right now."
+        try:
+            people = await store.list_people()
+        except Exception as exc:  # noqa: BLE001 — a lookup never breaks a turn
+            logger.debug("person lookup failed: %s", exc)
+            return "I could not read my notes on people just now."
+
+        key = name.lower()
+        exact = [p for p in people if p.person_id.lower() == key
+                 or p.display_name.strip().lower() == key]
+        if not exact:
+            exact = [p for p in people
+                     if p.display_name.strip().split()[:1] == [name] or
+                     p.display_name.strip().lower().split()[:1] == [key]]
+        if not exact:
+            return (f"I have no profile for {name}. They are new to me — "
+                    f"say who they are and I will remember.")
+        if len(exact) > 1:
+            names = ", ".join(p.display_name for p in exact)
+            return (f"I know more than one {name}: {names}. Which do you mean?")
+
+        person = exact[0]
+        ctx = await self._judgment.build_context(person.person_id)
+        note = ctx.to_system_note() if ctx is not None else ""
+        role = str(getattr(person.role, "value", person.role))
+        if not note:
+            return (f"{person.display_name} ({role}) — I keep a profile, but "
+                    f"nothing I may share about them.")
+        return f"{person.display_name} ({role}):\n{note}"
+
     async def _call_connector(self, tool_name: str, arguments: dict) -> str:
         # U255: an added MCP tool is served by its own server, not by the
         # connector service. Checked first because its name can never collide
         # with a built-in route (the mcp__ prefix is reserved).
         if tool_name.startswith("mcp__"):
             return await self._call_mcp(tool_name, arguments)
+        # U294: his own household. Asked for as "hij moet zich dit zelf
+        # aanleren bij de personen te gaan kijken" — the roster (U293) tells
+        # him WHO exists, cheaply, every turn; this lets him go and LOOK when a
+        # name actually matters, instead of everyone's details being pushed
+        # into every prompt whether or not anybody asked.
+        if tool_name == "look_up_person":
+            return await self._look_up_person(str(arguments.get("name", "")))
         # U259: the internet. Not a connector route — it has its own fallback
         # chain (provider → MCP → the owner's browser).
         if tool_name in ("web_search", "read_url"):

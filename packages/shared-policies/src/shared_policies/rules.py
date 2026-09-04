@@ -137,7 +137,13 @@ MODE_TOOL_MAP: dict[str, frozenset[str]] = {
 # have to remember to switch on. Presentation included: a talk is exactly where
 # being unable to check a fact is most embarrassing. WHETHER it stops to ask is
 # a separate question, answered per mode in mode_policy (work asks).
-_ALWAYS = {"request_capability", "web_search", "read_url"}
+# U294: and so does knowing WHO is being talked about. Looking a
+# housemate up in his own notes is not a capability anyone should have
+# to switch on first — it reads the owner's own data, through the
+# judgment layer, which is what decides per person what may be said at
+# all. Presentation included: being introduced to someone you already
+# know is exactly the moment not to draw a blank.
+_ALWAYS = {"request_capability", "web_search", "read_url", "look_up_person"}
 
 MODE_TOOL_MAP = {
     mode: tools | _ALWAYS for mode, tools in MODE_TOOL_MAP.items()

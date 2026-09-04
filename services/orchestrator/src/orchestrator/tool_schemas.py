@@ -159,6 +159,18 @@ TOOL_SCHEMAS: dict[str, dict] = {
             "query": {"type": "string", "description": "What to search for."},
         }, "required": ["query"], "additionalProperties": False},
     ),
+    "look_up_person": _fn(
+        "look_up_person",
+        "Look someone up in what you already know about the household. Use it "
+        "whenever a person is mentioned and you are unsure who they are or "
+        "what you know about them. Never guess from the conversation alone, "
+        "and never say you only know a name from this conversation without "
+        "looking first. Returns only what you are allowed to know about them.",
+        {"type": "object", "properties": {
+            "name": {"type": "string",
+                     "description": "The person's name as it was said, e.g. 'Limme'."},
+        }, "required": ["name"], "additionalProperties": False},
+    ),
     "read_url": _fn(
         "read_url",
         "Fetch one public web page and read its text. Use after web_search to "
