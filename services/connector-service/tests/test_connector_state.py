@@ -40,7 +40,9 @@ def test_every_known_connector_is_described_even_when_off() -> None:
     the owner; one word for both is what made the page useless.
     """
     infos = _by_key(connector_state.describe(_s(enabled_connectors="m365")))
-    assert set(infos) == {"m365", "google", "github", "slack"}
+    # Every key the registry can build, so a new one cannot be added without
+    # the panel learning to show it. U298 added calendar_link.
+    assert set(infos) == {"calendar_link", "m365", "google", "github", "slack"}
     assert infos["slack"].status == connector_state.NOT_ENABLED
     assert infos["slack"].next_step                      # always actionable
 

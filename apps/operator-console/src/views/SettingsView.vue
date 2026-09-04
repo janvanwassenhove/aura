@@ -120,8 +120,9 @@
                the page where the id comes from. -->
           <template v-if="p.state.enabled !== false && p.state.missing?.length">
             <input v-model="appIds[p.id]" class="d2-field row-field"
-                   :placeholder="`${p.label} app ID`" autocomplete="off"
-                   :aria-label="`${p.label} app ID`">
+                   :placeholder="setupField(p.id)?.placeholder ?? `${p.label} app ID`"
+                   autocomplete="off"
+                   :aria-label="setupField(p.id)?.placeholder ?? `${p.label} app ID`">
             <button class="d2-ghost-btn" :disabled="!appIds[p.id]?.trim() || savingApp === p.id"
                     @click="saveAppId(p.id)">
               {{ savingApp === p.id ? 'Saving…' : 'Save' }}
@@ -517,6 +518,14 @@ async function testRealtime(): Promise<void> {
 // ── Connections ────────────────────────────────────────────────────────────
 const providers = computed(() => [
   {
+    // U298: the connection that needs nothing registered, listed first
+    // because for most households it is the whole answer.
+    id: 'calendar' as const, label: 'Calendar by link',
+    sub: 'Your agenda, read from a sharing link · nothing to register',
+    state: connections.providers.find(p => p.provider === 'calendar') ?? blank(),
+    connect: () => {},
+  },
+  {
     id: 'microsoft' as const, label: 'Microsoft 365', sub: 'Mail, calendar, todos, Teams',
     state: connections.providers.find(p => p.provider === 'microsoft') ?? blank(),
     connect: () => connections.startMicrosoftAuth(),
@@ -527,9 +536,13 @@ const providers = computed(() => [
     connect: () => connections.startGoogleAuth(),
   },
   {
+    // U298: the device-code flow needs a registered OAuth app; a personal
+    // access token needs nothing but a click on github.com. The store could
+    // already save one — only this row never offered the field.
     id: 'github' as const, label: 'GitHub', sub: 'Repos, issues, PR review',
     state: connections.providers.find(p => p.provider === 'github') ?? blank(),
     connect: () => connections.startGitHubAuth(),
+    tokenField: { placeholder: 'ghp_… (a personal token)' },
   },
   {
     // Slack signs in with a pasted bot token rather than a device code, so the
@@ -569,25 +582,39 @@ function linkify(text: string): { text: string; href?: string }[] {
 
 const appIds = ref<Record<string, string>>({})
 const savingApp = ref('')
-const APP_ID_FIELD: Record<string, string> = {
-  m365: 'azure_client_id',
-  google: 'google_client_id',
-  github: 'github_client_id',
+
+/** The single value a row is waiting for, keyed by the row's own id.
+ *
+ *  U298: keyed by the ROW id. U295 keyed it by the connector key the brain
+ *  uses ('m365'), while the row calls itself 'microsoft' — so the Save button
+ *  it had just added looked up nothing and returned without a word. The two
+ *  naming schemes meet here and nowhere else, so here is where they are
+ *  written down. */
+const SETUP_FIELD: Record<string, {
+  key: string; placeholder: string; also?: Record<string, string>
+}> = {
+  calendar: { key: 'calendar_ics_url', placeholder: 'https://…/calendar.ics' },
+  // "common" is the tenant for every household account, so asking would be a
+  // question with exactly one answer.
+  microsoft: { key: 'azure_client_id', placeholder: 'Microsoft app ID',
+               also: { azure_tenant_id: 'common' } },
+  google: { key: 'google_client_id', placeholder: 'Google app ID' },
+  github: { key: 'github_client_id', placeholder: 'GitHub app ID' },
+}
+
+function setupField(id: string): { key: string; placeholder: string } | undefined {
+  return SETUP_FIELD[id]
 }
 
 async function saveAppId(id: string): Promise<void> {
-  const field = APP_ID_FIELD[id]
+  const field = SETUP_FIELD[id]
   const value = (appIds.value[id] ?? '').trim()
   if (!field || !value) return
   savingApp.value = id
   try {
-    const body: Record<string, string> = { [field]: value }
-    // Microsoft also needs a tenant, and "common" is the answer for every
-    // household account — asking for it would be a question with one answer.
-    if (id === 'm365') body.azure_tenant_id = 'common'
     await fetch(`${BRAIN_URL}/setup/config`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
+      body: JSON.stringify({ [field.key]: value, ...(field.also ?? {}) }),
     })
     appIds.value[id] = ''
     await connections.refreshAllStatuses()

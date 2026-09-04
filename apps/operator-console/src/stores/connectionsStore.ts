@@ -13,7 +13,7 @@ export type ConnectorStatus =
   'ok' | 'mock' | 'unauthenticated' | 'unavailable' | 'unknown'
   | 'not_enabled' | 'no_credentials'
 
-export type Provider = 'microsoft' | 'google' | 'github' | 'slack' | 'music'
+export type Provider = 'calendar' | 'microsoft' | 'google' | 'github' | 'slack' | 'music'
 
 export interface ProviderState {
   provider: Provider
@@ -45,6 +45,7 @@ export interface ProviderState {
 
 export const useConnectionsStore = defineStore('connections', () => {
   const connectorKey: Record<Provider, string> = {
+    calendar: 'calendar_link',
     microsoft: 'm365',
     google: 'google',
     github: 'github',
@@ -53,6 +54,8 @@ export const useConnectionsStore = defineStore('connections', () => {
   }
 
   const providers = ref<ProviderState[]>([
+    // U298: first, because it is the one that needs nothing registered.
+    { provider: 'calendar',  label: 'Calendar by link', status: 'unknown', authPending: false },
     { provider: 'microsoft', label: 'Microsoft M365',   status: 'unknown', authPending: false },
     { provider: 'google',    label: 'Google Workspace', status: 'unknown', authPending: false },
     { provider: 'github',    label: 'GitHub',           status: 'unknown', authPending: false },
@@ -150,6 +153,10 @@ export const useConnectionsStore = defineStore('connections', () => {
       if (ps.status !== 'unknown') continue // already known from connector-service
       if (ps.enabled === false) continue    // U254: off — nothing to sign in to
       if (ps.provider === 'music') continue // music status comes from connector health only
+      // U298: a pasted calendar link is not an account — there is no
+      // token for identity to have, and asking would report it as "not
+      // signed in" forever.
+      if (ps.provider === 'calendar') continue
       try {
         // U221: ask whether it's connected, don't fetch the live access token.
         // This only ever read resp.ok — pulling a real Microsoft/Google/GitHub

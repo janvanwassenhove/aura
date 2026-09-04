@@ -150,8 +150,12 @@ _CONFIG_KEYS = {
     "azure_tenant_id": "AZURE_TENANT_ID",
     "google_client_id": "GOOGLE_CLIENT_ID",
     "github_client_id": "GITHUB_CLIENT_ID",
+    # U298: the calendar sharing link. Anyone holding it can read the calendar,
+    # so it is treated as a secret: stored, never echoed back to the console.
+    "calendar_ics_url": "CALENDAR_ICS_URL",
 }
-_SECRET_KEYS = {"openai_api_key", "openrouter_api_key", "gemini_api_key"}
+_SECRET_KEYS = {"openai_api_key", "openrouter_api_key", "gemini_api_key",
+                "calendar_ics_url"}
 
 
 @router.post("/config")

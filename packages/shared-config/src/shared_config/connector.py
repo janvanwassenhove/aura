@@ -1,4 +1,4 @@
-"""Connector-service settings — M365, Google, GitHub, Slack, and keyring."""
+"""Connector-service settings — M365, calendar links, Google, GitHub, Slack, keyring."""
 
 from __future__ import annotations
 
@@ -86,9 +86,28 @@ class SlackSettings(_ConnectorBase):
     )
 
 
+class CalendarLinkSettings(_ConnectorBase):
+    """U298: a calendar connected by pasting its published .ics link.
+
+    The friendliest connection there is: no app registration, no consent
+    screen, no sign-in — and read-only by construction, which is most of why
+    it is safe to set up in thirty seconds.
+    """
+
+    calendar_ics_url: str = Field(
+        default="",
+        description="Published iCalendar (.ics) subscription URL. Read-only.",
+    )
+    calendar_timezone: str = Field(
+        default="",
+        description="IANA zone for reading the feed. Empty → this machine's.",
+    )
+
+
 class ConnectorServiceSettings(
     KeyringSettings,
     M365Settings,
+    CalendarLinkSettings,
     GoogleSettings,
     GitHubSettings,
     SlackSettings,

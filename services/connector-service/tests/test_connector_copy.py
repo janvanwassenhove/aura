@@ -59,3 +59,32 @@ def test_the_step_points_at_a_page_that_can_be_opened() -> None:
         if not info.missing:
             continue
         assert "http" in info.next_step, info.label
+
+
+def test_the_easy_connection_is_offered_before_the_hard_ones() -> None:
+    """U298: "app-ids is enige manier? er niks gebruiksvriendelijker?"
+
+    A calendar link needs no app, no consent screen and no sign-in. Listing it
+    after two connectors that each want an Azure registration would bury the
+    only one most households ever need."""
+    keys = [i.key for i in describe()]
+    assert keys[0] == "calendar_link"
+
+
+def test_the_calendar_link_is_never_described_as_an_app_id() -> None:
+    """It is a URL you copy out of Outlook. Calling it an app ID would send
+    somebody to portal.azure.com for the connector that exists to avoid it."""
+    (info,) = [i for i in describe(enabled={"calendar_link"})
+               if i.key == "calendar_link"]
+    text = _visible(info).lower()
+    assert "app id" not in text
+    assert ".ics" in text
+    assert "read" in text, "and it must say it is read-only"
+
+
+def test_github_is_not_sent_to_register_an_oauth_app() -> None:
+    """U298: a personal access token is one click; registering an OAuth App is
+    ten minutes for the same result. The panel pointed at the ten minutes."""
+    (info,) = [i for i in describe(enabled={"github"}) if i.key == "github"]
+    assert "settings/tokens" in info.next_step
+    assert "settings/developers" not in info.next_step

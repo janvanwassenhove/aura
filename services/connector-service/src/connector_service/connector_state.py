@@ -91,12 +91,22 @@ class _Known:
     requires: tuple[tuple[str, str], ...] = ()   # (settings attr, env var name)
     #: Where the owner registers the OAuth app, when credentials are missing.
     register_at: str = ""
+    #: U298: the missing-credentials sentence, when "a one-time app ID" is the
+    #: wrong noun. A calendar link is not an app registration, and telling
+    #: somebody to register an app for it would send them the long way round
+    #: past the very thing this connector exists to avoid.
+    missing_copy: tuple[str, str] = ()  # type: ignore[assignment]
     #: U254b: the cheapest READ that proves this connector really works, and
     #: the noun to count in the answer. It MUST be a call the connector
     #: actually implements: the probe used to ask everything for today's
     #: calendar, so GitHub and Slack — which deliberately refuse calendar and
     #: do repos and channels instead — could never pass their own Test button.
     probe: tuple[str, str] = ("list_calendar_events_today", "calendar event")
+    #: U298: how a sign-in is actually done for THIS connector. GitHub does
+    #: not need an app registration at all — a personal access token is one
+    #: click — but the panel was pointing at github.com/settings/developers,
+    #: the ten-minute route to the same place.
+    signin_step: str = "Press Connect and complete the device-code sign-in."
     #: True when the credential is only fetched at CALL time (a keyring token,
     #: an identity lookup) rather than needed to construct the connector. Such
     #: a connector builds happily with no account at all, so "it constructed"
@@ -110,6 +120,22 @@ class _Known:
 # a product decision: an owner should see Slack listed and switched off, not
 # be left wondering whether AURA has heard of it.
 KNOWN: tuple[_Known, ...] = (
+    _Known(
+        # U298: asked as "app-ids is enige manier? er niks gebruiksvriendelijker?"
+        # Outlook, Google and Apple all publish a private .ics link for a
+        # calendar. Pasting it needs no app, no consent screen and no sign-in.
+        key="calendar_link", label="Calendar by link",
+        domains=("calendar",),
+        requires=(("calendar_ics_url", "CALENDAR_ICS_URL"),),
+        missing_copy=(
+            "Not connected yet. This is the quick one: paste the sharing link "
+            "from your calendar and he can read your agenda — nothing to "
+            "register, nothing to sign in to.",
+            "In Outlook or Google Calendar, publish the calendar and copy the "
+            "link ending in .ics, then paste it here. It only lets him READ "
+            "the calendar.",
+        ),
+    ),
     _Known(
         key="m365", label="Microsoft 365",
         domains=("mail", "calendar", "tasks", "chat", "files"),
@@ -127,6 +153,8 @@ KNOWN: tuple[_Known, ...] = (
         key="github", label="GitHub",
         domains=("repos",),
         register_at="https://github.com/settings/developers",
+        signin_step=("Create a token at https://github.com/settings/tokens and "
+                     "paste it here — no app to register."),
         probe=("list_assigned_issues", "assigned issue"),
         verifies_at_call_time=True,
     ),
@@ -214,6 +242,8 @@ def _describe_one(
         # the owner needs to know is that signing in is not possible yet and
         # that one value fixes it; WHICH variable holds it is our business,
         # and still travels in `missing` for anyone debugging.
+        if known.missing_copy:
+            return info(NO_CREDENTIALS, *known.missing_copy, missing=missing)
         return info(
             NO_CREDENTIALS,
             f"{known.label} needs a one-time app ID before you can sign in. "
@@ -235,7 +265,7 @@ def _describe_one(
                 UNAUTHENTICATED,
                 "Switched on, but no token is stored — so there is no account "
                 "to ask.",
-                "Press Connect (or paste a token), then Test to prove it.",
+                known.signin_step,
             )
     if status in (OK, MOCK):
         return info(
@@ -252,7 +282,7 @@ def _describe_one(
     return info(
         UNAUTHENTICATED,
         "Ready, but nobody has signed in yet — so there is no account to ask.",
-        "Press Connect and complete the device-code sign-in.",
+        known.signin_step,
     )
 
 

@@ -117,6 +117,17 @@ class ConnectorRegistry:
             return GoogleConnector(settings=s, identity_url=s.identity_service_url,
                                    token_fetcher=self._token_fetcher)
 
+        if key == "calendar_link":
+            # U298: nothing to register, so the only thing that can be missing
+            # is the link itself.
+            if not s.calendar_ics_url:
+                raise _AuthMissingError(
+                    "a published calendar link is required for the "
+                    "calendar_link connector"
+                )
+            from connector_service.connectors.calendar_link import CalendarLinkConnector
+            return CalendarLinkConnector(settings=s)
+
         if key == "github":
             # GitHub token may be stored in keyring — absence is not fatal at startup
             from connector_service.connectors.github import GitHubConnector

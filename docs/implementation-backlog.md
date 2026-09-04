@@ -908,3 +908,46 @@ Onderweg drie dingen rechtgezet:
 
 Vijf tests, waaronder één die controleert dat elke afbeelding waar de README
 naar wijst ook echt bestaat, en drie op de robotstore. CI draait ze mee.
+
+### U298 — nee, een app-ID is niet de enige manier
+
+Gevraagd als "app-ids is enige manier? er niks gebruiksvriendelijker?" — een
+eerlijke vraag na U295, waarin ik het veld had toegevoegd maar de stap zelf had
+laten staan. Voor twee van de drie is er wél een kortere weg, en die zijn nu
+gebouwd.
+
+**Agenda via een link.** Outlook, Google Agenda en Apple Agenda geven elk een
+privé-abonneelink: één URL die eindigt op `.ics` en de hele agenda als tekst
+teruggeeft. Plakken duurt dertig seconden: geen app-registratie, geen
+toestemmingsscherm, geen aanmelding, niets dat een beheerder ergens kan
+intrekken. Het levert minder op dan een echt account — alleen lezen, alleen
+agenda, geen mail en niets versturen — maar "wat staat er vandaag" is de vraag
+die een gezin stelt, en die wordt nu beantwoord zonder iemand naar
+portal.azure.com te sturen. De rij staat bovenaan, want voor de meeste
+huishoudens is dit het hele antwoord.
+
+Zelf geparseerd in plaats van met een bibliotheek: `uv sync` snoeit elke extra
+die niet gevraagd is, en dat heeft dit project al vier keer gekost (U179, U213,
+U246, U266). Wat een abonneefeed gebruikt is klein en stabiel. Achttien tests
+uit het gedrag van échte feeds: DTEND is exclusief (anders staat elke
+hele-dag-afspraak ook op de dag erna), Outlook schrijft TZID en Google een Z,
+en een gezinsagenda bestaat vooral uit herhalingen — precies het stuk dat een
+naïeve parser fout doet terwijl het werkend lijkt. `tzdata` toegevoegd, want
+Windows heeft geen tijdzonedatabase: zonder dat zou `TZID=Europe/Brussels`
+stilletjes op het verkeerde uur landen.
+
+**GitHub had nooit een app nodig.** Een persoonlijk token is één klik op
+github.com; de OAuth-app-registratie waar het paneel naar wees is tien minuten
+voor hetzelfde resultaat. De store kon zo'n token al opslaan — alleen bood de
+rij het veld niet aan.
+
+Onderweg: **de Save-knop uit U295 deed niets op de Microsoft-rij.** Ik had de
+map op de connectorsleutel van de brain gezet (`m365`) terwijl de rij zichzelf
+`microsoft` noemt, dus de opzoeking gaf niets terug en de functie keerde
+zwijgend om. Precies de fout die deze sessie blijft opleveren en precies de
+soort die geen enkele test ving. Nu één map, op de rij-id, met een opmerking
+erbij dat de twee naamgevingen elkaar alleen hier tegenkomen.
+
+Wat hiermee níét is opgelost: mail lezen, mail versturen en Teams vragen nog
+altijd een echte aanmelding, en daarvoor blijft één app-registratie nodig
+zolang `defaults.py` leeg staat. Die kan alleen de eigenaar doen.
