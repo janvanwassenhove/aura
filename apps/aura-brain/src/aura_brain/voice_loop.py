@@ -884,6 +884,13 @@ class VoiceLoop:
         note = ""
         try:
             note = await self._pipeline.person_note()
+            # U293: the household too. The speech path never calls the
+            # pipeline, so anything it is not handed, it simply does without —
+            # which is how he came to know Jappe, Elke and Limme "from this
+            # conversation" while their profiles sat in the store.
+            household = await self._pipeline.household_note()
+            if household:
+                note = f"{note}\n\n{household}" if note else household
         except Exception as exc:  # noqa: BLE001 — speech must never wait on this
             logger.debug("person note unavailable for the realtime path: %s", exc)
         from aura_brain.voice import _stt_language

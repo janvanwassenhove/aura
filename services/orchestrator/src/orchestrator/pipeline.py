@@ -474,6 +474,50 @@ class OrchestratorPipeline:
         return {"language": getattr(person, "language", "") or "",
                 "character": getattr(person, "character", "") or ""}
 
+    async def household_note(self) -> str:
+        """The people he ALREADY KNOWS, so a name in conversation lands on a
+        profile instead of arriving as a stranger.
+
+        U293: he was only ever told who was standing in front of him. Say
+        "Limme" to him and nothing connected that to the profile the owner had
+        created — so he answered "ik ken de namen uit ons gesprek", which was
+        true and was exactly the problem. He learns the household perfectly
+        well AFTER a conversation (U280 links a remembered line to the person
+        it is about); during one he had never been told they exist.
+
+        Names and roles only. What he knows ABOUT each of them stays behind
+        the judgment layer, which is where the role rules live — a minor is
+        not passively learned about (ADR-008 §10), and putting everyone's
+        facts into every prompt would hand a guest the household's private
+        life to overhear.
+        """
+        store = getattr(self._judgment, "_store", None)
+        if store is None:
+            return ""
+        try:
+            people = await store.list_people()
+        except Exception as exc:  # noqa: BLE001 - context is never worth a turn
+            logger.debug("household roster unavailable: %s", exc)
+            return ""
+
+        listed = []
+        for person in people:
+            role = str(getattr(person.role, "value", person.role))
+            if role in ("demo", "guest"):
+                continue        # fiction, and people who are not remembered
+            if person.person_id == self._active_person_id:
+                continue        # already covered, in more detail, by person_note
+            listed.append(f"{person.display_name} ({role})")
+        if not listed:
+            return ""
+        return (
+            "## People you already know\n"
+            + ", ".join(sorted(listed))
+            + ".\nThese have profiles you keep. When one of them comes up you "
+            "already know who they are — never say you only know the name from "
+            "this conversation."
+        )
+
     def set_active_person(self, person_id: str | None) -> None:
         """Update the currently-recognized person (called on PersonRecognized events)."""
         self._active_person_id = person_id
@@ -640,6 +684,11 @@ class OrchestratorPipeline:
         note = await self.person_note()
         if note:
             ctx_str = note + "\n\n" + ctx_str
+        # U293: and who else lives here, so a name he is told lands on a
+        # profile rather than on nothing.
+        household = await self.household_note()
+        if household:
+            ctx_str = household + "\n\n" + ctx_str
 
         tool_list_str = await self._context.build_tool_list(allowed)
         system_prompt = self._persona.render_system_prompt(ctx_str, tool_list_str)
