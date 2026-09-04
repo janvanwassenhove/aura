@@ -28,12 +28,17 @@ is how most of it was built.
 ## See it
 
 <p align="center">
-  <img src="docs/screenshots/console.webp" alt="The AURA console: robot state and camera on the left, the conversation in the middle, and the brain panel on the right." width="900">
+  <img src="docs/screenshots/console.webp" alt="The AURA console: the navigation rail and conversation on the left, and on the right the robot camera, what he is thinking about, what is next, and what his body just did." width="900">
 </p>
 
 <p align="center">
   <img src="docs/screenshots/brain-person.webp" alt="A person's profile in the brain panel: facts grouped by category, each with wiki-style links to topics." width="440">
   <img src="docs/screenshots/knowledge-graph.webp" alt="The knowledge graph: a person node surrounded by facts, skills and the topics they mention." width="440">
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/skills.webp" alt="The Skills panel: each learned procedure as a card with the phrases that trigger it and who it applies to." width="440">
+  <img src="docs/screenshots/settings.webp" alt="Settings: which model he thinks with, and which accounts he may reach — each connection saying in plain words what it can answer right now." width="440">
 </p>
 
 *Captured from a demo build. The only profile in these images is fictional — the

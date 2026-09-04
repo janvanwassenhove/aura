@@ -173,3 +173,39 @@ describe('robotStore — WS generation signal (U175)', () => {
     expect(store.wsGeneration).toBe(0)
   })
 })
+
+describe('U297 — the robot state is asked for, not only waited for', () => {
+  beforeEach(() => setActivePinia(createPinia()))
+
+  /** U152 wrote syncFromStatus for exactly this and wired it into the Robot
+   *  view alone, so every start said "Robot offline" about a robot that was
+   *  answering — visible in our own release screenshots. */
+  it('a poll turns an unseen RobotConnected into a connected robot', async () => {
+    const store = useRobotStore()
+    expect(store.connected).toBe(false)
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ connected: true, mode: 'home', battery_pct: 62, has_battery: true }),
+    }))
+    await store.refreshStatus()
+    expect(store.connected).toBe(true)
+    expect(store.mode).toBe('home')
+    expect(store.batteryLine).toBe('62%')
+  })
+
+  it('a blip does not turn a working robot offline', async () => {
+    const store = useRobotStore()
+    store.applyEvent({ event_type: 'RobotConnected', mode: 'work' })
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')))
+    await store.refreshStatus()
+    expect(store.connected).toBe(true)
+  })
+
+  it('ignores a status the brain could not answer', async () => {
+    const store = useRobotStore()
+    store.applyEvent({ event_type: 'RobotConnected', mode: 'work' })
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 503, json: async () => ({}) }))
+    await store.refreshStatus()
+    expect(store.connected).toBe(true)
+  })
+})

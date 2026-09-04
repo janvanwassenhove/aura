@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
+import { BRAIN_URL } from '../lib/endpoints'
 
 export interface MotionLogEntry {
   id: string
@@ -151,6 +152,22 @@ export const useRobotStore = defineStore('robot', () => {
     faceVisible.value = s.face_visible ?? null   // U165
   }
 
+  /** U297: ask the brain how the robot is, instead of waiting for an event
+   *  that may already have happened.
+   *
+   *  U152 wrote the sync above for exactly this case and then wired it into
+   *  the Robot view alone. So on every start the header said "Robot offline"
+   *  about a robot that was answering — `RobotConnected` is published when
+   *  the robot connects, which is normally BEFORE the console is open — and
+   *  the truth only appeared if you went to look for it in the one view that
+   *  polled. It was even visible in our own release screenshots. */
+  async function refreshStatus(): Promise<void> {
+    try {
+      const r = await fetch(`${BRAIN_URL}/robot/status`)
+      if (r.ok) syncFromStatus(await r.json())
+    } catch { /* leave the last known state — a blip is not a disconnect */ }
+  }
+
   /** U162: flip follow-me on the robot; reverts on failure so the UI never
    *  claims a mode the robot isn't in. Returns whether it took. */
   async function setTracking(enabled: boolean, brainUrl: string): Promise<boolean> {
@@ -184,5 +201,5 @@ export const useRobotStore = defineStore('robot', () => {
     wsGeneration.value = 0
   }
 
-  return { batteryPct, hasBattery, batteryLine, mode, behaviorState, isSpeaking, currentTranscript, uptime, connected, motionLog, lastRecognized, tracking, faceVisible, wsGeneration, noteWsOpen, statusBadgeClass, applyEvent, syncFromStatus, setTracking, $reset }
+  return { batteryPct, hasBattery, batteryLine, mode, behaviorState, isSpeaking, currentTranscript, uptime, connected, motionLog, lastRecognized, tracking, faceVisible, wsGeneration, noteWsOpen, statusBadgeClass, applyEvent, syncFromStatus, refreshStatus, setTracking, $reset }
 })

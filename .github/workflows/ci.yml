@@ -30,6 +30,12 @@ jobs:
       # months — nothing was watching, because nothing could.
       - name: Release-notes tests
         run: pytest scripts/test_release_notes.py -q
+      # U297: the README's screenshots are generated too, and a renamed shot
+      # would otherwise leave a broken picture on the front page.
+      - name: README-screenshot tests
+        run: |
+          pip install pillow
+          pytest scripts/test_readme_shots.py -q
 
   test:
     runs-on: ubuntu-latest

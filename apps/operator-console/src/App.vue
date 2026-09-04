@@ -84,9 +84,16 @@ watch(() => robot.faceVisible, (visible) => {
   else if (visible) knowledge.noteFaceSeen()
 })
 
+// U297: the robot's state is asked for, not waited for. `RobotConnected` fires
+// when the robot connects — normally before this window exists — so a console
+// that only listens starts by claiming the robot is offline. Re-asked on every
+// reconnect, because a brain restart loses the same event again.
+watch(wsStatus, (s) => { if (s === 'open') void robot.refreshStatus() })
+
 onMounted(async () => {
   themeStore.apply()
   connect()
+  void robot.refreshStatus()
   modeStore.fetchPolicy()
   knowledge.fetchTier()
   knowledge.fetchPeople()

@@ -876,3 +876,35 @@ uitgeschakelde knop legt zichzelf uit — en de tooltip vertelt dan wat je eerst
 moet doen.
 
 Vijf tests, geverifieerd rood tegen de oude store.
+
+### U297 — de screenshots in de README waren van de vorige app
+
+Gemeld als "also update screenshots in readme, these are still from the old
+app". Ze dateerden van 11 augustus: met de hand gemaakt, vier maanden oud, en
+niets kon dat merken — een verouderde afbeelding rendert nog altijd prima.
+
+Dus zijn ze niet opnieuw met de hand genomen. De release-pipeline fotografeert
+al sinds U166 een wegwerpstack (nep-robot, echo-model, één verzonnen profiel);
+dat script maakt nu ook de plaatjes voor de README, en `scripts/readme_shots.py`
+zet ze om naar de .webp-bestanden waar de README naar wijst. "Screenshots
+opnieuw nemen" is daarmee een commando in plaats van een namiddag.
+
+Onderweg drie dingen rechtgezet:
+
+* **De header loog over de robot.** `RobotConnected` wordt gepubliceerd wanneer
+  de robot verbindt — normaal vóór de console openstaat. U152 schreef
+  `syncFromStatus` precies daarvoor en hing hem alleen in het Robot-scherm, dus
+  elke start zei "Robot offline" over een robot die gewoon antwoordde, en de
+  waarheid verscheen enkel als je ernaar ging zoeken. Nu wordt de status
+  gevraagd bij het opstarten en bij elke herverbinding. Het stond op onze eigen
+  release-screenshot.
+* **`model-roles.webp`** toonde een sectie die alleen bestaat bij provider
+  OpenAI — wat een sleutelloze demostack nooit is. Het bestand heette naar iets
+  dat er niet op stond en stond nergens meer in de README; vervangen door
+  `settings.webp`, dat wél toont wat het belooft.
+* **Elke opname begint nu op een verse pagina.** Navigatie in deze console is
+  Pinia-state, geen URL: één mislukte klik liet alle volgende opnames op het
+  verkeerde scherm staan, en die zagen er nog steeds uit als screenshots.
+
+Vijf tests, waaronder één die controleert dat elke afbeelding waar de README
+naar wijst ook echt bestaat, en drie op de robotstore. CI draait ze mee.
