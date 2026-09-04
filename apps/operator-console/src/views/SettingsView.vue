@@ -89,8 +89,13 @@
             <!-- The brain composes this sentence, so the page and the assistant
                  can never disagree about what is true. -->
             <div class="row-sub">{{ p.state.detail || p.sub }}</div>
+            <!-- U295: the step names a page to visit, and it was plain text —
+                 so the one instruction on the row could not be followed from
+                 the row. -->
             <div v-if="p.state.nextStep && p.state.status !== 'ok'" class="row-next">
-              → {{ p.state.nextStep }}
+              → <template v-for="(part, i) in linkify(p.state.nextStep)" :key="i"><a
+                  v-if="part.href" :href="part.href" target="_blank" rel="noopener">{{ part.text }}</a><span
+                  v-else>{{ part.text }}</span></template>
             </div>
             <div v-if="p.state.deviceCode" class="device-code">
               Enter <strong class="mono">{{ p.state.deviceCode }}</strong> at
@@ -108,6 +113,20 @@
             :title="p.state.enabled === false ? `Switch ${p.label} on` : `Switch ${p.label} off — he stops using it`"
             @click="connections.setEnabled(p.id, p.state.enabled === false)"
           ><span class="knob" /></button>
+          <!-- U295: a connector missing its app ID used to render NO controls
+               at all, while its own text said "paste its id here". Asked as
+               "don't we have more user friendly ways to connect? this is
+               really dev like" — so here is the field, and a link that opens
+               the page where the id comes from. -->
+          <template v-if="p.state.enabled !== false && p.state.missing?.length">
+            <input v-model="appIds[p.id]" class="d2-field row-field"
+                   :placeholder="`${p.label} app ID`" autocomplete="off"
+                   :aria-label="`${p.label} app ID`">
+            <button class="d2-ghost-btn" :disabled="!appIds[p.id]?.trim() || savingApp === p.id"
+                    @click="saveAppId(p.id)">
+              {{ savingApp === p.id ? 'Saving…' : 'Save' }}
+            </button>
+          </template>
           <template v-if="p.state.enabled !== false && !p.state.missing?.length">
             <template v-if="p.tokenField && p.state.status !== 'ok'">
               <input v-model="tokens[p.id]" type="password" class="d2-field row-field"
@@ -528,6 +547,55 @@ const musicState = computed(() =>
   connections.providers.find(p => p.provider === 'music')?.status ?? 'unknown')
 // Token-based connectors (Slack today) hold their pasted secret here only
 // until it is sent; it is never read back from the brain.
+// U295: the OAuth app ID a connector needs before a sign-in can even start.
+// It lived only in an environment variable, which is not a thing to ask of
+// somebody who just wants their calendar to show up. Not a secret — a public
+// client id, the kind the gh and Azure CLIs ship in their binaries — so it is
+// saved beside the other settings rather than in the keyring.
+/** Split a sentence into text and the links inside it, so the page it tells
+ *  you to open can be opened. U295 — it used to render as plain text. */
+function linkify(text: string): { text: string; href?: string }[] {
+  const out: { text: string; href?: string }[] = []
+  let last = 0
+  for (const m of text.matchAll(/https?:\/\/[^\s)]+/g)) {
+    const at = m.index ?? 0
+    if (at > last) out.push({ text: text.slice(last, at) })
+    out.push({ text: m[0], href: m[0] })
+    last = at + m[0].length
+  }
+  if (last < text.length) out.push({ text: text.slice(last) })
+  return out
+}
+
+const appIds = ref<Record<string, string>>({})
+const savingApp = ref('')
+const APP_ID_FIELD: Record<string, string> = {
+  m365: 'azure_client_id',
+  google: 'google_client_id',
+  github: 'github_client_id',
+}
+
+async function saveAppId(id: string): Promise<void> {
+  const field = APP_ID_FIELD[id]
+  const value = (appIds.value[id] ?? '').trim()
+  if (!field || !value) return
+  savingApp.value = id
+  try {
+    const body: Record<string, string> = { [field]: value }
+    // Microsoft also needs a tenant, and "common" is the answer for every
+    // household account — asking for it would be a question with one answer.
+    if (id === 'm365') body.azure_tenant_id = 'common'
+    await fetch(`${BRAIN_URL}/setup/config`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    appIds.value[id] = ''
+    await connections.refreshAllStatuses()
+  } finally {
+    savingApp.value = ''
+  }
+}
+
 const tokens = ref<Record<string, string>>({})
 async function saveToken(id: 'github' | 'slack'): Promise<void> {
   const value = (tokens.value[id] ?? '').trim()

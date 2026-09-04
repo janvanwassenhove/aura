@@ -140,6 +140,16 @@ _CONFIG_KEYS = {
     "openai_api_key": "OPENAI_API_KEY",
     "openrouter_api_key": "OPENROUTER_API_KEY",
     "gemini_api_key": "GEMINI_API_KEY",
+    # U295: the OAuth app ids a connector needs before a sign-in can even
+    # start. They were reachable only by editing environment variables, while
+    # the Connections panel said "paste its id here" next to no field to paste
+    # it into. Not secrets — public client ids, the same ones the gh and Azure
+    # CLIs ship in their binaries — so they live beside the other settings
+    # rather than in the keyring.
+    "azure_client_id": "AZURE_CLIENT_ID",
+    "azure_tenant_id": "AZURE_TENANT_ID",
+    "google_client_id": "GOOGLE_CLIENT_ID",
+    "github_client_id": "GITHUB_CLIENT_ID",
 }
 _SECRET_KEYS = {"openai_api_key", "openrouter_api_key", "gemini_api_key"}
 

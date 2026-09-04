@@ -198,20 +198,28 @@ def _describe_one(
     # m365 has a mock that needs no credentials at all, so it is checked before
     # the credential gate — otherwise the demo setup would report itself broken.
     if known.key == "m365" and _mock_m365(s):
+        # U295: this used to read "Set M365_CONNECTOR=workiq and register an
+        # Azure app for the real one" — an environment variable, in a panel
+        # meant for the person who owns the household. Asked as "don't we have
+        # more user friendly ways to connect? this is really dev like".
         return info(
             MOCK,
-            "Answering with canned data — a demo account, not your mail.",
-            "Set M365_CONNECTOR=workiq and register an Azure app for the real one.",
+            "Showing example data, not your real mail or calendar.",
+            "Connect your Microsoft account to see the real thing.",
         )
 
     missing = tuple(env for attr, env in known.requires if not getattr(s, attr, ""))
     if missing:
+        # U295: the same fact, without the environment-variable names. What
+        # the owner needs to know is that signing in is not possible yet and
+        # that one value fixes it; WHICH variable holds it is our business,
+        # and still travels in `missing` for anyone debugging.
         return info(
             NO_CREDENTIALS,
-            f"Switched on, but {' and '.join(missing)} is not set, so a sign-in "
-            f"cannot even start.",
-            f"Register an app at {known.register_at}, then paste its id here."
-            if known.register_at else "Set the missing values.",
+            f"{known.label} needs a one-time app ID before you can sign in. "
+            f"It is free, and you only do it once.",
+            f"Create one at {known.register_at}, then paste it in the field here."
+            if known.register_at else "One setting is still missing.",
             missing,
         )
 

@@ -60,7 +60,13 @@ def test_the_mock_never_claims_to_be_your_account() -> None:
     infos = _by_key(connector_state.describe(_s(enabled_connectors="m365",
                                                 m365_connector="mock")))
     assert infos["m365"].status == connector_state.MOCK
-    assert "canned data" in infos["m365"].detail
+    # U295: assert the PROMISE, not the phrasing. The row now reads "Showing
+    # example data, not your real mail or calendar" — the wording changed when
+    # the panel stopped talking to developers, the guarantee did not: it must
+    # never let the owner believe they are looking at their own account.
+    detail = infos["m365"].detail.lower()
+    assert "example data" in detail or "canned data" in detail
+    assert "not your real" in detail or "not your mail" in detail
 
 
 def test_the_owner_can_switch_one_on_and_it_sticks() -> None:
