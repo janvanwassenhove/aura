@@ -1058,3 +1058,21 @@ machinerie waar het model niet bij kan, en geef het nooit een zin om zich
 achter te verschuilen.
 
 Schuld: 285 → 225.
+
+### U303 — spec 018: kennis, personen en de oordeelslaag
+
+Eenenveertig units rond de kant waar de persoonlijke gegevens staan. ADR-008
+beschreef het model in juni en klopt nog grotendeels; wat er niet in stond is
+alles wat de laag sindsdien geleerd heeft: gezichten herkennen op woonkamer-
+afstand, een profiel laten groeien uit een gesprek, wat je over de één zegt aan
+de ánder hangen, en eerlijk zijn wanneer hij niets van dat alles doet.
+
+Expliciet vastgelegd, omdat het echt is: er is **geen tweede kopie** van de
+eigenaarssleutel. De wachtzin staat in de Windows-kluis en nergens anders; kwijt
+is kwijt, inclusief de profielen en de gezichtsdata.
+
+Ook vastgelegd wat drie keer misging op dezelfde manier — de console die een
+kennisstand toonde die de brain niet deelde (U276, U278, U290) — en waarom een
+laag-vertrouwen waarneming taggen géén correctie is maar training.
+
+Schuld: 225 → 184.

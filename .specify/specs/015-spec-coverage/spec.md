@@ -5,7 +5,7 @@ owner: "build"
 priority: P1
 risk: Low
 created: "2026-09-05"
-units: [U299, U300, U301, U302]
+units: [U299, U300, U301, U302, U303]
 ---
 
 # Feature Specification: Spec Coverage — traceability that a machine checks
@@ -158,3 +158,4 @@ spec-first rule and the per-unit obligations, and points at the constitution.
 | U300 | Batched and ranged commit subjects counted as the several units they are — the debt went from 292 to its true 321 |
 | U301 | Spec 016 — embodiment and presence (36 units) |
 | U302 | Spec 017 — voice and language (60 units) |
+| U303 | Spec 018 — knowledge, people and judgment (41 units) |
