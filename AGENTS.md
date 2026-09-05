@@ -55,6 +55,8 @@ All feature work begins with a specification. No implementation task exists with
 - **No secrets in logs** — auth tokens, personal data, and M365 content must never appear in log output
 - **STT/TTS is pluggable** — use `STT_PROVIDER` / `TTS_PROVIDER` env vars; never hardcode a vendor
 - **The Pi is older than you think** — the laptop self-updates, the robot is flashed by hand. Any NEW brain→runtime call goes in its own try and must not break the sequence around it when the robot answers 404; report the degradation instead of plain success (constitution X)
+- **Never report what has not been verified** — a missing measurement renders as an absence, a mock says it is a mock, and `unknown` is not a status (constitution XI, ADR-009)
+- **A unit owes its spec** — the change, the spec (with the unit in its `units:` frontmatter), the ledger entry, the drawing if the shape changed, and an ADR if a decision was taken — all in the same commit. `scripts/spec_drift.py` checks the link and CI fails on it (constitution I)
 - **Change the shape, change the drawing** — a unit that alters the trust boundary, the turn, a loop's cadence, the knowledge model, the key hierarchy or a sub-agent's bounds updates the matching SVG in `docs/diagrams/` in the same unit (constitution IX)
 
 ### Project Map
@@ -75,6 +77,9 @@ All feature work begins with a specification. No implementation task exists with
 | `apps/operator-console/` | Vue 3 + TypeScript monitoring console |
 | `docs/adr/` | Architecture Decision Records |
 | `docs/architecture/` | System diagrams and component specs |
+| `.specify/specs/` | What the product does **today** — 22 feature specs |
+| `docs/implementation-backlog.md` | The unit ledger — how it got there, in Dutch |
+| `CLAUDE.md` | The same working agreement, for agents that read that file |
 | `infra/dev/` | Docker Compose, dev scripts |
 | `tests/` | Unit, integration, contract, simulation tests |
 

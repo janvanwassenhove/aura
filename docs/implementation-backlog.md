@@ -1255,3 +1255,27 @@ update vervangen.
 Het architectuuroverzicht is bijgewerkt: drie spraakpaden in plaats van twee
 providers, zes connectoren in plaats van één, vier principes erbij, en een
 leeslijst die niet meer stopt bij ADR-006.
+
+### U312 — de grondwet naar 1.3.0
+
+De grondwet staat amendementen expliciet toe, mits er een onderbouwing is en de
+betrokken ADR's zijn bijgewerkt. Beide zijn er nu, dus:
+
+**Principe I zegt hoe het wordt afgedwongen.** "Specs are living artifacts" was
+waar en volstrekt machteloos: het principe stond 292 units buiten werking en
+niets kon dat merken. Er staat nu bij dat traceerbaarheid wordt *gecontroleerd*,
+niet vertrouwd, met de precedent erbij — want een principe zonder precedent
+leest als een goede voornemen.
+
+**Principe XI — Never report what has not been verified.** De onderbouwing is
+ADR-009 uit U311. Tien incidenten, één vorm, geen enkele een crash, allemaal
+geloofd.
+
+**En het werkritme staat er eindelijk in.** De workflow beschreef alleen
+geplande features met een branch per spec. De autobuild-stroom werkt anders: één
+gemeld probleem, van begin tot eind opgelost, in één commit — en die commit is
+pas af met de code én de spec én het ledger én de tekening als de vorm wijzigde
+én een ADR als er een beslissing is genomen.
+
+`AGENTS.md` is meegetrokken, zodat de Copilot-kant en `CLAUDE.md` hetzelfde
+zeggen.

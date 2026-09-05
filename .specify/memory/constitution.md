@@ -7,7 +7,9 @@
 Every feature begins as a specification in `.specify/specs/NNN-name/spec.md`.  
 No implementation task is created without a corresponding spec entry.  
 No code is merged without traceability to a spec acceptance criterion.  
-Specs are living artifacts — update them when reality diverges.
+Specs are living artifacts — update them when reality diverges.  
+**Traceability is checked, not trusted.** Every unit names itself in the `units:` frontmatter of the spec whose behaviour it changed; `scripts/spec_drift.py` reports any unit no spec accounts for, and CI fails on it.  
+Precedent: this principle was inoperative for 292 units — `.specify/` was touched three times while the product was rebuilt around it, and nothing could notice, because nothing was looking (U299, spec 015).
 
 ### II. Hardware Abstraction is Non-Negotiable
 The orchestrator, behavior engine, and all higher-level services MUST NOT import or reference Reachy-specific SDK types.  
@@ -67,6 +69,13 @@ Concretely: call a new endpoint in its own `try`, never in the same block as the
 When the optional half is missing, SAY so in the response instead of reporting plain success — the owner should hear about a degradation from the app, not discover it by watching the robot.  
 Precedent: U195 (new camera route, probed once, falls back to the legacy stream) got this right. U237 did not: one 404 made the sleep button do nothing at all while the app reported success (fixed in U238).
 
+### XI. Never Report What Has Not Been Verified
+A value is reported only if it has been measured or proven. Where it has not, the ABSENCE is reported — in the owner's language, with the next step attached.  
+Concretely: never substitute a plausible default for a missing measurement; a mock says it is a mock; constructing is not connecting (green is earned by a probe that exercises the real path); and `unknown` is not a status, because it is the only answer nobody can act on.  
+The console composes presentation, never truth: every status, capability and knowledge state it shows comes from the brain.  
+**The cost is asymmetric.** "I don't know" costs a moment. "It's fine" when it is not costs the owner's trust in everything else the system says.  
+Precedent: ten instances of one shape — a green badge over canned data (U52), "sleep: done" on a 404 (U238), "following" with a dead tracker (U253), "battery 100%" from an SDK that measures none (U270), "nothing is being remembered" while it was (U290), "CI is green" for six hours while it was red (U283). None was a crash; every one was believed. Rationale in [ADR-009](../../docs/adr/ADR-009-honest-state.md).
+
 ---
 
 ## Architecture Constraints
@@ -101,6 +110,22 @@ Precedent: U195 (new camera route, probed once, falls back to the legacy stream)
 5. Acceptance criteria verified before merging
 6. Spec status updated to `implemented` after merge
 
+For the autobuild stream — one reported problem, fixed end to end, landing as
+exactly one commit `auto(UNNN): title` — a unit is not finished until **all** of
+these are in that same commit:
+
+| | What | Where |
+|---|---|---|
+| 1 | The change, with tests verified **red** against the old code | the source tree |
+| 2 | The spec updated to match what the code now does, with the unit in its `units:` frontmatter | `.specify/specs/NNN-*/spec.md` |
+| 3 | The ledger entry — what was reported, what was actually wrong, what changed | `docs/implementation-backlog.md` |
+| 4 | The drawing, if the shape changed (principle IX) | `docs/diagrams/*.svg` |
+| 5 | An ADR, if a decision was taken a future reader would otherwise have to reverse-engineer | `docs/adr/` |
+
+The ledger records *how we got here*; the spec records *what is true now*. One
+is not a substitute for the other, and treating it as one is exactly what
+principle I now checks for.
+
 ---
 
 ## Governance
@@ -110,4 +135,4 @@ Amendments require: documented rationale, update to affected ADR(s), migration p
 All PRs must verify compliance with the Hardware Abstraction and Safety Gates principles.  
 Complexity violations must be justified in `.specify/specs/NNN/plan.md` under the **Complexity Tracking** section.
 
-**Version**: 1.2.0 | **Ratified**: 2026-04-25 | **Last Amended**: 2026-08-12 (added principles IX and X)
+**Version**: 1.3.0 | **Ratified**: 2026-04-25 | **Last Amended**: 2026-09-05 (added principle XI; principle I now names its enforcement; the workflow states what a unit owes)
