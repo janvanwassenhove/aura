@@ -1093,3 +1093,22 @@ gevraagd "guardrails toe te voegen voor de faalgevallen die uit het bewijs
 blijken", over bewijs waarin geen enkel faalgeval stond.
 
 Schuld: 184 → 151.
+
+### U305 — specs 020 en 021: de app, de releases, en de robot bijwerken
+
+Eenenvijftig units, in twee specs gesplitst omdat het twee verschillende
+werelden zijn. De laptop werkt zichzelf bij bij elke release; de Pi in de robot
+niet. Die asymmetrie is grondwetsprincipe X en geen tijdelijke toestand: een
+gezin installeert de app zodra ze wordt aangeboden en raakt het
+bestandssysteem van de robot ongeveer nooit aan.
+
+De belangrijkste regel in 020 staat er omdat ze ooit ontbrak: alle eigendom van
+de eigenaar — profielen, herinneringen, sleutels, instellingen — staat **buiten**
+de installatiemap. In U177 stond het erin, en elke update wiste het.
+
+021 legt ook de routine vast die ik vandaag zelf gebruikte: `--check` zegt dat
+de robot achterloopt, maar "achter" telt élke commit, en de meeste units raken
+`robot-runtime` niet aan. De diff beslist of het uitmaakt — deployen is niet
+gratis, het herstart de runtime en dat hakt het gesprek af.
+
+Schuld: 151 → 99. Onder de honderd.
