@@ -1034,3 +1034,27 @@ trefwoorden worden gekozen en niet met een tweede modelaanroep, omdat een
 gebaar dat ná de zin aankomt erger is dan een licht verkeerd knikje.
 
 Schuld: 321 → 285.
+
+### U302 — spec 017: stem en taal, en waarom het vier keer misging
+
+Zestig units, de meest herwerkte kant van het product. Het belangrijkste dat
+deze spec vastlegt is niet een detail maar een feit dat nergens stond: **er zijn
+drie spraakpaden**, geen twee. Pipeline (goedkoop, en het enige pad dat tools
+kan aanroepen), realtime per beurt, en de doorlopende realtime-sessie met
+server-VAD.
+
+ADR-005 beschrijft dat niet. Die beschrijft één pluggable pipeline met een
+lokale fallback, en is op dat punt achterhaald — dat staat nu ook in de spec,
+en de ADR zelf wordt in U309 bijgewerkt.
+
+Dat ene ontbrekende feit verklaart vier taalbugs op rij (U287, U289, U291,
+U292): telkens een correcte oplossing, toegepast op één pad, terwijl de andere
+twee het oude gedrag hielden. Elke keer leek het klaar tot het volgende
+gesprek. De spec eist nu expliciet dat een wijziging aan taal, wakegedrag of
+instructietekst in alle drie landt, of hardop zegt op welk pad ze slaat.
+
+Ook vastgelegd: de twee regels uit U292, die ik zelf nodig had. Beschrijf nooit
+machinerie waar het model niet bij kan, en geef het nooit een zin om zich
+achter te verschuilen.
+
+Schuld: 285 → 225.
