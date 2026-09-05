@@ -116,7 +116,7 @@ A presenter can write a YAML script file with slide numbers, speech text, and op
 
 ## References
 
-- [Constitution](.specify/memory/constitution.md) — Principle III (Events Drive State)
+- [Constitution](../../memory/constitution.md) — Principle III (Events Drive State)
 - [Spec 004 — Behavior Engine](../004-behavior-engine/spec.md)
 - [Spec 006 — Orchestrator Foundation](../006-orchestrator-foundation/spec.md)
 

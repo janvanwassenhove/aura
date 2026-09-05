@@ -139,8 +139,8 @@ Each session's transcript (user turns + AURA responses) is persisted to the memo
 
 ## References
 
-- [Constitution](.specify/memory/constitution.md) — Principle V (Voice Pipeline is Pluggable)
-- [ADR-005](docs/adr/ADR-005-voice-pipeline.md)
+- [Constitution](../../memory/constitution.md) — Principle V (Voice Pipeline is Pluggable)
+- [ADR-005](../../../docs/adr/ADR-005-voice-pipeline.md)
 - [Spec 003 — Event Bus](../003-event-bus-schemas/spec.md)
 - [Spec 006 — Orchestrator](../006-orchestrator-foundation/spec.md)
 

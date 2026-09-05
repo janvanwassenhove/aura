@@ -128,9 +128,9 @@ A CI pipeline can run all FakeRobot tests without hardware and without network a
 
 ## References
 
-- [Constitution](.specify/memory/constitution.md) — Principle II (Hardware Abstraction)
-- [ADR-003](docs/adr/ADR-003-robot-adapter-abstraction.md)
-- [RobotAdapter ABC](services/robot-runtime/src/robot_runtime/adapters/base.py)
+- [Constitution](../../memory/constitution.md) — Principle II (Hardware Abstraction)
+- [ADR-003](../../../docs/adr/ADR-003-robot-adapter-abstraction.md)
+- [RobotAdapter ABC](../../../packages/shared-schemas/src/shared_schemas/robot/adapter.py)
 
 ---
 

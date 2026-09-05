@@ -175,7 +175,7 @@ rather than configuring a face, a voice and a motion style separately.
 ## Functional Requirements
 
 - **FR-001**: All robot interaction goes through `RobotAdapter`
-  (`services/robot-runtime/src/robot_runtime/adapters/base.py`). `FakeRobot`
+  (`packages/shared-schemas/src/shared_schemas/robot/adapter.py`). `FakeRobot`
   and `ReachyRobotAdapter` pass the same contract tests.
 - **FR-002**: Head tracking, torso yaw, gestures, dances, poses and the sleep
   pose are adapter concerns; the brain asks for a named motion and never for

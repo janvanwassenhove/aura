@@ -126,8 +126,8 @@ The operator console event log panel shows real-time events from any connected s
 
 ## References
 
-- [Constitution](.specify/memory/constitution.md) — Principle III (Events Drive State)
-- [ADR-002](docs/adr/ADR-002-event-model.md)
+- [Constitution](../../memory/constitution.md) — Principle III (Events Drive State)
+- [ADR-002](../../../docs/adr/ADR-002-event-model.md)
 
 ---
 

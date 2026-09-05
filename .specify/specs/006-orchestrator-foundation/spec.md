@@ -146,9 +146,9 @@ The context builder assembles a complete LLM prompt from: system prompt (persona
 
 ## References
 
-- [Constitution](.specify/memory/constitution.md) — Principle IV (Safety Gates), Principle VII (Simplicity)
-- [ADR-002](docs/adr/ADR-002-event-model.md)
-- [ADR-006](docs/adr/ADR-006-m365-connector.md)
+- [Constitution](../../memory/constitution.md) — Principle IV (Safety Gates), Principle VII (Simplicity)
+- [ADR-002](../../../docs/adr/ADR-002-event-model.md)
+- [ADR-006](../../../docs/adr/ADR-006-m365-connector.md)
 - [Spec 005 — Conversation Runtime](../005-conversation-runtime/spec.md)
 - [Spec 010 — Connector Skeletons](../010-connector-skeletons/spec.md)
 

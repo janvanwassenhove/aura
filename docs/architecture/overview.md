@@ -183,7 +183,7 @@ graph TB
 
 ## Key Design Principles
 
-See [constitution](.specify/memory/constitution.md) for the full governing principles. Key architecture rules:
+See [constitution](../../.specify/memory/constitution.md) for the full governing principles. Key architecture rules:
 
 1. **No direct SDK imports outside `robot-runtime`** — all robot access via `RobotAdapter` ABC
 2. **All state changes via events** — no service calls another for state updates

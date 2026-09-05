@@ -5,7 +5,7 @@ owner: "build"
 priority: P1
 risk: Low
 created: "2026-09-05"
-units: [U299, U300, U301, U302, U303, U304, U305, U306, U307, U308, U309, U310, U311, U312, U313, U314]
+units: [U299, U300, U301, U302, U303, U304, U305, U306, U307, U308, U309, U310, U311, U312, U313, U314, U315]
 ---
 
 # Feature Specification: Spec Coverage — traceability that a machine checks
@@ -170,3 +170,4 @@ spec-first rule and the per-unit obligations, and points at the constitution.
 | U312 | Constitution 1.3.0 — principle XI, enforced traceability in principle I, and what a unit owes |
 | U313 | Every spec's status made true — including the one that is honestly blocked |
 | U314 | The guided one-time registration; defaults.py made a ready slot with tests; identity-service reaches CI |
+| U315 | ADRs 001/003 amended, an ADR index, and a link checker after 25 broken links — five of them the contract paths in AGENTS.md |

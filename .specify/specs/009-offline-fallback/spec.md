@@ -139,8 +139,8 @@ The heartbeat monitor checks all backend services every 30 seconds and emits hea
 
 ## References
 
-- [Constitution](.specify/memory/constitution.md) — Principle IV (Safety Gates are Inviolable)
-- [ADR-004](docs/adr/ADR-004-offline-fallback.md)
+- [Constitution](../../memory/constitution.md) — Principle IV (Safety Gates are Inviolable)
+- [ADR-004](../../../docs/adr/ADR-004-offline-fallback.md)
 - [Spec 003 — Event Bus](../003-event-bus-schemas/spec.md)
 - [Spec 006 — Orchestrator](../006-orchestrator-foundation/spec.md)
 

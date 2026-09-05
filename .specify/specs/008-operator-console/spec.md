@@ -146,7 +146,7 @@ A developer can type text in the console and submit it as a conversation turn, r
 
 ## References
 
-- [Constitution](.specify/memory/constitution.md) — Principle III (Events Drive State)
+- [Constitution](../../memory/constitution.md) — Principle III (Events Drive State)
 - [Spec 003 — Event Bus](../003-event-bus-schemas/spec.md)
 - [Spec 006 — Orchestrator](../006-orchestrator-foundation/spec.md)
 

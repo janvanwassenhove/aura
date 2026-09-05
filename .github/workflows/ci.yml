@@ -38,6 +38,14 @@ jobs:
         run: |
           pytest scripts/test_spec_drift.py -q
           python scripts/spec_drift.py
+      # U315: five paths in AGENTS.md's Key Interfaces block pointed at files
+      # that had never existed, and 24 links across the specs resolved to
+      # nothing. A link that looks like a link and goes nowhere is worse than
+      # no link, for the same reason a stale diagram is (constitution IX).
+      - name: Documentation links
+        run: |
+          pytest scripts/test_check_doc_links.py -q
+          python scripts/check_doc_links.py
       # U297: the README's screenshots are generated too, and a renamed shot
       # would otherwise leave a broken picture on the front page.
       - name: README-screenshot tests

@@ -61,7 +61,7 @@ principle produced the three-state battery, the honest connector statuses
 
 | Path | Role |
 |---|---|
-| `services/robot-runtime/src/robot_runtime/adapters/base.py` | The contract |
+| `packages/shared-schemas/src/shared_schemas/robot/adapter.py` | The contract |
 | `services/robot-runtime/src/robot_runtime/adapters/reachy.py` | Hardware, motions, dances, sleep |
 | `services/robot-runtime/src/robot_runtime/adapters/fake.py` | The primary development target |
 | `services/robot-runtime/src/robot_runtime/behavior/` | States, timeline builder |

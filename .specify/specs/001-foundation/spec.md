@@ -117,10 +117,10 @@ Every service, package, and app directory contains a `README.md` describing its 
 
 ## References
 
-- [Constitution](.specify/memory/constitution.md)
-- [ADR-001](docs/adr/ADR-001-language-choice.md)
-- [ADR-002](docs/adr/ADR-002-event-model.md)
-- [Architecture Overview](docs/architecture/overview.md)
+- [Constitution](../../memory/constitution.md)
+- [ADR-001](../../../docs/adr/ADR-001-language-choice.md)
+- [ADR-002](../../../docs/adr/ADR-002-event-model.md)
+- [Architecture Overview](../../../docs/architecture/overview.md)
 
 ---
 

@@ -85,10 +85,21 @@ All feature work begins with a specification. No implementation task exists with
 
 ### Key Interfaces (always respect these contracts)
 
-```python
-# RobotAdapter ABC — services/robot-runtime/src/robot_runtime/adapters/base.py
-# BehaviorEngine — services/robot-runtime/src/robot_runtime/behavior/engine.py
-# Orchestrator — services/orchestrator/src/orchestrator/core/
-# MemoryStore ABC — services/memory-service/src/memory_service/store/base.py
-# Connector ABC — services/connector-service/src/connector_service/base.py
-```
+<!-- U315: every path in this block used to point at a file that does not
+     exist — five out of five, since April. `scripts/check_doc_links.py` now
+     checks the links in the documentation, and this table is verified with
+     it. Add a row only for a path you have opened. -->
+
+| Contract | Where it actually lives |
+|---|---|
+| `RobotAdapter` ABC | [`packages/shared-schemas/src/shared_schemas/robot/adapter.py`](packages/shared-schemas/src/shared_schemas/robot/adapter.py) |
+| `M365Connector` ABC | [`packages/shared-schemas/src/shared_schemas/m365/connector.py`](packages/shared-schemas/src/shared_schemas/m365/connector.py) |
+| `MemoryStore` ABC | [`packages/shared-schemas/src/shared_schemas/memory/store.py`](packages/shared-schemas/src/shared_schemas/memory/store.py) |
+| `STTProvider` / `TTSProvider` ABCs | [`packages/shared-schemas/src/shared_schemas/voice/providers.py`](packages/shared-schemas/src/shared_schemas/voice/providers.py) |
+| `BehaviorEngine` | [`services/robot-runtime/src/robot_runtime/engine/behavior.py`](services/robot-runtime/src/robot_runtime/engine/behavior.py) |
+| `OrchestratorPipeline` | [`services/orchestrator/src/orchestrator/pipeline.py`](services/orchestrator/src/orchestrator/pipeline.py) |
+| `ConnectorRegistry` | [`services/connector-service/src/connector_service/registry.py`](services/connector-service/src/connector_service/registry.py) |
+
+The ABCs live in `packages/shared-schemas`, not beside their implementations —
+that is what lets `robot-runtime`, `orchestrator` and `connector-service` depend
+on a contract without depending on each other.

@@ -1,6 +1,6 @@
 # ADR-003: Robot Adapter Abstraction
 
-**Status**: Accepted  
+**Status**: Accepted 2026-04-25 — **amended 2026-09-05**  
 **Date**: 2026-04-25  
 **Deciders**: AURA Platform Team
 
@@ -98,3 +98,38 @@ class RobotAdapter(ABC):
 | Mock (MagicMock) instead of FakeRobot | No event emission; no realistic behavior; not reusable |
 | Protocol (structural subtyping) instead of ABC | Less explicit; no `__abstractmethods__` enforcement |
 | One adapter per capability | Too many small ABCs; harder to configure and inject |
+
+---
+
+## Amendment — 2026-09-05
+
+*Recorded as part of the documentation catch-up (U315).*
+
+This is the decision that has paid off most, and it is worth saying how.
+
+**`FakeRobot` never became a development convenience.** It is load-bearing in
+production tooling: the release pipeline boots `ROBOT_ADAPTER=fake` to take
+every screenshot, which is what makes those images privacy-safe **by
+construction** rather than by review — no camera, no model, no keys, one
+fictional persona ([spec 020](../../.specify/specs/020-desktop-app-and-releases/spec.md)).
+An abstraction adopted for testability turned out to be the thing that lets the
+project publish pictures of itself at all.
+
+**The ABC does not live beside its implementations.** `RobotAdapter` is in
+[`packages/shared-schemas/src/shared_schemas/robot/adapter.py`](../../packages/shared-schemas/src/shared_schemas/robot/adapter.py),
+not in `robot-runtime`. That is what lets the brain depend on the contract
+without depending on the runtime — and it survived the topology collapse of
+[ADR-007](ADR-007-topology-and-capability-reshape.md) unchanged, which is the
+test of whether a boundary was real.
+
+*(For four months `AGENTS.md` told every agent this file was at
+`services/robot-runtime/src/robot_runtime/adapters/base.py`, which has never
+existed. Corrected in U315, along with four other paths in the same block, and
+now checked by `scripts/check_doc_links.py`.)*
+
+**Where the abstraction is deliberately not the boundary.** Constitution X —
+tolerating a robot runtime older than the brain — lives at the **HTTP** seam
+(`RobotClient`, U13), not at the adapter. The adapter's contract is what the
+robot can do; the client's contract is what this particular robot, today,
+happens to implement. Conflating them would push deployment skew down into
+`FakeRobot`, where it has no meaning.

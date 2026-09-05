@@ -131,7 +131,7 @@ AURA can push status events to registered external agents via webhook callbacks.
 
 ## References
 
-- [Constitution](.specify/memory/constitution.md) — Principle IV (Safety Gates are Inviolable)
+- [Constitution](../../memory/constitution.md) — Principle IV (Safety Gates are Inviolable)
 - [Spec 006 — Orchestrator Foundation](../006-orchestrator-foundation/spec.md)
 - [Spec 009 — Offline Fallback](../009-offline-fallback/spec.md)
 

@@ -1334,3 +1334,29 @@ map bevatte alleen een `__init__.py`. Nu wel.
 
 Spec 014 blijft op `blocked`, met daarin wat er wél af is, wat er niet af is,
 waarom geen unit dat kan, en de deblokkeerinstructie in vier regels.
+
+### U315 — de ADR's nagelopen, en 25 links die nergens heen gingen
+
+Bij het controleren van de ADR's bleek er iets pijnlijkers aan de hand dan
+verouderde tekst.
+
+**Vijf van de vijf paden in het "Key Interfaces"-blok van `AGENTS.md` wezen naar
+bestanden die nooit hebben bestaan.** Inclusief `RobotAdapter` — het contract dat
+de grondwet als niet-onderhandelbaar bestempelt. Dat blok vertelt agenten waar
+de contracten staan, en het stond sinds april fout. Ik heb het zelf
+overgeschreven in spec 016 zonder te kijken.
+
+De echte plek is `packages/shared-schemas/.../robot/adapter.py`, niet
+`services/robot-runtime/.../adapters/base.py`. Dat de ABC's níét naast hun
+implementaties staan is precies wat de inklap van ADR-007 heeft overleefd — en
+dat is de toets of een grens echt was.
+
+Daarnaast: **24 links in de specs losten op naar niets.** Ze waren geschreven
+vanaf de repo-root, terwijl Markdown ze relatief aan het bestand oplost. Sinds
+april kapot. Niemand had geklikt.
+
+`scripts/check_doc_links.py` controleert nu elke relatieve link in de
+documentatie, met eigen tests, in CI. Verder: ADR-001 en ADR-003 aangevuld —
+onder meer met het gevolg dat nergens stond, namelijk dat er geen `vue-tsc` in
+de build zit en typefouten dus pas bij de eigenaar opduiken — en
+`docs/adr/README.md` als index met een leesvolgorde voor wie hier binnenkomt.

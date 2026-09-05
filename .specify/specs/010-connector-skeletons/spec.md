@@ -139,8 +139,8 @@ No auth token, client secret, or personal M365 content appears in any log output
 
 ## References
 
-- [Constitution](.specify/memory/constitution.md) — Principle IV (Safety Gates), Principle VI (No Sensitive Data in Logs)
-- [ADR-006](docs/adr/ADR-006-m365-connector.md)
+- [Constitution](../../memory/constitution.md) — Principle IV (Safety Gates), Principle VI (No Sensitive Data in Logs)
+- [ADR-006](../../../docs/adr/ADR-006-m365-connector.md)
 - [Spec 006 — Orchestrator Foundation](../006-orchestrator-foundation/spec.md)
 
 ---

@@ -1,6 +1,6 @@
 # ADR-001: Language and Framework Choice
 
-**Status**: Accepted  
+**Status**: Accepted 2026-04-25 — **amended 2026-09-05**  
 **Date**: 2026-04-25  
 **Deciders**: AURA Platform Team
 
@@ -88,3 +88,37 @@ We needed to choose: backend language, framework, async model, package manager, 
 | Flask instead of FastAPI | No native async support; no OpenAPI generation |
 | React frontend | Team preference for Vue; Pinia's composition API integrates more naturally |
 | Poetry package manager | Slower than uv; no `run` shortcut |
+
+---
+
+## Amendment — 2026-09-05
+
+*Recorded as part of the documentation catch-up (U315).*
+
+The stack held. Python 3.11+/FastAPI/Pydantic v2/uv on the back, Vue 3 + Vite +
+TypeScript + Pinia + Tailwind on the front — all still true after three hundred
+units, which is the strongest thing that can be said about a technology choice.
+
+**Two corrections.**
+
+**"Containerization: Docker + Docker Compose" is superseded by
+[ADR-010](ADR-010-desktop-app-is-the-delivery-unit.md).** Compose is the
+development and CI environment; what a user receives is a signed desktop
+application. That distinction is not cosmetic — it is why an environment
+variable is not an acceptable setting and why a change that needs a restart
+reads as broken.
+
+**There is no `vue-tsc` in the build, and that is a consequence worth stating.**
+Vite/esbuild strips TypeScript annotations without checking them, so a type
+error does not fail the build: it surfaces at runtime, in front of the owner.
+This has bitten repeatedly — a store method renamed but not at its call site, a
+`Response` treated as JSON (U290), a watcher comparing against a status string
+that never occurs. The defence is not a type checker but **mount tests**: a
+store or view change ships with a test that instantiates it. Adding `vue-tsc`
+remains open, and would be an improvement; until then this is the rule, and it
+is stated in `CLAUDE.md` and `AGENTS.md` where it will actually be read.
+
+**One thing `uv` costs.** It prunes any extra that is not requested on every
+sync, which has silently removed a dependency four times (U179 recognition,
+U213 Pillow, U246 pyautogui, U266 presentation/pywin32). A new dependency
+belongs in `pyproject.toml`, never only in the working environment.

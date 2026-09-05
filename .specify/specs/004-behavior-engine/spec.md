@@ -138,8 +138,8 @@ Each persona (work, home, demo) has a different gesture intensity and style. Wor
 
 ## References
 
-- [Constitution](.specify/memory/constitution.md) — Principle II (Hardware Abstraction), Principle III (Events Drive State)
-- [ADR-003](docs/adr/ADR-003-robot-adapter-abstraction.md)
+- [Constitution](../../memory/constitution.md) — Principle II (Hardware Abstraction), Principle III (Events Drive State)
+- [ADR-003](../../../docs/adr/ADR-003-robot-adapter-abstraction.md)
 - [Spec 002 — FakeRobot](../002-fakerobot-simulation/spec.md)
 - [Spec 003 — Event Bus](../003-event-bus-schemas/spec.md)
 

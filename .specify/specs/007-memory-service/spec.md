@@ -141,7 +141,7 @@ The `MemoryStore` interface is implemented by `SQLiteMemoryStore`; a `PostgresMe
 
 ## References
 
-- [Constitution](.specify/memory/constitution.md) — Principle VII (Simplicity Over Cleverness)
+- [Constitution](../../memory/constitution.md) — Principle VII (Simplicity Over Cleverness)
 - [Spec 006 — Orchestrator Foundation](../006-orchestrator-foundation/spec.md)
 
 ---
