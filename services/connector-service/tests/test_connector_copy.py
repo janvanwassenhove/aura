@@ -88,3 +88,54 @@ def test_github_is_not_sent_to_register_an_oauth_app() -> None:
     (info,) = [i for i in describe(enabled={"github"}) if i.key == "github"]
     assert "settings/tokens" in info.next_step
     assert "settings/developers" not in info.next_step
+
+
+# ── U314: the one manual step, made small ──────────────────────────────────
+
+def test_every_connector_that_needs_something_says_how_to_get_it() -> None:
+    """Spec 014 is blocked on three app registrations only the owner can do.
+    The step that remains must be followable without knowing what OAuth is."""
+    for info in describe(enabled={"m365", "google", "github", "slack",
+                                  "calendar_link"}):
+        if info.status in ("no_credentials", "unauthenticated"):
+            assert info.setup_steps, info.label
+
+
+def test_the_steps_open_the_exact_page_not_a_portal_front_door() -> None:
+    for info in describe(enabled={"m365", "google", "github", "slack"}):
+        if not info.setup_steps:
+            continue
+        assert info.register_url.startswith("https://"), info.label
+        # A link to portal.azure.com's home page is a research project, not a
+        # step: the owner then has to find "App registrations" themselves.
+        assert len(info.register_url.rstrip("/").split("/")) > 3, info.label
+
+
+def test_a_pasted_calendar_link_needs_no_page_to_open() -> None:
+    """It is obtained inside the owner's own calendar app, so there is
+    nothing for us to link to — but there are still steps."""
+    (info,) = [i for i in describe(enabled={"calendar_link"})
+               if i.key == "calendar_link"]
+    assert info.setup_steps
+    assert info.register_url == ""
+    assert any("outlook" in s.lower() for s in info.setup_steps)
+    assert any("google" in s.lower() for s in info.setup_steps)
+
+
+def test_the_microsoft_steps_name_the_choice_that_is_easy_to_get_wrong() -> None:
+    """Picking a single-tenant account type is the one mistake that makes a
+    home Microsoft account unable to sign in, and the portal defaults to it."""
+    (info,) = [i for i in describe(enabled={"m365"}) if i.key == "m365"]
+    joined = " ".join(info.setup_steps).lower()
+    assert "personal microsoft account" in joined
+    assert "organizational directory" in joined
+
+
+def test_a_connected_connector_is_not_handed_a_walkthrough() -> None:
+    """Instructions for something already done are noise.
+
+    `mock` is deliberately NOT in that set: showing example data is precisely
+    the state where "how do I connect the real one?" is the next question."""
+    for info in describe(enabled={"m365"}, registry=None):
+        if info.status == "ok":
+            assert not info.setup_steps, info.label

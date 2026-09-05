@@ -37,6 +37,11 @@ export interface ProviderState {
   nextStep?: string
   /** Env vars still missing before a sign-in is even possible. */
   missing?: string[]
+  /** U314: how to obtain what is missing, in steps, and the page that starts
+   *  them. Composed by the brain, never here — the console must not have its
+   *  own idea of what Azure's screens say. */
+  setupSteps?: string[]
+  registerUrl?: string
   /** What this connection would let him answer (mail, calendar, …). */
   domains?: string[]
   /** Switched on by the owner — independent of whether it is signed in. */
@@ -119,6 +124,7 @@ export const useConnectionsStore = defineStore('connections', () => {
         details?: {
           key: string; status: string; detail?: string; next_step?: string
           missing?: string[]; domains?: string[]; live?: boolean
+          setup_steps?: string[]; register_url?: string
         }[]
         live_domains?: string[]
       }
@@ -137,6 +143,8 @@ export const useConnectionsStore = defineStore('connections', () => {
         ps.detail = d.detail
         ps.nextStep = d.next_step
         ps.missing = d.missing ?? []
+        ps.setupSteps = d.setup_steps ?? []
+        ps.registerUrl = d.register_url ?? ''
         ps.domains = d.domains ?? []
         ps.enabled = d.status !== 'not_enabled'
       }

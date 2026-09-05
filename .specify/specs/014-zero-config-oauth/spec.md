@@ -5,6 +5,7 @@ owner: "identity-service"
 priority: P1
 risk: Low
 created: "2026-05-01"
+units: [U314]
 ---
 
 # Feature Specification: Zero-Config OAuth Connections
@@ -139,26 +140,53 @@ Slack bot tokens cannot be obtained via OAuth Device Code. The current "paste bo
 
 ---
 
-## Status note — 2026-09-05
+## Status note — 2026-09-05, updated 2026-09-05 (U314)
 
-**Blocked, deliberately, and this is the honest status rather than
-"in-progress".**
+**Status: `blocked`, and this is the honest word rather than `in-progress`.**
 
-Everything on the code side is done: device-code flows for Microsoft, Google
-and GitHub; `defaults.py` as the place shipped client ids live; the resolution
-order (environment variable first, then the shipped default) in
-`identity_service.main`.
+### What is delivered
 
-What is missing is not code. `MICROSOFT_CLIENT_ID`, `GOOGLE_CLIENT_ID` and
-`GITHUB_CLIENT_ID` are empty, each with a `TODO: paste after registering`.
-Filling them requires registering three OAuth applications under a project
-account — the owner's accounts and the owner's decision, which no unit can make.
+Everything on the code side. Device-code flows for Microsoft, Google and
+GitHub; `defaults.py` as the slot the shipped client ids drop into, now with
+the exact registration steps in its own docstring; the resolution order
+(environment variable first, then the shipped default) in
+`identity_service.main`; and `defaults.shipped()` so the console can tell
+"press Connect" from "paste an id first" without guessing.
 
-Until then the fallback is the field added in U295 (paste your own app id) and,
-better, the routes that need no registration at all: a calendar connected by a
-published `.ics` link, and GitHub by a personal access token
-([010](../010-connector-skeletons/spec.md), U298).
+`tests/test_defaults.py` guards the failure mode in between: an id pasted
+without its tenant, or a Google id without its secret, does not read as "not
+configured yet" — it reaches the provider and returns an opaque error to
+somebody standing in a living room. Complete or absent, never half
+(constitution XI). Those tests also run in CI from U314; this package had none
+before.
 
-**To unblock**: register the three apps once, paste the ids into
-`services/identity-service/src/identity_service/defaults.py`, and Connect
-becomes one click for every install.
+### What is not delivered, and why no unit can deliver it
+
+`MICROSOFT_CLIENT_ID`, `GOOGLE_CLIENT_ID` and `GITHUB_CLIENT_ID` are empty.
+Filling them means registering three OAuth applications under a project
+account — the owner's accounts, the owner's decision, and an action no agent
+should take on somebody's behalf.
+
+### What U314 changed while it stays blocked
+
+The step that remains was a fifteen-minute research project across three
+portals. It is now a guided one:
+`connector_state` carries numbered steps and a link that opens the **exact**
+page (not a portal front door) for every connector waiting on something, and
+the Connections panel renders them behind "How do I get this?". The steps name
+the two choices that are easy to get wrong and silent when wrong — Microsoft's
+account type, which defaults to single-tenant and locks out every home account,
+and Google's "TVs and Limited Input devices" client type, which is the only one
+a device-code flow can use.
+
+Better still, two routes now skip registration entirely: a calendar connected
+by a published `.ics` link, and GitHub by a personal access token
+([spec 010](../010-connector-skeletons/spec.md), U298).
+
+### To unblock
+
+Register the three apps once, following the docstring at the top of
+`services/identity-service/src/identity_service/defaults.py`, and paste the
+three ids in. Nothing else changes: `defaults.shipped()` starts returning
+`True`, the panel stops asking, and Connect becomes one click for every
+install, present and future.

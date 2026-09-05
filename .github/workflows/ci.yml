@@ -89,6 +89,8 @@ jobs:
 
       - name: Run connector-service tests
         run: uv run --package connector-service --extra dev pytest services/connector-service/tests -v
+      - name: Test identity-service
+        run: uv run --package identity-service --extra dev pytest services/identity-service/tests -v
 
       - name: Run aura-brain tests
         run: uv run --package aura-brain --extra dev pytest apps/aura-brain/tests -v

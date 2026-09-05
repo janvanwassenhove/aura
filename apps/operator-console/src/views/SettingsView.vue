@@ -103,6 +103,24 @@
               — he waits and completes on his own.
             </div>
             <div v-if="p.state.error" class="sec-error">{{ p.state.error }}</div>
+            <!-- U314: spec 014 is blocked on three app registrations only the
+                 owner can do. What a unit CAN do is make the step that remains
+                 take two minutes instead of fifteen — so the steps live here,
+                 with a link that opens the exact page rather than a portal
+                 front door. -->
+            <div v-if="p.state.setupSteps?.length" class="row-guide">
+              <button class="guide-toggle" :aria-expanded="guideOpen === p.id"
+                      @click="guideOpen = guideOpen === p.id ? '' : p.id">
+                {{ guideOpen === p.id ? '▾' : '▸' }} How do I get this?
+              </button>
+              <ol v-if="guideOpen === p.id" class="guide-steps">
+                <li v-for="(step, i) in p.state.setupSteps" :key="i">{{ step }}</li>
+              </ol>
+              <a v-if="guideOpen === p.id && p.state.registerUrl" class="d2-ghost-btn guide-open"
+                 :href="p.state.registerUrl" target="_blank" rel="noopener">
+                Open that page →
+              </a>
+            </div>
           </div>
           <span class="row-val" :class="statusClass(p.state.status)">{{ statusLabel(p.state.status) }}</span>
           <!-- Switching on is the FIRST step and belongs on every row, so an
@@ -580,6 +598,10 @@ function linkify(text: string): { text: string; href?: string }[] {
   return out
 }
 
+/** Which row has its walkthrough open. One at a time: five expanded lists is
+ *  a wall, and the owner is only setting up one connection. */
+const guideOpen = ref('')
+
 const appIds = ref<Record<string, string>>({})
 const savingApp = ref('')
 
@@ -725,6 +747,18 @@ watch(() => themeStore.theme, () => { /* persisted by the store's own watcher */
   font-size: 10.5px; padding: 2px 8px; border-radius: 999px;
   background: var(--sunken); color: var(--ink-2); border: 1px solid var(--line);
 }
+.row-guide { margin-top: 6px; }
+.guide-toggle {
+  background: none; border: 0; padding: 0; cursor: pointer;
+  font: inherit; font-size: 12px; color: var(--accent);
+}
+.guide-steps {
+  margin: 6px 0 8px; padding-left: 20px;
+  font-size: 12px; line-height: 1.55; color: var(--ink-2);
+  max-width: 62ch;
+}
+.guide-steps li { margin-bottom: 4px; }
+.guide-open { font-size: 12px; }
 .row-next { font-size: 12px; color: var(--info); margin-top: 3px; }
 .device-code {
   margin-top: 6px; font-size: 12.5px; color: var(--info);

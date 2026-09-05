@@ -1302,3 +1302,35 @@ Dat is principe XI toegepast op onze eigen administratie: `in-progress` was
 precies zo'n plausibele standaardwaarde als "batterij 100%".
 
 **Eindstand: 22 specs, 335 units, schuld 0.**
+
+### U314 — de blokkade verkleind tot twee minuten (niet opgeheven)
+
+Gevraagd: "deblokkeer". Eerlijk antwoord vooraf: het échte deblokkeren — drie
+OAuth-apps registreren onder een projectaccount — vraagt jouw accounts en jouw
+beslissing. Dat is niets wat ik namens jou hoor te doen. Wat een unit wél kan,
+is de stap die overblijft klein maken.
+
+**Wat er nu ligt.** `connector_state` draagt per connector genummerde stappen
+en een link die de **exacte** pagina opent, geen portaalvoordeur. Het paneel
+toont ze achter "How do I get this?". De stappen benoemen de twee keuzes die
+makkelijk fout gaan en stil zijn als ze fout gaan: het accounttype bij
+Microsoft, dat standaard op single-tenant staat en daarmee élk thuisaccount
+buitensluit, en Googles clienttype "TVs and Limited Input devices", het enige
+dat met een device-code overweg kan.
+
+Ook de mock-toestand krijgt die uitleg. "Showing example data" is precies het
+moment waarop "hoe koppel ik dan de echte?" de volgende vraag is.
+
+**`defaults.py` is nu een klaargelegde plek.** De registratiehandleiding staat
+in de docstring van het bestand zelf, met de stap die iedereen vergeet
+(*Allow public client flows: Yes*). Zes tests bewaken de faalvorm ertussenin:
+een client-id zonder tenant, of een Google-id zonder secret, leest niet als
+"nog niet ingesteld" maar bereikt de provider en komt terug als een
+onbegrijpelijke fout — bij iemand die in zijn woonkamer staat. Volledig of leeg,
+nooit half. Dat is principe XI.
+
+Onderweg bleek `identity-service` **helemaal geen tests in CI** te hebben; die
+map bevatte alleen een `__init__.py`. Nu wel.
+
+Spec 014 blijft op `blocked`, met daarin wat er wél af is, wat er niet af is,
+waarom geen unit dat kan, en de deblokkeerinstructie in vier regels.
