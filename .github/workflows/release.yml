@@ -18,16 +18,20 @@ on:
     tags: ["v*"]          # manual tags keep working as before
   workflow_dispatch:
 
-# U317: creating a release writes to the repository. This grant is at the top
-# so every job has it, AND repeated on the `release` job itself — a job-level
-# block is the most specific scope GitHub honours, and this failed silently
-# once already (v2.0.127, 403 "Resource not accessible by integration").
+# U317/U318: creating a release writes to the repository, and the grant has to
+# be on the JOB, not only here.
 #
-# It is not sufficient on its own. The repository setting
-#   Settings -> Actions -> General -> Workflow permissions
-# must be "Read and write permissions". With it on "Read repository contents",
-# releases 403 no matter what this file says. Check with:
-#   gh api repos/<owner>/<repo>/actions/permissions/workflow
+# Measured on this repository, with the setting
+# `default_workflow_permissions: "read"` unchanged throughout:
+#
+#   workflow-level `permissions: contents: write` only  -> 403 on publish
+#   the same, plus a job-level block on `release`       -> published
+#
+# Three releases were lost to the first state (v2.0.127-129, all built and
+# tested, none published). U318 exists because U317 asserted the cause was the
+# repository setting and told the owner to change it — before the evidence was
+# in. It was not the setting; the setting is still "read". Constitution XI
+# applies to explanations too.
 permissions:
   contents: write
 
@@ -347,15 +351,18 @@ jobs:
         run: |
           echo "::error title=Release not published::The build succeeded; publishing did not."
           echo ""
-          echo "Most likely cause — the repository's Actions token is read-only."
-          echo "Check it:"
-          echo "  gh api repos/${{ github.repository }}/actions/permissions/workflow"
-          echo "If it says \"default_workflow_permissions\": \"read\", fix it at:"
-          echo "  Settings -> Actions -> General -> Workflow permissions"
-          echo "  -> Read and write permissions"
+          echo "Two things to check, in this order:"
           echo ""
-          echo "This file already requests 'contents: write' at both workflow"
-          echo "and job level; the repository setting overrides it."
+          echo "1. Is 'permissions: contents: write' still on the release JOB?"
+          echo "   Measured here (U318): the workflow-level grant alone was not"
+          echo "   enough and returned 403; adding the job-level block fixed it,"
+          echo "   with the repository setting unchanged."
+          echo ""
+          echo "2. The repository's Actions token:"
+          echo "     gh api repos/${{ github.repository }}/actions/permissions/workflow"
+          echo "   'read' is not on its own a blocker — releases publish from"
+          echo "   'read' with the job-level grant in place — but it narrows"
+          echo "   what anything else in this workflow may do."
           echo ""
           echo "The installers for ${{ needs.version.outputs.tag }} are still"
           echo "attached to this run as artifacts — nothing was lost, it just"

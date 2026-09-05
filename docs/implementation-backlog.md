@@ -1436,3 +1436,35 @@ Onderweg ook vastgelegd waarom sommige versienummers ontbreken: GitHub bewaart
 per concurrency-groep maar één wachtende run, dus een snelle reeks pushes wordt
 samengevoegd. De nieuwste run publiceert alles wat zich heeft opgestapeld; de
 nummering heeft gaten, de inhoud niet.
+
+### U318 — het werkte, en mijn verklaring klopte niet
+
+U317 publiceerde. **v2.0.127 staat er**, om 17:29, en de repo-instelling staat
+nog steeds op `default_workflow_permissions: "read"`.
+
+Dat betekent dat wat ik in U317 schreef fout was. Ik zei dat de repo-instelling
+beide `permissions`-blokken overrulet en dat één klik in Settings van jou nodig
+was. Die klik is niet gebeurd en het werkt. Wat het oploste was het
+**job-niveau**-blok dat ik er tegelijk bij zette.
+
+Wat er nu feitelijk gemeten is, op deze repository, met de instelling
+onveranderd op `read`:
+
+| | |
+|---|---|
+| alleen `permissions: contents: write` op workflowniveau | 403 bij publiceren |
+| datzelfde, plus een blok op het `release`-karwei | gepubliceerd |
+
+Drie releases zijn aan de eerste toestand verloren gegaan (v2.0.127–129 in
+nummering; gebouwd, getest, nooit uitgebracht).
+
+Ik heb een oorzaak aangewezen voordat het bewijs binnen was, en die als
+instructie aan jou doorgegeven. Dat is precies principe XI, maar dan toegepast
+op een verklaring in plaats van op een statusregel: niet melden wat niet
+geverifieerd is. De opmerking in `release.yml`, de diagnosestap en de
+acceptatievoorwaarde in spec 020 zeggen nu wat er gemeten is, en niet wat ik
+vermoedde.
+
+De diagnosestap is blijven staan maar noemt nu twee dingen in volgorde: eerst
+"staat het blok nog op het karwei?", dan pas de repo-instelling — met erbij dat
+`read` op zichzelf geen blokkade is, want daar publiceert het nu vanaf.

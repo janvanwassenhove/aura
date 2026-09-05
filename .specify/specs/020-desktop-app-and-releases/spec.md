@@ -5,7 +5,7 @@ owner: "apps/desktop + CI"
 priority: P1
 risk: High
 created: "2026-09-05"
-units: [U32, U33, U44, U55, U56, U151, U152, U166, U168, U168b, U168c, U168d, U168e, U169, U169b, U170, U171, U172, U173, U174, U176, U177, U178, U192, U193, U197, U201, U211, U228, U229, U230, U231, U232, U233, U234, U235, U236, U283, U284, U285, U285b, U297, U179, U184, U185, U186, U210, U317]
+units: [U32, U33, U44, U55, U56, U151, U152, U166, U168, U168b, U168c, U168d, U168e, U169, U169b, U170, U171, U172, U173, U174, U176, U177, U178, U192, U193, U197, U201, U211, U228, U229, U230, U231, U232, U233, U234, U235, U236, U283, U284, U285, U285b, U297, U179, U184, U185, U186, U210, U317, U318]
 amended: "2026-09-05"
 ---
 
@@ -100,11 +100,12 @@ and installers for Windows, macOS (arm64 and x64) and Linux.
    otherwise **invisible**: the build is green, the app simply never offers an
    update, and the owner asks days later why nothing is arriving — which is
    exactly what happened when v2.0.127 through v2.0.129 never published.
-6. **Given** the repository's Actions token, **When** it is read-only, **Then**
-   no `permissions:` block in the workflow can rescue it. `contents: write` is
-   declared at both workflow and job level; the repository setting
-   (*Settings → Actions → General → Workflow permissions*) overrides both, and
-   `gh api repos/<owner>/<repo>/actions/permissions/workflow` is how you check.
+6. **Given** the release job, **When** it publishes, **Then** it carries its
+   own `permissions: contents: write`. Measured on this repository (U317/U318):
+   the workflow-level grant **alone** returned 403 and lost three releases; the
+   job-level block published successfully with the repository's
+   `default_workflow_permissions` still set to `read`. The workflow-level grant
+   is kept as well, but the job-level one is the load-bearing half.
 
 ### User Story 4 — The window is one window, and it looks like a product (Priority: P2)
 
