@@ -27,5 +27,8 @@ SPEC=$(git diff --cached --name-only --diff-filter=ACM -- '.specify/specs/*' | h
 if [ -n "$CODE" ] && [ -z "$SPEC" ]; then
   echo "pre-commit: code is changing and no spec is."
   echo "            Constitution I: specs are living artifacts - update them"
-  echo "            when reality diverges. See CLAUDE.md, 'what a unit owes'."
+  echo "            when reality diverges. See 'what a unit owes' in CLAUDE.md,"
+  echo "            AGENTS.md or .github/copilot-instructions.md - all three"
+  echo "            carry the same block, generated from"
+  echo "            docs/agent-working-agreement.md."
 fi

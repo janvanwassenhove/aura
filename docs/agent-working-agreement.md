@@ -1,36 +1,17 @@
-# AURA — working agreement
+# The working agreement
 
-> Read this before changing anything.
-> [`.specify/memory/constitution.md`](.specify/memory/constitution.md) is the
-> governing document; this file exists so that an agent working here is
-> actually holding it.
+> **This file is the source.** `CLAUDE.md`, `AGENTS.md` and
+> `.github/copilot-instructions.md` each carry a copy of everything below,
+> injected by `scripts/sync_agent_docs.py` between `BEGIN/END GENERATED`
+> markers. Edit **here**, then run the script; CI fails if the copies drift.
+>
+> Three files exist because three tools read three different names, and a rule
+> in a file the tool does not open is not a rule. That is not a hypothetical:
+> Claude Code reads `CLAUDE.md`, which did not exist for 292 units, and GitHub
+> Copilot reads `.github/copilot-instructions.md`, which described a completely
+> different repository — five of its directories did not exist here.
 
-## Why this file exists
-
-It was missing, and that cost 292 units.
-
-The constitution lives under `.specify/`, and `AGENTS.md` was titled "GitHub
-Copilot Agent Instructions". Neither is loaded automatically by Claude Code,
-which reads `CLAUDE.md`. So the first principle of this project — *specs are
-living artifacts, update them when reality diverges* — was never in view during
-the entire autobuild stream. `.specify/` was touched three times in 292 units.
-Everything the product became went into `docs/implementation-backlog.md`
-instead: a 420 kB Dutch diary, honest and detailed and completely disconnected
-from the contract it was supposed to keep current.
-
-`scripts/spec_drift.py` now connects them and CI runs it. This file makes sure
-the rule is read before the code is written rather than after.
-
-**Do not edit the block below.** It is shared with `AGENTS.md` and
-`.github/copilot-instructions.md`, because Copilot and Claude read different
-filenames and a rule only one of them can see is not a rule. The source is
-[`docs/agent-working-agreement.md`](docs/agent-working-agreement.md); after
-editing it, run `python scripts/sync_agent_docs.py`. CI fails if the three
-copies drift.
-
----
-
-<!-- BEGIN GENERATED: working-agreement — edit docs/agent-working-agreement.md, then run scripts/sync_agent_docs.py -->
+<!-- BEGIN SHARED -->
 ## Spec-first, always
 
 The first principle of this project, from `.specify/memory/constitution.md`
@@ -142,4 +123,4 @@ and CI fails on any of them. Mentioning a unit in prose does **not** claim it.
 | `scripts/spec_drift.py` | Which units no spec accounts for |
 | `scripts/check_doc_links.py` | Every relative documentation link resolves |
 | `scripts/privacy_scan.py` | The gate that keeps personal data out of git |
-<!-- END GENERATED -->
+<!-- END SHARED -->

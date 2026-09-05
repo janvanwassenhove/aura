@@ -1360,3 +1360,40 @@ documentatie, met eigen tests, in CI. Verder: ADR-001 en ADR-003 aangevuld —
 onder meer met het gevolg dat nergens stond, namelijk dat er geen `vue-tsc` in
 de build zit en typefouten dus pas bij de eigenaar opduiken — en
 `docs/adr/README.md` als index met een leesvolgorde voor wie hier binnenkomt.
+
+### U316 — één werkafspraak, drie bestanden, en Copilot las een andere repo
+
+Gevraagd: zorg dat zowel GitHub Copilot als Claude deze documentatie en specs
+voortaan altijd bijwerken. Bij het uitzoeken bleek de Copilot-kant er nóg
+slechter aan toe dan de Claude-kant.
+
+**`.github/copilot-instructions.md` — het bestand dat Copilot automatisch laadt
+— beschreef een andere repository.** Een generieke "Cognitive Hub" met `.apm/`,
+`knowledge/`, `providers/` en `specs/`: vier mappenbomen die hier niet bestaan.
+Het woord AURA kwam er nul keer in voor. En vier van de vijf bestanden in
+`.github/instructions/` hadden `applyTo`-globs die op diezelfde afwezige mappen
+wezen, dus ze konden nooit afgaan.
+
+Dat is precies de tegenhanger van het ontbrekende `CLAUDE.md`: Claude las niets,
+Copilot las iets verkeerds.
+
+**De oplossing is niet drie bestanden bijhouden.** Dat is dezelfde weddenschap
+die al twee keer verloren is. `docs/agent-working-agreement.md` is nu de bron;
+`scripts/sync_agent_docs.py` injecteert die tekst in alle drie de bestanden
+tussen markeringen, en CI faalt als ze uit elkaar lopen.
+
+Verder:
+
+* **`.github/instructions/source-change.instructions.md`** gaat af zodra je
+  `apps/`, `services/` of `packages/` aanraakt, en zegt dan precies wat een unit
+  verschuldigd is. Een tweede voor `.specify/**` legt uit dat je aanvult in
+  plaats van herschrijft, en dat een status waar moet zijn.
+* Een **PR-template** met dezelfde checklist, waarin met een ster staat welke
+  punten CI afdwingt.
+* Een test die eist dat elke `applyTo`-glob naar iets bestaands wijst, en dat
+  elk pad in Copilots projectkaart echt bestaat. Die test controleert de kaart,
+  niet een zinsnede — juist omdat het bestand nu bewust uitlegt wat er vroeger
+  fout was.
+
+Zeven tests erbij. Grondwet, ADR's, specs, ledger en drie agentbestanden zeggen
+nu hetzelfde, en drie CI-checks houden dat zo.

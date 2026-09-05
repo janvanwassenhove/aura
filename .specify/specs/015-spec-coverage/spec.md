@@ -5,7 +5,7 @@ owner: "build"
 priority: P1
 risk: Low
 created: "2026-09-05"
-units: [U299, U300, U301, U302, U303, U304, U305, U306, U307, U308, U309, U310, U311, U312, U313, U314, U315]
+units: [U299, U300, U301, U302, U303, U304, U305, U306, U307, U308, U309, U310, U311, U312, U313, U314, U315, U316]
 ---
 
 # Feature Specification: Spec Coverage — traceability that a machine checks
@@ -46,7 +46,12 @@ Three separate causes, each sufficient on its own:
 2. **Nothing checked.** The privacy scan has a pre-commit hook and a CI job;
    release notes have unit tests. Spec traceability had neither, so it degraded
    to a habit — and habits do not survive 292 units at speed.
-3. **The ledger absorbed the pressure.** Writing a careful entry every unit
+3. **The rule was wrong for the other agent too.** GitHub Copilot reads
+   `.github/copilot-instructions.md`. That file described a generic "Cognitive
+   Hub" — `.apm/`, `knowledge/`, `providers/`, `specs/`, none of which exist
+   here — and never mentioned AURA. Four of the five path-scoped instruction
+   files had `applyTo` globs aimed at those same absent trees (U316).
+4. **The ledger absorbed the pressure.** Writing a careful entry every unit
    *felt* like documenting, which is exactly why the gap went unnoticed for
    three months. Effort was going in; it was going to the wrong artifact.
 
@@ -139,8 +144,18 @@ spec-first rule and the per-unit obligations, and points at the constitution.
   the previous committed value.
 - **FR-006**: The check runs in CI alongside the privacy scan and the
   release-notes tests.
-- **FR-007**: `CLAUDE.md` states the working agreement and is kept in step with
-  `AGENTS.md` and the constitution.
+- **FR-007**: The working agreement has **one** source,
+  `docs/agent-working-agreement.md`, injected by `scripts/sync_agent_docs.py`
+  into every file a coding agent actually reads — `CLAUDE.md` (Claude Code),
+  `.github/copilot-instructions.md` (GitHub Copilot) and `AGENTS.md` (the
+  cross-tool default). CI fails if they drift.
+- **FR-008**: Path-scoped Copilot instructions in `.github/instructions/` fire
+  on the tree being edited, and every `applyTo` glob must name a path that
+  exists — four of the original five pointed at directory trees absent from
+  this repository, so they could never fire (U316).
+- **FR-009**: Relative links in the documentation resolve
+  (`scripts/check_doc_links.py`, in CI). Twenty-five were broken, five of them
+  the contract paths in `AGENTS.md`'s Key Interfaces block (U315).
 
 ## Out of scope
 
@@ -171,3 +186,4 @@ spec-first rule and the per-unit obligations, and points at the constitution.
 | U313 | Every spec's status made true — including the one that is honestly blocked |
 | U314 | The guided one-time registration; defaults.py made a ready slot with tests; identity-service reaches CI |
 | U315 | ADRs 001/003 amended, an ADR index, and a link checker after 25 broken links — five of them the contract paths in AGENTS.md |
+| U316 | One working agreement injected into all three agent files; Copilot's instructions were for a different repository |

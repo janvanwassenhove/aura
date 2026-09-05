@@ -46,6 +46,14 @@ jobs:
         run: |
           pytest scripts/test_check_doc_links.py -q
           python scripts/check_doc_links.py
+      # U316: three agents read three filenames. CLAUDE.md did not exist for
+      # 292 units, and .github/copilot-instructions.md described a different
+      # repository entirely. Keeping the three in step by hand is the bet that
+      # lost twice; this checks it instead.
+      - name: Agent instructions in step
+        run: |
+          pytest scripts/test_sync_agent_docs.py -q
+          python scripts/sync_agent_docs.py --check
       # U297: the README's screenshots are generated too, and a renamed shot
       # would otherwise leave a broken picture on the front page.
       - name: README-screenshot tests
