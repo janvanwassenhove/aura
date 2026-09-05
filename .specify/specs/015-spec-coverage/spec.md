@@ -5,7 +5,7 @@ owner: "build"
 priority: P1
 risk: Low
 created: "2026-09-05"
-units: [U299, U300, U301, U302, U303, U304, U305, U306]
+units: [U299, U300, U301, U302, U303, U304, U305, U306, U307]
 ---
 
 # Feature Specification: Spec Coverage — traceability that a machine checks
@@ -162,3 +162,4 @@ spec-first rule and the per-unit obligations, and points at the constitution.
 | U304 | Spec 019 — skills, automation and the agentic loop (32 units) |
 | U305 | Specs 020 + 021 — the desktop app, its releases, and getting code onto the robot (51 units) |
 | U306 | Spec 022 — security and privacy (9 units, tracked against the August audit) |
+| U307 | Spec 011 amended — the presentation copilot as it actually is (14 units) |

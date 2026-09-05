@@ -53,3 +53,23 @@
 - Only one presentation session can be active at a time; loading a new script while a session is active replaces the previous session silently.
 - Motion cue names that don't exist in the gesture map are silently skipped (logged at WARNING).
 - Speech cues are passed verbatim to TTS — no LLM summarisation or expansion.
+
+---
+
+## Amendment 2026-09-05 — what actually shipped
+
+Retro-specified; all done. See the amendment section in `spec.md`.
+
+- [x] T101 [U27] Synchronised speech and gesture; co-pilot navigation
+- [x] T102 [U205] The beat model (trigger + kind), the runner, a test presentation
+- [x] T103 [U206] Live wiring and the presenter view
+- [x] T104 [U207] Author and save scenarios in the app; YAML stays the storage format
+- [x] T105 [U208] `improvise` beats — `orchestrate(announce=False)`, spoken once by the runner
+- [x] T106 [U263, U263b] Follow the running slideshow (PowerPoint, Keynote); a field for the deck name
+- [x] T107 [U264] Starting a presentation can never destroy the scenario
+- [x] T108 [U265] The projector overlay — transparent, click-through, always on top
+- [x] T109 [U269] The overlay knows about the show: cues, warnings, subtitles, animation
+- [x] T110 [U266] Four causes behind one "nothing happens", including an overlay that would not close
+- [x] T111 [U267] The panel says what will actually happen — progress, next cue, advance hint, rehearsal
+- [x] T112 [U282] A save error a person can read
+- [x] T113 [U246] `uv sync` pruned the presentation extra — pinned, with the other two causes

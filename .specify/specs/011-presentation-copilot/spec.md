@@ -1,20 +1,24 @@
 ---
 feature: "011-presentation-copilot"
-status: "in-progress"
+status: "implemented"
 owner: "orchestrator"
-priority: P3
-risk: Low
+priority: P2
+risk: Medium
 created: "2026-04-25"
+amended: "2026-09-05"
+units: [U27, U205, U206, U207, U208, U246, U263, U263b, U264, U265, U266,
+        U267, U269, U282]
 ---
 
 # Feature Specification: Presentation Copilot
 
 **Feature Branch**: `011-presentation-copilot`
 **Created**: 2026-04-25
-**Status**: In Progress
+**Status**: Implemented — **see the 2026-09 amendment at the end of this
+document**, which supersedes the slide-index model described below.
 **Owner**: orchestrator
-**Priority**: P3
-**Risk**: Low
+**Priority**: P2 (raised from P3: it is a demonstrated, used feature)
+**Risk**: Medium
 
 ## User Scenarios & Testing
 
@@ -115,3 +119,100 @@ A presenter can write a YAML script file with slide numbers, speech text, and op
 - [Constitution](.specify/memory/constitution.md) — Principle III (Events Drive State)
 - [Spec 004 — Behavior Engine](../004-behavior-engine/spec.md)
 - [Spec 006 — Orchestrator Foundation](../006-orchestrator-foundation/spec.md)
+
+---
+
+# Amendment — 2026-09-05: what it actually became
+
+*Retro-specified; see [015-spec-coverage](../015-spec-coverage/spec.md) for why
+this arrives late. The April text above is left intact as the record of the
+original plan. Where the two disagree, this section is the truth.*
+
+## What changed in shape
+
+The plan assumed **the deck drives the robot**: a slide activates, a cue for
+that index is spoken. Used in a real room, three of those assumptions failed.
+
+| April plan | What it is now | Why |
+|---|---|---|
+| One cue per slide index | **Beats** with a trigger: `manual`, `slide:4`, or `keyword:Java` | A presenter does not talk in slide units. Half the beats fire on something said, not on a transition (U205). |
+| Cues read verbatim, no LLM | Verbatim **plus** `improvise` beats that run the full agentic loop | A demo needs today's calendar, not April's. `improvise` calls `orchestrate(announce=False)`: tools run, and the presenter's robot speaks the result once itself (U208). |
+| Script written as a YAML file | Built and saved **in the app** | Nobody hand-writes YAML on stage. The scenario builder is the authoring surface; YAML is still the storage format (U207). |
+| Driven by console or remote | Driven by **the slideshow itself**, PowerPoint and Keynote | The presenter clicks Next in Keynote like they always do; AURA watches the deck (U263, U263b). |
+| Robot speaks | Robot speaks **and appears** — a transparent, click-through overlay window on the projector | Not every room has the robot at the front, and a face on the slide is worth as much as a voice (U265, U269). |
+
+## Additional user stories
+
+### User Story 4 — He appears on the projector (Priority: P2)
+
+1. **Given** the overlay is switched on, **When** it opens, **Then** it is a
+   frameless, transparent, click-through window (`alwaysOnTop`,
+   `'screen-saver'`) that does not steal a click from the deck (U265).
+2. **Given** the overlay is open, **When** the presentation runs, **Then** it
+   shows cues, warnings and subtitles, and the character animates while
+   speaking (U269).
+3. **Given** the overlay is on, **When** the owner switches it off, **Then** it
+   closes — U266: it could be opened and not closed.
+4. **Given** the camera is wanted on the projector, **When** it is enabled,
+   **Then** the overlay can show what the robot actually sees.
+5. **Given** a character is chosen, **When** it changes, **Then** the overlay
+   follows. It is a **separate BrowserWindow with its own Pinia store**, which
+   is the recurring root cause of state not crossing (U269, U276, U286, U290);
+   it follows through a `storage` event (U286).
+
+### User Story 5 — "Start presentation" starts something (Priority: P1)
+
+Reported four times in a row — *"start presentation is not doing anything"*,
+*"start presentation doet nog steeds niks"*, *"he never said anything"*.
+
+1. **Given** a scenario, **When** Start is pressed, **Then** the run begins, or
+   the panel says why it cannot. U266 found **four different causes behind one
+   symptom**, which is why this is a P1 story rather than a bug note.
+2. **Given** the scenario is being started, **When** the beats are read,
+   **Then** the console's beat parsing cannot throw — `lib/beats.ts`
+   (`toRows`, `triggerOf`, `kindOf`, `cueOf`) is used inside a `try`, and a cue
+   is a **string** (`"manual"`, `"slide:4"`, `"keyword:Java"`), not an object.
+   U264: an exception here wiped the scenario the presenter had just written.
+3. **Given** the panel, **When** it is read before starting, **Then** it says
+   what will actually happen: progress, the next cue, whether beats are manual,
+   how to advance, and a banner when speech has failed (U267, U269).
+4. **Given** rehearsal mode, **When** it is on, **Then** the panel says what
+   that changes.
+5. **Given** a scenario fails to save, **When** it does, **Then** the error is a
+   sentence, not a raw Pydantic dump (U282).
+
+## Amended functional requirements
+
+- **FR-101**: A beat has a trigger (`manual` | `slide:N` | `keyword:TEXT`) and a
+  kind (verbatim speech, motion, or `improvise`). The cue is a string.
+- **FR-102**: `improvise` runs the full loop with `announce=False`, so tools
+  execute and nothing auto-speaks; the presentation runner speaks the result
+  once.
+- **FR-103**: Scenarios are authored in the app and stored as YAML.
+- **FR-104**: The deck is followed by watching the running slideshow
+  (PowerPoint and Keynote), not by the console pushing indexes.
+- **FR-105**: The projector overlay is a separate, transparent, click-through
+  window; it can be closed; and it reflects character, cues, subtitles and
+  optionally the camera.
+- **FR-106**: Nothing in the Present panel may throw while reading a scenario.
+  Losing the presenter's work is the worst outcome available to this feature.
+
+## Superseded
+
+FR-002's `slide_index`/`speech_cue` script format is retained as the storage
+shape for slide-triggered beats only. SC-002 (500 ms from slide activation) now
+applies to `slide:N` beats; `manual` and `keyword:` beats have no such deadline.
+
+## Traceability
+
+| Units | What they delivered |
+|---|---|
+| U27 | The first version: synchronised speech and gesture, co-pilot navigation |
+| U205, U206 | The beat model, the runner, the test presentation; live wiring and presenter view |
+| U207, U282 | Building and saving scenarios in the app; and an error a person can read |
+| U208 | `improvise` beats — live data through the pipeline, spoken once |
+| U263, U263b | Following the real slideshow, Keynote included; somewhere to type the deck name |
+| U264 | "Start presentation" no longer destroys the scenario |
+| U265, U269 | The projector overlay: transparent, click-through, animated, with cues and subtitles |
+| U266, U267 | Four "nothing happens" with four causes; a panel that says what will happen |
+| U246 | Three broken things behind one missing word — including `uv sync` pruning the presentation extra |

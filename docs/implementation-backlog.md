@@ -1131,3 +1131,22 @@ móet over het LAN bereikbaar zijn — die zit op een andere machine — en word
 daarom met een gedeeld geheim bewaakt in plaats van door niet te luisteren.
 
 Schuld: 99 → 90.
+
+### U307 — spec 011 aangevuld: de presentatiecopiloot zoals hij echt is
+
+De apriltekst blijft staan als eerlijk verslag van het oorspronkelijke plan;
+eronder staat nu wat het geworden is, met een tabel die per aanname zegt waarom
+ze in een echte zaal niet hield.
+
+Het plan ging ervan uit dat de dia's de robot aansturen: dia wordt actief, cue
+voor die index wordt uitgesproken. Een presentator praat niet in dia-eenheden.
+De helft van de beats vuurt op iets dat gezégd wordt, niet op een overgang —
+vandaar triggers `manual`, `slide:4`, `keyword:Java`. En niemand tikt YAML op
+een podium, dus de scenario-bouwer in de app is de schrijfplek geworden; YAML
+bleef alleen het opslagformaat.
+
+Eén eis staat er scherper dan de rest, omdat U264 liet zien wat het kost:
+**niets in het Present-paneel mag gooien tijdens het lezen van een scenario.**
+Het werk van de presentator kwijtraken is het ergste wat deze functie kan doen.
+
+Schuld: 90 → 76.
