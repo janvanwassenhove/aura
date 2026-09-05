@@ -1,6 +1,6 @@
 # ADR-006: Microsoft 365 Connector Strategy
 
-**Status**: Accepted  
+**Status**: Accepted 2026-04-25 — **amended 2026-09-05**  
 **Date**: 2026-04-25  
 **Deciders**: AURA Platform Team
 
@@ -137,3 +137,35 @@ tool = MCPStreamableHTTPTool(
 | Graph API direct with httpx | Requires manual schema design for 70+ endpoints |
 | No M365 integration | Core product requirement; rejected |
 | Semantic Kernel plugins | Another abstraction layer; no benefit over direct MCP tools |
+
+---
+
+## Amendment — 2026-09-05
+
+*Recorded as part of the spec backfill (U308, U310). Canonical description:
+[spec 010](../../.specify/specs/010-connector-skeletons/spec.md).*
+
+**It is no longer one connector.** Microsoft 365, Google, GitHub, Slack, generic
+MCP servers the owner adds (U255), and a calendar connected by pasting a
+published `.ics` link (U298). The `M365Connector` ABC stayed as the contract;
+connectors that cannot do part of it refuse in a sentence a person can read
+rather than failing deep inside a turn.
+
+**`unknown` was the problem.** A connector now reports one of six states, each a
+*different job for the owner*: `not_enabled`, `no_credentials`,
+`unauthenticated`, `mock`, `ok`, `unavailable` — always with the next step
+attached, and computed without touching the network (U254). `live_domains` then
+decides which tools the model is even offered, so a connector that is off does
+not leave him promising mail he cannot read.
+
+**Green must be earned.** A mock says it is a mock (U52). A connector whose
+credential is only read at call time constructs happily with no account at all,
+so "it constructed" proves nothing: it stays `unauthenticated` until a real
+probe succeeds, and the probe is a call *that* connector implements (U254b — the
+Test button used to ask GitHub and Slack for a calendar).
+
+**Registering an app is the last resort, not the first.** The panel shows no
+environment-variable names in its visible copy — they stay in `missing`, for
+diagnosis — offers a field and a link where an app ID is genuinely needed
+(U295), and prefers the routes that need no registration at all: a pasted
+calendar link, or a GitHub personal access token (U298).

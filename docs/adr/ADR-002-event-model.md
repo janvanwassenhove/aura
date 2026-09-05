@@ -1,6 +1,6 @@
 # ADR-002: Event Model and Inter-Service Communication
 
-**Status**: Accepted  
+**Status**: Accepted 2026-04-25 — **amended 2026-09-05**  
 **Date**: 2026-04-25  
 **Deciders**: AURA Platform Team
 
@@ -97,3 +97,28 @@ We needed to choose: event format, transport, and pub/sub mechanism.
 | RabbitMQ from day one | Requires infrastructure even for local dev; YAGNI |
 | Plain dict events | No type safety; schema drift between services |
 | Server-Sent Events (SSE) | One-way only; cannot support approval grant/deny from console |
+
+---
+
+## Amendment — 2026-09-05
+
+*Recorded as part of the spec backfill (U309, U310).*
+
+**One bus, in one process.** After the collapse in
+[spec 001](../../.specify/specs/001-foundation/spec.md) (U1-U11) all routers run
+inside `aura-brain`, so the bus is a single shared in-process `AsyncEventBus`,
+verified end to end in U6 — not one bus per service with a broadcaster between
+them. Redis Streams remains documented and unimplemented, per constitution VII.
+
+**Two properties that later units kept rediscovering**, written down here so
+they stop being rediscoveries:
+
+1. **An event only reaches a subscriber that exists when it is published.**
+   `RobotConnected` fires when the robot connects — normally before the console
+   window exists — so a console that only listens starts by claiming the robot
+   is offline. That shipped, visibly, for months (U152, finished in U297).
+   *State that must survive a late subscriber is polled, not awaited.*
+2. **The projector overlay is not on this bus at all.** It is a separate
+   BrowserWindow with its own Pinia store. Anything two windows must agree on
+   crosses through an explicit channel — a `storage` event, or the brain —
+   never by assumption (U269, U276, U286, U290).

@@ -1,6 +1,6 @@
 # ADR-005: Voice Pipeline Design
 
-**Status**: Accepted  
+**Status**: Accepted 2026-04-25 — **partly superseded 2026-09-05** (see the amendment)  
 **Date**: 2026-04-25  
 **Deciders**: AURA Platform Team
 
@@ -120,3 +120,60 @@ class TTSProvider(ABC):
 | Coqui TTS | Project archived; less maintained than Kokoro/Piper |
 | Azure Cognitive Services | Adds MSAL complexity for another provider; not needed |
 | Deepgram | Another cloud dependency; similar tradeoffs to OpenAI Realtime |
+
+---
+
+## Amendment — 2026-09-05: there are three paths, not two
+
+*Recorded as part of the spec backfill (U302, U310). The decision above was
+made before any of this ran in a room. The canonical description is
+[spec 017](../../.specify/specs/017-voice-and-language/spec.md).*
+
+### What is superseded
+
+The two-provider selection (`STT_PROVIDER` / `TTS_PROVIDER`, cloud default with
+a local fallback) describes the **pipeline path only**. Two more paths exist,
+and choosing between them is a product decision the owner makes in Settings,
+not a deployment detail:
+
+| Path | Module | Tools? | Chosen when |
+|---|---|---|---|
+| **Pipeline** | `voice.py` + `voice_loop.py` | **yes** | anything needing the calendar, a skill or the screen; also the cheap option |
+| **Per-turn realtime** | `realtime_voice.py` | no | speech-to-speech quality for one answer, opened after the wake word |
+| **Realtime session** | `realtime_session.py` | no | continuous conversation with server-side VAD |
+
+**The consequence is why this amendment exists.** Four language defects in a row
+(U287, U289, U291, U292) were each a correct fix applied to one path while the
+other two kept the old behaviour, and each looked complete until the next
+conversation. Any change to language, wake behaviour or instruction text must
+land in all three, or say out loud which path it is scoped to.
+
+### What is added
+
+**The wake word is detected locally** (openWakeWord, ONNX on the CPU, U128).
+Transcribing every audio window over the network to hear a name costs a
+round-trip per window and is unreliable on short clips. When the model is
+missing, `build_detector()` returns `None` and the loop keeps the old path — the
+fallback is a return value, never an exception, because an exception here takes
+the microphone down.
+
+**The language is pinned, not detected** (U287). Auto-detection turned
+half-heard Dutch into German and then into non-Latin scripts, answered
+confidently. `voice._stt_language()` resolves one language —
+`STT_LANGUAGE` then `ASSISTANT_LANGUAGE` then the language of the person he can
+see (U288) then the machine locale then `LANGUAGE_FALLBACK` — and
+`_wrong_script()` discards anything returning in a script the household does not
+use. `multi` is the explicit opt-out for households that mix languages inside
+one sentence.
+
+**Realtime degrades loudly** (U133, U141-U143): a timeout, a circuit breaker
+back to the pipeline, an access self-check the owner can run, and
+candidate-model detection for when a model name goes stale. A hung Realtime call
+is indistinguishable from a broken robot, so every failure names its reason.
+
+**Instructions never describe machinery the model cannot reach, and never
+contain a sentence it can stall with** (U292). A description of transcript
+fetching, handed to a model that hears audio directly, produced twenty
+repetitions of a scripted apology. `voice_context.build_instructions()` appends
+the language and delivery rule unconditionally, so a persona prompt cannot
+delete it (U291).

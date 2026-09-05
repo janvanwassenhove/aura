@@ -1,6 +1,6 @@
 # ADR-004: Offline Fallback Strategy
 
-**Status**: Accepted  
+**Status**: Accepted 2026-04-25 — **amended 2026-09-05**  
 **Date**: 2026-04-25  
 **Deciders**: AURA Platform Team
 
@@ -102,3 +102,26 @@ MAINTENANCE ──(admin)──► ONLINE
 | Immediate recovery on first heartbeat success | Too fragile; flaky connections cause constant state changes |
 | Local LLM fallback (Ollama) | Too large for the hardware budget; spec is out of scope |
 | Two modes only (ONLINE/OFFLINE) | Does not capture partial degradation (LLM down, M365 up) |
+
+---
+
+## Amendment — 2026-09-05
+
+*Recorded as part of the spec backfill (U309, U310). Canonical description:
+[spec 009](../../.specify/specs/009-offline-fallback/spec.md).*
+
+**A tier was inserted.** The ladder is now: the configured model, then **a local
+model via ollama (U21)**, then the regex `FallbackAgent`, then the on-device
+behaviour loop in `robot-runtime` (U15) which keeps the robot polite with no
+brain at all. `docs/diagrams/degradation-ladder.svg` draws it.
+
+**The heartbeat watches the link, not the process** (U14). Pinging a service
+that is alive but cannot reach the robot reports health nobody has. The monitor
+checks brain-to-robot and upstream, and `OFFLINE` is distinct from `DEGRADED`
+because they call for different behaviour.
+
+**Constitution X is the companion rule.** The Pi is routinely older than the
+brain, so a 404 from the runtime is an expected condition rather than an
+outage: the call fails alone, the sequence around it completes, and the
+degradation is reported rather than swallowed. U238 is what ignoring this looks
+like — one 404 made the sleep button do nothing and report success.

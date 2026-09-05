@@ -1,6 +1,6 @@
 # ADR-007: Topology & Capability Reshape
 
-**Status**: Proposed
+**Status**: **Accepted and implemented** (was still marked Proposed until 2026-09-05) — **amended 2026-09-05**
 **Date**: 2026-06-21
 **Supersedes (in part)**: ADR-002 (event model deferral assumptions), the 6-service split implied by ADR-001
 **Owner**: architecture
@@ -138,3 +138,31 @@ of the product repo. Not load-bearing.
   sensitive data in logs)
 - `docs/reshape-plan.md` — the phased migration
 - ADR-002 (event model), ADR-004 (offline fallback)
+
+---
+
+## Amendment — 2026-09-05
+
+*Recorded as part of the spec backfill (U309, U310).*
+
+The reshape happened. Decision #6 ("demote the delivery-method ceremony") moved
+the generic framework to `docs/method/`, and U1-U11 carried out the collapse:
+every router mounted into `aura-brain`, the HTTP hops between them replaced by
+in-process seams, and `infra/dev` down from six compose services to three.
+
+Two things worth stating now that it has run for 300 units:
+
+**The module boundaries were kept, and that mattered.** `services/*` and
+`packages/*` are unchanged, the routers are still routers, and each seam is an
+injected callable (`token_fetcher`, `get_valid_token`) rather than a URL. The
+collapse removed the network, not the architecture — which is what makes it
+reversible, and what let `connector-service` and `identity-service` keep their
+own test suites.
+
+**The delivery unit is the desktop application, not a compose file.** A
+household installs one window that starts the whole stack (spec
+[020](../../.specify/specs/020-desktop-app-and-releases/spec.md)). The compose
+setup remains for development and CI. Anything that assumes an operator with a
+terminal — an environment variable as a setting, a restart to apply a change —
+is a defect in this product, and several units have been spent removing exactly
+that (U254, U295, U298).

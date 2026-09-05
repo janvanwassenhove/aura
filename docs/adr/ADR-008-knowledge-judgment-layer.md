@@ -1,6 +1,6 @@
 # ADR-008: Personal Knowledge & Judgment Layer — Data Model & Crypto
 
-**Status**: Proposed
+**Status**: **Accepted and implemented** (was still marked Proposed until 2026-09-05) — **amended 2026-09-05**
 **Date**: 2026-06-21
 **Owner**: aura-brain
 **Related**: ADR-007 (capability #4), `docs/reshape-plan.md` Phase 3e, Constitution Principle VI
@@ -230,3 +230,43 @@ per child; even then it stays owner-readable only.
 - `docs/reshape-plan.md` — Phase 3e
 - `services/identity-service/src/identity_service/token_store.py` — keyring/cryptfile pattern reused for the OMK
 - Constitution — Principle VI (no sensitive data in logs)
+
+---
+
+## Amendment — 2026-09-05
+
+*Recorded as part of the spec backfill (U303, U310). Canonical description:
+[spec 018](../../.specify/specs/018-knowledge-people-and-judgment/spec.md). The
+model above is unchanged; this records what was added and one parameter that
+moved.*
+
+**Section 4 crypto parameters moved** (U225, audit S9/S10). The static salt
+`aura-knowledge00` and scrypt n=2^14 are gone: the salt is random per install
+and lives in `key-params.json` beside the ciphertext, scrypt runs at n=2^17, and
+the minimum passphrase is 12 characters. The passphrase itself moved out of
+`.env` and into the OS credential store (Windows Credential Manager, DPAPI).
+Existing installs rotate in place on boot — DEKs rewrapped, embeddings
+re-encrypted — because a security improvement nobody applies is not one.
+**There is exactly one copy of that passphrase and no recovery path.**
+
+**Knowledge grows from a conversation, not only from the owner typing.** A
+person mentioned in a turn can have a profile created for them — the brain stays
+local to the household — but matching comes first, so an existing person is
+linked rather than duplicated (U281). The turn already carries who else lives
+here (`household_note`, U293), and `look_up_person` lets him go and check on his
+own (U294).
+
+**Long-term memory is lines, not a blob.** It was one `ProfileFact` holding the
+whole bullet list, which the graph drew as a single dot truncated at 40
+characters. It is now one node per remembered line, with keywords, its own
+styling and legend, and `[[links]]` as edges to the people it mentions (U272,
+U279, U280).
+
+**Section 10 role rules are enforced per turn** by the judgment layer,
+statelessly: minors get no passive learning without deliberate opt-in, guests
+retain a name only. The unlock badge is written in the owner's language rather
+than the word `BENIGN` (U180).
+
+**Forgetting is real.** Destroying a person's key leaves unreadable ciphertext,
+and their face data goes with them (U244 — it did not, and the deleted person
+kept being recognised).

@@ -1204,3 +1204,24 @@ er wordt niets meer vergeven, elke unit vanaf nu moet door een spec geclaimd
 worden of CI valt om.
 
 **331 units, 22 specs, schuld 0.**
+
+### U310 — de ADR's ingehaald
+
+Alle acht ADR's dateerden van april of 21 juni. Zeven zijn nu bijgewerkt, en
+twee ervan stonden nog op **"Proposed"** terwijl ze al maanden draaiden —
+ADR-007 (de topologie-inklap, uitgevoerd in U1–U11) en ADR-008 (de kennislaag,
+waar het hele product op staat).
+
+De belangrijkste is ADR-005. Die staat nu op **gedeeltelijk achterhaald**: de
+beslissing beschrijft één pluggable pipeline met een lokale fallback, en dat
+klopt alleen nog voor het pipeline-pad. Er zijn er drie, en welk pad je kiest is
+een productkeuze in Settings, geen deploymentdetail. Dat ene ontbrekende feit
+kostte vier taalbugs op rij.
+
+Verder: ADR-002 kreeg de twee eigenschappen die latere units bleven
+herontdekken (een event bereikt alleen wie op dat moment luistert; de overlay
+zit helemaal niet op die bus), ADR-004 de lokale-model-trede en het feit dat een
+404 van de Pi een verwachte toestand is en geen storing, ADR-006 waarom `unknown`
+het echte probleem was en waarom groen verdiend moet worden, en ADR-008 de
+verplaatste sleutelparameters plus de zin die er hoort te staan: er is precies
+één kopie van die wachtzin en geen herstelpad.
