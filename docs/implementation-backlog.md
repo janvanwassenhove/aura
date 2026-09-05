@@ -1003,3 +1003,19 @@ uitgewerkte voorbeeld van het mechanisme. Zestien tests.
 Wat hiermee **niet** is opgelost: de 292 units schuld zelf. Die staat nu geteld
 en zichtbaar in beeld, en wordt in de volgende units afbetaald — telkens een
 spec geschreven en de basislijn een stuk terug.
+
+### U300 — de teller telde zichzelf te laag
+
+De check uit U299 las één unit per commit-subject, want dat is sinds lang de
+regel. De vroege geschiedenis bundelde er meerdere: `auto(U2,U3):`,
+`auto(U19c+U20):`, `auto(U112-U115):`. Die tweede en derde unit werden gewoon
+niet gezien.
+
+Uitgerekend deze check mag dat niet doen. Een bewaker die zijn eigen schuld te
+laag inschat, geeft precies de gerustheid die het probleem in stand houdt. De
+werkelijke stand is geen 292 maar **321** units.
+
+Onderweg liep ik in de valkuil die ik één commit eerder in `CLAUDE.md` had
+opgeschreven: een heredoc at de `\b` uit de reguliere expressies op en liet er
+een letterlijke backspace achter, waarna alles nul units vond. Opgelost, en
+vier tests erbij voor de gebundelde vormen.

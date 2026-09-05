@@ -40,8 +40,17 @@ import re
 import subprocess
 from pathlib import Path
 
-#: `auto(U284): the title` and `auto(U242b): …` — one unit, one commit.
-_UNIT_IN_SUBJECT = re.compile(r"^auto\((U\d+[a-z]?)\)\s*:", re.M)
+#: The unit(s) a commit subject claims to have landed. One unit per commit is
+#: the rule today, but the early history batched them — `auto(U2,U3):`,
+#: `auto(U19c+U20):`, `auto(U112-U115):` — and a checker that skips those
+#: under-reports its own debt, which is the one thing it must not do.
+_UNITS_IN_SUBJECT = re.compile(r"^auto\(([^)]*)\)\s*:", re.M)
+
+#: A unit id: `U284`, `U242b`. `U168-ledger` is bookkeeping, not a unit.
+_UNIT_TOKEN_STRICT = re.compile(r"\bU\d+[a-z]?\b")
+
+#: `U112-U115` means four units, not two — the range was shorthand for a run.
+_RANGE = re.compile(r"\bU(\d+)\s*-\s*U(\d+)\b")
 
 #: A unit id anywhere inside a spec's `units:` frontmatter block.
 _UNIT_TOKEN = re.compile(r"\bU\d+[a-z]?\b")
@@ -54,12 +63,36 @@ def _root() -> Path:
     return Path(__file__).resolve().parent.parent
 
 
+def units_in(subject_body: str) -> list[str]:
+    """The units named inside an `auto(...)` subject, expanding any range."""
+    out: list[str] = []
+
+    def add(unit: str) -> None:
+        if unit not in out:
+            out.append(unit)
+
+    def expand(m: re.Match[str]) -> str:
+        lo, hi = int(m.group(1)), int(m.group(2))
+        if lo > hi or hi - lo >= 100:
+            # Backwards, or absurdly wide: not a range anybody meant. Leave the
+            # text alone so the two endpoints are still read as plain units.
+            return m.group(0)
+        for n in range(lo, hi + 1):
+            add(f"U{n}")
+        return " "
+
+    for unit in _UNIT_TOKEN_STRICT.findall(_RANGE.sub(expand, subject_body)):
+        add(unit)
+    return out
+
+
 def shipped_units(log_text: str) -> list[str]:
     """Every unit in a git log, oldest first, without duplicates."""
     out: list[str] = []
-    for unit in reversed(_UNIT_IN_SUBJECT.findall(log_text)):
-        if unit not in out:
-            out.append(unit)
+    for body in reversed(_UNITS_IN_SUBJECT.findall(log_text)):
+        for unit in units_in(body):
+            if unit not in out:
+                out.append(unit)
     return out
 
 

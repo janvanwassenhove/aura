@@ -5,7 +5,7 @@ owner: "build"
 priority: P1
 risk: Low
 created: "2026-09-05"
-units: [U299]
+units: [U299, U300]
 ---
 
 # Feature Specification: Spec Coverage — traceability that a machine checks
@@ -123,7 +123,12 @@ spec-first rule and the per-unit obligations, and points at the constitution.
 ## Functional Requirements
 
 - **FR-001**: Every unit is identified by its commit subject `auto(UNNN): …`.
-  A letter suffix (`U242b`) is a distinct unit.
+  A letter suffix (`U242b`) is a distinct unit. The early history batched
+  several into one subject — `auto(U2,U3):`, `auto(U19c+U20):`,
+  `auto(U112-U115):` — and every unit named in such a subject counts,
+  ranges expanded. A checker that reads only the first would under-report its
+  own debt, which is the one failure it cannot afford (U300: doing exactly
+  that hid 29 units).
 - **FR-002**: A spec claims units through a `units:` key in its leading
   frontmatter, as an inline or block YAML list. Mentions elsewhere do not count.
 - **FR-003**: The check reports unclaimed units, the reason (in the
@@ -150,3 +155,4 @@ spec-first rule and the per-unit obligations, and points at the constitution.
 | Unit | What it delivered |
 |---|---|
 | U299 | `scripts/spec_drift.py`, `scripts/test_spec_drift.py`, `.specify/coverage.json`, `CLAUDE.md`, CI job, pre-commit warning |
+| U300 | Batched and ranged commit subjects counted as the several units they are — the debt went from 292 to its true 321 |

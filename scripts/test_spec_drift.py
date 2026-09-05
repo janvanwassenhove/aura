@@ -130,3 +130,32 @@ def test_the_baseline_only_ever_moves_backwards() -> None:
     assert now <= before, (
         f"the baseline moved forward (U{before} → U{now}): that forgives drift "
         "instead of documenting it")
+
+
+# ── U300: the early history batched units into one commit ──────────────────
+
+def test_a_batched_subject_names_every_unit_in_it() -> None:
+    """`auto(U2,U3):` and `auto(U19c+U20):` are two units each. A checker that
+    counted one would under-report its OWN debt, which is the single thing it
+    must never do."""
+    from spec_drift import units_in
+    assert units_in("U2,U3") == ["U2", "U3"]
+    assert units_in("U19c+U20") == ["U19c", "U20"]
+    assert units_in("U252e+U253b") == ["U252e", "U253b"]
+
+
+def test_a_range_means_every_unit_in_it() -> None:
+    """`auto(U112-U115):` was shorthand for a run of four."""
+    from spec_drift import units_in
+    assert units_in("U112-U115") == ["U112", "U113", "U114", "U115"]
+
+
+def test_bookkeeping_suffixes_are_not_units() -> None:
+    from spec_drift import units_in
+    assert units_in("U168-ledger") == ["U168"]
+
+
+def test_a_nonsense_range_does_not_explode() -> None:
+    from spec_drift import units_in
+    assert units_in("U300-U1") == ["U300", "U1"]     # backwards: taken literally
+    assert units_in("U1-U9999") == ["U1", "U9999"]   # absurd: not expanded
