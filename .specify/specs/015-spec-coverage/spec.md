@@ -5,7 +5,7 @@ owner: "build"
 priority: P1
 risk: Low
 created: "2026-09-05"
-units: [U299, U300, U301, U302, U303, U304, U305, U306, U307, U308, U309, U310]
+units: [U299, U300, U301, U302, U303, U304, U305, U306, U307, U308, U309, U310, U311]
 ---
 
 # Feature Specification: Spec Coverage — traceability that a machine checks
@@ -166,3 +166,4 @@ spec-first rule and the per-unit obligations, and points at the constitution.
 | U308 | Specs 008 + 010 amended — the D2 console and the connections (45 units) |
 | U309 | The remaining original specs claimed and amended; the debt reaches zero and the baseline is cleared |
 | U310 | Seven ADRs amended to match reality; two that were still marked Proposed had shipped months ago |
+| U311 | ADR-009 (honest state) and ADR-010 (the desktop app as delivery unit); the architecture overview brought up to date |

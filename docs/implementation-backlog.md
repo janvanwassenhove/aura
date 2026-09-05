@@ -1225,3 +1225,33 @@ zit helemaal niet op die bus), ADR-004 de lokale-model-trede en het feit dat een
 het echte probleem was en waarom groen verdiend moet worden, en ADR-008 de
 verplaatste sleutelparameters plus de zin die er hoort te staan: er is precies
 één kopie van die wachtzin en geen herstelpad.
+
+### U311 — twee beslissingen die nooit zijn opgeschreven
+
+**ADR-009 — Honest state.** Deze is laat vastgelegd omdat hij nooit *genomen*
+is: hij stapelde zich op, incident na incident, tot bleek dat het de meest
+herhaalde les uit driehonderd units was. Tien keer dezelfde vorm: een groen
+badge boven verzonnen data (U52), "slapen: gelukt" bij een 404 (U238),
+"volgend" terwijl de tracker dood was (U253), "batterij 100%" van een SDK die
+geen batterij meet (U270), "er wordt niets onthouden" terwijl hij precies wist
+wie er praatte (U290), "CI is groen" terwijl die zes uur rood stond (U283).
+
+Geen enkele daarvan was een crash. Ze werden allemaal geloofd. De kosten zijn
+asymmetrisch: "ik weet het niet" kost een moment teleurstelling, "het is in
+orde" kost het vertrouwen in álles wat het systeem verder zegt.
+
+Vier regels, en een vijfde voor de console: die maakt presentatie, nooit
+waarheid. Toen ze toestand zelf afleidde had ze het zes keer mis.
+
+**ADR-010 — De desktopapplicatie is de leveringseenheid.** ADR-007 klapte zes
+services in tot één proces maar zei niet wat een gebruiker eigenlijk *krijgt*.
+Het antwoord van de scaffold was docker-compose: een operator met een terminal.
+De eigenaar is een gezin. Elke aanname uit dat operatormodel is er unit voor
+unit uit gehaald, en telkens gemeld door de eigenaar in zijn eigen woorden. De
+vier verplichtingen die eruit volgen staan er nu, inclusief de meest kostbare:
+eigendom van de eigenaar staat buiten de installatiemap, want die wordt bij elke
+update vervangen.
+
+Het architectuuroverzicht is bijgewerkt: drie spraakpaden in plaats van twee
+providers, zes connectoren in plaats van één, vier principes erbij, en een
+leeslijst die niet meer stopt bij ADR-006.

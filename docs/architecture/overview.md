@@ -190,6 +190,15 @@ See [constitution](.specify/memory/constitution.md) for the full governing princ
 3. **Approval gate for write operations** — `orchestrator.ApprovalManager` is always in the path
 4. **FakeRobot is always available** — `ROBOT_ADAPTER=fake` works with no hardware
 5. **M365 is always mockable** — `M365_CONNECTOR=mock` works with no credentials
+6. **Nothing is reported that has not been verified** — a missing measurement
+   renders as an absence, a mock says it is a mock, and `unknown` is not a
+   status (ADR-009)
+7. **The Pi is older than the app** — every new brain→runtime call tolerates a
+   404 and reports the degradation instead of success (constitution X)
+8. **The console composes presentation, never truth** — every status,
+   capability and knowledge state comes from the brain
+9. **Specs are living artifacts** — a unit that changes behaviour updates the
+   spec that describes it, and CI checks the link (spec 015)
 
 ---
 
@@ -202,14 +211,14 @@ See [constitution](.specify/memory/constitution.md) for the full governing princ
 | Data validation | Pydantic v2 |
 | Package manager | uv |
 | Database | SQLite (aiosqlite + SQLAlchemy async) |
-| Container orchestration | Docker Compose |
+| Delivery | Electron desktop app (ADR-010); Docker Compose for development and CI |
 | Frontend framework | Vue 3 + Vite + TypeScript + Pinia + TailwindCSS |
 | LLM | OpenAI GPT-4o (configurable) |
-| STT default | OpenAI Realtime API |
-| STT fallback | Local Whisper |
-| TTS default | OpenAI Realtime API |
-| TTS fallback | Kokoro / Piper |
-| M365 connector | Work IQ MCP (HTTPS, MSAL OBO) |
+| Speech | **Three paths**, chosen in Settings: pipeline (tools, cheaper), per-turn realtime, realtime session (server VAD). See ADR-005's amendment |
+| Wake word | openWakeWord, ONNX, on the CPU — with a network fallback |
+| STT / TTS providers | OpenAI; local Whisper and Kokoro/Piper as fallbacks |
+| Connectors | Microsoft 365 (Work IQ MCP, MSAL OBO), Google, GitHub, Slack, owner-added MCP servers, calendar-by-`.ics`-link |
+| Traceability | `scripts/spec_drift.py` — every unit claimed by a spec, checked in CI |
 
 ---
 
@@ -221,3 +230,21 @@ See [constitution](.specify/memory/constitution.md) for the full governing princ
 - [ADR-004: Offline Fallback](../adr/ADR-004-offline-fallback.md)
 - [ADR-005: Voice Pipeline](../adr/ADR-005-voice-pipeline.md)
 - [ADR-006: M365 Connector Strategy](../adr/ADR-006-m365-connector.md)
+- [ADR-007: Topology and Capability Reshape](../adr/ADR-007-topology-and-capability-reshape.md)
+- [ADR-008: Personal Knowledge & Judgment Layer](../adr/ADR-008-knowledge-judgment-layer.md)
+- [ADR-009: Honest State](../adr/ADR-009-honest-state.md)
+- [ADR-010: The Desktop App is the Delivery Unit](../adr/ADR-010-desktop-app-is-the-delivery-unit.md)
+
+**ADR-002, ADR-004, ADR-005, ADR-006, ADR-007 and ADR-008 carry 2026-09-05
+amendments.** ADR-005 is partly superseded: the voice pipeline it describes is
+one of three paths. Read the amendments before relying on the original text.
+
+### The specifications
+
+Feature specs live in [`.specify/specs/`](../../.specify/specs/) and are the
+description of what the product does **today**;
+[`docs/implementation-backlog.md`](../implementation-backlog.md) is the history
+of how it got there. Start with
+[015-spec-coverage](../../.specify/specs/015-spec-coverage/spec.md), which
+explains why the two were disconnected for 292 units and what now keeps them
+together.
