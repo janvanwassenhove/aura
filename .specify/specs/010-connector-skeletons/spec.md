@@ -1,17 +1,19 @@
 ---
 feature: "010-connector-skeletons"
-status: "in-progress"
+status: "implemented"
 owner: "connector-service"
 priority: P2
 risk: Medium
 created: "2026-04-25"
+amended: "2026-09-05"
+units: [U39, U48, U52, U69, U254, U254b, U255, U295, U298]
 ---
 
 # Feature Specification: Connector Skeletons (Work IQ MCP + Mock)
 
 **Feature Branch**: `010-connector-skeletons`
 **Created**: 2026-04-25
-**Status**: In Progress
+**Status**: Implemented — **see the 2026-09 amendment at the end**.
 **Owner**: connector-service
 **Priority**: P2
 **Risk**: Medium
@@ -140,3 +142,108 @@ No auth token, client secret, or personal M365 content appears in any log output
 - [Constitution](.specify/memory/constitution.md) — Principle IV (Safety Gates), Principle VI (No Sensitive Data in Logs)
 - [ADR-006](docs/adr/ADR-006-m365-connector.md)
 - [Spec 006 — Orchestrator Foundation](../006-orchestrator-foundation/spec.md)
+
+---
+
+# Amendment — 2026-09-05: connections a household can make
+
+*Retro-specified; see [015-spec-coverage](../015-spec-coverage/spec.md). The
+April text is the record of the original plan and is left intact.*
+
+## What changed in shape
+
+The plan was a **skeleton**: a `Connector` ABC, a Work IQ MCP client, and a
+mock. What was missing was everything between "the code can talk to Microsoft"
+and "a family sees their calendar".
+
+| April plan | What it is now | Why |
+|---|---|---|
+| Connectors built from `ENABLED_CONNECTORS` | Owner-switchable in Settings, persisted, applied without a restart | Editing an env file the desktop app generates is not a setting (U254) |
+| Status: connected / not | Six states, each a **different job**: `not_enabled`, `no_credentials`, `unauthenticated`, `mock`, `ok`, `unavailable` | `unknown` is the only status that tells the owner nothing they can act on (U254) |
+| A mock for development | A mock that **says** it is canned data | A green badge over invented data is the worst outcome available here (U52) |
+| Microsoft only | Microsoft 365, Google, GitHub, Slack, generic MCP servers, and a calendar connected by **pasting a link** | (U255, U298) |
+
+## Additional user stories
+
+### User Story 4 — Every connector answers for itself (Priority: P1)
+
+1. **Given** any connector the code can build, **When** the panel is shown,
+   **Then** it appears — enabled or not — with a plain sentence for what is
+   true and a plain sentence for the next step (`connector_state.describe`,
+   U254).
+2. **Given** a connector is switched on, **When** it is, **Then** the brain
+   republishes what he may do in the same request, so his capabilities change
+   without a restart (U254).
+3. **Given** a live connector, **When** the tool layer builds the turn,
+   **Then** `live_domains` decides which tools exist — so a connector that is
+   off does not leave him promising mail he cannot read (U254).
+4. **Given** the Test button, **When** it is pressed, **Then** it makes the
+   cheapest **real** call that connector implements. U254b: it asked every
+   connector for today's calendar, so GitHub and Slack — which do repos and
+   channels — could never pass their own test.
+5. **Given** a connector whose credential is only read at call time, **When**
+   it constructs, **Then** that is **not** reported as connected: green has to
+   be earned by a successful probe (U254b).
+
+### User Story 5 — Connecting does not require being a developer (Priority: P1)
+
+Reported as *"don't we have more user friendly ways to connect? this is really
+dev like"*, then *"app-ids is enige manier? er niks gebruiksvriendelijker?"*.
+
+1. **Given** any row, **When** its copy is shown, **Then** it contains no
+   environment-variable names. The names still travel in `missing`, because a
+   diagnostic that drops them helps nobody — it is the visible sentence that
+   had to change (U295).
+2. **Given** a connector needs a one-time app ID, **When** the row is shown,
+   **Then** there is a field to paste it into and a clickable link to the page
+   it comes from. U295: the text said "paste its id here" next to no field.
+3. **Given** a calendar, **When** the owner wants one connected, **Then** they
+   can paste a published `.ics` link: no app registration, no consent screen,
+   no sign-in, read-only by construction (U298).
+4. **Given** GitHub, **When** it is connected, **Then** a personal access token
+   is enough — no OAuth app to register (U298).
+5. **Given** a connector cannot do something, **When** it is asked, **Then** it
+   says so plainly rather than failing deep inside a turn ("A shared calendar
+   link can only read the calendar").
+
+### User Story 6 — Tools the owner adds themselves (Priority: P2)
+
+1. **Given** any MCP server with an HTTP endpoint, **When** it is added,
+   **Then** its tools are **discovered first** and switched on afterwards —
+   adding is not enabling (U255).
+
+### User Story 7 — Music, honestly (Priority: P3)
+
+1. **Given** Spotify or Sonos, **When** asked, **Then** playback is controlled
+   for real (U39), the mock says it is a mock (U48), and "always allow" is
+   remembered per action (U48).
+2. **Given** lyrics, **When** they are heard, **Then** they cannot become
+   conversation (U69).
+
+## Amended functional requirements
+
+- **FR-101**: `connector_state.describe()` answers for **every** known
+  connector, enabled or not, without touching the network, with a next step
+  always attached.
+- **FR-102**: Visible copy contains no environment-variable names; `missing`
+  carries them for diagnosis.
+- **FR-103**: A mock never reports itself as connected.
+- **FR-104**: A connector verified only at call time must earn `ok` with a real
+  probe.
+- **FR-105**: The probe is a call that connector actually implements.
+- **FR-106**: `live_domains` gates which tools are offered to the model.
+- **FR-107**: A calendar can be connected read-only from a published `.ics`
+  link, parsed in-repo (no new dependency beyond `tzdata`, because `uv sync`
+  prunes unrequested extras — four units have been lost to that).
+
+## Traceability
+
+| Units | What they delivered |
+|---|---|
+| U39, U48, U69 | Spotify and Sonos control; an honest mock and remembered approvals; the lyrics guard |
+| U52 | Honest connector statuses; Chrome browser control |
+| U254 | Connections that exist, can be switched on, and change what he can do |
+| U254b | A Test button that asks each connector something it can answer |
+| U255 | MCP servers the owner adds, discovered before being switched on |
+| U295 | The Connections page stopped speaking developer — and got the field its own text promised |
+| U298 | A calendar connected by a link; GitHub by a personal token |

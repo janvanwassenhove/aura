@@ -1150,3 +1150,27 @@ Eén eis staat er scherper dan de rest, omdat U264 liet zien wat het kost:
 Het werk van de presentator kwijtraken is het ergste wat deze functie kan doen.
 
 Schuld: 90 → 76.
+
+### U308 — specs 008 en 010 aangevuld: de console en de verbindingen
+
+Vijfenveertig units. Voor de console was de vormverandering fundamenteel: het
+plan beschreef een **operatorconsole** — panelen die een draaiend systeem
+observeren. Wat er staat is het enige scherm dat het product heeft, het venster
+dat een gezin opent. Daarmee veranderen de regels: geen icoontjessoep met vijf
+schermvullende modals maar één navigatiebalk met namen, en drie dichtheden die
+meebewegen met de persoon tegen wie hij praat.
+
+Eén defectklasse staat er expliciet in omdat ze in deze spec het vaakst
+terugkomt: **de console die een toestand toont die de brain niet deelt** —
+U252c, U252e, U276, U278, U290, U297. De eis is nu dat elke status, capaciteit
+en kennistoestand van de brain komt; de console maakt presentatie, nooit
+waarheid.
+
+Bij de connectoren was de kern dat `unknown` de enige status is waar de
+eigenaar niets mee kan. Zes toestanden nu, elk een ander karwei, en elk met de
+volgende stap eraan vast.
+
+De basislijn is voor het eerst teruggeschoven: van U298 naar U224. Alles wat
+daarna kwam is nu geclaimd.
+
+Schuld: 76 → 31.
