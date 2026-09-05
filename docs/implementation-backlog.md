@@ -951,3 +951,55 @@ erbij dat de twee naamgevingen elkaar alleen hier tegenkomen.
 Wat hiermee níét is opgelost: mail lezen, mail versturen en Teams vragen nog
 altijd een echte aanmelding, en daarvoor blijft één app-registratie nodig
 zolang `defaults.py` leeg staat. Die kan alleen de eigenaar doen.
+
+### U299 — de specs zijn 292 units lang niet meegegroeid
+
+Gevraagd als "waarom zie ik in specify en docs folder geen wijzigingen? ... ga
+na wat er is fout gelopen en fix it". Terecht, en het was erger dan het leek.
+
+`.specify/` is in de hele geschiedenis drie keer aangeraakt: de scaffold, U231
+en U238. Geen enkele spec noemde ooit een unit; alle veertien stonden nog op
+`status: in-progress`, ook die van juni. De ADR's dateren van 21 juni. Wat het
+product intussen geworden is, staat uitsluitend in
+`docs/implementation-backlog.md`: 420 kB Nederlands proza, één entry per unit,
+kloppend en gedetailleerd — maar een dagboek is geen contract. Wie wil weten hoe
+het product zich vandaag gedraagt, hoort daarvoor niet de hele
+ontstaansgeschiedenis te moeten lezen.
+
+Drie oorzaken, elk op zich voldoende:
+
+1. **De regel stond nergens in beeld.** `AGENTS.md` heet "GitHub Copilot Agent
+   Instructions" en de grondwet staat onder `.specify/`. Claude Code laadt
+   `CLAUDE.md`, en dat bestond niet. Elke unit in deze stroom is geschreven
+   door een agent die principe I nooit gelezen had. Op de vraag "zat dit enkel
+   in copilot instructions?": ja.
+2. **Niets controleerde het.** De privacy-scan heeft een hook én een CI-job; de
+   release notes hebben tests. Traceerbaarheid had geen van beide en verviel
+   daarmee tot een gewoonte — en gewoontes overleven geen 292 units op tempo.
+3. **Het ledger ving de druk op.** Elke unit een zorgvuldige entry schrijven
+   vóélde als documenteren. Er ging moeite in; ze ging naar het verkeerde
+   artefact.
+
+Wat er nu ligt:
+
+* `scripts/spec_drift.py` leest de units uit de commitlog en de claims uit de
+  `units:`-frontmatter van elke spec, en meldt het verschil. Alleen de
+  frontmatter telt: een spec die U263 in een alinea noemt, heeft er daarmee
+  geen verantwoordelijkheid voor genomen.
+* `.specify/coverage.json` houdt de basislijn bij — de eerlijke grens tussen de
+  schuld die er al was en de discipline die nu begint. Het openstaande aantal
+  wordt bij élke run getoond, de check zegt nooit "compleet" zolang het niet
+  nul is, en een test weigert een basislijn die vooruit beweegt. Omlaag komt ze
+  alleen door de spec te schrijven.
+* `CLAUDE.md` — de ontbrekende schakel. Spec-first, wat een unit verschuldigd
+  is (code + tests, spec, ledger, tekening, ADR), en de praktische valkuilen
+  van deze repo.
+* Een CI-job naast de privacy-scan, en een waarschuwing in de pre-commit hook
+  wanneer er code wijzigt en geen spec.
+
+Spec `015-spec-coverage` beschrijft dit en claimt U299 — meteen het eerste
+uitgewerkte voorbeeld van het mechanisme. Zestien tests.
+
+Wat hiermee **niet** is opgelost: de 292 units schuld zelf. Die staat nu geteld
+en zichtbaar in beeld, en wordt in de volgende units afbetaald — telkens een
+spec geschreven en de basislijn een stuk terug.

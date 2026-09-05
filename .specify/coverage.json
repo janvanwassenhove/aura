@@ -1,0 +1,5 @@
+{
+  "_why": "U299. The constitution says specs are living artifacts, updated when reality diverges. In practice .specify/ was touched three times in 292 units: the scaffold, U231 and U238. Everything the product actually became lives in docs/implementation-backlog.md instead — a diary, not a contract. scripts/spec_drift.py now checks the link, and this file is the honest boundary between the debt that already exists and the discipline that starts now.",
+  "baseline": "U298",
+  "_baseline_means": "Units up to and including this one are historical debt: reported on every run so the number stays visible, but not yet blocking. Every unit AFTER it must be claimed by a spec's `units:` frontmatter or CI fails. The baseline may only ever move BACKWARDS, as the debt is paid off by writing the specs that were never written; scripts/test_spec_drift.py refuses a baseline that moves forward."
+}

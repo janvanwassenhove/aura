@@ -17,3 +17,15 @@ else
 fi
 
 $PY "$(git rev-parse --show-toplevel)/scripts/privacy_scan.py" --staged
+
+# U299: a unit owes its spec in the same commit. This only warns — the check
+# that BLOCKS is `scripts/spec_drift.py` in CI, which reads commit subjects and
+# so cannot run before the commit exists. Here we can only see the staged files,
+# and "code without spec" is worth saying out loud while it is still cheap.
+CODE=$(git diff --cached --name-only --diff-filter=ACM        -- 'apps/*' 'services/*' 'packages/*' | head -1)
+SPEC=$(git diff --cached --name-only --diff-filter=ACM -- '.specify/specs/*' | head -1)
+if [ -n "$CODE" ] && [ -z "$SPEC" ]; then
+  echo "pre-commit: code is changing and no spec is."
+  echo "            Constitution I: specs are living artifacts - update them"
+  echo "            when reality diverges. See CLAUDE.md, 'what a unit owes'."
+fi

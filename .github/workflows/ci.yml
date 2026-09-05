@@ -30,6 +30,14 @@ jobs:
       # months — nothing was watching, because nothing could.
       - name: Release-notes tests
         run: pytest scripts/test_release_notes.py -q
+      # U299: the constitution's first principle, made checkable. `.specify/`
+      # was touched three times in 292 units while the product was rebuilt
+      # around it, and nothing anywhere could notice. Fails on any unit newer
+      # than the baseline that no spec claims.
+      - name: Spec coverage
+        run: |
+          pytest scripts/test_spec_drift.py -q
+          python scripts/spec_drift.py
       # U297: the README's screenshots are generated too, and a renamed shot
       # would otherwise leave a broken picture on the front page.
       - name: README-screenshot tests
