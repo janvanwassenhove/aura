@@ -1112,3 +1112,22 @@ de robot achterloopt, maar "achter" telt élke commit, en de meeste units raken
 gratis, het herstart de runtime en dat hakt het gesprek af.
 
 Schuld: 151 → 99. Onder de honderd.
+
+### U306 — spec 022: veiligheid en privacy
+
+Negen units, en het enige gebied waar de lat anders ligt: alles wat hier
+misgaat is niet met een volgende release te herstellen. Een kennisbestand dat
+van het LAN te lezen was, of gegevens van een gezinslid in een publieke
+git-geschiedenis — dat haal je niet terug.
+
+Het dreigingsmodel staat er nu in één alinea: geen statelijke aanvaller maar het
+LAN zelf — een smart-tv, een buur op dezelfde wifi, een tabblad dat openstaat,
+en een publieke geschiedenis.
+
+`docs/audit-2026-08.md` blijft de levende lijst; de spec legt de vorm vast en
+verwijst per punt (S1, S2, …) naar de audit. Ook vastgelegd waarom sommige
+keuzes asymmetrisch zijn: de brain bindt op loopback, maar de robot-runtime
+móet over het LAN bereikbaar zijn — die zit op een andere machine — en wordt
+daarom met een gedeeld geheim bewaakt in plaats van door niet te luisteren.
+
+Schuld: 99 → 90.
