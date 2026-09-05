@@ -5,7 +5,7 @@ owner: "build"
 priority: P1
 risk: Low
 created: "2026-09-05"
-units: [U299, U300, U301, U302, U303, U304, U305, U306, U307, U308, U309, U310, U311, U312]
+units: [U299, U300, U301, U302, U303, U304, U305, U306, U307, U308, U309, U310, U311, U312, U313]
 ---
 
 # Feature Specification: Spec Coverage — traceability that a machine checks
@@ -168,3 +168,4 @@ spec-first rule and the per-unit obligations, and points at the constitution.
 | U310 | Seven ADRs amended to match reality; two that were still marked Proposed had shipped months ago |
 | U311 | ADR-009 (honest state) and ADR-010 (the desktop app as delivery unit); the architecture overview brought up to date |
 | U312 | Constitution 1.3.0 — principle XI, enforced traceability in principle I, and what a unit owes |
+| U313 | Every spec's status made true — including the one that is honestly blocked |

@@ -1,6 +1,6 @@
 ---
 feature: "005-conversation-runtime"
-status: "in-progress"
+status: "implemented"
 owner: "conversation-runtime"
 priority: P1
 risk: Medium
@@ -143,3 +143,17 @@ Each session's transcript (user turns + AURA responses) is persisted to the memo
 - [ADR-005](docs/adr/ADR-005-voice-pipeline.md)
 - [Spec 003 — Event Bus](../003-event-bus-schemas/spec.md)
 - [Spec 006 — Orchestrator](../006-orchestrator-foundation/spec.md)
+
+---
+
+## Status note — 2026-09-05
+
+Implemented, and then **absorbed**. `conversation-runtime` no longer runs as
+its own process: its router was mounted into `aura-brain` in U4 with the rest
+of the collapse (see [001-foundation](../001-foundation/spec.md) and ADR-007's
+amendment). The module boundary is unchanged.
+
+The voice half has moved a long way from the design here — three speech paths
+rather than one pipeline, a locally detected wake word, and a pinned language.
+[017-voice-and-language](../017-voice-and-language/spec.md) is the current
+description; ADR-005 carries the amendment.

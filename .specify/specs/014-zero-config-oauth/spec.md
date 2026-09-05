@@ -1,6 +1,6 @@
 ---
 feature: "014-zero-config-oauth"
-status: "in-progress"
+status: "blocked"
 owner: "identity-service"
 priority: P1
 risk: Low
@@ -136,3 +136,29 @@ Slack bot tokens cannot be obtained via OAuth Device Code. The current "paste bo
 - GitHub Device Flow docs: https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps#device-flow
 - Google Device Flow: https://developers.google.com/identity/protocols/oauth2/limited-input-device
 - Microsoft Device Code: https://learn.microsoft.com/en-us/entra/identity-platform/v2-oauth2-device-code
+
+---
+
+## Status note — 2026-09-05
+
+**Blocked, deliberately, and this is the honest status rather than
+"in-progress".**
+
+Everything on the code side is done: device-code flows for Microsoft, Google
+and GitHub; `defaults.py` as the place shipped client ids live; the resolution
+order (environment variable first, then the shipped default) in
+`identity_service.main`.
+
+What is missing is not code. `MICROSOFT_CLIENT_ID`, `GOOGLE_CLIENT_ID` and
+`GITHUB_CLIENT_ID` are empty, each with a `TODO: paste after registering`.
+Filling them requires registering three OAuth applications under a project
+account — the owner's accounts and the owner's decision, which no unit can make.
+
+Until then the fallback is the field added in U295 (paste your own app id) and,
+better, the routes that need no registration at all: a calendar connected by a
+published `.ics` link, and GitHub by a personal access token
+([010](../010-connector-skeletons/spec.md), U298).
+
+**To unblock**: register the three apps once, paste the ids into
+`services/identity-service/src/identity_service/defaults.py`, and Connect
+becomes one click for every install.

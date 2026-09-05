@@ -1,6 +1,6 @@
 ---
 feature: "012-openclaw-gateway"
-status: "in-progress"
+status: "implemented"
 owner: "orchestrator"
 priority: P3
 risk: Medium
@@ -134,3 +134,17 @@ AURA can push status events to registered external agents via webhook callbacks.
 - [Constitution](.specify/memory/constitution.md) — Principle IV (Safety Gates are Inviolable)
 - [Spec 006 — Orchestrator Foundation](../006-orchestrator-foundation/spec.md)
 - [Spec 009 — Offline Fallback](../009-offline-fallback/spec.md)
+
+---
+
+## Status note — 2026-09-05
+
+Implemented: `GatewayManager`
+(`services/orchestrator/src/orchestrator/gateway.py`) provides API-key
+authentication, per-key rate limiting, command dispatch and an audit log, and
+is constructed in both `orchestrator.main` and `aura_brain.main`.
+
+It is **not exercised by the desktop product**, which has no external agent
+driving it. Constitution IV still binds it: an external agent cannot bypass the
+orchestrator or the approval gate, and `SENSITIVE_ACTIONS` is enforced on this
+path like any other.

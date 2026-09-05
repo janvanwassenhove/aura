@@ -1279,3 +1279,26 @@ pas af met de code én de spec én het ledger én de tekening als de vorm wijzig
 
 `AGENTS.md` is meegetrokken, zodat de Copilot-kant en `CLAUDE.md` hetzelfde
 zeggen.
+
+### U313 — de statussen kloppen nu ook
+
+Vier specs stonden nog op `in-progress`. Drie daarvan draaiden al maanden
+(gedragsengine, conversation-runtime, de OpenClaw-gateway) en staan nu op
+`implemented`, met een notitie waar hun echte beschrijving intussen staat.
+
+De vierde is de interessante: **014-zero-config-oauth staat nu op `blocked`,
+niet op `in-progress`.** Dat is het verschil tussen "we zijn ermee bezig" en
+"dit ligt stil en niemand wacht op code". De hele codekant is af — device-code
+flows voor Microsoft, Google en GitHub, `defaults.py` als de plek waar de
+meegeleverde client-ids horen te staan, de juiste voorrangsvolgorde. Wat
+ontbreekt is geen code: drie OAuth-apps registreren onder een projectaccount,
+met jouw accounts en jouw beslissing.
+
+Er staat nu bij hoe je het deblokkeert, in één zin: registreer die drie apps
+één keer, plak de ids in `defaults.py`, en Connect wordt één klik voor élke
+installatie.
+
+Dat is principe XI toegepast op onze eigen administratie: `in-progress` was
+precies zo'n plausibele standaardwaarde als "batterij 100%".
+
+**Eindstand: 22 specs, 335 units, schuld 0.**

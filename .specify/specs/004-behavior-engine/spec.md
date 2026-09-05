@@ -1,6 +1,6 @@
 ---
 feature: "004-behavior-engine"
-status: "in-progress"
+status: "implemented"
 owner: "robot-runtime"
 priority: P1
 risk: Medium
@@ -142,3 +142,13 @@ Each persona (work, home, demo) has a different gesture intensity and style. Wor
 - [ADR-003](docs/adr/ADR-003-robot-adapter-abstraction.md)
 - [Spec 002 — FakeRobot](../002-fakerobot-simulation/spec.md)
 - [Spec 003 — Event Bus](../003-event-bus-schemas/spec.md)
+
+---
+
+## Status note — 2026-09-05
+
+Implemented and considerably extended. The behaviour engine ships in
+`services/robot-runtime/src/robot_runtime/behavior/`; what grew on top of it —
+idle behaviour, moods, poses, dances, follow-me, and the character system that
+selects between them — is described in
+[016-embodiment-and-presence](../016-embodiment-and-presence/spec.md).
