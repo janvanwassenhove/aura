@@ -1076,3 +1076,20 @@ kennisstand toonde die de brain niet deelde (U276, U278, U290) — en waarom een
 laag-vertrouwen waarneming taggen géén correctie is maar training.
 
 Schuld: 225 → 184.
+
+### U304 — spec 019: vaardigheden, automatisering en de agentische lus
+
+Tweeëndertig units rond het deel dat écht iets kan doen: een commando draaien,
+de muis bewegen, een app openen. Alles daar staat onder grondwetsprincipe IV —
+veiligheidspoorten zijn onaantastbaar — en de spec legt vast welke gereedschappen
+per definitie níét afgesloten kunnen worden. `request_capability` is de
+belangrijkste: als om deblokkering vragen zelf geblokkeerd kan worden, moet de
+eigenaar logs gaan lezen om te weten wat hij wilde.
+
+De interessantste les staat er ook in, uit U247: een leerlus is nooit eerlijker
+dan het verslag waaruit hij leert. Die regel werd vóór de beurt geschreven, dus
+hij bevatte de bedoeling en nooit de uitkomst — en het optimalisatieproces werd
+gevraagd "guardrails toe te voegen voor de faalgevallen die uit het bewijs
+blijken", over bewijs waarin geen enkel faalgeval stond.
+
+Schuld: 184 → 151.

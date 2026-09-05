@@ -5,7 +5,7 @@ owner: "build"
 priority: P1
 risk: Low
 created: "2026-09-05"
-units: [U299, U300, U301, U302, U303]
+units: [U299, U300, U301, U302, U303, U304]
 ---
 
 # Feature Specification: Spec Coverage — traceability that a machine checks
@@ -159,3 +159,4 @@ spec-first rule and the per-unit obligations, and points at the constitution.
 | U301 | Spec 016 — embodiment and presence (36 units) |
 | U302 | Spec 017 — voice and language (60 units) |
 | U303 | Spec 018 — knowledge, people and judgment (41 units) |
+| U304 | Spec 019 — skills, automation and the agentic loop (32 units) |
