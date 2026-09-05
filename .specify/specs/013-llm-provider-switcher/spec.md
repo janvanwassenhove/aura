@@ -1,5 +1,7 @@
 ---
 description: "Runtime LLM provider and model switcher — operator console UI + orchestrator config API"
+units: [U90, U191, U202]
+amended: "2026-09-05"
 ---
 
 # Feature Specification: LLM Provider Switcher
@@ -97,3 +99,21 @@ As an operator, I want the Settings panel to always display the currently active
 - **SC-005**: `PATCH` with invalid provider returns 422.
 - **SC-006**: `GET /orchestrator/config/llm/models?provider=gemini` returns a non-empty model list.
 - **SC-007**: Unit tests cover: GET returns initial env config, PATCH updates config, `openai_chat` reads from runtime config not env on each call, Gemini branch is exercised.
+
+---
+
+# Amendment — 2026-09-05
+
+*Retro-specified; see [015-spec-coverage](../015-spec-coverage/spec.md) for why this arrives late. The text above is the record of the original plan.*
+
+Extended twice more since the May amendment.
+
+**Model roles (U90)**: one model per *task type* rather than one model for
+everything — chat, tool use, distillation and screen control have different
+cost and capability needs. **Per-role model lists (U191)**: the lists are per
+provider, so a role cannot be set to a model the active provider does not have.
+
+And the failure worth recording: **U202 — my own U191 silenced the assistant,
+and the echo hid it.** A role left pointing at nothing produced no reply, and
+because the echo provider still answered in tests, nothing failed. A switcher
+must be tested against the provider it will actually run on.

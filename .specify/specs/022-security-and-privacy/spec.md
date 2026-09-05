@@ -5,7 +5,8 @@ owner: "cross-cutting"
 priority: P1
 risk: High
 created: "2026-09-05"
-units: [U121, U167, U182, U183, U215, U220, U221, U225, U226]
+units: [U121, U167, U182, U183, U215, U220, U221, U225, U226, U224]
+amended: "2026-09-05"
 ---
 
 # Feature Specification: Security and Privacy

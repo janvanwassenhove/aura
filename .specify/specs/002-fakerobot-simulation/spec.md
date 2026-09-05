@@ -1,10 +1,12 @@
 ---
 feature: "002-fakerobot-simulation"
-status: "in-progress"
+status: "implemented"
 owner: "robot-runtime"
 priority: P1
 risk: Low
 created: "2026-04-25"
+units: [U13]
+amended: "2026-09-05"
 ---
 
 # Feature Specification: FakeRobot Simulation
@@ -129,3 +131,22 @@ A CI pipeline can run all FakeRobot tests without hardware and without network a
 - [Constitution](.specify/memory/constitution.md) — Principle II (Hardware Abstraction)
 - [ADR-003](docs/adr/ADR-003-robot-adapter-abstraction.md)
 - [RobotAdapter ABC](services/robot-runtime/src/robot_runtime/adapters/base.py)
+
+---
+
+# Amendment — 2026-09-05
+
+*Retro-specified; see [015-spec-coverage](../015-spec-coverage/spec.md) for why this arrives late. The text above is the record of the original plan.*
+
+`FakeRobot` did what the spec asked and then became **load-bearing**. It is not
+a development convenience: it is what the release pipeline boots to take every
+screenshot (`ROBOT_ADAPTER=fake`), which is what makes those images
+privacy-safe by construction, and it is the target every flow must work
+against per constitution II.
+
+U13 added the other half — `RobotClient`, the brain↔robot boundary contract —
+so the brain talks to *a runtime over HTTP*, not to an adapter. That boundary
+is where constitution X lives: the runtime on the Pi is routinely older than
+the brain, so every call added since goes in its own `try` and reports the
+degradation rather than plain success. See
+[021-robot-deployment](../021-robot-deployment/spec.md).

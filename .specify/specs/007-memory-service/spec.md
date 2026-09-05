@@ -1,12 +1,14 @@
 ---
 feature: "007-memory-service"
-status: "in-progress"
+status: "implemented"
 owner: "memory-service"
 priority: P2
 risk: Low
 plan_required: false
 plan_note: "P2/Low-risk feature — tasks.md provides sufficient planning detail; no separate plan.md warranted."
 created: "2026-04-25"
+units: [U41, U42]
+amended: "2026-09-05"
 ---
 
 # Feature Specification: Memory Service
@@ -141,3 +143,19 @@ The `MemoryStore` interface is implemented by `SQLiteMemoryStore`; a `PostgresMe
 
 - [Constitution](.specify/memory/constitution.md) — Principle VII (Simplicity Over Cleverness)
 - [Spec 006 — Orchestrator Foundation](../006-orchestrator-foundation/spec.md)
+
+---
+
+# Amendment — 2026-09-05
+
+*Retro-specified; see [015-spec-coverage](../015-spec-coverage/spec.md) for why this arrives late. The text above is the record of the original plan.*
+
+The service is as specified. U41/U42 added **conversation memory** — the
+session's own turns as context — which is distinct from, and much shorter-lived
+than, the per-person long-term memory in
+[018-knowledge-people-and-judgment](../018-knowledge-people-and-judgment/spec.md).
+
+Keeping the two separate matters: session turns are working memory that ends
+with the conversation and is *not* encrypted per person, while long-term memory
+is a durable, consented, person-scoped record. Anything that must survive the
+conversation belongs in the knowledge store, not here.

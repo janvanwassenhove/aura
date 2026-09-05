@@ -5,10 +5,8 @@ owner: "apps/desktop + CI"
 priority: P1
 risk: High
 created: "2026-09-05"
-units: [U32, U33, U44, U55, U56, U151, U152, U166, U168, U168b, U168c, U168d,
-        U168e, U169, U169b, U170, U171, U172, U173, U174, U176, U177, U178,
-        U192, U193, U197, U201, U211, U228, U229, U230, U231, U232, U233,
-        U234, U235, U236, U283, U284, U285, U285b, U297]
+units: [U32, U33, U44, U55, U56, U151, U152, U166, U168, U168b, U168c, U168d, U168e, U169, U169b, U170, U171, U172, U173, U174, U176, U177, U178, U192, U193, U197, U201, U211, U228, U229, U230, U231, U232, U233, U234, U235, U236, U283, U284, U285, U285b, U297, U179, U184, U185, U186, U210]
+amended: "2026-09-05"
 ---
 
 # Feature Specification: The Desktop App and its Releases

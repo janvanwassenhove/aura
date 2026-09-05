@@ -1,10 +1,12 @@
 ---
 feature: "006-orchestrator-foundation"
-status: "in-progress"
+status: "implemented"
 owner: "orchestrator"
 priority: P1
 risk: High
 created: "2026-04-25"
+units: [U23, U25]
+amended: "2026-09-05"
 ---
 
 # Feature Specification: Orchestrator Foundation
@@ -149,3 +151,19 @@ The context builder assembles a complete LLM prompt from: system prompt (persona
 - [ADR-006](docs/adr/ADR-006-m365-connector.md)
 - [Spec 005 — Conversation Runtime](../005-conversation-runtime/spec.md)
 - [Spec 010 — Connector Skeletons](../010-connector-skeletons/spec.md)
+
+---
+
+# Amendment — 2026-09-05
+
+*Retro-specified; see [015-spec-coverage](../015-spec-coverage/spec.md) for why this arrives late. The text above is the record of the original plan.*
+
+The foundation holds; what grew on top of it is
+[019-skills-and-automation](../019-skills-and-automation/spec.md) — the
+multi-round agentic loop, the skill ledger, and the tools that can act on the
+laptop.
+
+Two additions belong to the foundation itself: per-turn latency instrumentation
+emitted onto the event stream (U23, which is how `TurnLatencyMeasured` became
+the thing the console shows), and parallel tool calling (U25), because a turn
+that needs three independent reads should not pay for them in sequence.

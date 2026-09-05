@@ -114,10 +114,15 @@ def test_the_baseline_only_ever_moves_backwards() -> None:
     import json
     import subprocess
 
+    def number(baseline: str) -> int:
+        # An empty baseline forgives nothing, which is the strictest value
+        # there is — and the one U309 reached by paying the debt off.
+        return (int(baseline.lstrip("U").rstrip("abcdefghijklmnopqrstuvwxyz"))
+                if baseline.strip() else 0)
+
     root = Path(__file__).resolve().parent.parent
     path = root / ".specify" / "coverage.json"
-    now = int(json.loads(path.read_text(encoding="utf-8"))["baseline"].lstrip("U")
-              .rstrip("abcdefghijklmnopqrstuvwxyz"))
+    now = number(json.loads(path.read_text(encoding="utf-8"))["baseline"])
 
     was = subprocess.run(                                          # noqa: S603
         ["git", "show", "HEAD:.specify/coverage.json"],           # noqa: S607
@@ -125,8 +130,7 @@ def test_the_baseline_only_ever_moves_backwards() -> None:
     ).stdout
     if not was.strip():
         return  # first commit of the file — nothing to compare against
-    before = int(json.loads(was)["baseline"].lstrip("U")
-                 .rstrip("abcdefghijklmnopqrstuvwxyz"))
+    before = number(json.loads(was)["baseline"])
     assert now <= before, (
         f"the baseline moved forward (U{before} → U{now}): that forgives drift "
         "instead of documenting it")

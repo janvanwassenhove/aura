@@ -5,10 +5,8 @@ owner: "aura-brain / knowledge"
 priority: P1
 risk: High
 created: "2026-09-05"
-units: [U18, U19a, U19b, U19c, U19d, U19e, U20, U29, U93, U94, U97, U103,
-        U104, U105, U106, U109, U136, U160, U180, U181, U189, U190, U204,
-        U213, U214, U218, U243, U244, U245, U271, U272, U274, U276, U277,
-        U278, U279, U280, U281, U290, U293, U294]
+units: [U18, U19a, U19b, U19c, U19d, U19e, U20, U29, U93, U94, U97, U103, U104, U105, U106, U109, U136, U160, U180, U181, U189, U190, U204, U213, U214, U218, U243, U244, U245, U271, U272, U274, U276, U277, U278, U279, U280, U281, U290, U293, U294, U36f]
+amended: "2026-09-05"
 ---
 
 # Feature Specification: Knowledge, People and Judgment

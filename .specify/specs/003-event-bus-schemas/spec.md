@@ -1,10 +1,12 @@
 ---
 feature: "003-event-bus-schemas"
-status: "in-progress"
+status: "implemented"
 owner: "platform"
 priority: P1
 risk: Low
 created: "2026-04-25"
+units: [U6]
+amended: "2026-09-05"
 ---
 
 # Feature Specification: Event Bus and Shared Schemas
@@ -126,3 +128,26 @@ The operator console event log panel shows real-time events from any connected s
 
 - [Constitution](.specify/memory/constitution.md) — Principle III (Events Drive State)
 - [ADR-002](docs/adr/ADR-002-event-model.md)
+
+---
+
+# Amendment — 2026-09-05
+
+*Retro-specified; see [015-spec-coverage](../015-spec-coverage/spec.md) for why this arrives late. The text above is the record of the original plan.*
+
+The bus is as specified and is still the spine (constitution III). One thing
+changed: after the collapse in [001](../001-foundation/spec.md) it is **one
+shared in-process bus**, verified end to end in U6, rather than one per
+service with a broadcaster between them.
+
+Two consequences that later units kept rediscovering, recorded here so they
+stop being rediscoveries:
+
+* An event only reaches a subscriber that exists **when it is published**.
+  `RobotConnected` fires when the robot connects — normally before the console
+  window exists — so a console that only listens starts by claiming the robot
+  is offline (U152, finished in U297). State that must survive a late
+  subscriber is **polled**, not awaited.
+* The projector overlay is a separate BrowserWindow with its own store, so it
+  is not on the same bus at all. Anything two windows must agree on crosses
+  through an explicit channel (U269, U276, U286, U290).

@@ -5,7 +5,7 @@ owner: "build"
 priority: P1
 risk: Low
 created: "2026-09-05"
-units: [U299, U300, U301, U302, U303, U304, U305, U306, U307, U308]
+units: [U299, U300, U301, U302, U303, U304, U305, U306, U307, U308, U309]
 ---
 
 # Feature Specification: Spec Coverage — traceability that a machine checks
@@ -164,3 +164,4 @@ spec-first rule and the per-unit obligations, and points at the constitution.
 | U306 | Spec 022 — security and privacy (9 units, tracked against the August audit) |
 | U307 | Spec 011 amended — the presentation copilot as it actually is (14 units) |
 | U308 | Specs 008 + 010 amended — the D2 console and the connections (45 units) |
+| U309 | The remaining original specs claimed and amended; the debt reaches zero and the baseline is cleared |

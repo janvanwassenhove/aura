@@ -1,10 +1,12 @@
 ---
 feature: "009-offline-fallback"
-status: "in-progress"
+status: "implemented"
 owner: "orchestrator"
 priority: P2
 risk: High
 created: "2026-04-25"
+units: [U14, U15, U21]
+amended: "2026-09-05"
 ---
 
 # Feature Specification: Offline Fallback and Resilience
@@ -141,3 +143,24 @@ The heartbeat monitor checks all backend services every 30 seconds and emits hea
 - [ADR-004](docs/adr/ADR-004-offline-fallback.md)
 - [Spec 003 — Event Bus](../003-event-bus-schemas/spec.md)
 - [Spec 006 — Orchestrator](../006-orchestrator-foundation/spec.md)
+
+---
+
+# Amendment — 2026-09-05
+
+*Retro-specified; see [015-spec-coverage](../015-spec-coverage/spec.md) for why this arrives late. The text above is the record of the original plan.*
+
+Implemented, and extended by one tier the plan did not have. The ladder is now:
+
+1. the configured model,
+2. **a local model** (ollama) — U21,
+3. the regex `FallbackAgent`,
+4. the on-device behaviour loop in `robot-runtime` (U15), which keeps the robot
+   polite with no brain at all.
+
+U14 made the heartbeat watch the **real** link — brain↔robot and upstream —
+rather than a process being alive, and added `OFFLINE` as distinct from
+`DEGRADED`. `docs/diagrams/degradation-ladder.svg` draws it.
+
+Constitution IV still governs the queue: offline-queued sensitive actions never
+auto-execute on reconnect without fresh approval.

@@ -1,10 +1,12 @@
 ---
 feature: "001-foundation"
-status: "in-progress"
+status: "implemented"
 owner: "platform"
 priority: P1
 risk: Low
 created: "2026-04-25"
+units: [U1, U2, U3, U4, U5, U7, U8, U9, U10, U11, U12, U31]
+amended: "2026-09-05"
 ---
 
 # Feature Specification: Foundation and Spec Kit Setup
@@ -119,3 +121,27 @@ Every service, package, and app directory contains a `README.md` describing its 
 - [ADR-001](docs/adr/ADR-001-language-choice.md)
 - [ADR-002](docs/adr/ADR-002-event-model.md)
 - [Architecture Overview](docs/architecture/overview.md)
+
+---
+
+# Amendment — 2026-09-05
+
+*Retro-specified; see [015-spec-coverage](../015-spec-coverage/spec.md) for why this arrives late. The text above is the record of the original plan.*
+
+The scaffold shipped as planned, and then **collapsed**. The plan had one
+service per bounded context behind docker-compose; U1–U11 mounted every router
+into a single FastAPI process (`aura-brain`) and replaced the HTTP hops between
+them with in-process seams. The compose file went from six services to three,
+and U12 smoked the whole stack through the collapsed brain with the echo
+provider and the mock connector.
+
+Why: they are one deployment. A household installs one application, and an HTTP
+round-trip between two routers in the same process is latency and a failure
+mode bought for nothing. The **module boundaries stayed** — `services/*` and
+`packages/*` are unchanged, the routers are still routers, and the seam is an
+injected callable (`token_fetcher`, `get_valid_token`) rather than a URL. That
+is what keeps the option of splitting them again.
+
+FR-003 ("specs 001 through 012") is superseded by
+[015-spec-coverage](../015-spec-coverage/spec.md): specs now exist because a
+feature exists, not because a number does.

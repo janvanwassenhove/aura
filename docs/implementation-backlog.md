@@ -1174,3 +1174,33 @@ De basislijn is voor het eerst teruggeschoven: van U298 naar U224. Alles wat
 daarna kwam is nu geclaimd.
 
 Schuld: 76 → 31.
+
+### U309 — de laatste eenendertig, en de schuld staat op nul
+
+De overgebleven units zijn ondergebracht bij de oorspronkelijke specs, met per
+spec een korte aanvulling die zegt wat er sinds april écht is gebeurd. De
+interessantste:
+
+**001** — de scaffold is geleverd zoals gepland en daarna **ingeklapt**. Zes
+compose-services werden er drie; elke router draait nu in één FastAPI-proces en
+de HTTP-sprongen ertussen zijn in-process naden geworden. Het zijn één
+installatie: een gezin zet één applicatie neer, en een netwerkronde tussen twee
+routers in hetzelfde proces is latentie en een faalmodus voor niets. De
+modulegrenzen bleven staan — dat is wat de optie openhoudt ze ooit weer te
+splitsen.
+
+**003** — twee gevolgen van "één gedeelde bus" die latere units bleven
+herontdekken, staan nu opgeschreven zodat het herontdekken stopt. Een event
+bereikt alleen een abonnee die bestaat op het moment van publiceren; toestand
+die een late abonnee moet overleven wordt **opgevraagd**, niet afgewacht. En de
+projectoroverlay zit helemaal niet op die bus.
+
+**013** — inclusief de fout die het waard is te bewaren: U202, waarin mijn eigen
+U191 de assistent stil legde en de echo-provider dat verborg. Een schakelaar moet
+getest worden tegen de provider waar hij op gaat draaien.
+
+Daarmee is de teller leeg. `.specify/coverage.json` heeft geen basislijn meer:
+er wordt niets meer vergeven, elke unit vanaf nu moet door een spec geclaimd
+worden of CI valt om.
+
+**331 units, 22 specs, schuld 0.**
