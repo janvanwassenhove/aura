@@ -18,6 +18,16 @@ on:
     tags: ["v*"]          # manual tags keep working as before
   workflow_dispatch:
 
+# U317: creating a release writes to the repository. This grant is at the top
+# so every job has it, AND repeated on the `release` job itself — a job-level
+# block is the most specific scope GitHub honours, and this failed silently
+# once already (v2.0.127, 403 "Resource not accessible by integration").
+#
+# It is not sufficient on its own. The repository setting
+#   Settings -> Actions -> General -> Workflow permissions
+# must be "Read and write permissions". With it on "Read repository contents",
+# releases 403 no matter what this file says. Check with:
+#   gh api repos/<owner>/<repo>/actions/permissions/workflow
 permissions:
   contents: write
 
@@ -268,6 +278,8 @@ jobs:
   release:
     needs: [version, test, build]
     runs-on: ubuntu-latest
+    permissions:
+      contents: write        # U317: publishing a release writes to the repo
     steps:
       - uses: actions/checkout@v4
         with:
@@ -306,6 +318,7 @@ jobs:
           python3 scripts/release_notes.py             --tag "$TAG" --repo "$REPO" --prev "$PREV"             --shots-dir shots --out notes.md
           cat notes.md
       - name: Publish release
+        id: publish
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ needs.version.outputs.tag }}
@@ -321,3 +334,29 @@ jobs:
             installers/*
             shots/*.png
           draft: false
+
+      # U317: a release that fails is invisible — the app simply never offers
+      # an update, and the owner asks days later why nothing is arriving. It
+      # already happened: v2.0.127 through v2.0.129 never published, and the
+      # only trace was a red tick nobody was looking at.
+      #
+      # This turns the most likely cause into a sentence in the log rather than
+      # a REST error code to go and look up.
+      - name: Why the release failed
+        if: failure() && steps.publish.outcome == 'failure'
+        run: |
+          echo "::error title=Release not published::The build succeeded; publishing did not."
+          echo ""
+          echo "Most likely cause — the repository's Actions token is read-only."
+          echo "Check it:"
+          echo "  gh api repos/${{ github.repository }}/actions/permissions/workflow"
+          echo "If it says \"default_workflow_permissions\": \"read\", fix it at:"
+          echo "  Settings -> Actions -> General -> Workflow permissions"
+          echo "  -> Read and write permissions"
+          echo ""
+          echo "This file already requests 'contents: write' at both workflow"
+          echo "and job level; the repository setting overrides it."
+          echo ""
+          echo "The installers for ${{ needs.version.outputs.tag }} are still"
+          echo "attached to this run as artifacts — nothing was lost, it just"
+          echo "was not published."

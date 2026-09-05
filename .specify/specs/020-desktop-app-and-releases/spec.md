@@ -5,7 +5,7 @@ owner: "apps/desktop + CI"
 priority: P1
 risk: High
 created: "2026-09-05"
-units: [U32, U33, U44, U55, U56, U151, U152, U166, U168, U168b, U168c, U168d, U168e, U169, U169b, U170, U171, U172, U173, U174, U176, U177, U178, U192, U193, U197, U201, U211, U228, U229, U230, U231, U232, U233, U234, U235, U236, U283, U284, U285, U285b, U297, U179, U184, U185, U186, U210]
+units: [U32, U33, U44, U55, U56, U151, U152, U166, U168, U168b, U168c, U168d, U168e, U169, U169b, U170, U171, U172, U173, U174, U176, U177, U178, U192, U193, U197, U201, U211, U228, U229, U230, U231, U232, U233, U234, U235, U236, U283, U284, U285, U285b, U297, U179, U184, U185, U186, U210, U317]
 amended: "2026-09-05"
 ---
 
@@ -90,7 +90,21 @@ and installers for Windows, macOS (arm64 and x64) and Linux.
 3. **Given** a flaky test, **When** it blocks a release, **Then** it is fixed
    rather than retried (U190, U210).
 4. **Given** the release workflow, **When** two run at once, **Then** they do
-   not abort each other half-published (`cancel-in-progress: false`).
+   not abort each other half-published (`cancel-in-progress: false`). Note that
+   GitHub keeps only the **latest** queued run per concurrency group, so a
+   rapid series of pushes coalesces: intermediate version numbers are skipped
+   and the newest run publishes everything accumulated. No change is lost; the
+   numbering has gaps.
+5. **Given** publishing fails, **When** it does, **Then** the run says why in
+   one sentence rather than a REST error code (U317). A failed release is
+   otherwise **invisible**: the build is green, the app simply never offers an
+   update, and the owner asks days later why nothing is arriving — which is
+   exactly what happened when v2.0.127 through v2.0.129 never published.
+6. **Given** the repository's Actions token, **When** it is read-only, **Then**
+   no `permissions:` block in the workflow can rescue it. `contents: write` is
+   declared at both workflow and job level; the repository setting
+   (*Settings → Actions → General → Workflow permissions*) overrides both, and
+   `gh api repos/<owner>/<repo>/actions/permissions/workflow` is how you check.
 
 ### User Story 4 — The window is one window, and it looks like a product (Priority: P2)
 
@@ -139,6 +153,9 @@ and installers for Windows, macOS (arm64 and x64) and Linux.
 - **FR-007**: An installer is verified before it is run.
 - **FR-008**: Ports are resolved, never assumed; prefer `127.0.0.1` over
   `localhost`.
+- **FR-009**: A release that does not publish explains itself in the run log,
+  naming the setting to check. Silence is the failure mode this whole feature
+  cannot afford (constitution XI).
 
 ## Out of scope
 

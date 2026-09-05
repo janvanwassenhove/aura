@@ -1397,3 +1397,42 @@ Verder:
 
 Zeven tests erbij. Grondwet, ADR's, specs, ledger en drie agentbestanden zeggen
 nu hetzelfde, en drie CI-checks houden dat zo.
+
+### U317 — de releases publiceren al de hele middag niet
+
+Opgemerkt tijdens het controleren van CI na U315: de Release-workflow faalt.
+Niet de build — die is groen — maar het publiceren zelf, met
+`403 Resource not accessible by integration`.
+
+De laatste gepubliceerde release is **v2.0.126 van 08:45**. Alles daarna —
+v2.0.127 tot en met v2.0.129, dus U314, U315 en U316 — is gebouwd, getest,
+geïnstalleerd in artefacten, en nooit uitgebracht.
+
+Precies de faalvorm waar dit onderdeel niet tegen kan: **hij is onzichtbaar.**
+De build staat groen, de app biedt gewoon nooit een update aan, en de eigenaar
+vraagt dagen later waarom er niets binnenkomt. Dat is eerder gebeurd (U236,
+U283) en het is grondwetsprincipe XI in zijn duurste vorm.
+
+De oorzaak zit niet in dit bestand. `permissions: contents: write` stond er al
+op workflowniveau; ik heb het nu ook op het `release`-karwei zelf gezet, want
+dat is de meest specifieke scope die GitHub kent. Maar de repo-instelling
+overrulet beide:
+
+```
+default_workflow_permissions: "read"
+```
+
+Dat is één klik in **Settings → Actions → General → Workflow permissions →
+Read and write permissions**, en het is jouw repository, dus die klik is aan
+jou. Ik verander geen instellingen van je account zonder dat te vragen.
+
+Wat ik wél kon doen: de mislukking laten praten. Faalt het publiceren, dan
+schrijft de run nu in gewone taal welke instelling het is, hoe je hem
+controleert (`gh api repos/<owner>/<repo>/actions/permissions/workflow`), en dat
+de installers nog gewoon als artefact aan die run hangen — er is niets kwijt,
+het is alleen niet uitgebracht.
+
+Onderweg ook vastgelegd waarom sommige versienummers ontbreken: GitHub bewaart
+per concurrency-groep maar één wachtende run, dus een snelle reeks pushes wordt
+samengevoegd. De nieuwste run publiceert alles wat zich heeft opgestapeld; de
+nummering heeft gaten, de inhoud niet.
