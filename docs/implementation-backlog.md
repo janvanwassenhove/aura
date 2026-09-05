@@ -1019,3 +1019,18 @@ Onderweg liep ik in de valkuil die ik één commit eerder in `CLAUDE.md` had
 opgeschreven: een heredoc at de `\b` uit de reguliere expressies op en liet er
 een letterlijke backspace achter, waarna alles nul units vond. Opgelost, en
 vier tests erbij voor de gebundelde vormen.
+
+### U301 — spec 016: het lichaam, eindelijk beschreven
+
+Eerste aflossing van de achterstand uit U299. `016-embodiment-and-presence`
+beschrijft wat er in 36 units aan lichaam is gebouwd en nooit is
+gespecificeerd: volgen met hoofd én torso, de waakhond en het heroriënteren,
+Follow/Manual, slapen dat blijft slapen, stemming via hoofd en antennes, de
+tien karakters, en de camera die stil kon vallen zonder dat iets het merkte.
+
+Geschreven vanuit de code, niet vanuit een plan. Waar een beslissing onder druk
+is genomen en nog steeds draagt, staat dat er ook bij — zoals dat gebaren met
+trefwoorden worden gekozen en niet met een tweede modelaanroep, omdat een
+gebaar dat ná de zin aankomt erger is dan een licht verkeerd knikje.
+
+Schuld: 321 → 285.
