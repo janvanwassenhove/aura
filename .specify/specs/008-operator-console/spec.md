@@ -6,10 +6,7 @@ priority: P1
 risk: Medium
 created: "2026-04-25"
 amended: "2026-09-05"
-units: [U28, U30, U36c, U38, U53, U63, U68, U72, U76, U77, U78, U79, U95,
-        U98, U112, U113, U114, U115, U117, U119, U120, U122, U123, U124,
-        U125, U187, U188, U216, U217, U222, U223, U252, U252c, U252e,
-        U253b, U262]
+units: [U28, U30, U36c, U38, U53, U63, U68, U72, U76, U77, U78, U79, U95, U98, U112, U113, U114, U115, U117, U119, U120, U122, U123, U124, U125, U187, U188, U216, U217, U222, U223, U252, U252c, U252e, U253b, U262, U319]
 ---
 
 # Feature Specification: Operator Console
@@ -188,7 +185,32 @@ household opens — and that changed the rules.
    U252e, U276, U278, U290, U297 — is the console showing a state the backend
    does not share.
 
-### User Story 5 — Nothing is a dead end (Priority: P1)
+### User Story 5 — Choose directly, do not press until it lands (Priority: P1)
+
+Reported as *"'who is this' → tapping will cycle, but via arrow we should be
+able to choose directly"*, and the same for the robot on the Talk screen.
+
+1. **Given** the identity chip, **When** the **chevron** is pressed, **Then** a
+   menu lists every person plus Guest, marks the current one, and picking one
+   sets the speaker. The chip **body** still steps to the next person, which is
+   the fast path when a household has two of you (U319).
+2. **Given** the chevron, **When** it is drawn, **Then** it is a button. It used
+   to be decoration on a button that cycled — the affordance promised a list
+   and the click gave you the next one, which is the worst of both.
+3. **Given** the robot on the Talk screen, **When** he is pressed, **Then** his
+   character picker opens there. He is the most obvious thing on the screen to
+   press and pressing him did nothing; the choice used to live two screens away
+   in the Robot panel, which still holds the full cards, the voice samples and
+   "Try a move" (U319).
+4. **Given** ten characters, **When** the menu opens, **Then** all ten are
+   visible with their marks and traits. Reaching the tenth by cycling is nine
+   presses without ever seeing the options.
+5. **Given** a menu, **When** it is open, **Then** Escape and a click outside
+   close it, and the arrow keys move between rows.
+6. **Given** an empty list, **When** it is shown, **Then** it says so and offers
+   the way out — and it never says "nobody yet" above a populated list.
+
+### User Story 6 — Nothing is a dead end (Priority: P1)
 
 1. **Given** a ✕ on a card, **When** it is pressed, **Then** something happens
    (U262 — it did not), and a typo can be corrected rather than being permanent
@@ -255,3 +277,4 @@ household opens — and that changed the rules.
 | U216, U217, U222, U223 | Missing design tokens and contrast; audit quick wins and reduced motion; the worst WCAG findings; one language and a real confirm dialog |
 | U252, U252c, U252e, U253b | One surface and honest capability chips; the guessed field names; Settings that loaded nothing |
 | U262 | The cross that did nothing, and the typo that was forever |
+| U319 | `PickerMenu` — the identity chevron and the robot avatar open a list you choose from, instead of a control you press until it lands |

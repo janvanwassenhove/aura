@@ -35,14 +35,35 @@
     </button>
 
     <!-- Persistent identity — click to reassign, always escapable -->
-    <button class="who-chip" :class="{ unknown: !speakerPerson }" :title="whoHint" @click="cycleSpeaker">
-      <span class="who-avatar" :class="{ guest: isGuestSpeaker || !speakerPerson }">{{ whoInitials }}</span>
-      <span class="who-text">
-        <span class="who-name">{{ whoName }}</span>
-        <span class="who-sub">{{ whoSub }}</span>
-      </span>
-      <ChevronDown :size="12" class="who-chev" />
-    </button>
+    <!-- U319: the chevron used to be decoration on a button that cycled. It
+         looked like a dropdown and behaved like a step button, which is the
+         worst of both. Now the pill is two controls: the body still steps to
+         the next person (fast when there are two of you), the chevron opens
+         the list and you pick. -->
+    <div class="who-group" :class="{ unknown: !speakerPerson }">
+      <button class="who-chip" :title="whoHint" @click="cycleSpeaker">
+        <span class="who-avatar" :class="{ guest: isGuestSpeaker || !speakerPerson }">{{ whoInitials }}</span>
+        <span class="who-text">
+          <span class="who-name">{{ whoName }}</span>
+          <span class="who-sub">{{ whoSub }}</span>
+        </span>
+      </button>
+      <button
+        class="who-more" :aria-expanded="whoOpen" aria-haspopup="menu"
+        aria-label="Choose who is talking"
+        title="Choose who is talking"
+        @click.stop="whoOpen = !whoOpen"
+      >
+        <ChevronDown :size="12" class="who-chev" />
+      </button>
+      <PickerMenu
+        :open="whoOpen" :items="whoItems" title="Who is talking?"
+        empty="Nobody is in the brain yet."
+        footer="Add or teach a person →"
+        @pick="pickSpeaker" @close="whoOpen = false"
+        @footer="whoOpen = false; nav.go('people')"
+      />
+    </div>
 
     <!-- Density: demoted to a small dial, never mistaken for mode -->
     <div class="density-group" role="group" aria-label="Detail level" :title="densityHint">
@@ -89,6 +110,7 @@ import {
 import { BRAIN_URL } from '../../lib/endpoints'
 import { DENSITY_META, usePrefsStore, type Density } from '../../stores/prefsStore'
 import { MODE_META, useModeStore, type UiMode } from '../../stores/modeStore'
+import PickerMenu from './PickerMenu.vue'
 import { useCharacterStore } from '../../stores/characterStore'
 import { useKnowledgeStore } from '../../stores/knowledgeStore'
 import { useNavStore } from '../../stores/navStore'
@@ -161,23 +183,53 @@ const whoInitials = computed(() => {
 const whoSub = computed(() => {
   if (isGuestSpeaker.value) return 'nothing saved'
   if (!speakerPerson.value) return 'tap to choose'
-  return `${speakerPerson.value.role} · tap to switch`
+  return `${speakerPerson.value.role} · tap to switch`  // the chevron lists them
 })
 const whoHint = computed(() =>
   speakerPerson.value || isGuestSpeaker.value
     ? `Answering as ${whoName.value}. Click to switch person or drop to Guest — he also drops to Guest after 10 minutes with no face.`
     : 'Nobody selected — click to say who is talking')
 
+// ── U319: the same people, choosable directly ─────────────────────────────
+const whoOpen = ref(false)
+const whoItems = computed(() => [
+  ...knowledge.people.map(p => ({
+    id: p.person_id,
+    label: p.display_name,
+    sub: p.role,
+    initials: p.display_name.slice(0, 2).toUpperCase(),
+    active: knowledge.speaker === p.person_id,
+  })),
+  {
+    id: 'guest',
+    label: 'Guest',
+    sub: 'nothing is saved',
+    initials: 'G',
+    muted: true,
+    active: isGuestSpeaker.value,
+  },
+])
+
+function pickSpeaker(id: string): void {
+  whoOpen.value = false
+  applySpeaker(id)
+}
+
+/** Shared by the chevron menu and the step button, so the two cannot drift
+ *  in what "becoming this person" means — the density follow is easy to
+ *  forget on one path. */
+function applySpeaker(id: string): void {
+  knowledge.setSpeaker(id, 'manual')
+  prefs.resetDensityTouch()
+  prefs.followPerson(
+    id === 'guest' ? 'guest' : knowledge.people.find(p => p.person_id === id)?.role)
+}
+
 function cycleSpeaker(): void {
   const order = [...knowledge.people.map(p => p.person_id), 'guest']
   if (!order.length) return
   const i = order.indexOf(knowledge.speaker ?? '')
-  knowledge.setSpeaker(order[(i + 1) % order.length], 'manual')
-  prefs.resetDensityTouch()
-  const role = order[(i + 1) % order.length] === 'guest'
-    ? 'guest'
-    : knowledge.people.find(p => p.person_id === order[(i + 1) % order.length])?.role
-  prefs.followPerson(role)
+  applySpeaker(order[(i + 1) % order.length])
 }
 
 const densityHint = computed(() =>
@@ -239,13 +291,26 @@ async function panicStop(): Promise<void> {
 .health-chip.warn { color: var(--warn); }
 .health-dot { width: 8px; height: 8px; border-radius: 50%; }
 
-.who-chip {
-  display: inline-flex; align-items: center; gap: 8px; padding: 5px 9px 5px 5px;
-  border-radius: 999px; cursor: pointer; font-family: inherit;
-  flex: 0 1 auto; min-width: 38px; overflow: hidden;
-  background: var(--surface); border: 1.5px solid var(--line); color: var(--ink);
+/* U319: one pill, two controls — step, and open the list. */
+.who-group {
+  position: relative; display: inline-flex; align-items: stretch;
+  flex: 0 1 auto; min-width: 38px;
+  border-radius: 999px; overflow: visible;
+  background: var(--surface); border: 1.5px solid var(--line);
 }
-.who-chip.unknown { border-color: var(--warn); }
+.who-group.unknown { border-color: var(--warn); }
+.who-chip {
+  display: inline-flex; align-items: center; gap: 8px; padding: 5px 4px 5px 5px;
+  border: 0; border-radius: 999px 0 0 999px; cursor: pointer; font-family: inherit;
+  flex: 0 1 auto; min-width: 32px; overflow: hidden;
+  background: none; color: var(--ink);
+}
+.who-more {
+  display: inline-flex; align-items: center; padding: 0 8px 0 4px;
+  border: 0; border-radius: 0 999px 999px 0; cursor: pointer;
+  background: none; color: var(--ink-3);
+}
+.who-more:hover { background: var(--sunken); }
 .who-avatar {
   width: 26px; height: 26px; border-radius: 50%; flex-shrink: 0;
   display: inline-flex; align-items: center; justify-content: center;

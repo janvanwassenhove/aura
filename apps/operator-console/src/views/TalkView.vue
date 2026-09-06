@@ -4,16 +4,33 @@
       <!-- ═══ The conversation, with presence inside it at every density ═══ -->
       <section class="talk-card convo">
         <div class="presence">
-          <div class="presence-avatar" :style="{ width: avatarBox + 'px', height: avatarBox + 'px' }">
-            <span v-if="!modeStore.quiet" class="presence-ripple" :style="{ background: character.hue }" />
-            <span class="presence-art" v-html="character.art(calm ? 68 : 52, characterStore.act)" />
+          <!-- U319: he is the most obvious thing on the screen to press, and
+               pressing him did nothing. Now he is the character picker: the
+               choice you would go to the Robot panel for, made where you are
+               looking. -->
+          <div class="presence-avatar-wrap">
+            <button
+              class="presence-avatar" :style="{ width: avatarBox + 'px', height: avatarBox + 'px' }"
+              :aria-expanded="charOpen" aria-haspopup="menu"
+              :title="`${character.tag} — click to change his character`"
+              @click.stop="charOpen = !charOpen"
+            >
+              <span v-if="!modeStore.quiet" class="presence-ripple" :style="{ background: character.hue }" />
+              <span class="presence-art" v-html="character.art(calm ? 68 : 52, characterStore.act)" />
+            </button>
+            <PickerMenu
+              :open="charOpen" :items="charItems" title="His character"
+              footer="Hear them and try a move →"
+              @pick="pickCharacter" @close="charOpen = false"
+              @footer="charOpen = false; nav.go('robot')"
+            />
           </div>
           <div class="presence-text">
             <div class="presence-title">
               <strong :style="{ fontSize: (calm ? 20 : 16) + 'px' }">{{ prefs.assistantName }}</strong>
               <span class="state-pill" :class="stateClass">{{ stateLabel }}</span>
               <button class="char-chip" :style="{ borderColor: character.hue }"
-                      title="Change his character in Robot" @click="nav.go('robot')">{{ character.tag }}</button>
+                      title="Change his character" @click.stop="charOpen = !charOpen">{{ character.tag }}</button>
             </div>
             <p class="presence-sentence" :style="{ fontSize: (calm ? 15 : 13.5) + 'px' }">{{ stateSentence }}</p>
           </div>
@@ -243,9 +260,11 @@ import {
   ChevronLeft, ChevronRight, Crosshair, GraduationCap, Mic, TriangleAlert, Volume2,
 } from 'lucide-vue-next'
 import MindCanvas from '../components/canvas/MindCanvas.vue'
+import PickerMenu from '../components/shell/PickerMenu.vue'
 import ActivityLog from '../components/ActivityLog.vue'
 import { BRAIN_URL } from '../lib/endpoints'
 import { useApprovalStore, type PendingApproval } from '../stores/approvalStore'
+import { CHARACTERS } from '../lib/characters'
 import { useCharacterStore } from '../stores/characterStore'
 import { useConversationStore, type ConversationTurn } from '../stores/conversationStore'
 import { useCameraFeed } from '../composables/useCameraFeed'
@@ -425,6 +444,22 @@ function fullTime(iso: string): string {
 
 // U296: the hint has to work as an instruction too, because an empty composer
 // is the state this button is most often pressed in.
+// ── U319: pick his character from the conversation, not two screens away ──
+const charOpen = ref(false)
+const charItems = computed(() => Object.entries(CHARACTERS).map(([id, c]) => ({
+  id,
+  label: c.tag,
+  sub: c.traits,
+  hint: c.hint,
+  art: c.art(22, 'idle'),
+  active: id === characterStore.selected,
+})))
+
+function pickCharacter(id: string): void {
+  charOpen.value = false
+  characterStore.select(id)
+}
+
 const teachHint = computed(() => convo.pendingText.trim()
   ? 'Teach — turn this message into a lesson you approve'
   : 'Teach — write the lesson in the box first, then press this')
@@ -583,7 +618,13 @@ const nowCard = computed(() => {
   display: flex; align-items: center; gap: 12px; padding: 12px 16px 10px;
   border-bottom: 1px solid var(--line); flex-shrink: 0;
 }
-.presence-avatar { position: relative; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+.presence-avatar-wrap { position: relative; flex-shrink: 0; }
+.presence-avatar {
+  position: relative; display: flex; align-items: center; justify-content: center;
+  padding: 0; border: 0; background: none; cursor: pointer; border-radius: 50%;
+}
+/* The picker hangs off the avatar, which sits at the left of the row. */
+.presence-avatar-wrap :deep(.picker) { right: auto; left: 0; }
 .presence-ripple { position: absolute; inset: 0; border-radius: 50%; animation: ripple 3.4s ease-out infinite; }
 .presence-art { position: relative; display: flex; }
 .presence-text { flex: 1; min-width: 0; }

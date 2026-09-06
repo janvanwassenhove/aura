@@ -1468,3 +1468,42 @@ vermoedde.
 De diagnosestap is blijven staan maar noemt nu twee dingen in volgorde: eerst
 "staat het blok nog op het karwei?", dan pas de repo-instelling — met erbij dat
 `read` op zichzelf geen blokkade is, want daar publiceert het nu vanaf.
+
+### U319 — kiezen in plaats van doorklikken tot het klopt
+
+Gemeld als "'who is this' -> tapping will cycle, but via arrow we should be
+able to choose directly", en hetzelfde voor de robot op het Talk-scherm.
+
+Het identiteitschipje tekende een pijltje omlaag en gedroeg zich als een
+stapknop. Dat is het slechtste van twee werelden: de vorm belooft een lijst en
+de klik geeft je de volgende. Bij een gezin van vijf is de laatste persoon vier
+keer drukken, zonder ooit te zien waaruit je kiest.
+
+De robot op het Talk-scherm was erger: dat is het meest voor de hand liggende
+ding op het scherm om aan te raken, en er gebeurde **niets**. De karakterkeuze
+lag twee schermen verderop.
+
+Nu:
+
+* **Het chipje is twee knoppen.** De body stapt nog steeds door — dat is de
+  snelle weg als jullie met z'n tweeën zijn — en het pijltje opent de lijst met
+  iedereen plus Guest, met een vinkje bij wie er nu praat.
+* **De robot opent zijn eigen karakterkiezer**, alle tien met hun tekening en
+  eigenschappen, waar je toch al kijkt. Het Robot-paneel blijft bestaan voor de
+  volledige kaarten, de stemfragmenten en "Try a move".
+
+Eén gedeeld `PickerMenu`-component in plaats van twee dropdowns, want het is
+twee keer dezelfde taak — en twee schermen die uit elkaar groeien is in deze
+console de meest terugkerende fout.
+
+Twee dingen kwamen boven bij het verifiëren met een echte stack:
+
+1. De `watch` op `open` was lui, dus een menu dat al open gemonteerd wordt kreeg
+   nooit zijn Escape- en klik-buiten-luisteraars. In de app valt dat niet op;
+   het stond klaar voor de eerste die het anders aanriep. Nu `immediate`, met
+   opruimen bij unmount.
+2. **"Nobody is in the brain yet." stond onder een lijst mét een persoon erin.**
+   De console die iets beweert wat ze zelf kan zien dat het onwaar is —
+   principe XI in het klein. Nu alleen bij een echt lege lijst.
+
+Vijftien tests, geverifieerd tegen een draaiende demostack.
