@@ -6,8 +6,7 @@ priority: P2
 risk: Medium
 created: "2026-04-25"
 amended: "2026-09-05"
-units: [U27, U205, U206, U207, U208, U246, U263, U263b, U264, U265, U266,
-        U267, U269, U282]
+units: [U27, U205, U206, U207, U208, U246, U263, U263b, U264, U265, U266, U267, U269, U282, U320]
 ---
 
 # Feature Specification: Presentation Copilot
@@ -181,6 +180,37 @@ Reported four times in a row — *"start presentation is not doing anything"*,
 5. **Given** a scenario fails to save, **When** it does, **Then** the error is a
    sentence, not a raw Pydantic dump (U282).
 
+### User Story 6 — The panel reads like one thing (Priority: P2)
+
+Reported as *"improve ui/ux in present mode → presentations"*, with the
+settings aside as the example.
+
+1. **Given** the aside, **When** it is read, **Then** it is grouped — *how he
+   sounds*, *what he is following*, *on the projector* — rather than one flat
+   list in which a setting, a read-only status and a six-control overlay block
+   all carry the same weight (U320).
+2. **Given** what Present mode locks, **When** it is shown, **Then** it is a
+   row of chips (mail · dev tools · screen control), not a sentence to parse.
+3. **Given** the audience/presenter choice, **When** it is offered, **Then**
+   both options are visible as a segmented control. A `<select>` hides one
+   behind a click, and the wrong one on a beamer projects the presenter's
+   private cue notes at the audience.
+4. **Given** the run button, **When** nothing is loaded, **Then** it says
+   *Write a scenario*, because that is what pressing it does. It said "Run
+   presentation" and opened the builder — a label naming a different action
+   than the one it performs, which is constitution XI applied to a button.
+5. **Given** an empty Present view, **When** it is opened, **Then** the two
+   ways in are offered in the body where the eye is, not only in the top-right
+   corner — and the state is said **once**: the run bar is hidden rather than
+   reading "No scenario loaded" directly above "No scenario yet".
+6. **Given** the four-step explanation, **When** a presenter already knows it,
+   **Then** it collapses to one line and stays collapsed. It had no heading, so
+   it read as the page's content rather than as help, and taught the same
+   presenter before every talk.
+7. **Given** the overlay controls, **When** they are shown, **Then** the panel
+   does **not** claim whether the overlay is up — this window cannot see the
+   other one — and *Take it down* is always present regardless (U266, U320).
+
 ## Amended functional requirements
 
 - **FR-101**: A beat has a trigger (`manual` | `slide:N` | `keyword:TEXT`) and a
@@ -216,3 +246,4 @@ applies to `slide:N` beats; `manual` and `keyword:` beats have no such deadline.
 | U265, U269 | The projector overlay: transparent, click-through, animated, with cues and subtitles |
 | U266, U267 | Four "nothing happens" with four causes; a panel that says what will happen |
 | U246 | Three broken things behind one missing word — including `uv sync` pruning the presentation extra |
+| U320 | The panel regrouped: locks as chips, status as status, the projector block given the weight it earns, a run button that names its own action, an empty state with the two doors, and help you can put away |

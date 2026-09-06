@@ -196,7 +196,76 @@ describe('U266 — Present mode does what its buttons say', () => {
 
     // Freshly mounted: nothing has been shown from THIS view. The overlay may
     // still be on the beamer from a previous one, so the way out must be here.
-    const hide = w.findAll('button').filter(b => b.text() === 'Hide')
-    expect(hide.length).toBe(1)
+    //
+    // U320 renamed the button from "Hide" to "Take it down" — the assertion is
+    // on the WAY OUT existing, not on the word, so it survives the next rename
+    // and still fails if the button goes back to being conditional.
+    expect(w.find('.ov-hide').exists()).toBe(true)
+    // And the panel does not pretend to know whether the overlay is up: this
+    // window cannot see the other one.
+    expect(w.find('.ov-honest').text()).toContain('cannot see')
+  })
+})
+
+describe('U320 — the Present panel reads like one thing, not a list of six', () => {
+  it('groups the aside instead of flattening settings, status and actions', async () => {
+    stubFetch()
+    const w = mount(PresentView)
+    await flushPromises()
+    expect(w.findAll('.aside-group-title').map(n => n.text())).toEqual([
+      'How he sounds', 'What he is following', 'On the projector',
+    ])
+  })
+
+  it('says it once: no run bar above an empty state', async () => {
+    stubFetch()
+    const w = mount(PresentView)
+    await flushPromises()
+    // It read "No scenario loaded" directly above "No scenario yet", with two
+    // identical primary buttons. One invitation is enough.
+    expect(w.find('.run-bar').exists()).toBe(false)
+    expect(w.find('.present-empty').exists()).toBe(true)
+  })
+
+  it('names the run button after what it will actually do', async () => {
+    stubFetch()
+    const w = mount(PresentView, { data: () => ({}) })
+    await flushPromises()
+    await w.find('.present-empty .d2-primary-btn').trigger('click')
+    // The builder is open, so the run bar is back — and with no beats yet,
+    // pressing Run opens the builder, which is what the label must say.
+    expect(w.find('.run-btn').text()).toBe('Write a scenario')
+  })
+
+  it('offers the two ways in where the page is empty, not only in the corner', async () => {
+    stubFetch()
+    const w = mount(PresentView)
+    await flushPromises()
+    const empty = w.find('.present-empty')
+    expect(empty.exists()).toBe(true)
+    expect(empty.text()).toContain('Write a scenario')
+    expect(empty.text()).toContain('Import YAML')
+  })
+
+  it('lets a presenter who knows the steps put them away', async () => {
+    stubFetch()
+    const w = mount(PresentView)
+    await flushPromises()
+    expect(w.find('.how-steps').exists()).toBe(true)
+    await w.find('.how-toggle').trigger('click')
+    expect(w.find('.how-steps').exists()).toBe(false)
+    // Remembered, so it is not taught again before every talk.
+    expect(localStorage.getItem('aura-present-how')).toBe('closed')
+  })
+
+  it('shows the audience/presenter choice as two visible options', async () => {
+    stubFetch()
+    const w = mount(PresentView)
+    await flushPromises()
+    // A <select> hides one of them behind a click, and the wrong one on a
+    // beamer means projecting your private cue notes at the audience.
+    const seg = w.findAll('.seg-btn').map(b => b.text())
+    expect(seg).toEqual(['The room', 'Me'])
+    expect(w.findAll('.seg-btn.on')).toHaveLength(1)
   })
 })

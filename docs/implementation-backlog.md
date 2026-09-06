@@ -1507,3 +1507,38 @@ Twee dingen kwamen boven bij het verifiëren met een echte stack:
    principe XI in het klein. Nu alleen bij een echt lege lijst.
 
 Vijftien tests, geverifieerd tegen een draaiende demostack.
+
+### U320 — het Present-paneel las als een lijst van zes losse dingen
+
+Gevraagd: "improve ui/ux in present mode -> presentations", met de
+instellingenkolom als voorbeeld.
+
+Die kolom was één platte lijst. Twee instellingen, twee alleen-lezen waarden en
+een overlayblok met zes bedieningen, allemaal met exact hetzelfde gewicht — dus
+het ding dat de **zaal** ziet las als kleine lettertjes onder een dropdown. Nu
+drie groepen: hoe hij klinkt, wat hij volgt, wat er op de projector staat.
+
+Verder:
+
+* **Wat Present-modus dichtzet** is een rij chips (mail · dev tools · screen
+  control) in plaats van een zin die je moet ontleden.
+* **Zaal of ikzelf** is een segmented control geworden. Een `<select>` verbergt
+  de andere optie achter een klik, en de verkeerde keuze op een beamer betekent
+  je eigen cue-notities geprojecteerd op het publiek. Dat mag geen keuze zijn
+  die je pas ziet als je hem opent.
+* **De knop zei "Run presentation" en opende de bouwer** wanneer er niets
+  geladen was. Een label dat een andere handeling noemt dan het uitvoert, is
+  principe XI toegepast op een knop. Hij zegt nu "Write a scenario".
+* **Een lege staat waar je kijkt.** De twee deuren stonden rechtsboven; de
+  pagina eronder was leeg met "No scenario loaded" bovenaan én "No scenario
+  yet" eronder. Nu één uitnodiging, in het midden, met beide knoppen.
+* **De vier stappen zijn hulp die je kunt wegklikken**, onthouden per machine.
+  Ze hadden geen kop, dus ze lazen als de inhoud van de pagina in plaats van
+  als uitleg — en leerden dezelfde presentator vóór elke talk hetzelfde.
+* **Het overlayblok doet niet meer alsof het iets weet.** Dit venster kan het
+  andere niet zien, dus het beweert niet of de overlay opstaat; "Take it down"
+  staat er altijd, en er staat bij waarom.
+
+Zes tests erbij. Eén bestaande test toetste het wóórd "Hide" in plaats van dat
+er een uitweg is — die toetst nu de uitweg, en overleeft de volgende hernoeming.
+Geverifieerd tegen een draaiende demostack.

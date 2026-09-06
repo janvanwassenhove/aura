@@ -73,3 +73,10 @@ Retro-specified; all done. See the amendment section in `spec.md`.
 - [x] T111 [U267] The panel says what will actually happen — progress, next cue, advance hint, rehearsal
 - [x] T112 [U282] A save error a person can read
 - [x] T113 [U246] `uv sync` pruned the presentation extra — pinned, with the other two causes
+- [x] T114 [U320] The aside grouped: how he sounds · what he is following · on the projector
+- [x] T115 [U320] Locks as chips; read-only values styled as status, not as fields with the input missing
+- [x] T116 [U320] Audience/presenter as a segmented control — both options visible
+- [x] T117 [U320] The run button names the action it performs when nothing is loaded
+- [x] T118 [U320] An empty state with the two ways in; the run bar hidden rather than saying it twice
+- [x] T119 [U320] The four-step explanation collapsible and remembered
+- [x] T120 [U320] The overlay block stops implying it knows whether the overlay is up

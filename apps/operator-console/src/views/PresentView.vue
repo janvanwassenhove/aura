@@ -17,7 +17,16 @@
         <!-- They stay up until he is actually FOLLOWING a deck: while the
              status says "waiting", step 2 is precisely what the reader needs.
              They disappear the moment they have been completed. -->
-        <ol v-if="!slidesLive" class="how-steps">
+        <!-- U320: four paragraphs with no heading read as the page's content
+             rather than as help, and a presenter who has done this before was
+             re-taught every time. It is a disclosure now, remembered. -->
+        <div v-if="!slidesLive" class="how-box">
+          <button class="how-toggle" :aria-expanded="howOpen" @click="toggleHow">
+            <span class="how-chev">{{ howOpen ? '▾' : '▸' }}</span>
+            How this works — four steps
+            <span v-if="!howOpen" class="how-peek">write · start the slideshow · run · click through</span>
+          </button>
+        <ol v-if="howOpen" class="how-steps">
           <li :class="{ done: !!presentation.status.title }">
             <strong>Write the scenario</strong> - beats with a cue each:
             <code>manual</code>, <code>slide:4</code> or <code>keyword:Java</code>.
@@ -41,9 +50,14 @@
             cannot carry a cue.
           </li>
         </ol>
+        </div>
 
-        <!-- Run bar: running a scenario IS switching to Present mode -->
-        <div class="run-bar" :class="{ live: presenting }">
+        <!-- Run bar: running a scenario IS switching to Present mode.
+             U320: hidden while there is nothing to run — it said "No scenario
+             loaded" directly above an empty state saying "No scenario yet",
+             with two identical primary buttons. One invitation is enough. -->
+        <div v-if="presenter.beats.length || presenting || builderOpen"
+             class="run-bar" :class="{ live: presenting }">
           <div class="run-text">
             <div class="run-title">{{ presenting ? `Presenting — ${presentation.status.title ?? 'scenario'}` : (presentation.status.title ?? 'No scenario loaded') }}</div>
             <div class="run-sub">
@@ -67,8 +81,13 @@
                   @click="toggleRehearsal">
             {{ presenter.rehearsing ? 'Stop rehearsal' : 'Rehearse' }}
           </button>
-          <button class="run-btn" :class="{ end: presenting }" :disabled="presentation.busy" @click="toggleRun">
-            {{ presenting ? 'End presentation' : 'Run presentation' }}
+          <!-- U320: with nothing loaded this said "Run presentation" and
+               opened the builder. A label that names a different action than
+               the one it performs is the same defect as a status that reports
+               something it has not verified (constitution XI). -->
+          <button class="run-btn" :class="{ end: presenting }" :disabled="presentation.busy"
+                  :title="runHint" @click="toggleRun">
+            {{ runLabel }}
           </button>
         </div>
         <p v-if="presentation.error" class="present-error">{{ presentation.error }}</p>
@@ -151,6 +170,21 @@
         </p>
         <ScenarioBuilder v-if="builderOpen" ref="builderRef" class="builder" @start="startScenario" />
 
+        <!-- U320: the page was a run bar and then nothing — the two ways in
+             live in the top-right corner, which is not where you look when a
+             page says "No scenario loaded". -->
+        <div v-if="!presenter.beats.length && !builderOpen && !presenting" class="present-empty">
+          <p class="empty-title">No scenario yet</p>
+          <p class="empty-sub">
+            A scenario is a list of beats — a line for him to say, and the cue
+            that fires it. Write one here, or bring a YAML file you already have.
+          </p>
+          <div class="empty-actions">
+            <button class="d2-primary-btn" @click="builderOpen = true">Write a scenario</button>
+            <button class="d2-ghost-btn" @click="pickYaml">Import YAML</button>
+          </div>
+        </div>
+
         <template v-if="presenter.beats.length && !builderOpen">
           <div class="beats-head">
             <h3 class="d2-h3">Beats</h3>
@@ -174,77 +208,120 @@
 
     <!-- ═══ Presenter settings aside ═══ -->
     <aside class="present-aside">
+      <!-- U320: this was one flat list — two settings, two read-only values
+           and a six-control overlay block, all at identical weight, so the
+           thing the ROOM sees read like fine print under a dropdown. Three
+           groups now: how he sounds, what he is following, what is on the
+           projector. -->
       <h3 class="d2-h3">While presenting</h3>
-      <p class="aside-lead">Present mode locks mail, dev tools and screen control automatically — those beats cannot fire even if a slide asks for them.</p>
-      <div class="aside-field">
-        <div class="aside-k">Persona</div>
-        <select v-model="presentBehaviourPersona" class="d2-field" aria-label="Presenter persona" @change="saveAsideBehaviour('persona', presentBehaviourPersona)">
-          <option v-for="c in personas" :key="c.id" :value="c.id">{{ c.name }}</option>
-        </select>
-      </div>
-      <div class="aside-field">
-        <div class="aside-k">Voice</div>
-        <!-- U273: this had no effect on beats at all — the presentation
-             synthesized with the global default and never consulted the mode.
-             It does now, unless the chosen persona carries its own voice,
-             which outranks it. -->
-        <div class="aside-hint">Used while presenting, unless the persona above carries its own voice.</div>
-        <select v-model="presentBehaviourVoice" class="d2-field" aria-label="Presenter voice" @change="saveAsideBehaviour('voice', presentBehaviourVoice)">
-          <option v-for="v in TTS_VOICES" :key="v" :value="v">{{ v }}</option>
-        </select>
-      </div>
-      <div class="aside-field">
-        <div class="aside-k">Slide source</div>
-          <div class="aside-v">{{ slidesHeadline }}</div>
-      </div>
-      <div class="aside-field">
-        <div class="aside-k">Armed keywords</div>
-        <div class="aside-v">{{ (presentation.status.armed_keywords ?? []).join(' · ') || 'none right now' }}</div>
+      <p class="aside-lead">
+        Present mode locks these automatically — the beats cannot fire even if
+        a slide asks for them:
+      </p>
+      <div class="lock-chips">
+        <span class="lock-chip">mail</span>
+        <span class="lock-chip">dev tools</span>
+        <span class="lock-chip">screen control</span>
       </div>
 
-      <!-- ═══ U265: the overlay — him on the projector ═══ -->
-      <div class="aside-field">
-        <div class="aside-k">Overlay</div>
-        <div class="aside-v ov-help">
-          His character and subtitles of what he says, drawn over your slides.
-          The window is click-through — your clicker keeps working.
-        </div>
-        <label class="ov-row">
-          <span>Who is this screen for?</span>
-          <select v-model="overlayMode" class="d2-field" aria-label="Overlay mode" @change="saveOverlayPrefs">
-            <option value="audience">the room — character + subtitles only</option>
-            <option value="presenter">me — adds cues, timing and warnings</option>
+      <!-- ── How he sounds ────────────────────────────────────────────── -->
+      <div class="aside-group">
+        <div class="aside-group-title">How he sounds</div>
+        <div class="aside-field">
+          <label class="aside-k" for="pv-persona">Persona</label>
+          <select id="pv-persona" v-model="presentBehaviourPersona" class="d2-field"
+                  @change="saveAsideBehaviour('persona', presentBehaviourPersona)">
+            <option v-for="c in personas" :key="c.id" :value="c.id">{{ c.name }}</option>
           </select>
-        </label>
+        </div>
+        <div class="aside-field">
+          <label class="aside-k" for="pv-voice">Voice</label>
+          <select id="pv-voice" v-model="presentBehaviourVoice" class="d2-field"
+                  @change="saveAsideBehaviour('voice', presentBehaviourVoice)">
+            <option v-for="v in TTS_VOICES" :key="v" :value="v">{{ v }}</option>
+          </select>
+          <!-- U273: this used to have no effect at all — the presentation
+               synthesized with the global default and never consulted the
+               mode. It does now, unless the persona carries its own voice. -->
+          <p class="aside-hint">Unless the persona above carries its own voice, which wins.</p>
+        </div>
+      </div>
+
+      <!-- ── What he is following ─────────────────────────────────────── -->
+      <div class="aside-group">
+        <div class="aside-group-title">What he is following</div>
+        <div class="aside-stat">
+          <span class="aside-stat-k">Slides</span>
+          <span class="aside-stat-v">{{ slidesHeadline }}</span>
+        </div>
+        <div class="aside-stat">
+          <span class="aside-stat-k">Keywords armed</span>
+          <span class="aside-stat-v" :class="{ quiet: !armedKeywords.length }">
+            {{ armedKeywords.join(' · ') || 'none right now' }}
+          </span>
+        </div>
+      </div>
+
+      <!-- ── On the projector ─────────────────────────────────────────── -->
+      <!-- U265/U269: the overlay is what the audience actually sees, so it
+           gets the weight rather than a paragraph under a dropdown. -->
+      <div class="aside-group ov-group">
+        <div class="aside-group-title">On the projector</div>
+        <p class="aside-hint ov-lead">
+          His character and subtitles, drawn over your slides. The window is
+          click-through — your clicker keeps working.
+        </p>
+
+        <div class="aside-field">
+          <span class="aside-k">Who is this screen for?</span>
+          <div class="seg" role="group" aria-label="Who is this screen for?">
+            <button
+              v-for="m in OVERLAY_MODES" :key="m.id"
+              class="seg-btn" :class="{ on: overlayMode === m.id }"
+              :title="m.hint"
+              @click="overlayMode = m.id; saveOverlayPrefs()"
+            >{{ m.label }}</button>
+          </div>
+        </div>
+
         <!-- U269: asked for directly. Off by default and never implied:
              projecting a live view of a room back at that room is a decision,
              not a detail. -->
-        <label class="ov-row ov-check">
+        <label class="ov-check">
           <input v-model="overlayCamera" type="checkbox" @change="applyOverlayCamera">
-          <span>Show what he sees (his camera, small, in the corner)</span>
+          <span>
+            <strong>Show what he sees</strong>
+            <em>his camera, small, in the corner</em>
+          </span>
         </label>
-        <label v-if="overlayDisplays.length > 1" class="ov-row">
-          <span>On which display?</span>
-          <select v-model.number="overlayDisplay" class="d2-field" aria-label="Overlay display" @change="saveOverlayPrefs">
+
+        <div v-if="overlayDisplays.length > 1" class="aside-field">
+          <label class="aside-k" for="pv-display">Display</label>
+          <select id="pv-display" v-model.number="overlayDisplay" class="d2-field"
+                  @change="saveOverlayPrefs">
             <option v-for="d in overlayDisplays" :key="d.id" :value="d.id">
               {{ d.label }}{{ d.primary ? ' (this one)' : '' }} · {{ d.width }}×{{ d.height }}
             </option>
           </select>
-        </label>
-        <div class="ov-actions">
-          <button class="d2-primary-btn" :disabled="overlayShown" @click="showOverlay">
-            {{ isElectron ? 'Show overlay' : 'Open overlay window' }}
-          </button>
-          <!-- U266: Hide is ALWAYS here. It used to appear only while this view
-               believed the overlay was up, and that belief resets every time the
-               view is re-created — leaving a live overlay on the beamer with no
-               button anywhere to take it down. A Hide that hides nothing costs
-               nothing; an overlay you cannot close costs a talk. -->
-          <button class="d2-ghost-btn" @click="hideOverlay">Hide</button>
         </div>
+
+        <button class="d2-primary-btn ov-show" @click="showOverlay">
+          {{ isElectron ? 'Show overlay' : 'Open overlay window' }}
+        </button>
+        <!-- U266: Hide is ALWAYS here. It used to appear only while this view
+             believed the overlay was up, and that belief resets every time the
+             view is re-created — leaving a live overlay on the beamer with no
+             button anywhere to take it down. U320 keeps it always present and
+             stops pretending to know: this console cannot see the other
+             window, so it offers the action instead of claiming a state. -->
+        <button class="ov-hide" @click="hideOverlay">Take it down</button>
+        <p class="ov-note ov-honest">
+          This panel cannot see the overlay window, so it never claims whether
+          it is up. Press <em>Take it down</em> if you are not sure.
+        </p>
         <p v-if="!isElectron" class="ov-note">
-          In a browser this opens a normal window (drag it to the beamer and
-          press F11). The see-through, click-through version needs the desktop app.
+          In a browser this opens a normal window — drag it to the beamer and
+          press F11. The see-through, click-through version needs the desktop app.
         </p>
       </div>
     </aside>
@@ -287,6 +364,38 @@ interface OverlayApi {
 const overlayApi = (window as never as { aura?: { presentOverlay?: OverlayApi } })
   .aura?.presentOverlay
 const isElectron = !!overlayApi
+
+/** U320: two options where the difference matters — a <select> hides one of
+ *  them behind a click, and the wrong one on a beamer is a talk with your
+ *  private cue notes projected at the audience. */
+const OVERLAY_MODES = [
+  { id: 'audience', label: 'The room', hint: 'Character and subtitles only' },
+  { id: 'presenter', label: 'Me', hint: 'Adds cues, timing and warnings — never put this on the beamer' },
+] as const
+
+/** U320: the run button names the action it performs. With no beats loaded
+ *  `toggleRun` opens the builder, so that is what it should say. */
+const runLabel = computed(() =>
+  presenting.value ? 'End presentation'
+    : presenter.beats.length ? 'Run presentation'
+      : 'Write a scenario')
+const runHint = computed(() =>
+  presenting.value ? 'Stop, and hand the mode back'
+    : presenter.beats.length
+      ? 'Switches him to Present mode and starts watching your deck'
+      : 'Nothing is loaded yet — this opens the builder')
+
+/** Help you can put away. Remembered per machine: a presenter who has done
+ *  this before should not be taught it again before every talk. */
+const HOW_KEY = 'aura-present-how'
+const howOpen = ref(localStorage.getItem(HOW_KEY) !== 'closed')
+function toggleHow(): void {
+  howOpen.value = !howOpen.value
+  try { localStorage.setItem(HOW_KEY, howOpen.value ? 'open' : 'closed') }
+  catch { /* session-only */ }
+}
+
+const armedKeywords = computed(() => presentation.status.armed_keywords ?? [])
 
 const overlayMode = ref<'audience' | 'presenter'>('audience')
 const overlayDisplay = ref<number | null>(null)
@@ -671,6 +780,51 @@ async function saveAsideBehaviour(key: string, value: string): Promise<void> {
   border-left: 1px solid var(--line); padding: 14px 16px; overflow-y: auto;
 }
 .aside-lead { margin: 0 0 14px; font-size: 12.5px; color: var(--ink-2); line-height: 1.5; }
+/* U320: groups, so a setting, a status and an action do not all look the
+   same. */
+.aside-group {
+  margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--line);
+}
+.aside-group:first-of-type { border-top: 0; padding-top: 0; }
+.aside-group-title {
+  font-size: 10.5px; font-weight: 700; letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--ink-3); margin-bottom: 10px;
+}
+.lock-chips { display: flex; flex-wrap: wrap; gap: 5px; margin: -4px 0 4px; }
+.lock-chip {
+  font-size: 11px; padding: 2px 8px; border-radius: 999px;
+  background: var(--sunken); color: var(--ink-2); border: 1px solid var(--line);
+}
+/* Read-only facts read as facts, not as fields with the input missing. */
+.aside-stat { display: flex; gap: 10px; align-items: baseline; margin-bottom: 8px; }
+.aside-stat-k { flex: 0 0 92px; font-size: 12px; color: var(--ink-3); }
+.aside-stat-v { flex: 1; min-width: 0; font-size: 12.5px; font-weight: 600; }
+.aside-stat-v.quiet { font-weight: 400; color: var(--ink-3); }
+
+.seg { display: flex; gap: 0; border: 1.5px solid var(--line); border-radius: 8px; overflow: hidden; }
+.seg-btn {
+  flex: 1; padding: 7px 8px; border: 0; background: var(--surface);
+  color: var(--ink-2); font: inherit; font-size: 12px; cursor: pointer;
+}
+.seg-btn + .seg-btn { border-left: 1.5px solid var(--line); }
+.seg-btn.on { background: var(--accent); color: var(--on-accent); font-weight: 600; }
+
+.ov-lead { margin: -2px 0 12px; }
+.ov-check {
+  display: flex; gap: 9px; align-items: flex-start; margin: 12px 0;
+  cursor: pointer; font-size: 12.5px;
+}
+.ov-check input { margin-top: 2px; flex-shrink: 0; }
+.ov-check span { display: flex; flex-direction: column; }
+.ov-check em { font-style: normal; font-size: 11.5px; color: var(--ink-3); }
+.ov-show { width: 100%; margin-top: 4px; }
+.ov-hide {
+  display: block; width: 100%; margin-top: 6px; padding: 6px;
+  border: 0; background: none; color: var(--ink-3);
+  font: inherit; font-size: 12px; cursor: pointer; text-decoration: underline;
+}
+.ov-hide:hover { color: var(--ink); }
+.ov-honest { margin-top: 8px; }
 .aside-field { margin-bottom: 12px; }
 .ov-help { margin-bottom: 8px; }
 .ov-row { display: flex; flex-direction: column; gap: 3px; margin-bottom: 8px; font-size: 12px; color: var(--ink-3); }
@@ -679,10 +833,31 @@ async function saveAsideBehaviour(key: string, value: string): Promise<void> {
 .aside-k { font-size: 11.5px; color: var(--ink-3); margin-bottom: 5px; }
 .aside-v { font-size: 12.5px; color: var(--ink-2); }
 
-.how-steps {
-  margin: 0 0 14px; padding: 14px 18px 14px 34px; list-style: decimal;
+.how-box {
+  margin: 0 0 14px; max-width: 74ch;
   background: var(--surface); border: 1px solid var(--line); border-radius: 12px;
-  font-size: 13px; line-height: 1.5; color: var(--ink-2); max-width: 74ch;
+}
+.how-toggle {
+  display: flex; align-items: baseline; gap: 8px; width: 100%;
+  padding: 11px 16px; border: 0; background: none; border-radius: 12px;
+  color: var(--ink); font: inherit; font-size: 13px; font-weight: 600;
+  text-align: left; cursor: pointer;
+}
+.how-chev { color: var(--ink-3); }
+.how-peek { font-weight: 400; font-size: 12px; color: var(--ink-3); }
+.present-empty {
+  margin-top: 22px; padding: 26px 22px; text-align: center;
+  border: 1px dashed var(--line); border-radius: 12px;
+}
+.empty-title { margin: 0 0 6px; font-size: 15px; font-weight: 700; }
+.empty-sub {
+  margin: 0 auto 16px; max-width: 52ch;
+  font-size: 13px; line-height: 1.55; color: var(--ink-2);
+}
+.empty-actions { display: flex; gap: 8px; justify-content: center; }
+.how-steps {
+  margin: 0; padding: 0 18px 14px 40px; list-style: decimal;
+  font-size: 13px; line-height: 1.5; color: var(--ink-2);
 }
 .how-steps li { margin: 0 0 7px; }
 .how-steps li:last-child { margin-bottom: 0; }
