@@ -5,8 +5,8 @@ owner: "cross-cutting"
 priority: P1
 risk: High
 created: "2026-09-05"
-units: [U121, U167, U182, U183, U215, U220, U221, U225, U226, U224]
-amended: "2026-09-05"
+units: [U121, U167, U182, U183, U215, U220, U221, U225, U226, U224, U323]
+amended: "2026-09-11"
 ---
 
 # Feature Specification: Security and Privacy
@@ -101,14 +101,18 @@ work below. The constitution states the principle — *no sensitive data in logs
 
 1. **Given** a staged commit, **When** the pre-commit hook runs, **Then**
    `scripts/privacy_scan.py --staged` refuses personal or sensitive data
-   (U167).
+   (U167) — and the scan's verdict is the hook's exit status, so a finding
+   **refuses the commit** rather than printing a warning above a commit that
+   happens anyway. From U299 until U323 it did exactly that (U323).
 2. **Given** a push, **When** CI runs, **Then** the same scanner runs over the
    **whole tree**, so `--no-verify` locally is still caught (U167).
 3. **Given** the repository became public, **When** it did, **Then** the
    history was scrubbed and re-checked, and the scanner prevents its return
    (U182, U183).
 4. **Given** the scanner itself, **When** it changes, **Then** its own tests
-   run in CI (`scripts/test_privacy_scan.py`).
+   run in CI (`scripts/test_privacy_scan.py`) — including one that commits
+   through a copy of the real hook and checks that no commit exists, because
+   a healthy scanner inside a broken hook blocks nothing (U323).
 
 ### User Story 5 — An input never becomes an instruction (Priority: P1)
 
@@ -144,7 +148,7 @@ work below. The constitution states the principle — *no sensitive data in logs
 - **FR-004**: Encryption is AES-256-GCM with a per-write random nonce and AAD
   binding.
 - **FR-005**: Personal data cannot enter git: hook plus CI, with the scanner
-  under test.
+  **and the hook** under test.
 - **FR-006**: Values persisted to `.env` are sanitised; outbound targets refuse
   link-local; paths refuse traversal; subprocesses use argv and an allow-list.
 - **FR-007**: Anything destructive requires explicit confirmation.
@@ -173,3 +177,4 @@ work below. The constitution states the principle — *no sensitive data in logs
 | U221 | S3 (console side), S14, S15 — no tokens in the browser, the unlock oracle closed, Electron links gated |
 | U225 | S9, S10 — owner key out of `.env`, modern KDF parameters, in-place rotation |
 | U226 | S3 (route deleted), S7, S12, and a leaked mediapipe model |
+| U323 | The hook had stopped refusing (U299 left the scan's exit code behind); now refuses again, with a test that commits through it |

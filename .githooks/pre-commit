@@ -16,7 +16,12 @@ else
   exit 0
 fi
 
-$PY "$(git rev-parse --show-toplevel)/scripts/privacy_scan.py" --staged
+# The scan's verdict IS the hook's verdict. A shell script exits with the
+# status of its LAST command: when U299 appended the warning below without this
+# `|| exit 1`, the hook started exiting with that final `if` — 0 — and from then
+# until U323 it printed "PRIVACY SCAN FAILED" and committed anyway. CI's
+# whole-tree scan was the only gate that still blocked.
+$PY "$(git rev-parse --show-toplevel)/scripts/privacy_scan.py" --staged || exit 1
 
 # U299: a unit owes its spec in the same commit. This only warns — the check
 # that BLOCKS is `scripts/spec_drift.py` in CI, which reads commit subjects and

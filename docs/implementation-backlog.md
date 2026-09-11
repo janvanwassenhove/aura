@@ -1619,7 +1619,35 @@ Twee dingen naast de versie:
   plekken maar kreeg het alleen via de orchestrator binnen — precies de vorm
   van de `uv sync`-snoeival die al vier units heeft gekost.
 * **Een contracttest** pint wat AURA van de SDK gebruikt: de Live-client die
-  U323 nodig heeft, én alles wat de andere paden en de orchestrator al
+  U324 nodig heeft, én alles wat de andere paden en de orchestrator al
   aanroepen, zodat een volgende majorsprong niet stil een resource weghaalt.
   Rood gezien op 2.33 (3 van de 4), groen op 3.13.
+
+### U323 — de privacy-hook drukte "FAILED" af en committe toch
+
+Bij het committen van U322 meldde de pre-commit-hook een bevinding in de nieuwe
+contracttest — een nep-`api_key` van achttien tekens leek voor de scanner een
+sleutel met een waarde — en daarna stond de commit er gewoon, en was hij al
+gepusht. CI draait dezelfde scanner over de hele boom en zou master rood maken.
+
+De bevinding zelf was vals alarm. Wat níet klopte, was dat de hook hem liet
+passeren. Een shellscript eindigt met de status van zijn **laatste** commando.
+Tot U299 was dat de scan. U299 zette er de spec-waarschuwing achter (een `if`
+die 0 teruggeeft als er niets te waarschuwen valt), en vanaf dan eindigde de
+hook altijd met 0. Van U299 tot hier drukte de lokale privacygate dus netjes
+"PRIVACY SCAN FAILED" af boven een commit die toch doorging. Alleen de CI-scan
+over de hele boom blokkeerde nog; die is op elke push groen gebleven, dus er is
+in die periode niets persoonlijks binnengeglipt.
+
+Waarom niemand het zag: de tests van de scanner bleven groen, want de scanner
+was in orde. Niets testte de **hook**.
+
+* `.githooks/pre-commit`: `privacy_scan.py --staged || exit 1`, met uitleg
+  waarom die twee woorden er staan.
+* `scripts/test_privacy_scan.py`: een test die in een tijdelijke repo commit
+  via een kopie van de echte hook, en daarna aan git vraagt of er een commit
+  bestaat. Rood gezien tegen de oude hook (returncode 0, HEAD bestond), groen
+  met de fix — en een schone commit gaat nog steeds door.
+* De contracttest schrijft `api_key="x"`, zoals zijn eigen regel 50 al deed.
+* GPT-Live, eerder aangekondigd als U323, wordt daardoor U324.
 

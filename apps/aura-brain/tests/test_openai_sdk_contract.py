@@ -17,7 +17,7 @@ from openai import AsyncOpenAI, OpenAI
 
 
 def _client() -> AsyncOpenAI:
-    return AsyncOpenAI(api_key="not-used-no-network")
+    return AsyncOpenAI(api_key="x")                     # no network is used
 
 
 def test_the_sdk_is_the_major_version_the_lock_promises() -> None:
@@ -25,7 +25,7 @@ def test_the_sdk_is_the_major_version_the_lock_promises() -> None:
 
 
 def test_the_live_api_has_a_client() -> None:
-    """The one thing U323 cannot be built without."""
+    """The one thing U324 cannot be built without."""
     c = _client()
     assert hasattr(c, "live"), "no Live API client — GPT-Live cannot connect"
     assert callable(c.live.connect)

@@ -3,6 +3,8 @@ trusts gets bypassed, and a guard that rots blocks nothing."""
 
 from __future__ import annotations
 
+import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -96,3 +98,47 @@ def test_personal_skill_files_are_blocked() -> None:
     assert check_path("skills/music.md")
     assert check_path("skills/vrtmax.md")
     assert not check_path("skills/README.md")   # the explainer stays
+
+
+# --- the hook itself: a finding must REFUSE the commit ----------------------
+
+def test_the_hook_refuses_the_commit_rather_than_only_printing(tmp_path) -> None:
+    """U323: everything above tests the scanner; nothing ran the hook.
+
+    U299 appended a spec warning to `.githooks/pre-commit` after the scan line,
+    and a shell script exits with the status of its LAST command — that final
+    `if`, which is 0. From then on the hook printed "PRIVACY SCAN FAILED" and
+    committed anyway. The scanner's own tests stayed green the whole time,
+    because the scanner was fine. So this test commits for real, through a copy
+    of the real hook, and asks git whether a commit exists.
+    """
+    def git(*args: str, check: bool = True) -> subprocess.CompletedProcess:
+        return subprocess.run(["git", *args], cwd=tmp_path, check=check,
+                              capture_output=True, text=True)
+
+    root = Path(__file__).resolve().parent.parent
+    (tmp_path / "scripts").mkdir()
+    shutil.copy(SCRIPT, tmp_path / "scripts" / "privacy_scan.py")
+    (tmp_path / ".githooks").mkdir()
+    hook = tmp_path / ".githooks" / "pre-commit"
+    shutil.copy(root / ".githooks" / "pre-commit", hook)
+    os.chmod(hook, 0o755)
+
+    git("init", "-q")
+    git("config", "user.email", "test@example.com")
+    git("config", "user.name", "test")
+    git("config", "core.hooksPath", ".githooks")
+    (tmp_path / "notes.md").write_text("api_key = 'sk-" + "a" * 40 + "'\n")
+    git("add", "notes.md")
+
+    refused = git("commit", "-q", "-m", "leak", check=False)
+    assert "PRIVACY SCAN FAILED" in refused.stdout + refused.stderr, "the hook ran"
+    assert refused.returncode != 0, "a finding must refuse the commit"
+    assert git("rev-parse", "--verify", "HEAD", check=False).returncode != 0, \
+        "and no commit may exist afterwards"
+
+    # A clean commit still goes through — a gate that refuses everything gets
+    # bypassed with --no-verify, which is worse than no gate.
+    (tmp_path / "notes.md").write_text("just release notes\n")
+    git("add", "notes.md")
+    assert git("commit", "-q", "-m", "clean", check=False).returncode == 0
