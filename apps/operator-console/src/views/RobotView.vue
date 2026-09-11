@@ -146,6 +146,7 @@
               <option value="">default</option>
               <option value="pipeline">pipeline — tools, cheaper</option>
               <option value="realtime">realtime — fluid speech</option>
+              <option value="live">live — natural speech, with tools</option>
             </select>
           </label>
         </div>

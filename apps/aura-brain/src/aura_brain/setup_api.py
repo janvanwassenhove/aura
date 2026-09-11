@@ -323,7 +323,7 @@ _ALLOWED_LANGUAGES = {"auto", "en", "nl", "fr", "de"}  # U130: + German
 
 
 _ALLOWED_VOICE_MODES = {"off", "wake_word"}
-_ALLOWED_VOICE_ENGINES = {"pipeline", "realtime"}  # U132
+_ALLOWED_VOICE_ENGINES = {"pipeline", "realtime", "live"}  # U132, U324
 
 
 def _prefs_snapshot() -> dict:

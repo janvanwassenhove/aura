@@ -185,6 +185,6 @@ delete it (U291).
 OpenAI's `gpt-live-1` is **not** a drop-in voice model for any of the three
 paths above: measured, the Realtime API refuses it ("not supported in realtime
 mode") and so does chat-completions. It serves a separate Live API with its
-own protocol, full duplex and tool delegation. Whether and when it becomes a
-fourth path is [ADR-011](ADR-011-gpt-live-is-a-fourth-path.md).
+own protocol, full duplex and tool delegation. It became the fourth path in
+U324, opt-in — see [ADR-011](ADR-011-gpt-live-is-a-fourth-path.md).
 

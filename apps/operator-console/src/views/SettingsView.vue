@@ -60,13 +60,17 @@
         <div class="row">
           <div class="row-text">
             <div class="row-title">Conversation engine</div>
-            <div class="row-sub">Pipeline runs tools and is cheaper; realtime is fluid speech-to-speech.</div>
+            <div class="row-sub">{{ engineHint }}</div>
           </div>
           <select :value="prefs.voiceEngine" class="d2-field row-field" aria-label="Conversation engine" @change="saveEngine">
             <option value="pipeline">pipeline</option>
             <option value="realtime">realtime</option>
+            <option value="live">live (GPT-Live)</option>
           </select>
-          <button class="d2-ghost-btn" :disabled="testingRealtime"
+          <button v-if="prefs.voiceEngine === 'live'" class="d2-ghost-btn" :disabled="testingRealtime"
+                  title="Opens a GPT-Live session for a moment and closes it again"
+                  @click="testLive">{{ testingRealtime ? 'Testing…' : 'Test Live access' }}</button>
+          <button v-else class="d2-ghost-btn" :disabled="testingRealtime"
                   title="Checks whether your account can actually open a realtime session"
                   @click="testRealtime">{{ testingRealtime ? 'Testing…' : 'Test realtime access' }}</button>
         </div>
@@ -475,7 +479,7 @@ function applyModel(): void {
   settingsStore.applyConfig(settingsStore.provider as LLMProvider, settingsStore.model)
 }
 function saveEngine(e: Event): void {
-  prefs.save({ voice_engine: (e.target as HTMLSelectElement).value as 'pipeline' | 'realtime' })
+  prefs.save({ voice_engine: (e.target as HTMLSelectElement).value as 'pipeline' | 'realtime' | 'live' })
 }
 // ── Model roles (U90/U202) — stored in /setup/prefs, OpenAI only ───────────
 type RoleField = 'chat_model' | 'realtime_model' | 'agent_model' | 'computer_use_model'
@@ -530,6 +534,28 @@ async function testRealtime(): Promise<void> {
     const r = await fetch(`${BRAIN_URL}/voice/realtime-check`, { method: 'POST' })
     const body = await r.json().catch(() => ({}))
     realtimeResult.value = body.detail ?? body.result ?? (r.ok ? 'Realtime access works.' : `Check failed (${r.status})`)
+  } catch { realtimeResult.value = 'Could not reach the brain.' } finally { testingRealtime.value = false }
+}
+
+// U324: what each engine gives up, said where the choice is made. Live is the
+// first that is natural AND can use tools — and the only one billed per open
+// minute rather than per turn, which is worth knowing before choosing it.
+const ENGINE_HINT: Record<string, string> = {
+  pipeline: 'Runs tools and is the cheapest. Realtime and Live sound more natural.',
+  realtime: 'Fluid speech-to-speech, but it cannot use tools (agenda, mail, music).',
+  live: 'GPT-Live: natural speech that hands tool work back to AURA. Billed per open minute; a quiet conversation closes itself.',
+}
+const engineHint = computed(() => ENGINE_HINT[prefs.voiceEngine] ?? ENGINE_HINT.pipeline)
+
+async function testLive(): Promise<void> {
+  testingRealtime.value = true
+  realtimeResult.value = ''
+  try {
+    const r = await fetch(`${BRAIN_URL}/voice/live-probe`)
+    const body = await r.json().catch(() => ({}))
+    realtimeResult.value = body.ok
+      ? (body.hint ?? 'GPT-Live works on this account.')
+      : `GPT-Live is not available: ${body.reason ?? `check failed (${r.status})`}`
   } catch { realtimeResult.value = 'Could not reach the brain.' } finally { testingRealtime.value = false }
 }
 

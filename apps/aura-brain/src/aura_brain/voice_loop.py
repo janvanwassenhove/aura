@@ -410,7 +410,7 @@ class VoiceLoop:
         """
         char = getattr(self._manager, "character", None) if self._manager else None
         pref = (getattr(char, "voice_engine", "") or "").strip().lower()
-        if pref in ("pipeline", "realtime"):
+        if pref in ("pipeline", "realtime", "live"):
             return pref
         return os.environ.get("VOICE_ENGINE", "pipeline").lower()
 
@@ -693,7 +693,7 @@ class VoiceLoop:
                 # (or when the engine is 'pipeline') fall back to the classic
                 # transcribe→LLM→TTS handler so Richie always replies.
                 try:
-                    if not await self._realtime_turn(wav, command):
+                    if not await self._speech_turn(wav, command):
                         await self._handle(command)
                 finally:
                     _TRACE.finish(self._session_id)
@@ -751,6 +751,23 @@ class VoiceLoop:
             return ""
         return (await voice.transcribe(wav, filename="robot.wav") or "").strip()
 
+    async def _speech_turn(self, wav: bytes, command: str = "") -> bool:
+        """Route a confirmed turn to the engine that owns it. False → pipeline.
+
+        U324: the engine now really follows `_engine()`. `_realtime_turn`
+        gated on the GLOBAL VOICE_ENGINE only, so a character set to realtime
+        — U203's whole promise — was answered by the pipeline whenever the
+        global said pipeline, and a character set to pipeline went realtime
+        whenever the global said realtime. The resolver had tests; the
+        dispatch never asked it.
+        """
+        engine = self._engine()
+        if engine == "live":
+            return await self._live_session_turn(wav, command)
+        if engine == "realtime":
+            return await self._realtime_turn(wav, command)
+        return False
+
     async def _realtime_turn(self, wav: bytes, command: str = "") -> bool:
         """U129: run one spoken turn through the OpenAI Realtime API and play
         the audio reply. Returns True if handled; False (or on ANY error) means
@@ -760,7 +777,9 @@ class VoiceLoop:
         # U133: circuit breaker — after repeated failures (e.g. no realtime
         # entitlement, wrong model) stop trying so we don't add the timeout
         # latency to every turn; the pipeline handles the whole session.
-        if getattr(self, "_realtime_broken", False) or not realtime_voice.realtime_enabled():
+        # U324: WHICH engine is decided by _speech_turn (the character first);
+        # this only asks whether realtime CAN run — a key, and a closed breaker.
+        if getattr(self, "_realtime_broken", False) or not os.environ.get("OPENAI_API_KEY"):
             return False
         # U154: conversation-session mode (default) — one persistent Realtime
         # connection with server-side VAD instead of one turn per connection.
@@ -881,6 +900,18 @@ class VoiceLoop:
         from aura_brain.voice_context import build_instructions
 
         prompt = getattr(character, "character_prompt", "") or ""
+        note = await self._room_note()
+        from aura_brain.voice import _stt_language
+
+        # U291: the language he must answer in travels with the
+        # instructions, so a persona prompt can never silently replace it.
+        return build_instructions(prompt, note, _stt_language())
+
+    async def _room_note(self) -> str:
+        """Who is in front of him, and who lives here (U245, U293).
+
+        One place for both speech paths. A Live session also re-asks it while
+        open, and APPENDS it when the room changes (U324)."""
         note = ""
         try:
             note = await self._pipeline.person_note()
@@ -892,12 +923,8 @@ class VoiceLoop:
             if household:
                 note = f"{note}\n\n{household}" if note else household
         except Exception as exc:  # noqa: BLE001 — speech must never wait on this
-            logger.debug("person note unavailable for the realtime path: %s", exc)
-        from aura_brain.voice import _stt_language
-
-        # U291: the language he must answer in travels with the
-        # instructions, so a persona prompt can never silently replace it.
-        return build_instructions(prompt, note, _stt_language())
+            logger.debug("person note unavailable for the speech path: %s", exc)
+        return note
 
     async def _realtime_session_turn(self, command: str) -> bool:
         """U154: open a conversation session — the robot mic streams into ONE
@@ -955,6 +982,71 @@ class VoiceLoop:
             else:
                 logger.warning("realtime session failed, using pipeline: %s", exc)
             return False
+
+    async def _live_session_turn(self, wav: bytes, command: str) -> bool:
+        """U324: GPT-Live — a natural voice that can still use tools (ADR-011).
+
+        The session HEARS the command he was woken with (Live has no text
+        input), keeps listening without a wake word until it goes idle, and
+        hands anything that needs work to the orchestrator — the same agentic
+        loop and approval gate the typed path uses. False on any failure, so
+        the pipeline answers instead; two failures trip a breaker.
+        """
+        if getattr(self, "_live_broken", False) or not os.environ.get("OPENAI_API_KEY"):
+            return False
+        if not hasattr(self._robot, "stream_audio"):
+            return False
+        from aura_brain import live_session, realtime_voice
+        from aura_brain.turn_trace import LOG as _TRACE
+
+        try:
+            character = getattr(self._manager, "character", None) if self._manager else None
+            instructions = await self._instructions(character)
+            voice_id = live_session.live_voice(getattr(character, "voice_id", "") or "")
+            _t = _TRACE.current(self._session_id)
+            if _t is not None:
+                _t.mark("llm_request_sent")
+            pcm = (realtime_voice.wav_to_pcm24k(wav) if wav else b"") or b""
+            sess = live_session.LiveSession(
+                robot=self._robot, bus=self._bus, session_id=self._session_id,
+                instructions=instructions, voice=voice_id,
+                delegate=self._live_delegate, on_reply=self.note_spoken, trace=_t,
+                context_provider=self._room_note)
+            logger.info("live session opening (command=%r)", command[:60])
+            self._active_session = sess          # U184: panic stop handle
+            try:
+                await sess.run(initial_pcm=pcm, initial_text=command)
+            finally:
+                self._active_session = None
+            if _t is not None:
+                _t.mark("playback_complete")
+            if sess.turns == 0 and sess.closed_reason != "stopped by owner":
+                raise RuntimeError("live session produced no spoken reply")
+            logger.info("live session done: %d replies, %d delegations (%s), ~$%.4f open time",
+                        sess.turns, sess.delegations, sess.closed_reason,
+                        live_session.LIVE_METER.summary()["estimated_usd"])
+            self._live_fails = 0
+            return True
+        except Exception as exc:  # noqa: BLE001 — the pipeline answers instead
+            self._live_fails = getattr(self, "_live_fails", 0) + 1
+            if self._live_fails >= 2:
+                self._live_broken = True
+                logger.warning(
+                    "Live disabled for this session (%s) — falling back to the "
+                    "pipeline. Set Conversation engine back in Settings, or "
+                    "restart to retry.", exc)
+            else:
+                logger.warning("live session failed, using pipeline: %s", exc)
+            return False
+
+    async def _live_delegate(self, text: str) -> str:
+        """What GPT-Live hands back to us: the orchestrator's agentic loop.
+
+        announce=False — the tools run and the approval gate asks as always,
+        but nothing auto-speaks the reply: the live voice paraphrases it."""
+        if self._pipeline is None:
+            raise RuntimeError("no orchestrator to delegate to")
+        return await self._pipeline.orchestrate(text, self._session_id, announce=False)
 
     async def panic(self) -> dict:
         """U184: STOP EVERYTHING, now.

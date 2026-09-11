@@ -1651,3 +1651,71 @@ was in orde. Niets testte de **hook**.
 * De contracttest schrijft `api_key="x"`, zoals zijn eigen regel 50 al deed.
 * GPT-Live, eerder aangekondigd als U323, wordt daardoor U324.
 
+### U324 — GPT-Live als vierde engine: natuurlijk praten, en toch dingen doen
+
+De eigenaar: "go voor full implementatie". Tot nu toe moest je kiezen: de
+pipeline kan tools gebruiken maar klinkt niet natuurlijk, de realtime-sessie
+klinkt natuurlijk maar kan niets opzoeken. GPT-Live is het eerste ontwerp dat
+allebei kan — en met *client delegation* komt het werk terug bij óns, zodat het
+in AURA's eigen orchestrator loopt, achter AURA's eigen goedkeuringspoort.
+
+**Wat er gebouwd is** (`live_session.py`, vierde keuze in Settings en per
+personage, opt-in):
+
+* **Hij hoort het commando waarmee hij gewekt werd.** Live heeft geen
+  tekstinvoer, dus de audio van het wekvenster gaat eerst de sessie in; daarna
+  luistert hij verder zonder wekwoord tot het stil wordt.
+* **Stilte is geen spraak.** Het model stuurt ononderbroken audio, en 74–81 %
+  daarvan is digitale stilte. Die afspelen — of meetellen als "hij praat" —
+  zou de microfoon eeuwig dicht houden. Dus een luidheidspoort met 0,6 s
+  naloop, zodat pauzes binnen een zin blijven. Omdat Live geen
+  einde-van-antwoord-event heeft, is een langere pauze het einde van een
+  uiting: dan wordt het antwoord gepubliceerd en krijgt de echo-bewaker het.
+* **Hij hoort zichzelf niet.** De Pi heeft geen echo-onderdrukking, dus terwijl
+  hij praat (plus de naklank) krijgt de sessie `session.input_audio.mute`, en
+  daarna `unmute`. `LIVE_BARGE_IN=true` alleen met AEC.
+* **Opzoekwerk gaat naar de orchestrator.** `session.delegation.created` bevat
+  geen taaktekst, dus de sessie houdt zelf bij wat de persoon zei en geeft dát
+  door, met `announce=False`: tools en goedkeuring zoals altijd, maar de
+  Live-stem zegt het resultaat. Mislukt het, dan krijgt het model een feit via
+  `thinking` — geen verzonnen resultaat, geen zin om voor te lezen (U292).
+* **Geld.** Live rekent per open minuut. Een stille sessie sluit na 45 s (een
+  opzoeking die loopt telt niet als stil), er is een plafond van 600 s, en
+  sluiten stuurt `session.close` en wacht op `session.closed` — het rekenen
+  stopt op het woord van de server. `/voice/realtime-cost` toont de open tijd
+  apart, en zegt dat de eigen modelaanroepen van de orchestrator er niet in
+  zitten.
+* **Wie er in de kamer is**: verandert dat, dan wordt alleen de nieuwe
+  kamernotitie toegevoegd — Live-instructies worden aangevuld, niet vervangen.
+* **Faalt Live**, dan antwoordt de pipeline; na twee keer staat Live uit tot
+  een herstart, en het log zegt dat.
+* **Settings** zegt bij elke engine wat je opgeeft, en *Test Live access* opent
+  een sessie even en sluit ze weer.
+
+**Onderweg gevonden: U203 werkte nooit in de dispatch.** De resolver
+`_engine()` gaf het personage voorrang op de globale instelling, en had daar
+tests voor. Maar `_realtime_turn` keek alleen naar de globale
+`VOICE_ENGINE`. Een presentatiepersonage op realtime werd dus door de pipeline
+beantwoord zolang de globale instelling pipeline zei. Nu vraagt de dispatch de
+resolver; de test daarvoor was rood op de oude code.
+
+**Gemeten tegen de echte API** (echte `LiveSession`, echte SDK, een nep-robot
+die kamerstilte streamt op 16 kHz in echte tijd): de Nederlandse zin werd juist
+gehoord en gepubliceerd; de delegate kreeg exact die tekst; het resultaat ging
+terug via `commentary`; hij zei agenda en weer correct in het Nederlands. 9,5 s
+spraak in 10 segmenten naar de robot, 11 van 94 vensters stil (pauzes binnen
+zinnen), 4× mute en 4× unmute, sessie gesloten na 8 s stilte, 36,7 s open,
+$0,031. Stemmen: `marin`, `cedar`, `coral`, `verse`, `ash`, `sage` en `alloy`
+aanvaard, `nova` geweigerd — dus alleen die zeven worden van een personage
+doorgegeven, anders `marin`.
+
+Tests eerst rood gezien: de Live-sessietests (module bestond niet), de
+dispatch-, prefs- en personagetests (9 rood). Daarna aura-brain 595 groen, de
+console 198 groen.
+
+**Wat overblijft is van de eigenaar:** de test in een echte kamer, op de robot,
+met de televisie aan. De fakes bewijzen de logica, de smoke run het protocol;
+alleen de kamer bewijst de akoestiek. Tot dan blijft Live opt-in en blijft de
+pipeline de standaard. Nog niet gedaan: de meter in Talk tonen voor Live
+(het eindpunt heeft hem; de view heeft geen mounttest om hem aan te hangen).
+

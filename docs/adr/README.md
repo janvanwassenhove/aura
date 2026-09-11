@@ -22,7 +22,7 @@ loses the reason.
 | [008](ADR-008-knowledge-judgment-layer.md) | Personal knowledge and judgment layer | Accepted and implemented · amended 2026-09-05 |
 | [009](ADR-009-honest-state.md) | Never report what has not been verified | Accepted 2026-09-05 |
 | [010](ADR-010-desktop-app-is-the-delivery-unit.md) | The desktop app is the delivery unit | Accepted 2026-09-05 |
-| [011](ADR-011-gpt-live-is-a-fourth-path.md) | GPT-Live is a fourth speech path, not a model swap | Accepted 2026-09-11 — integration in progress |
+| [011](ADR-011-gpt-live-is-a-fourth-path.md) | GPT-Live is a fourth speech path, not a model swap | Accepted 2026-09-11 — implemented as an opt-in fourth engine (U324); real-room test outstanding |
 
 ## Reading order for someone new
 
@@ -34,8 +34,9 @@ loses the reason.
    learn and now governs every status line in the product.
 4. **[008](ADR-008-knowledge-judgment-layer.md)** — the data model and the
    crypto, if you are going anywhere near personal data.
-5. **[005](ADR-005-voice-pipeline.md)**, amendment first — three speech paths,
-   and why a change to one is not a change to the others.
+5. **[005](ADR-005-voice-pipeline.md)**, amendments first — the speech paths
+   (four since U324, [011](ADR-011-gpt-live-is-a-fourth-path.md)), and why a
+   change to one is not a change to the others.
 
 ## Writing one
 

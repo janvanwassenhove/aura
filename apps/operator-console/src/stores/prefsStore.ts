@@ -14,7 +14,7 @@ export const LANGUAGES: { id: Language; label: string }[] = [
 ]
 
 export type VoiceMode = 'off' | 'wake_word'
-export type VoiceEngine = 'pipeline' | 'realtime'  // U132
+export type VoiceEngine = 'pipeline' | 'realtime' | 'live'  // U132, U324 (GPT-Live)
 
 /** D2: one surface, three depths. Density changes how much of the SAME screen
  * is exposed — it never changes what the robot may do. */

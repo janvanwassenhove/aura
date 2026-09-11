@@ -43,7 +43,7 @@ class CharacterPersona:
     # global VOICE_ENGINE (pipeline by default). "pipeline" keeps skills, memory
     # and tools; "realtime" is fluid speech-to-speech but has NO tool access, so
     # it fits a chat-along presentation persona, not the everyday assistant.
-    voice_engine: str = ""               # "" (inherit) | pipeline | realtime
+    voice_engine: str = ""               # "" (inherit) | pipeline | realtime | live
     emotional_style: str = "warm"
     voice_provider: str = "openai"
     voice_id: str = ""                   # empty → global TTS voice
@@ -174,7 +174,7 @@ class CharacterStore:
             # U203: an invalid engine would silently disable tools on every turn
             # (realtime) or worse. Ignore anything that is not a real choice.
             if k == "voice_engine" and str(v).strip().lower() not in (
-                    "", "pipeline", "realtime"):
+                    "", "pipeline", "realtime", "live"):
                 continue
             setattr(current, k, type(getattr(current, k))(v))
         (self._dir / f"{character_id}.json").write_text(

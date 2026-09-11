@@ -78,3 +78,57 @@ describe('Settings loads its sections', () => {
     w.unmount()
   })
 })
+
+/** U324: GPT-Live is the fourth conversation engine. It is offered where the
+ *  other three are, says what it costs before it is chosen, and its access
+ *  test asks the brain — the only place that can open a Live session. */
+describe('GPT-Live as a conversation engine', () => {
+  it('is offered, explains itself, and its access test asks the brain', async () => {
+    const calls: string[] = []
+    vi.stubGlobal('fetch', (url: string) => {
+      const u = String(url)
+      calls.push(u)
+      if (u.includes('/setup/prefs')) return OK({ voice_engine: 'live' })
+      if (u.includes('/voice/live-probe')) {
+        return OK({ ok: true, model: 'gpt-live-1', hint: 'GPT-Live works on this account.' })
+      }
+      if (u.includes('/connector/health')) return OK({ status: 'ok', connectors: {} })
+      if (u.includes('/capabilities')) return OK({ capabilities: [], allowed_apps: [] })
+      if (u.includes('/config/llm/models')) return OK({ models: [] })
+      return OK({})
+    })
+    const w = mount(SettingsView)
+    await flushPromises()
+    await flushPromises()
+
+    const engine = w.find('select[aria-label="Conversation engine"]')
+    expect(engine.findAll('option').map(o => o.attributes('value'))).toEqual(['pipeline', 'realtime', 'live'])
+    expect(w.text()).toContain('Billed per open minute')
+
+    const test = w.findAll('button').find(b => b.text() === 'Test Live access')
+    expect(test, 'the Live engine gets its own access test').toBeTruthy()
+    await test!.trigger('click')
+    await flushPromises()
+    expect(calls.some(u => u.includes('/voice/live-probe'))).toBe(true)
+    expect(w.text()).toContain('GPT-Live works on this account.')
+    w.unmount()
+  })
+
+  it('says why, when the account cannot open a session', async () => {
+    vi.stubGlobal('fetch', (url: string) => {
+      const u = String(url)
+      if (u.includes('/setup/prefs')) return OK({ voice_engine: 'live' })
+      if (u.includes('/voice/live-probe')) return OK({ ok: false, reason: 'no OPENAI_API_KEY set' })
+      if (u.includes('/capabilities')) return OK({ capabilities: [], allowed_apps: [] })
+      if (u.includes('/config/llm/models')) return OK({ models: [] })
+      return OK({})
+    })
+    const w = mount(SettingsView)
+    await flushPromises()
+    await flushPromises()
+    await w.findAll('button').find(b => b.text() === 'Test Live access')!.trigger('click')
+    await flushPromises()
+    expect(w.text()).toContain('GPT-Live is not available: no OPENAI_API_KEY set')
+    w.unmount()
+  })
+})

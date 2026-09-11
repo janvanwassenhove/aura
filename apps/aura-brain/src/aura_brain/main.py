@@ -1063,16 +1063,26 @@ def create_app() -> FastAPI:
 
         return JSONResponse(await probe())
 
+    @app.get("/voice/live-probe")
+    async def live_probe() -> JSONResponse:
+        """U324: can this account open a GPT-Live session? (ADR-011)"""
+        from aura_brain.live_session import probe as _live_probe
+
+        return JSONResponse(await _live_probe())
+
     @app.get("/voice/realtime-cost")
     async def realtime_cost() -> JSONResponse:
-        """U129: running Realtime spend estimate (this brain session)."""
+        """U129: running Realtime spend estimate (this brain session).
+        U324: plus GPT-Live, which bills open minutes rather than tokens."""
         import os as _os
 
+        from aura_brain.live_session import LIVE_METER
         from aura_brain.realtime_voice import METER
         return JSONResponse({
             "engine": _os.environ.get("VOICE_ENGINE", "pipeline"),
             "model": _os.environ.get("REALTIME_MODEL", "gpt-realtime"),
             **METER.summary(),
+            "live": LIVE_METER.summary(),
         })
 
     @app.websocket("/ws/events")

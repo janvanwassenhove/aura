@@ -1,14 +1,14 @@
 # ADR-011: GPT-Live is a fourth speech path, not a model swap
 
-**Status**: **Accepted — adopt as a fourth path; integration in progress** (2026-09-11).
+**Status**: **Accepted — implemented as an opt-in fourth engine in U324** (2026-09-11).
 The owner asked to pursue it ("moet beschikbaar zijn, bekijk hoe we kunnen gaan
-gebruiken"); the sections *Why not now* below are therefore what the
-integration has to solve, not reasons to wait.
+gebruiken"). *What the integration has to solve* below now says how U324 met
+each item; one remains the owner's to run — the real-room test.
 **Date**: 2026-09-11
 **Owner**: aura-brain / voice
 **Related**: [ADR-005](ADR-005-voice-pipeline.md) (three speech paths),
 [ADR-009](ADR-009-honest-state.md) (honest state),
-[spec 017](../../.specify/specs/017-voice-and-language/spec.md), U321
+[spec 017](../../.specify/specs/017-voice-and-language/spec.md), U321, U322, U324
 
 ---
 
@@ -108,17 +108,38 @@ each is a requirement on the integration, not a reason to wait:
 5. **Per-minute billing** makes the session lifecycle a cost control, not just
    a resource one.
 
-## What would change this decision
+### How U324 met them
 
-* Full duplex verified on the physical robot with its AEC path on, in a real
-  room, without self-hearing — the U156 experiment finished.
-* A Dutch household conversation, with television on, holding its language
-  under instruction-only pinning — tested, not assumed.
-* SDK support, declared as a direct dependency.
+Measured with the real `LiveSession`, the real SDK and the real API, a fake
+robot streaming room silence at 16 kHz in real time, and a stand-in delegate
+(the smoke run of 2026-09-11):
 
-When those hold, GPT-Live becomes a fourth selectable engine alongside the
-three in ADR-005, with the delegation handler calling the orchestrator's
-existing agentic loop.
+| # | Requirement | U324 |
+|---|---|---|
+| 1 | Full duplex without AEC | While he speaks, plus the speaker tail, the session is told `session.input_audio.mute`; `unmute` after. One exchange: 4 mutes, 4 unmutes, none of his own audio sent. `LIVE_BARGE_IN=true` is for a robot with AEC. |
+| 2 | Language | Instruction-only, through `build_instructions` (U291). Held in the smoke run: Dutch in, Dutch out, Dutch after the delegation. **Not yet tested with a television on** — see *What remains*. |
+| 3 | No end-of-response event | The audio is the signal: output is gated on loudness with a 0.6 s hangover, and a longer pause ends an utterance — which publishes the reply and feeds the echo guard. Raw stream 74–81 % digital silence; after the gate 11 of 94 windows, all pauses inside sentences. |
+| 4 | SDK | openai 3.13, declared by aura-brain (U322). |
+| 5 | Per-minute billing | Idle close at 45 s (a lookup in flight is not idle), a 600 s cap, `session.close` and a wait for `session.closed`, and a meter of open time. The smoke run: 36.7 s open, $0.031. |
+
+The delegation itself: the session published the person's transcript, handed
+**that exact text** to the delegate, returned the result with
+`session.commentary.append`, and he said it in Dutch — agenda and weather,
+correctly paraphrased. Voices accepted by `session.start`: `marin`, `cedar`,
+`coral`, `verse`, `ash`, `sage`, `alloy`; `nova` was refused ("forbidden").
+
+## What remains
+
+* **The real-room test, on the robot.** The fakes prove the logic and the smoke
+  run proves the protocol; only a room proves the acoustics: the mic-mute rule
+  with a real speaker and a real reverb tail, a Dutch household conversation
+  with the television on holding its language under instruction-only pinning.
+  Until that has been run, Live stays opt-in and the default stays the
+  pipeline.
+* Full duplex with the robot's AEC path on (`LIVE_BARGE_IN=true`) — the U156
+  experiment, still unfinished, and now the only thing between Live and
+  barge-in.
+* SDK support, declared as a direct dependency — done (U322).
 
 ## The companion model: `gpt-live-transcribe`
 

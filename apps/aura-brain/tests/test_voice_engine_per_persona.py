@@ -66,3 +66,16 @@ def test_an_invalid_engine_is_refused_not_stored(tmp_path) -> None:
     assert store.get("friendly_assistant").voice_engine == ""
     store.update("friendly_assistant", {"voice_engine": "realtime"})
     assert store.get("friendly_assistant").voice_engine == "realtime"
+
+
+def test_a_character_can_choose_live(tmp_path) -> None:
+    """U324: a character may pick the GPT-Live engine, and the store keeps it."""
+    store = CharacterStore(str(tmp_path))
+    store.update("friendly_assistant", {"voice_engine": "live"})
+    assert store.get("friendly_assistant").voice_engine == "live"
+
+
+def test_the_resolver_names_live(monkeypatch) -> None:
+    monkeypatch.setenv("VOICE_ENGINE", "pipeline")
+    char = CharacterPersona(id="host", voice_engine="live")
+    assert _loop(char).engine_for_test() == "live"

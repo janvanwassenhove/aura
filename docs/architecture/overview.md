@@ -214,7 +214,7 @@ See [constitution](../../.specify/memory/constitution.md) for the full governing
 | Delivery | Electron desktop app (ADR-010); Docker Compose for development and CI |
 | Frontend framework | Vue 3 + Vite + TypeScript + Pinia + TailwindCSS |
 | LLM | OpenAI GPT-4o (configurable) |
-| Speech | **Three paths**, chosen in Settings: pipeline (tools, cheaper), per-turn realtime, realtime session (server VAD). See ADR-005's amendment |
+| Speech | **Four paths**, chosen in Settings and per character: pipeline (tools, cheapest), per-turn realtime, realtime session (server VAD, no tools), GPT-Live (natural speech, tools by delegation to the orchestrator; opt-in, billed per open minute). See ADR-005's amendments and ADR-011 |
 | Wake word | openWakeWord, ONNX, on the CPU — with a network fallback |
 | STT / TTS providers | OpenAI; local Whisper and Kokoro/Piper as fallbacks |
 | Connectors | Microsoft 365 (Work IQ MCP, MSAL OBO), Google, GitHub, Slack, owner-added MCP servers, calendar-by-`.ics`-link |
@@ -234,10 +234,11 @@ See [constitution](../../.specify/memory/constitution.md) for the full governing
 - [ADR-008: Personal Knowledge & Judgment Layer](../adr/ADR-008-knowledge-judgment-layer.md)
 - [ADR-009: Honest State](../adr/ADR-009-honest-state.md)
 - [ADR-010: The Desktop App is the Delivery Unit](../adr/ADR-010-desktop-app-is-the-delivery-unit.md)
+- [ADR-011: GPT-Live is a Fourth Speech Path](../adr/ADR-011-gpt-live-is-a-fourth-path.md)
 
 **ADR-002, ADR-004, ADR-005, ADR-006, ADR-007 and ADR-008 carry 2026-09-05
 amendments.** ADR-005 is partly superseded: the voice pipeline it describes is
-one of three paths. Read the amendments before relying on the original text.
+one of four paths. Read the amendments before relying on the original text.
 
 ### The specifications
 

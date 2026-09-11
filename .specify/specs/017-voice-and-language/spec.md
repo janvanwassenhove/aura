@@ -5,7 +5,7 @@ owner: "aura-brain / conversation"
 priority: P1
 risk: High
 created: "2026-09-05"
-units: [U22, U36b, U36e, U36h, U45, U46, U47, U49, U54, U67, U73, U80, U81, U82, U83, U84, U85, U86, U87, U88, U89, U91, U92, U96, U128, U129, U130, U131, U132, U133, U134, U135, U140, U141, U142, U143, U144, U145, U146, U148, U149, U150, U153, U154, U155, U156, U163, U203, U209, U256, U257, U258, U260, U273, U275, U287, U288, U289, U291, U292, U321, U322]
+units: [U22, U36b, U36e, U36h, U45, U46, U47, U49, U54, U67, U73, U80, U81, U82, U83, U84, U85, U86, U87, U88, U89, U91, U92, U96, U128, U129, U130, U131, U132, U133, U134, U135, U140, U141, U142, U143, U144, U145, U146, U148, U149, U150, U153, U154, U155, U156, U163, U203, U209, U256, U257, U258, U260, U273, U275, U287, U288, U289, U291, U292, U321, U322, U324]
 ---
 
 # Feature Specification: Voice and Language
@@ -25,17 +25,20 @@ audible in a room full of people the moment it is wrong.
 pipeline: OpenAI Realtime by default, local Whisper + Kokoro/Piper as the
 offline fallback, selected by `STT_PROVIDER` / `TTS_PROVIDER`.
 
-**Reality has three speech paths, not two**, and the ADR does not describe them:
+**Reality has four speech paths, not two**, and the ADR does not describe them:
 
 | Path | Module | What it is |
 |---|---|---|
 | Pipeline | `voice.py` → `voice_loop.py` | Wake word → STT → orchestrator (tools) → TTS. Cheaper, and the only path that can call tools. |
 | Per-turn realtime | `realtime_voice.py` | One Realtime request per turn, opened after the wake word (U129). |
 | Realtime session | `realtime_session.py` | A continuous session with server-side VAD — the "ChatGPT voice" architecture (U154). Fluid, no tools. |
+| GPT-Live session | `live_session.py` | A full-duplex Live API session (U324, [ADR-011](../../../docs/adr/ADR-011-gpt-live-is-a-fourth-path.md)). Natural speech **and** tools, through client delegation: the work comes back to AURA's own orchestrator and approval gate. Opt-in; billed per open minute. |
 
-The owner chooses in Settings (U132, U203): *pipeline runs tools and is
-cheaper; realtime is fluid speech-to-speech.* That choice, and the fact that
-there **are** three paths, is the single most important thing this spec records
+The owner chooses in Settings, and per character (U132, U203, U324): *the
+pipeline runs tools and is the cheapest; realtime is fluid speech-to-speech but
+cannot use tools; live is natural speech that hands tool work back to AURA.*
+That choice, and the fact that there **are** several paths, is the single most
+important thing this spec records
 — because four separate language bugs (U287, U289, U291, U292) were each fixed
 in one path while the others kept the old behaviour, and each fix looked
 complete until the next conversation.
@@ -160,11 +163,32 @@ none said which one applied (U273). Settings holds the default; the character
 carries its own; a person may be met in a specific one (U274). The order is
 stated on screen.
 
+### User Story 7 — A natural voice that can still do things (Priority: P2)
+
+**Acceptance Scenarios**:
+
+1. **Given** the Live engine, **When** the person asks about their agenda,
+   **Then** the session delegates, the orchestrator runs the tool behind the
+   approval gate, and he says the result in the conversation's language.
+   Measured in the U324 smoke run: a Dutch question, a delegation carrying the
+   exact transcript, a Dutch paraphrase of the result.
+2. **Given** he is speaking, **When** the robot's mic delivers audio, **Then**
+   none of it reaches the session — unless `LIVE_BARGE_IN` (U324).
+3. **Given** nobody speaks for `LIVE_SESSION_IDLE_S` and no lookup is in
+   flight, **When** that passes, **Then** the session is closed on the server,
+   not only on our side (U324).
+4. **Given** a character set to an engine, **When** a turn arrives, **Then**
+   that engine answers it, whatever the global says (U203, kept by the
+   dispatch only since U324).
+
 ## Functional Requirements
 
-- **FR-001**: Three speech paths exist and are selectable. Any change to
-  language, wake behaviour or instruction text must be applied to **all three**
-  or explicitly scoped to one, in the same unit.
+- **FR-001**: Four speech paths exist and are selectable — globally and per
+  character, and the turn goes to the engine `_engine()` names. (Until U324 it
+  did not: `_realtime_turn` read only the global `VOICE_ENGINE`, so U203's
+  per-character engine held in the resolver's tests and nowhere else.) Any
+  change to language, wake behaviour or instruction text must be applied to
+  **all four** or explicitly scoped to one, in the same unit.
 - **FR-002**: The transcription language is resolved by
   `voice._stt_language()` in the documented order and pinned; `multi` opts out.
 - **FR-003**: A transcript whose script does not match the household's
@@ -201,6 +225,37 @@ stated on screen.
   pruning trap. A contract test pins every SDK resource the four speech paths
   and the orchestrator call, so a future major bump cannot remove one quietly
   (U322).
+- **FR-014**: GPT-Live opens with **client** delegation. Delegated work goes to
+  the orchestrator's agentic loop with `announce=False`, so tools and the
+  approval gate behave exactly as on the typed path; the result returns with
+  `session.commentary.append`, clipped at a sentence to what one append carries
+  (500 tokens). A failed lookup is reported as a fact through
+  `session.thinking.append` — never an invented result, never a sentence to
+  say (U292's rule) (U324).
+- **FR-015**: Live output audio is gated on loudness (`LIVE_SILENCE_RMS`, 150)
+  with a hangover (`LIVE_VOICE_HANGOVER_S`, 0.6 s). The model streams output
+  continuously and 74–81 % of it is digital silence; played, or counted as
+  speech, it would keep the half-duplex gate shut. A pause longer than the
+  hangover ends an utterance — there is no end-of-response event — which
+  publishes the reply and feeds the echo guard (U324).
+- **FR-016**: Without echo cancellation the session is told
+  `session.input_audio.mute` while he speaks plus `SELF_HEARING_COOLDOWN_S`,
+  and `unmute` after. `LIVE_BARGE_IN=true` keeps listening and is for a robot
+  with AEC only (U324).
+- **FR-017**: A Live session hears the wake-window audio first (Live has no
+  text input); closes after `LIVE_SESSION_IDLE_S` (45 s — a lookup in flight
+  is not idleness), after `LIVE_SESSION_MAX_S`, or on the owner's Stop; and
+  closing sends `session.close` and waits for `session.closed`, because
+  billing stops on the server's word. When who is in the room changes, only the
+  new room note is appended — Live's instructions append, they do not
+  replace. `/voice/realtime-cost` reports Live's open time separately and says
+  the orchestrator's own model calls are not in it (U324).
+- **FR-018**: A failing Live session answers through the pipeline; two in a
+  row disable Live until restart, and the log says so. A character's voice is
+  passed to Live only if Live was measured to accept it (`marin`, `cedar`,
+  `coral`, `verse`, `ash`, `sage`, `alloy`; `nova` was refused), otherwise
+  `marin`; `LIVE_VOICE` overrides. `/voice/live-probe` and Settings' *Test
+  Live access* open a session for a moment and close it (U324).
 
 ## Out of scope
 
@@ -210,11 +265,12 @@ stated on screen.
 - Tool calling and the agentic loop — see
   [019-skills-and-automation](../019-skills-and-automation/spec.md). Note that
   the realtime session path cannot call tools; that is why the pipeline exists.
+  GPT-Live can, by delegating to the same loop (U324).
 
 ## Known divergence from ADR-005
 
 ADR-005 describes a two-provider pluggable pipeline selected by
-`STT_PROVIDER` / `TTS_PROVIDER`. It does not describe the three paths, the
+`STT_PROVIDER` / `TTS_PROVIDER`. It does not describe the speech paths, the
 local wake word, the circuit breaker, or the language pinning. **This spec is
 the current truth**; the ADR is superseded in those respects and is amended in
 the same series as this backfill.
@@ -238,3 +294,4 @@ the same series as this backfill.
 | U260, U287, U288, U289, U291, U292 | Greeted and then deaf; language pinned in the pipeline, then per room, then in the session; the persona that deleted the rule; the stall sentence I handed him |
 | U321 | `gpt-live-1` measured and not pinned (ADR-011); the classifier and the Settings guard stop offering and accepting models that serve neither endpoint; the pipeline guarded against a realtime-only transcriber; `REALTIME_STT_MODEL` |
 | U322 | OpenAI SDK 2.33 → 3.13 (a major bump), declared by aura-brain itself, with a contract test for every resource AURA uses |
+| U324 | GPT-Live as an opt-in fourth engine (`live_session.py`): delegation to the orchestrator, silence gate, mic mute, idle close, meter, probe, measured voices; the dispatch finally follows the per-character engine (U203) |

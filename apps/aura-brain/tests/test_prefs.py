@@ -162,3 +162,10 @@ def test_the_voice_role_still_takes_real_voice_models(client, model) -> None:
     with an unexpected name is not refused — the probe is the ground truth."""
     c, _ = client
     assert c.post("/setup/prefs", json={"realtime_model": model}).status_code == 200
+
+
+def test_live_is_a_conversation_engine(client) -> None:
+    """U324: the fourth engine can be chosen where the other three are."""
+    c, _ = client
+    assert c.post("/setup/prefs", json={"voice_engine": "live"}).status_code == 200
+    assert c.get("/setup/prefs").json()["voice_engine"] == "live"
