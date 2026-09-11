@@ -1719,3 +1719,55 @@ alleen de kamer bewijst de akoestiek. Tot dan blijft Live opt-in en blijft de
 pipeline de standaard. Nog niet gedaan: de meter in Talk tonen voor Live
 (het eindpunt heeft hem; de view heeft geen mounttest om hem aan te hangen).
 
+### U325 — "hij blijft soms statisch staan, zeker wanneer iemand passeert"
+
+Gevraagd: waarom staat hij stil, en zou hij iemand die passeert niet moeten
+opmerken en volgen? Nagekeken in de code en tegen de draaiende robot (die op dat
+moment `tracking: true, face_visible: false` meldde — volgen aan, niemand
+gezien). Drie oorzaken, en ze versterken elkaar:
+
+1. **De app weet nooit wáár je staat.** De herkenning draait elke twee seconden
+   op een camerabeeld en berekent per gezicht het kader — maar gebruikte dat
+   alleen om op grootte te sorteren, en gooide de positie dan weg.
+   `PersonRecognized` draagt identiteit, geen coördinaten.
+2. **Niets in de brain kon de kop richten.** De enige beschikbare primitief was
+   `aim`, en die pauzeert follow-me met opzet (U161: de joystick mag niet tegen
+   de tracker vechten). Kijken naar iemand zou dus het volgen uitschakelen.
+   Gevolg: al het kijken lag bij de tracker van de daemon, en de brain — die
+   als enige weet dát er iemand staat — deed niets met de kop.
+3. **Kwijt is kwijt, tot de volgende zwaai.** Raakt de daemon een gezicht kwijt
+   (na ~2 s uit beeld), dan blijft de kop staan tot de idle-zwaai. Die liep op
+   een vaste klok van 25 s, en wordt overgeslagen tijdens praten en gebaren.
+   Iemand die door de kamer loopt is dan al lang weg.
+
+Wat er nu is:
+
+* **`gaze`** — een *duwtje* in plaats van een overname: relatief ten opzichte
+  van waar hij al kijkt, follow-me blijft aan, en hij weigert beleefd (mét
+  reden) wanneer bewegen tegen iemand zou vechten: follow-me uit (dan is de
+  kop van de operator, U162), de daemon heeft al een gezicht vast (die doet het
+  sneller dan wij), of er loopt een beweging. De daemon componeert ons
+  `goto_target` met zijn eigen gezichtsaim — precies wat de idle-zwaai al
+  aantoonde. `body_yaw=None`, anders zet elk duwtje de torso stiekem terug naar
+  het midden (U158).
+* **De positie die we al hadden** — dezelfde detectiepas die de embedding maakt,
+  geeft nu ook waar het gezicht in beeld staat (geen tweede pas: dat is een
+  tweede seconde Pi). De lus duwt hem naar de dichtstbijzijnde persoon, met een
+  dode zone, want ruis najagen leest als een tic in plaats van als aandacht.
+* **Een zwaai die de kamer volgt** — niets zolang hij iemand ziet; binnen
+  `IDLE_SCAN_LOST_S` (6 s) nadat hij iemand kwijtraakte; en terug naar de rustige
+  `IDLE_SCAN_S` (25 s) als er al `IDLE_SCAN_RECENT_S` (90 s) niemand was.
+
+Dit is bewust de **trage** tracker (één beeld per twee seconden). De daemon
+blijft de snelle en wint zodra hij een gezicht vast heeft; de onze verdient zijn
+plek precies wanneer die jou kwijt is — of dood is (U253).
+
+Oudere Pi: `/robot/gaze` bestaat daar niet. De lus vraagt het één keer, hoort
+404, zegt het in het log en vraagt het niet meer (constitutie X).
+
+Tests eerst rood: 11 op de robotkant (gaze bestond niet), 3 op de brainkant.
+Daarna robot-runtime 112 groen, aura-brain 603 groen, ruff schoon. **Nog niet
+in een echte kamer getest** — dat vraagt de robot: de versterking (`GAZE_GAIN`)
+en de aanname over het camerabeeld (`GAZE_FOV_YAW_RAD`) zijn beredeneerd, niet
+gemeten, en de robotkant vereist een flash van de Pi.
+

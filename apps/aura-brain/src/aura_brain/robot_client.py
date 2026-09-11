@@ -146,6 +146,14 @@ class RobotClient:
             payload["body_yaw"] = body_yaw
         return (await self._request("POST", "/robot/aim", payload)).json()
 
+    async def gaze(self, dyaw: float = 0.0, dpitch: float = 0.0) -> dict:
+        """U325: nudge the head toward something without switching follow-me
+        off — which is what `aim` does (U161), and why nothing above the
+        runtime could look at anybody. Offsets are -1..1 fractions of the
+        camera's view in the picture's own frame: +dyaw right, +dpitch down."""
+        return (await self._request(
+            "POST", "/robot/gaze", {"dyaw": dyaw, "dpitch": dpitch})).json()
+
     async def set_tracking(self, enabled: bool) -> dict:
         return (await self._request("POST", "/robot/tracking", {"enabled": enabled})).json()
 

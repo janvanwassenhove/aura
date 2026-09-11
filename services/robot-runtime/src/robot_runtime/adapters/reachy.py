@@ -113,6 +113,13 @@ class ReachyRobotAdapter(RobotAdapter):
         self._aec_active = False
         # U157: conversational body language while speaking + idle re-acquire.
         self._talk_task: asyncio.Task | None = None
+        # U325: where WE last pointed the head, in the operator frame, so a
+        # gaze nudge can be relative to it. It is only meaningful while the
+        # daemon's tracker has no face — when it has one, it owns the head and
+        # we stand off, so the two never fight over the same joint.
+        self._gaze_yaw = 0.0
+        self._gaze_pitch = 0.0
+        self._face_seen_at = 0.0     # monotonic; 0.0 = nobody yet this session
         self._idle_scan_task: asyncio.Task | None = None
 
     def last_capture_peak(self) -> float:
@@ -239,6 +246,73 @@ class ReachyRobotAdapter(RobotAdapter):
         async with self._motion_lock:
             await asyncio.to_thread(_go)
         return {"yaw": y, "pitch": p, "body_yaw": b, "tracking_paused": paused}
+
+    # U325: looking at someone is a NUDGE, not a takeover. `aim()` pauses
+    # follow-me by design (U161), so nothing above the runtime could point the
+    # head without switching the tracker off — which is why the brain, which
+    # recognises faces every two seconds, never moved the head at all. The idle
+    # sweep already showed the way out: the daemon composes our `goto_target`
+    # with its own face aim by tracking weight, so a small relative move
+    # co-exists with tracking instead of replacing it.
+    GAZE_GAIN = 0.7          # <1: approach the face rather than overshoot it
+    GAZE_FOV_YAW = 0.60      # rad, about half the camera's horizontal view
+    GAZE_FOV_PITCH = 0.40    # rad, about half the vertical
+
+    async def gaze(self, dyaw: float = 0.0, dpitch: float = 0.0,
+                   duration: float = 0.6) -> dict:
+        """Turn a little toward something, relative to where he is looking.
+
+        ``dyaw``/``dpitch`` are -1..1 offsets in the OPERATOR's frame — the
+        same one the console pad and `aim` use (U164): **+dyaw is toward the
+        RIGHT of the camera picture, +dpitch is DOWN**. They are fractions of
+        the camera's half-view, which is exactly what a face's offset inside
+        the frame means, so the caller can pass one straight through.
+
+        It declines, with a reason, whenever moving would fight someone:
+        follow-me off (the operator owns the head in Manual, U162), the daemon
+        tracker holding a face (it does this better and faster than we can), or
+        a motion already running. `moved: false` is not a failure.
+        """
+        import time
+
+        if self._mini is None:
+            raise RuntimeError("not connected")
+        if not self._tracking_on:
+            return {"moved": False, "reason": "follow-me is off"}
+        if self._motion_lock.locked():
+            return {"moved": False, "reason": "a motion is running"}
+        try:
+            if await asyncio.to_thread(self._face_visible):
+                self._face_seen_at = time.monotonic()
+                return {"moved": False, "reason": "the daemon tracker has the face"}
+        except Exception as exc:  # noqa: BLE001 — a status read must not block a move
+            logger.debug("could not ask whether a face is tracked: %s", exc)
+
+        def _clamp(v: float, lim: float) -> float:
+            return max(-lim, min(lim, v))
+
+        try:
+            gain = float(os.environ.get("GAZE_GAIN", self.GAZE_GAIN))
+        except ValueError:
+            gain = self.GAZE_GAIN
+        y = _clamp(self._gaze_yaw + float(dyaw) * self.GAZE_FOV_YAW * gain,
+                   self.AIM_YAW_MAX)
+        p = _clamp(self._gaze_pitch + float(dpitch) * self.GAZE_FOV_PITCH * gain,
+                   self.AIM_PITCH_MAX)
+        # Operator frame → SDK frame (U164): right and down are negative there.
+        pose = _rot("z", -y) @ _rot("x", -p)
+
+        def _go() -> None:
+            # body_yaw=None (U158): the goto_target default of 0.0 quietly
+            # recentres the torso, which would undo follow-me's body turn on
+            # every single nudge — away from the person he is turning toward.
+            self._mini.goto_target(head=pose, duration=max(0.05, duration),
+                                   body_yaw=None)
+
+        async with self._motion_lock:
+            await asyncio.to_thread(_go)
+        self._gaze_yaw, self._gaze_pitch = y, p
+        return {"moved": True, "reason": "", "yaw": y, "pitch": p}
 
     async def set_body_follow(self, enabled: bool) -> bool:
         """U37: turn the torso along with the face. The SDK's head tracking only
@@ -541,19 +615,46 @@ class ReachyRobotAdapter(RobotAdapter):
         interval = float(os.environ.get("IDLE_SCAN_S", "25"))
         if interval <= 0:
             return
+        # U325: the fixed clock is why he "just stands there when somebody walks
+        # past". The daemon drops a face a couple of seconds after it leaves the
+        # frame, and nothing looked again until the next tick — by which time a
+        # passer-by is long gone. So the cadence now follows the room: while a
+        # face is in view there is nothing to search for; once it is lost he
+        # looks again within IDLE_SCAN_LOST_S; and when nobody has been seen for
+        # IDLE_SCAN_RECENT_S he falls back to the calm IDLE_SCAN_S, because a
+        # robot sweeping the room every few seconds all evening is its own kind
+        # of broken.
+        lost_interval = float(os.environ.get("IDLE_SCAN_LOST_S", "6"))
+        recent_s = float(os.environ.get("IDLE_SCAN_RECENT_S", "90"))
+        tick = float(os.environ.get("IDLE_SCAN_TICK_S", "1.0"))
+        last_scan = time.monotonic()
         while self._mini is not None:
-            await asyncio.sleep(interval)
+            await asyncio.sleep(tick)
             mini = self._mini
             if mini is None:
                 break
             if not self._tracking_on:            # follow-me off, or asleep
                 continue
-            if time.monotonic() < self._appsrc_until + 2.0:
+            now = time.monotonic()
+            try:
+                if await asyncio.to_thread(self._face_visible):
+                    self._face_seen_at = now      # he is looking at someone
+                    continue
+            except Exception as exc:  # noqa: BLE001 — best-effort read
+                logger.debug("face-visible check failed: %s", exc)
+            if now < self._appsrc_until + 2.0:
                 continue                          # talking — don't scan mid-reply
             if self._motion_lock.locked():
                 continue                          # a gesture/speech is running
+            just_lost = (self._face_seen_at > 0.0
+                         and now - self._face_seen_at < recent_s)
+            if now - last_scan < (lost_interval if just_lost else interval):
+                continue
+            last_scan = now
             try:
                 async with self._motion_lock:
+                    hold = float(os.environ.get("IDLE_SCAN_HOLD_S", "0.6"))
+
                     def _scan() -> None:
                         # U158: wider sweep (±~40°) WITH holds — the detector
                         # needs a few steady frames at each heading to spot a
@@ -564,9 +665,14 @@ class ReachyRobotAdapter(RobotAdapter):
                             mini.goto_target(
                                 head=_rot("z", yaw * random.uniform(0.85, 1.15)),
                                 duration=1.4, body_yaw=None)
-                            time.sleep(0.6)  # hold: give detection a chance
+                            time.sleep(hold)  # hold: give detection a chance
 
                     await asyncio.to_thread(_scan)
+                # U325: the sweep ends centred, so the nudge integrator has to
+                # agree — otherwise the next gaze starts from a pose the head is
+                # not in, and jumps.
+                self._gaze_yaw = 0.0
+                self._gaze_pitch = 0.0
             except asyncio.CancelledError:
                 raise
             except Exception as exc:  # noqa: BLE001 — scan is best-effort

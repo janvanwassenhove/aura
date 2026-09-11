@@ -106,6 +106,49 @@ class InsightFaceEmbedder:
                 for f in sorted(faces, key=_area, reverse=True)]
 
 
+    def embed_all_located(
+        self, png_bytes: bytes,
+    ) -> list[tuple[list[float], tuple[float, float, float]]]:
+        """Every face, nearest first, WITH where it sits in the frame (U325).
+
+        The bounding box was computed on every frame and used only to sort by
+        size (`_area`), then thrown away — so the app knew who was in the room
+        and never knew where they were standing, and all looking had to be left
+        to the daemon's own tracker. The position comes from the same detection
+        pass as the embedding, because a second pass is a second second of Pi.
+
+        Offsets are -1..1 from the centre of the picture (+x right, +y down),
+        and the third number is the fraction of the frame the face covers —
+        how near they are.
+        """
+        import io
+
+        import numpy as np
+        from PIL import Image
+
+        if self._app is None:
+            return []
+        try:
+            img = np.asarray(Image.open(io.BytesIO(png_bytes)).convert("RGB"))[:, :, ::-1]
+            faces = self._app.get(img)
+        except Exception as exc:  # noqa: BLE001 - a frame must never kill the loop
+            logger.debug("located embed failed: %s", exc)
+            return []
+        height, width = float(img.shape[0]), float(img.shape[1])
+        half_w, half_h = max(1.0, width / 2), max(1.0, height / 2)
+        out: list[tuple[list[float], tuple[float, float, float]]] = []
+        for face in sorted(faces, key=_area, reverse=True):
+            x1, y1, x2, y2 = (float(v) for v in face.bbox[:4])
+            dx = ((x1 + x2) / 2 - half_w) / half_w
+            dy = ((y1 + y2) / 2 - half_h) / half_h
+            out.append((
+                [float(x) for x in face.normed_embedding],
+                (max(-1.0, min(1.0, dx)), max(-1.0, min(1.0, dy)),
+                 _area(face) / max(1.0, width * height)),
+            ))
+        return out
+
+
 def _area(face) -> float:  # noqa: ANN001 - insightface Face
     """Bounding-box area: how near the camera someone is standing."""
     return float((face.bbox[2] - face.bbox[0]) * (face.bbox[3] - face.bbox[1]))
@@ -262,6 +305,9 @@ class PerceptionLoop:
         self._last_gesture_at = float("-inf")
         self._task: asyncio.Task | None = None
         self._last_seen: str | None = None  # person_id | _ABSENT | None(=never)
+        # U325 / constitution X: an older Pi has no /robot/gaze. Ask once, hear
+        # 404, stop asking — and say so, rather than retrying every 2 s forever.
+        self._gaze_supported = True
 
     def set_matcher(self, matcher: Any, embedder: FaceEmbedder) -> None:
         """Upgrade a running loop with recognition (in-app secure enable)."""
@@ -307,12 +353,25 @@ class PerceptionLoop:
         # The embedder is injected, so it may predate embed_all (and every test
         # fake does). Fall back to the single-face call rather than requiring
         # everyone to grow a method they do not need.
-        if hasattr(self._embedder, "embed_all"):
+        located: list[tuple[list[float], tuple[float, float, float]]] = []
+        if hasattr(self._embedder, "embed_all_located"):
+            # U325: the same pass gives us the embedding AND where the face is.
+            located = await asyncio.to_thread(self._embedder.embed_all_located, frame)
+            embeddings = [emb for emb, _ in located]
+        elif hasattr(self._embedder, "embed_all"):
             embeddings = await asyncio.to_thread(self._embedder.embed_all, frame)
         else:
             one = await asyncio.to_thread(self._embedder.embed, frame)
             embeddings = [one] if one is not None else []
         embedding = embeddings[0] if embeddings else None
+
+        # U325: turn toward whoever is nearest — the same person recognition
+        # treats as the one he is talking to (U288). This is deliberately the
+        # SLOW tracker (one frame every couple of seconds); the daemon's own
+        # tracker is faster and overrules it on the robot side. It earns its
+        # keep exactly when that one has lost you, or has died (U253).
+        if located:
+            await self._look_at(located[0][1][0], located[0][1][1])
 
         if embedding is None:
             self._note_room([])
@@ -459,6 +518,37 @@ class PerceptionLoop:
             return None
         logger.info("new face enrolled as %s", person_id)
         return person_id
+
+    async def _look_at(self, dx: float, dy: float) -> None:
+        """Nudge the head toward a face this frame found (U325). Never raises.
+
+        Inside the deadzone he is already facing them, and chasing detection
+        noise from frame to frame reads as a twitch rather than as attention.
+        """
+        if os.environ.get("GAZE_FOLLOW", "true").lower() != "true":
+            return
+        if not self._gaze_supported:
+            return
+        nudge = getattr(self._robot, "gaze", None)
+        if nudge is None:
+            return
+        try:
+            dead = float(os.environ.get("GAZE_DEADZONE", "0.12"))
+        except ValueError:
+            dead = 0.12
+        if abs(dx) < dead and abs(dy) < dead:
+            return
+        try:
+            await nudge(dyaw=round(float(dx), 3), dpitch=round(float(dy), 3))
+        except Exception as exc:  # noqa: BLE001 — looking is never worth a crash
+            status = getattr(getattr(exc, "response", None), "status_code", None)
+            if status in (404, 501):
+                self._gaze_supported = False
+                logger.info(
+                    "this robot runtime cannot be asked to look (HTTP %s) — "
+                    "following stays with the daemon's own tracker", status)
+            else:
+                logger.debug("gaze nudge failed: %s", exc)
 
     async def _detect_gesture(self, frame: bytes) -> None:
         import time

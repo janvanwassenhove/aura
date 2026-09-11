@@ -40,6 +40,11 @@ class FakeRobotAdapter(RobotAdapter):
         self._volume = 0.8
         self._tracking = False
         self._body_follow = False
+        # U325: a gaze nudge is behaviour, not hardware, so the fake honours
+        # the same rules — CI would otherwise never exercise the route.
+        self._gaze_yaw = 0.0
+        self._gaze_pitch = 0.0
+        self._last_gaze: tuple[float, float] | None = None
 
     async def set_tracking(self, enabled: bool) -> bool:
         self._tracking = enabled
@@ -48,6 +53,20 @@ class FakeRobotAdapter(RobotAdapter):
     async def set_body_follow(self, enabled: bool) -> bool:
         self._body_follow = enabled
         return enabled
+
+    async def gaze(self, dyaw: float = 0.0, dpitch: float = 0.0,
+                   duration: float = 0.6) -> dict:
+        """U325: relative look-toward nudge, recorded rather than performed.
+
+        Follow-me is honoured here because "the operator owns the head in
+        Manual" is a rule of the product, not a property of the hardware."""
+        if not self._tracking:
+            return {"moved": False, "reason": "follow-me is off"}
+        self._gaze_yaw = max(-1.0, min(1.0, self._gaze_yaw + float(dyaw)))
+        self._gaze_pitch = max(-1.0, min(1.0, self._gaze_pitch + float(dpitch)))
+        self._last_gaze = (self._gaze_yaw, self._gaze_pitch)
+        return {"moved": True, "reason": "",
+                "yaw": self._gaze_yaw, "pitch": self._gaze_pitch}
 
     def stop_audio(self) -> bool:
         self._audio_stopped = True

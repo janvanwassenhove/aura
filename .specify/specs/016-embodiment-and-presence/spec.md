@@ -5,10 +5,7 @@ owner: "robot-runtime"
 priority: P1
 risk: Medium
 created: "2026-09-05"
-units: [U16, U36a, U36d, U36g, U37, U51, U99, U100, U101, U102, U111, U116,
-        U126, U127, U137, U138, U139, U147, U157, U158, U161, U162, U164,
-        U165, U175, U196, U212, U219, U237, U238, U252b, U252d, U253, U268,
-        U270, U286]
+units: [U16, U36a, U36d, U36g, U37, U51, U99, U100, U101, U102, U111, U116, U126, U127, U137, U138, U139, U147, U157, U158, U161, U162, U164, U165, U175, U196, U212, U219, U237, U238, U252b, U252d, U253, U268, U270, U286, U325]
 ---
 
 # Feature Specification: Embodiment and Presence
@@ -79,6 +76,15 @@ frame; the adapter reports a head pose moving towards it, and `tracking` stays
 5. **Given** the robot is speaking, **When** it speaks, **Then** it keeps
    following (U81) and adds conversational body language rather than freezing
    into a talking statue (U157).
+6. **Given** the daemon's tracker has no face but the camera frame does,
+   **When** the recogniser processes that frame, **Then** the brain nudges the
+   head toward the person it found — a second, slow tracker that earns its keep
+   exactly when the fast one has lost you or has died (U325, U253).
+7. **Given** somebody was in view and walks out of it, **When** the tracker
+   drops them, **Then** he looks again within seconds rather than waiting out
+   the empty-room sweep interval; and **Given** nobody has been seen for a long
+   while, **Then** the cadence relaxes again, because a robot sweeping the room
+   every few seconds all evening is its own kind of broken (U325).
 
 ### User Story 2 — He can be asleep, and stay asleep (Priority: P1)
 
@@ -191,6 +197,25 @@ rather than configuring a face, a voice and a motion style separately.
   no model call on the speech path.
 - **FR-007**: Every new brain→runtime call tolerates a 404 from an older Pi and
   reports the degradation.
+- **FR-008**: Pointing the head comes in two kinds, and they are not
+  interchangeable. `aim` is a takeover: it pauses follow-me on purpose, because
+  the console joystick may not be fought by the tracker (U161). `gaze` is a
+  **nudge**: relative to where he is already looking, it leaves follow-me on,
+  and it declines — saying which — when follow-me is off, when the daemon's
+  tracker holds a face, or when a motion is running. Two controllers never
+  drive the same joint at the same time, and the daemon's tracker wins whenever
+  it has a lock (U325).
+- **FR-009**: The face position comes from the recognition pass that already
+  decoded the frame — never a second detection — as an offset from the centre
+  of the picture, in the same operator frame as `aim` (+x right, +y down).
+  Nudges below a deadzone are not sent: chasing detection noise reads as a
+  twitch, not as attention. The nearest face is the one he turns to, the same
+  one recognition treats as the person he is talking to (U288, U325).
+- **FR-010**: The re-acquire sweep follows the room: nothing while a face is in
+  view, `IDLE_SCAN_LOST_S` after one was just lost, `IDLE_SCAN_S` once nobody
+  has been seen for `IDLE_SCAN_RECENT_S` (U325). The sweep leaves the head
+  centred and resets the nudge origin, so the next nudge starts from the pose
+  the head is actually in.
 
 ## Out of scope
 
@@ -214,4 +239,5 @@ rather than configuring a face, a voice and a motion style separately.
 | U252d, U268, U286 | Per-character move; the one-letter SVG bug that froze all ten faces; the overlay following the character choice |
 | U175, U212, U219, U196 | Camera: silent MJPEG stall, single-frame blips, shared frame decode, and a live view against an older robot |
 | U270 | Battery, in the three states it can actually be in |
+| U325 | `gaze`: looking at someone without taking follow-me away; the face position the recogniser already had; a sweep whose cadence follows the room |
 | U252b | The title bar belongs to the app; the hand on the camera |

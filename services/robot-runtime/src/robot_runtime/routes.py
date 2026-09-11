@@ -283,6 +283,36 @@ async def aim(body: dict) -> JSONResponse:
     return JSONResponse({"ok": True, **(result or {})})
 
 
+@router.post("/robot/gaze")
+async def gaze(body: dict) -> JSONResponse:
+    """U325: turn a little toward something WITHOUT taking follow-me away.
+
+    Unlike `/robot/aim`, which pauses tracking on purpose so the console
+    joystick is not fought by the daemon (U161), this is a relative nudge the
+    daemon's tracker still overrules. The brain uses it to look at a face it
+    found in a camera frame while follow-me stays on.
+    """
+    assert adapter is not None
+    _touch()
+    fn = getattr(adapter, "gaze", None)
+    if fn is None:
+        return JSONResponse({"error": "adapter cannot gaze"}, status_code=501)
+    body = body or {}
+
+    def _num(key: str) -> float:
+        try:
+            return max(-1.0, min(1.0, float(body.get(key, 0.0) or 0.0)))
+        except (TypeError, ValueError):
+            return 0.0
+
+    try:
+        result = await fn(dyaw=_num("dyaw"), dpitch=_num("dpitch"),
+                          duration=float(body.get("duration", 0.6) or 0.6))
+    except RuntimeError as exc:
+        return JSONResponse({"error": str(exc)}, status_code=409)
+    return JSONResponse({"ok": True, **(result or {})})
+
+
 @router.post("/robot/tracking")
 async def set_tracking(body: dict) -> JSONResponse:
     assert adapter is not None
