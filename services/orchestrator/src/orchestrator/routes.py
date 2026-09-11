@@ -232,6 +232,15 @@ async def patch_llm_config(body: LLMConfigUpdate) -> LLMConfigResponse:
 _NOT_A_CHAT_MODEL = (
     "embedding", "moderation", "tts", "whisper", "transcribe", "image",
     "dall-e", "sora", "codex", "guard", "rerank", "-edit", "similarity",
+    # U321: two families this test got wrong, both measured on the owner's key.
+    # `gpt-live-*` serves only OpenAI's Live API (v1/live/sessions): chat-
+    # completions answers "not a chat model", the Realtime API "not supported
+    # in realtime mode". Without this line it fell through to ["chat",
+    # "vision"] and Settings offered it as a Conversation model — the exact
+    # U202 failure, every turn 404ing into the echo fallback. ADR-011.
+    # `*-realtime-translate` connects to the Realtime API and never answers a
+    # conversation turn, so it is not a voice model either.
+    "gpt-live", "realtime-translate",
 )
 # Text-only: no image input, so they cannot drive screen control.
 _TEXT_ONLY = ("gpt-3.5", "-instruct", "o1-mini", "o1-preview", "davinci", "babbage")

@@ -22,6 +22,7 @@ loses the reason.
 | [008](ADR-008-knowledge-judgment-layer.md) | Personal knowledge and judgment layer | Accepted and implemented · amended 2026-09-05 |
 | [009](ADR-009-honest-state.md) | Never report what has not been verified | Accepted 2026-09-05 |
 | [010](ADR-010-desktop-app-is-the-delivery-unit.md) | The desktop app is the delivery unit | Accepted 2026-09-05 |
+| [011](ADR-011-gpt-live-is-a-fourth-path.md) | GPT-Live is a fourth speech path, not a model swap | Accepted 2026-09-11 — integration in progress |
 
 ## Reading order for someone new
 

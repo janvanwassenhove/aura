@@ -22,7 +22,8 @@ from aura_brain.realtime_session import _transcription_config
 
 @pytest.fixture(autouse=True)
 def _clean(monkeypatch):
-    for var in ("STT_LANGUAGE", "ASSISTANT_LANGUAGE", "LANGUAGE_FALLBACK", "LANG", "LC_ALL"):
+    for var in ("STT_LANGUAGE", "ASSISTANT_LANGUAGE", "LANGUAGE_FALLBACK", "LANG", "LC_ALL",
+                "STT_MODEL", "REALTIME_STT_MODEL"):
         monkeypatch.delenv(var, raising=False)
     monkeypatch.setattr("locale.getlocale", lambda *a: (None, None))
     from aura_brain import voice
@@ -61,3 +62,16 @@ def test_both_realtime_paths_and_the_pipeline_now_agree(monkeypatch) -> None:
 
     monkeypatch.setenv("ASSISTANT_LANGUAGE", "nl")
     assert _transcription_config()["language"] == _stt_language() == "nl"
+
+
+def test_the_session_can_have_its_own_transcriber(monkeypatch) -> None:
+    """U321: gpt-live-transcribe works inside the session but 404s on the
+    pipeline's endpoint, so the two cannot share one setting."""
+    monkeypatch.setenv("STT_MODEL", "gpt-4o-mini-transcribe")
+    monkeypatch.setenv("REALTIME_STT_MODEL", "gpt-live-transcribe")
+    assert _transcription_config()["model"] == "gpt-live-transcribe"
+
+
+def test_without_its_own_setting_the_session_follows_stt_model(monkeypatch) -> None:
+    monkeypatch.setenv("STT_MODEL", "gpt-4o-transcribe")
+    assert _transcription_config()["model"] == "gpt-4o-transcribe"

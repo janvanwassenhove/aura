@@ -1542,3 +1542,62 @@ Verder:
 Zes tests erbij. Eén bestaande test toetste het wóórd "Hide" in plaats van dat
 er een uitweg is — die toetst nu de uitweg, en overleeft de volgende hernoeming.
 Geverifieerd tegen een draaiende demostack.
+
+### U321 — "gebruik gpt-live1 voor natuurlijke stem" — gemeten, en niet omgezet
+
+Gevraagd als "voor voice gpt-live1 is now available, use this one for natural
+voice", en even later "kunnen we gpt-live-transcribe ook gebruiken? andere
+doeleinden misschien?".
+
+De voor de hand liggende uitvoering was één regel: `REALTIME_MODEL` op het
+nieuwe model zetten, zoals `gpt-realtime-2` er nu op staat. Eerst gemeten, op
+jouw eigen sleutel, met `gpt-realtime-2` als controle door hetzelfde script:
+
+* de naam is `gpt-live-1`, met streepje — `gpt-live1` bestaat niet;
+* de Realtime API **weigert** hem: "not supported in realtime mode", op alle
+  drie de sessievormen die AURA verstuurt. De controle slaagde op alle drie;
+* chat-completions weigert hem ook, Responses geeft een 500;
+* hij draait alleen op een aparte **Live API** (`v1/live/sessions`), met een
+  ander protocol — en de geïnstalleerde SDK kent die nog niet.
+
+Had ik de pin omgezet, dan viel elke realtime-beurt via de stroomonderbreker
+terug op de pipeline: je stem wordt stilletjes minder natuurlijk en niets op het
+scherm zegt waarom.
+
+**Wat er wél al misging.** Het model stond al in de modellijst van je account,
+en de classifier — een substring-test op `realtime` of `-audio` — deelde het in
+als chatmodel. Je Settings bóden `gpt-live-1` aan als Conversation-model: exact
+U202, elke beurt een 404 en een echo. De U202-bewaker ving het ook niet, want
+die hield een eigen, zwakkere kopie van de classifier bij. Nu gebruikt de
+bewaker dezelfde classifier als het aanbod, en `gpt-live-*` en
+`*-realtime-translate` (verbindt, antwoordt nooit) worden voor geen enkele rol
+meer aangeboden of aanvaard — met de reden erbij.
+
+**`gpt-live-transcribe`.** Eerst mat ik hem als trager (2,6 s tegen 0,9 s). Dat
+was een meetfout: ik gooide de hele clip in één keer in de buffer, en mat
+daarmee het enige waar een streaming-model niet voor gemaakt is. In echt
+tempo aangeleverd is de eindtijd **gelijk** (±1,1 s na het einde van de zin),
+en met `delay: minimal` komt het eerste woord na **0,5 s** — terwijl je nog
+praat — tegen 7,4 s vandaag. Alleen het live-model aanvaardt `keywords`.
+
+Maar: op het pipeline-endpoint geeft hij een 404. En pipeline én sessie lazen
+dezelfde `STT_MODEL` — wie na dit nieuws `STT_MODEL=gpt-live-transcribe` had
+ingevuld, maakte Richie doof op de pipeline, want `transcribe` slikt fouten. De
+pipeline negeert nu een realtime-only transcriber, en zegt dat één keer; de
+sessie kreeg een eigen `REALTIME_STT_MODEL`. Niet als standaard: de sessie
+publiceert vandaag alleen de volledige transcriptie, dus die 0,5 s zou worden
+weggegooid.
+
+**De beslissing staat in ADR-011.** GPT-Live is geen modelwissel maar een vierde
+spraakpad, en een interessant: delegatie van tools gaat naar ónze server, dus
+natuurlijke stem mét tools terwijl de approval gate de enige weg naar actie
+blijft. Op jouw vraag ("moet beschikbaar zijn, bekijk hoe we kunnen gaan
+gebruiken") wordt dat pad aangesloten — als eigen engine, niet als
+modelnaam. De vijf dingen die dit project al kent — full-duplex op een robot
+zonder echo-onderdrukking (U156), taal alleen via instructies (U287, U289),
+geen einde-van-antwoord-event, geen SDK-ondersteuning in onze versie,
+facturatie per minuut — zijn nu de acceptatiecriteria van die integratie in
+plaats van redenen om te wachten.
+
+Twaalf tests, eerst rood gezien tegen de oude code.
+

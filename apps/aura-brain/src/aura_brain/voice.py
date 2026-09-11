@@ -257,6 +257,33 @@ def _wrong_script(text: str, lang: str) -> bool:
     return latin / len(letters) < 0.5
 
 
+_PIPELINE_STT_DEFAULT = "gpt-4o-mini-transcribe"
+_warned_stt: set[str] = set()
+
+
+def _pipeline_stt_model() -> str:
+    """The model POST /v1/audio/transcriptions is asked to use.
+
+    U321: `gpt-live-transcribe` exists only on realtime transcription sessions —
+    measured, this endpoint answers 404 "Invalid URL" for it. STT_MODEL is ALSO
+    read by the realtime session, which can use it, so the natural way to try
+    the new model — set STT_MODEL — would make this path fail on every clip,
+    and `transcribe` swallows failures by design: Richie would just go deaf.
+    A realtime-only transcriber is ignored HERE, loudly, once. The session has
+    its own setting, REALTIME_STT_MODEL.
+    """
+    model = os.environ.get("STT_MODEL", "") or _PIPELINE_STT_DEFAULT
+    if "gpt-live" in model.lower():
+        if model not in _warned_stt:
+            _warned_stt.add(model)
+            logger.warning(
+                "STT_MODEL=%s only works inside realtime sessions; the pipeline "
+                "uses %s instead. Set REALTIME_STT_MODEL to give the session "
+                "its own transcriber.", model, _PIPELINE_STT_DEFAULT)
+        return _PIPELINE_STT_DEFAULT
+    return model
+
+
 async def transcribe(data: bytes, filename: str = "audio.webm") -> str | None:
     """Speech → text via OpenAI (U36e voice input). None when unavailable."""
     if not os.environ.get("OPENAI_API_KEY"):
@@ -268,7 +295,7 @@ async def transcribe(data: bytes, filename: str = "audio.webm") -> str | None:
 
         client = AsyncOpenAI()
         kwargs: dict = {
-            "model": os.environ.get("STT_MODEL", "gpt-4o-mini-transcribe"),
+            "model": _pipeline_stt_model(),
             "file": (filename, io.BytesIO(data)),
         }
         # U130: multilingual (NL/EN/FR/DE) + code-switching. Forcing a single

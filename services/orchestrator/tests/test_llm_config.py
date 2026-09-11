@@ -181,3 +181,20 @@ def test_model_kinds_separates_voice_chat_and_vision() -> None:
     for mid in ("text-embedding-3-large", "dall-e-3", "tts-1",
                 "gpt-4o-transcribe", "gpt-image-1", "omni-moderation-latest"):
         assert _model_kinds(mid) == [], mid
+
+
+def test_models_that_serve_neither_endpoint_are_never_offered() -> None:
+    """U321: `gpt-live-1` appeared in the account's model list and fell through
+    to ["chat", "vision"], so Settings offered it as a Conversation model.
+    Measured: chat-completions answers "not a chat model", the Realtime API
+    "not supported in realtime mode" — it serves only the Live API (ADR-011).
+    """
+    from orchestrator.routes import _model_kinds
+
+    assert _model_kinds("gpt-live-1") == []
+    assert _model_kinds("gpt-live-transcribe") == []
+    # Connects to the Realtime API and never answers a conversation turn.
+    assert _model_kinds("gpt-realtime-translate") == []
+    # The families that DO hold a voice conversation are untouched.
+    assert _model_kinds("gpt-realtime-2") == ["realtime"]
+    assert _model_kinds("gpt-realtime-2.1-mini") == ["realtime"]

@@ -177,3 +177,14 @@ fetching, handed to a model that hears audio directly, produced twenty
 repetitions of a scripted apology. `voice_context.build_instructions()` appends
 the language and delivery rule unconditionally, so a persona prompt cannot
 delete it (U291).
+
+---
+
+## Amendment — 2026-09-11: GPT-Live
+
+OpenAI's `gpt-live-1` is **not** a drop-in voice model for any of the three
+paths above: measured, the Realtime API refuses it ("not supported in realtime
+mode") and so does chat-completions. It serves a separate Live API with its
+own protocol, full duplex and tool delegation. Whether and when it becomes a
+fourth path is [ADR-011](ADR-011-gpt-live-is-a-fourth-path.md).
+

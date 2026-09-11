@@ -88,7 +88,15 @@ def _transcription_config() -> dict:
     """
     from aura_brain.voice import _stt_language  # noqa: PLC0415 — avoids a cycle
 
-    cfg: dict = {"model": os.environ.get("STT_MODEL", "gpt-4o-mini-transcribe")}
+    # U321: the session may use a different transcriber from the pipeline.
+    # gpt-live-transcribe works HERE but 404s on the pipeline's endpoint, so it
+    # needs its own setting rather than sharing STT_MODEL. Measured in real
+    # time: same final latency as gpt-4o-mini-transcribe, first words ~0.5 s
+    # into speech instead of after it — but this session only publishes the
+    # COMPLETED transcript, so today its gain is keyword hints, not speed.
+    cfg: dict = {"model": (os.environ.get("REALTIME_STT_MODEL")
+                           or os.environ.get("STT_MODEL")
+                           or "gpt-4o-mini-transcribe")}
     lang = _stt_language()
     if lang:
         cfg["language"] = lang

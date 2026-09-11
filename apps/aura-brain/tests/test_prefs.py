@@ -127,3 +127,38 @@ def test_a_normal_chat_model_still_saves(client) -> None:
     c, _ = client
     assert c.post("/setup/prefs", json={"chat_model": "gpt-4o-mini"}).status_code == 200
     assert os.environ["CHAT_MODEL"] == "gpt-4o-mini"
+
+
+# ------------------------------------------------------------------
+# U321: a model that serves NEITHER endpoint, refused in either role
+# ------------------------------------------------------------------
+
+@pytest.mark.parametrize("role", ["chat_model", "agent_model"])
+def test_a_live_voice_model_is_refused_for_a_text_role(client, role) -> None:
+    """The guard kept its own copy of the classifier — "realtime" or "-audio"
+    in the name — and `gpt-live-1` matches neither, so it was accepted as a
+    chat model: U202 again, through a different door."""
+    c, _ = client
+    resp = c.post("/setup/prefs", json={role: "gpt-live-1"})
+    assert resp.status_code == 422
+    assert "Live API" in resp.json()["error"], "and it says WHY, not just no"
+
+
+@pytest.mark.parametrize("model", ["gpt-live-1", "gpt-realtime-translate",
+                                   "gpt-4o-mini-transcribe"])
+def test_the_voice_role_refuses_models_that_cannot_hold_a_conversation(client, model) -> None:
+    """Measured on the owner's key: each of these connects or 404s but never
+    answers a voice turn. Accepting one would silently drop every realtime turn
+    to the pipeline — "natural voice" gone, and nothing on screen saying why."""
+    c, _ = client
+    resp = c.post("/setup/prefs", json={"realtime_model": model})
+    assert resp.status_code == 422
+    assert os.environ.get("REALTIME_MODEL", "") != model
+
+
+@pytest.mark.parametrize("model", ["gpt-realtime-2", "gpt-realtime-2.1-mini", ""])
+def test_the_voice_role_still_takes_real_voice_models(client, model) -> None:
+    """Empty means "automatic" and must keep working; a future realtime model
+    with an unexpected name is not refused — the probe is the ground truth."""
+    c, _ = client
+    assert c.post("/setup/prefs", json={"realtime_model": model}).status_code == 200

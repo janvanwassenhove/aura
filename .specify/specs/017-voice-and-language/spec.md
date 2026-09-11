@@ -5,12 +5,7 @@ owner: "aura-brain / conversation"
 priority: P1
 risk: High
 created: "2026-09-05"
-units: [U22, U36b, U36e, U36h, U45, U46, U47, U49, U54, U67, U73, U80, U81,
-        U82, U83, U84, U85, U86, U87, U88, U89, U91, U92, U96, U128, U129,
-        U130, U131, U132, U133, U134, U135, U140, U141, U142, U143, U144,
-        U145, U146, U148, U149, U150, U153, U154, U155, U156, U163, U203,
-        U209, U256, U257, U258, U260, U273, U275, U287, U288, U289, U291,
-        U292]
+units: [U22, U36b, U36e, U36h, U45, U46, U47, U49, U54, U67, U73, U80, U81, U82, U83, U84, U85, U86, U87, U88, U89, U91, U92, U96, U128, U129, U130, U131, U132, U133, U134, U135, U140, U141, U142, U143, U144, U145, U146, U148, U149, U150, U153, U154, U155, U156, U163, U203, U209, U256, U257, U258, U260, U273, U275, U287, U288, U289, U291, U292, U321]
 ---
 
 # Feature Specification: Voice and Language
@@ -186,6 +181,20 @@ stated on screen.
 - **FR-009**: Verification runs with the API keys **unset** — three tests
   silently depended on a key present in a developer shell and hid a red build
   for six hours (U283).
+- **FR-010**: A model is offered for a role only if it can fill it, and the
+  Settings guard uses the **same** classifier as the offer. `gpt-live-*` and
+  `*-realtime-translate` are offered for no role: measured, neither holds a
+  voice or chat turn on the endpoints AURA uses (U321, ADR-011). The guard
+  used to keep its own weaker copy of the classifier, which is how
+  `gpt-live-1` was accepted as a Conversation model.
+- **FR-011**: The pipeline never sends a realtime-only transcriber to
+  `/v1/audio/transcriptions` (404 for `gpt-live-transcribe`); it uses the
+  default and says so once. The realtime session has its own
+  `REALTIME_STT_MODEL`, falling back to `STT_MODEL` (U321).
+- **FR-012**: A new voice model is verified against **all three** session
+  shapes, with the current model as a control, before it is pinned or made a
+  default. `gpt-live-1` looked like the natural successor and serves none of
+  them.
 
 ## Out of scope
 
@@ -221,3 +230,4 @@ the same series as this backfill.
 | U49, U69, U256, U257, U275 | Wake-word hallucinations, lyrics becoming conversation, greeting in Quiet mode, "hallo" is not a language, and "hey Richie" heard perfectly but ignored |
 | U203, U209, U273 | Voice with tools by default; laptop speakers; naming which "Voice" setting wins |
 | U260, U287, U288, U289, U291, U292 | Greeted and then deaf; language pinned in the pipeline, then per room, then in the session; the persona that deleted the rule; the stall sentence I handed him |
+| U321 | `gpt-live-1` measured and not pinned (ADR-011); the classifier and the Settings guard stop offering and accepting models that serve neither endpoint; the pipeline guarded against a realtime-only transcriber; `REALTIME_STT_MODEL` |

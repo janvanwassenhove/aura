@@ -360,17 +360,62 @@ def _prefs_snapshot() -> dict:
     }
 
 
+def _model_kinds(model: str) -> list[str]:
+    """The roles a model id can fill — the orchestrator's classifier, reused.
+
+    U321: this module kept its OWN copy of the substring test ("realtime" or
+    "-audio"), and the copy is why `gpt-live-1` got through: a new model that
+    fits neither pattern was a chat model as far as this guard knew. One
+    classifier now decides both what Settings OFFERS and what it ACCEPTS.
+    """
+    from orchestrator.routes import _model_kinds as kinds  # noqa: PLC0415
+
+    return kinds(model or "")
+
+
 def _is_realtime_model(model: str) -> bool:
     """Is this a speech-to-speech endpoint rather than a chat model?
 
     U202: the owner picked `gpt-realtime-2.1` for the Conversation role because
     U191's UI offered only realtime models there — and every turn afterwards
     404'd ("not a chat model") into the echo fallback, so the assistant simply
-    repeated the question back. Same substring test the orchestrator uses to
-    classify models; no provider exposes this as a field.
+    repeated the question back.
     """
-    low = (model or "").lower()
-    return "realtime" in low or "-audio" in low
+    return "realtime" in _model_kinds(model)
+
+
+def _why_not(model: str) -> str:
+    """The specific reason, for the two families that look like voice models."""
+    low = model.lower()
+    if "gpt-live" in low:
+        return (" — it serves only OpenAI's Live API (v1/live/sessions), which "
+                "AURA does not use yet (ADR-011)")
+    if "translate" in low:
+        return " — it translates speech; it does not answer it"
+    return ""
+
+
+def _role_refusal(env_key: str, model: str) -> str | None:
+    """Why this model cannot fill this role, or None when it can.
+
+    Text roles need a chat model. The voice role cannot recognise every future
+    realtime model by its name, so it only refuses the ones KNOWN not to hold a
+    conversation (live, translate, transcribe, tts, …); "Test realtime access"
+    stays the ground truth for everything else.
+    """
+    kinds = _model_kinds(model)
+    if env_key in ("CHAT_MODEL", "AGENT_MODEL"):
+        if "realtime" in kinds:
+            return (f"{model!r} is a speech-to-speech model. Use it under "
+                    f"'Voice'; this role goes through chat-completions.")
+        if not kinds:
+            return (f"{model!r} is not a chat model{_why_not(model)}. This role "
+                    f"goes through chat-completions.")
+    if env_key == "REALTIME_MODEL" and not kinds:
+        return (f"{model!r} cannot hold a voice conversation{_why_not(model)}. "
+                f"Pick a gpt-realtime model, or press 'Test realtime access' "
+                f"to find one this account serves.")
+    return None
 
 
 @router.get("/prefs")
@@ -465,12 +510,11 @@ async def set_prefs(body: dict) -> JSONResponse:
         val = str(val).strip()
         # U202: a realtime endpoint cannot serve chat-completions. Accepting one
         # here breaks EVERY turn — typed included — and the only visible symptom
-        # was the assistant parroting the question back.
-        if env_key in ("CHAT_MODEL", "AGENT_MODEL") and _is_realtime_model(val):
-            return JSONResponse(
-                {"error": f"{val!r} is a speech-to-speech model. Use it under "
-                          f"'Voice'; this role goes through chat-completions."},
-                status_code=422)
+        # was the assistant parroting the question back. U321: the same for a
+        # model that serves neither endpoint (gpt-live-1), in either direction.
+        refusal = _role_refusal(env_key, val) if val else None
+        if refusal:
+            return JSONResponse({"error": refusal}, status_code=422)
         updates[env_key] = val
     mic_sensitivity = (body or {}).get("mic_sensitivity")
     if mic_sensitivity is not None:
