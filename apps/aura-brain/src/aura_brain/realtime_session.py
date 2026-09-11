@@ -122,6 +122,12 @@ class RealtimeSession:
         self._robot = robot
         self._bus = bus
         self._session_id = session_id
+        # U326: the body's half of the conversation — acknowledge while they
+        # talk, move with what he answers. This engine commanded no motion at
+        # all, and it is the one with no wake nod and no thinking pause either.
+        from aura_brain.body_language import ConversationBody
+
+        self._body = ConversationBody(robot, session_id)
         self._instructions = instructions
         self._voice = voice
         self._factory = conn_factory or _default_conn_factory
@@ -381,8 +387,12 @@ class RealtimeSession:
                 elif etype in ("response.output_audio_transcript.delta",
                                "response.audio_transcript.delta"):
                     reply_parts.append(getattr(event, "delta", "") or "")
+                    # U326: he is answering — move with it. Rate-limited inside,
+                    # so the flood of deltas becomes about one gesture a reply.
+                    await self._body.replying("".join(reply_parts))
                 elif etype == "input_audio_buffer.speech_started":
                     self._last_activity = time.monotonic()
+                    self._body.start_listening()   # U326: someone is talking
                     # U156: user starts talking while Richie is still playing →
                     # true barge-in (only reachable with AEC full duplex; in
                     # half-duplex the gated mic can't trigger this mid-reply).
@@ -400,6 +410,7 @@ class RealtimeSession:
                             pass
                 elif etype == "input_audio_buffer.speech_stopped":
                     self._last_activity = time.monotonic()
+                    self._body.stop_listening()    # U326: and they stopped
                 elif etype in ("conversation.item.input_audio_transcription.completed",
                                "conversation.item.audio_transcription.completed"):
                     text = (getattr(event, "transcript", "") or "").strip()
@@ -432,6 +443,7 @@ class RealtimeSession:
                     # conversation loop; real failures (auth, model) should.
                     raise RuntimeError(f"realtime session error: {err}")
         finally:
+            self._body.stop_listening()   # U326: never nod at an empty room
             await play_q.put(None)  # drain remaining segments, then stop
             try:
                 await asyncio.wait_for(consumer, timeout=30.0)

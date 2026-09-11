@@ -1771,3 +1771,55 @@ in een echte kamer getest** — dat vraagt de robot: de versterking (`GAZE_GAIN`
 en de aanname over het camerabeeld (`GAZE_FOV_YAW_RAD`) zijn beredeneerd, niet
 gemeten, en de robotkant vereist een flash van de Pi.
 
+### U326 — meeleven in het gesprek: als jij praat, en als hij praat
+
+Gevraagd na het bewegingsrapport: hij moet meeleven terwijl er gepraat wordt —
+in beide richtingen. Uit datzelfde rapport kwamen de twee gaten:
+
+* **Terwijl jij praat** stond hij volkomen stil. De knik bij zijn naam (U275) en
+  de denkhouding (U147) vallen allebei *rond* een beurt, nooit erin — en in een
+  realtime- of GPT-Live-gesprek is er geen wekwoord en geen denkpauze, dus daar
+  gebeurde helemaal niets.
+* **Terwijl hij praat** stuurden de streamende paden geen enkele beweging aan.
+  Het wiegen van de kop is de SDK die op audioniveaus reageert (U157); dat weet
+  niets van wat hij zegt. En op het pad dat wél een gebaar maakt, werd dat
+  gebaar *afgewacht* vóór de synthese begon — dus elk antwoord was: bewegen,
+  stilte, dan pas stem.
+
+`body_language.py` doet nu beide, voor elke engine:
+
+* **`heard()`** — een klein "ga door" terwijl iemand tegen hem praat, met een
+  pauze ertussen, want transcriptiedeeltjes komen meerdere keren per seconde
+  binnen en een cue per deeltje is een tic. De realtime-sessie krijgt alleen
+  begin en einde van een beurt, dus die blijft knikken zolang jij aan het woord
+  bent en stopt als je stopt; GPT-Live krijgt een stroom deeltjes en gebruikt
+  de pauzeteller.
+* **`replying(tekst)`** — bewegen met wat hij zegt, via dezelfde
+  trefwoordheuristiek als het getypte pad (groet → zwaai, vraag → kantelen,
+  spijt → kantelen, enthousiasme → gebaar, anders knikken), ongeveer één gebaar
+  per antwoord.
+* **Alles blijft binnen de gebaren die het volgen intact laten**, anders kijkt
+  hij van je wég om een gebaar over jou te maken. En niets wordt afgewacht op
+  het spraakpad.
+* **Het antwoordgebaar op het getypte pad wordt nu gestárt in plaats van
+  afgewacht**, zodat het over de TTS-wachttijd heen valt in plaats van erbovenop.
+
+**Eerlijk over wat niet kan:** het pipeline-pad neemt vaste vensters op en meet
+pas achteraf of er spraak in zat. Er ís daar geen signaal midden in jouw zin,
+dus daar blijft het bij de wekknik en de denkhouding. Dat staat nu ook zo in de
+spec, zodat de afwezigheid een beslissing is en geen vergetelheid. (Een echte
+backchannel daar vraagt streaming-VAD op het pipeline-pad — een eigen unit.)
+
+Onderweg: mijn eerste patch landde op de verkeerde `listen()`-aanroep — die
+regel komt twee keer voor — en brak de inspringing van de hoofdlus. Gezien
+doordat zes testbestanden niet meer te importeren waren; teruggedraaid en op de
+juiste plek beoordeeld (en daar dus bewust niet gezet).
+
+Tests eerst rood: de helper (module bestond niet) en drie van de vier
+bedradingstests tegen de oude sessiecode — de vierde slaagde vanzelf, want er
+knikte sowieso niets. Daarna aura-brain 620 groen.
+
+**Nog niet in een echte kamer getest**: of een knik tijdens jouw zin de
+microfoon stoort, is de reden dat de bewegingen klein zijn (U147 koos de
+luisterleun precies daarom), maar gemeten is het niet.
+

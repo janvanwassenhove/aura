@@ -180,6 +180,11 @@ class LiveSession:
         self._robot = robot
         self._bus = bus
         self._session_id = session_id
+        # U326: Live is full duplex and has no wake word, so without this he
+        # listens to a whole sentence without moving a millimetre.
+        from aura_brain.body_language import ConversationBody
+
+        self._body = ConversationBody(robot, session_id)
         self._instructions = instructions
         self._voice = voice
         self._factory = conn_factory or _default_factory
@@ -469,9 +474,13 @@ class LiveSession:
                     # Silence while he is listening is not audio anybody hears.
                 elif etype == "session.output_transcript.delta":
                     self._reply_parts.append(ev.get("delta") or "")
+                    # U326: move with what he is saying (rate-limited inside).
+                    await self._body.replying("".join(self._reply_parts))
                 elif etype == "session.input_transcript.delta":
                     self._user_parts.append(ev.get("delta") or "")
                     self._last_activity = time.monotonic()
+                    # U326: deltas arrive while they speak — acknowledge, paced.
+                    await self._body.heard()
                 elif etype == "session.delegation.created":
                     delegation = ev.get("delegation") or {}
                     task = asyncio.ensure_future(

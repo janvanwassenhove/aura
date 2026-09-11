@@ -451,9 +451,13 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
                 gesture = mood_id
         try:
             if gesture is not None:
-                await _robot.execute_motion(MotionCommand(
-                    motion_id=gesture, speed=1.0, amplitude=amplitude, direction=None,
-                ))
+                # U326: start it and go straight on to synthesis. Awaiting the
+                # gesture here meant every reply was a move, then a silence,
+                # then a voice — the gesture's whole duration was added to the
+                # wait. Now it overlaps the TTS round-trip instead.
+                from aura_brain.body_language import start_motion
+
+                start_motion(_robot, gesture, amplitude)
             # U54: streamed speech — first sentence starts playing while the
             # rest is still being synthesized (SPEAK_STREAMING=false → old path).
             # U65: the voice follows the global pref, with per-persona override.

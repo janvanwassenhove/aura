@@ -5,7 +5,7 @@ owner: "robot-runtime"
 priority: P1
 risk: Medium
 created: "2026-09-05"
-units: [U16, U36a, U36d, U36g, U37, U51, U99, U100, U101, U102, U111, U116, U126, U127, U137, U138, U139, U147, U157, U158, U161, U162, U164, U165, U175, U196, U212, U219, U237, U238, U252b, U252d, U253, U268, U270, U286, U325]
+units: [U16, U36a, U36d, U36g, U37, U51, U99, U100, U101, U102, U111, U116, U126, U127, U137, U138, U139, U147, U157, U158, U161, U162, U164, U165, U175, U196, U212, U219, U237, U238, U252b, U252d, U253, U268, U270, U286, U325, U326]
 ---
 
 # Feature Specification: Embodiment and Presence
@@ -178,6 +178,32 @@ rather than configuring a face, a voice and a motion style separately.
    **Then** the surrounding sequence still completes and the degradation is
    reported (U196, U238).
 
+### User Story 7 — He is in the conversation, not beside it (Priority: P2)
+
+As someone talking to him, I want him to react while I am speaking and to move
+while he is speaking, so that a conversation looks like a conversation.
+
+**Acceptance Scenarios**:
+
+1. **Given** a streaming engine (realtime session or GPT-Live) and somebody
+   talking to him, **When** their speech is detected, **Then** he acknowledges
+   with a small, paced cue for as long as they keep talking, and stops when
+   they stop (U326).
+2. **Given** he is answering, **When** his reply comes back as a stream,
+   **Then** he moves with what he is saying — the same keyword heuristic the
+   typed path uses — about once per reply, never once per transcript delta
+   (U326). Before this, the streamed paths commanded **no** motion at all: the
+   head sway during speech is the SDK reacting to audio levels and knows
+   nothing about the words (U157).
+3. **Given** any conversational cue, **When** it plays, **Then** it is one of
+   the motions that keep follow-me alive, and it is never awaited on the speech
+   path — a gesture that arrives after the sentence is worse than none (U326).
+4. **Given** the pipeline path, **When** somebody speaks, **Then** the
+   acknowledgement stays the wake nod (U275) and the thinking pose (U147). It
+   records fixed windows and only measures afterwards whether they contained
+   speech, so there is no mid-sentence signal to answer — an absence by
+   construction, recorded here so it is not mistaken for an oversight (U326).
+
 ## Functional Requirements
 
 - **FR-001**: All robot interaction goes through `RobotAdapter`
@@ -211,6 +237,13 @@ rather than configuring a face, a voice and a motion style separately.
   Nudges below a deadzone are not sent: chasing detection noise reads as a
   twitch, not as attention. The nearest face is the one he turns to, the same
   one recognition treats as the person he is talking to (U288, U325).
+- **FR-011**: Conversational body language is rate-limited, tracking-preserving
+  and never awaited. `BACKCHANNEL_MIN_S` bounds how often he acknowledges a
+  speaker; `TALK_GESTURE_MIN_S` bounds how often he gestures inside one reply;
+  both draw only from the runtime's follow-gesture set, so no cue costs eye
+  contact. The reply gesture on the typed path is **started**, not awaited: it
+  used to be awaited before synthesis even began, which added its whole
+  duration to every answer — a move, a silence, then a voice (U326).
 - **FR-010**: The re-acquire sweep follows the room: nothing while a face is in
   view, `IDLE_SCAN_LOST_S` after one was just lost, `IDLE_SCAN_S` once nobody
   has been seen for `IDLE_SCAN_RECENT_S` (U325). The sweep leaves the head
@@ -239,5 +272,6 @@ rather than configuring a face, a voice and a motion style separately.
 | U252d, U268, U286 | Per-character move; the one-letter SVG bug that froze all ten faces; the overlay following the character choice |
 | U175, U212, U219, U196 | Camera: silent MJPEG stall, single-frame blips, shared frame decode, and a live view against an older robot |
 | U270 | Battery, in the three states it can actually be in |
+| U326 | Conversational body language both ways: acknowledging while someone speaks, moving with what he says, and a reply gesture that no longer delays the reply |
 | U325 | `gaze`: looking at someone without taking follow-me away; the face position the recogniser already had; a sweep whose cadence follows the room |
 | U252b | The title bar belongs to the app; the hand on the camera |
