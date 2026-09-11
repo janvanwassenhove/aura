@@ -29,7 +29,7 @@ control, so a failure could be attributed to the model and not to the test.
 | Chat Completions? | **No.** `This is not a chat model.` |
 | Responses? | 500. |
 | What does it serve? | Only OpenAI's dedicated **Live API**, `v1/live/sessions` (per OpenAI's model page). |
-| Does the installed SDK know it? | **No.** `openai` 2.33.0 has `.realtime`, no `.live`. |
+| Does the installed SDK know it? | **No.** `openai` 2.33.0 has `.realtime`, no `.live`. *(U322: 3.13 does, and AURA now runs it.)* |
 
 So pinning it would not have given a more natural voice. It would have failed
 every realtime turn, and the circuit breaker would have dropped each one to the
@@ -101,7 +101,8 @@ each is a requirement on the integration, not a reason to wait:
    language "voor eens en altijd"; this would reopen it.
 3. **No end-of-response event.** Barge-in, the echo guard and the seed mute
    (U148, U163) key off response completion today and would need rework.
-4. **The SDK does not have it.** A raw WebSocket client, or an SDK upgrade — and
+4. **The SDK does not have it.** *(Resolved in U322: openai 3.13, declared by
+   aura-brain directly, all seven suites green on it.)* A raw WebSocket client, or an SDK upgrade — and
    `openai` is not declared in `aura-brain`'s own `pyproject.toml`, which is the
    `uv sync` pruning trap that has already cost four units.
 5. **Per-minute billing** makes the session lifecycle a cost control, not just

@@ -1601,3 +1601,25 @@ plaats van redenen om te wachten.
 
 Twaalf tests, eerst rood gezien tegen de oude code.
 
+### U322 — de OpenAI-SDK naar 3.13, een majorsprong, eerst bewezen
+
+GPT-Live bestaat alleen op de Live API, en de SDK waarop AURA draaide — 2.33 —
+had daar geen client voor: `AsyncOpenAI().live` bestond niet. De eerste versie
+die het wél heeft is 3.13. Dat is een majorsprong, dus eerst bewezen vóór hij in
+de lock ging, in een overlay zonder de lockfile aan te raken:
+
+* alle zeven pakketten slagen erop (aura-brain, orchestrator,
+  conversation-runtime, connector-, identity- en memory-service, robot-runtime);
+* AURA's drie realtime-sessievormen werken er echt op, tegen `gpt-realtime-2`;
+* een echte chat-, TTS- en transcriptie-aanroep ook.
+
+Twee dingen naast de versie:
+
+* **`aura-brain` declareert `openai` nu zelf.** Hij importeert het op vijf
+  plekken maar kreeg het alleen via de orchestrator binnen — precies de vorm
+  van de `uv sync`-snoeival die al vier units heeft gekost.
+* **Een contracttest** pint wat AURA van de SDK gebruikt: de Live-client die
+  U323 nodig heeft, én alles wat de andere paden en de orchestrator al
+  aanroepen, zodat een volgende majorsprong niet stil een resource weghaalt.
+  Rood gezien op 2.33 (3 van de 4), groen op 3.13.
+
