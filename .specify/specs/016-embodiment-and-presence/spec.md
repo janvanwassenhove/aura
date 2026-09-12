@@ -5,7 +5,7 @@ owner: "robot-runtime"
 priority: P1
 risk: Medium
 created: "2026-09-05"
-units: [U16, U36a, U36d, U36g, U37, U51, U99, U100, U101, U102, U111, U116, U126, U127, U137, U138, U139, U147, U157, U158, U161, U162, U164, U165, U175, U196, U212, U219, U237, U238, U252b, U252d, U253, U268, U270, U286, U325, U326]
+units: [U16, U36a, U36d, U36g, U37, U51, U99, U100, U101, U102, U111, U116, U126, U127, U137, U138, U139, U147, U157, U158, U161, U162, U164, U165, U175, U196, U212, U219, U237, U238, U252b, U252d, U253, U268, U270, U286, U325, U326, U328]
 ---
 
 # Feature Specification: Embodiment and Presence
@@ -198,6 +198,15 @@ while he is speaking, so that a conversation looks like a conversation.
 3. **Given** any conversational cue, **When** it plays, **Then** it is one of
    the motions that keep follow-me alive, and it is never awaited on the speech
    path — a gesture that arrives after the sentence is worse than none (U326).
+5. **Given** a reaction inside somebody else's sentence, **When** it plays,
+   **Then** it is carried by the **antennae** wherever it can be: they cost no
+   eye contact, cannot fight the face tracker, and put no motor noise from the
+   head platform next to the microphone that is hearing that sentence (U147's
+   reason, U328). When head and antennae move together they do so in **one**
+   command — two would serialise on the motion lock and read as two events.
+6. **Given** the tone of a reply, **When** the body expresses it, **Then** the
+   head gesture and the antenna cue read the **same** classification, so the
+   two cannot drift into disagreeing about the same sentence (U328).
 4. **Given** the pipeline path, **When** somebody speaks, **Then** the
    acknowledgement stays the wake nod (U275) and the thinking pose (U147). It
    records fixed windows and only measures afterwards whether they contained
@@ -237,6 +246,12 @@ while he is speaking, so that a conversation looks like a conversation.
   Nudges below a deadzone are not sent: chasing detection noise reads as a
   twitch, not as attention. The nearest face is the one he turns to, the same
   one recognition treats as the person he is talking to (U288, U325).
+- **FR-012**: The antennae are a first-class channel, not decoration:
+  `perk`, `flick`, `droop` and `alert` are antenna-only; `acknowledge` moves
+  head and antennae in a single command and is deliberately smaller than a
+  deliberate `nod`, because it lands inside someone else's sentence. A reply's
+  tone is classified once (`embodiment.tone_for`) and both channels read it
+  (U328).
 - **FR-011**: Conversational body language is rate-limited, tracking-preserving
   and never awaited. `BACKCHANNEL_MIN_S` bounds how often he acknowledges a
   speaker; `TALK_GESTURE_MIN_S` bounds how often he gestures inside one reply;
@@ -272,6 +287,7 @@ while he is speaking, so that a conversation looks like a conversation.
 | U252d, U268, U286 | Per-character move; the one-letter SVG bug that froze all ten faces; the overlay following the character choice |
 | U175, U212, U219, U196 | Camera: silent MJPEG stall, single-frame blips, shared frame decode, and a live view against an older robot |
 | U270 | Battery, in the three states it can actually be in |
+| U328 | Antenna reactions: an antenna-led vocabulary, head-and-antennae in one command, and one tone classification feeding both |
 | U326 | Conversational body language both ways: acknowledging while someone speaks, moving with what he says, and a reply gesture that no longer delays the reply |
 | U325 | `gaze`: looking at someone without taking follow-me away; the face position the recogniser already had; a sweep whose cadence follows the room |
 | U252b | The title bar belongs to the app; the hand on the camera |

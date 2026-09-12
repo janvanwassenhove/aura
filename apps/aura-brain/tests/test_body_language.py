@@ -178,3 +178,58 @@ async def test_a_robot_without_motion_at_all_is_fine() -> None:
         pass
 
     assert await ConversationBody(Mute()).heard() is False
+
+
+# ── U328: the antennae carry the reaction too ──────────────────────────────
+
+async def test_he_listens_with_his_antennae_not_only_his_head() -> None:
+    """Antenna cues cost no eye contact and put no motor noise on the head
+    while it is hearing a sentence — so they lead the rotation."""
+    from aura_brain.body_language import ANTENNA_CUES
+
+    robot = _Robot()
+    body = ConversationBody(robot)
+    os.environ["BACKCHANNEL_MIN_S"] = "0"
+    try:
+        for _ in range(4):
+            await body.heard()
+    finally:
+        del os.environ["BACKCHANNEL_MIN_S"]
+    used = _ids(robot)
+    assert len(used) == 4
+    assert any(m in ANTENNA_CUES for m in used), used
+    assert all(m in KEEPS_TRACKING for m in used), used
+
+
+async def test_the_tone_of_the_reply_reaches_the_antennae() -> None:
+    """Regret droops, a greeting waves, everything else is the head-and-antenna
+    acknowledgement — one classification, shared with the typed path."""
+    cases = {
+        "Sorry, dat lukt niet vandaag.": "droop",
+        "Hallo Jan, goedemorgen!": "wave",
+        "Ik kijk het even na.": "acknowledge",
+    }
+    os.environ["TALK_GESTURE_MIN_S"] = "0"
+    try:
+        for text, expected in cases.items():
+            robot = _Robot()
+            await ConversationBody(robot).replying(text)
+            assert _ids(robot) == [expected], (text, _ids(robot))
+    finally:
+        del os.environ["TALK_GESTURE_MIN_S"]
+
+
+def test_one_classification_for_both_paths() -> None:
+    """`gesture_for` keeps its answers (the typed path is unchanged); the
+    antenna mapping reads the same tone, so the two can never drift."""
+    from aura_brain.embodiment import gesture_for, tone_for
+
+    assert tone_for("Hallo!") == "greeting"
+    assert tone_for("Geweldig gedaan!") == "excited"
+    assert tone_for("Sorry, dat lukt niet.") == "sad"
+    assert tone_for("Klopt dat?") == "question"
+    assert tone_for("Ik kijk het na.") == "plain"
+    # unchanged behaviour for everything that already used it
+    assert gesture_for("Hallo!") == "wave"
+    assert gesture_for("Klopt dat?") == "tilt"
+    assert gesture_for("Ik kijk het na.") == "nod"

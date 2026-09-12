@@ -31,7 +31,7 @@ import os
 import time
 from typing import Any
 
-from aura_brain.embodiment import gesture_for
+from aura_brain.embodiment import tone_for
 
 logger = logging.getLogger(__name__)
 
@@ -40,12 +40,23 @@ KEEPS_TRACKING = frozenset({
     "nod", "tilt", "shake", "gesture", "wave",
     "mood_happy", "mood_excited", "mood_apologetic", "mood_curious",
     "mood_attentive", "listening", "thinking",
+    # U328: the antenna reactions.
+    "acknowledge", "perk", "flick", "droop", "alert",
 })
 
-#: What "I am listening" looks like. Both are deliberately gentle: a big move
-#: puts motor noise next to the microphone in the middle of the sentence it is
-#: supposed to be hearing (U147 chose the lean for exactly this reason).
-LISTEN_MOTIONS = ("listening", "nod")
+#: Cues carried by the antennae alone (U328). They cost no eye contact, cannot
+#: fight the face tracker, and — unlike anything that moves the head — put no
+#: motor noise next to the microphone in the middle of the sentence he is
+#: listening to. That is why they lead the rotation below rather than decorate
+#: it.
+ANTENNA_CUES = frozenset({"perk", "flick", "droop", "alert", "wave"})
+
+#: What "I am listening" looks like, in rotation — antennae first, because a
+#: reaction that moves the head is the one that can cost the sentence it is
+#: reacting to. `acknowledge` moves both together (U328); `listening` is U147's
+#: lean, kept because a small lean toward the speaker is worth its cost now and
+#: then.
+LISTEN_MOTIONS = ("perk", "acknowledge", "flick", "listening")
 
 
 def _f(name: str, default: float) -> float:
@@ -147,6 +158,18 @@ class ConversationBody:
 
     # -- while he is talking --------------------------------------------
 
+    #: How a reply's tone reaches the body. Regret droops the antennae rather
+    #: than tilting the head at someone; everything ordinary is the small
+    #: head-and-antenna acknowledgement instead of a bare nod, which is what
+    #: "in combination with the antennae" asks for.
+    _TONE_MOTION = {
+        "greeting": "wave",        # antennae, already
+        "excited": "gesture",      # head sway WITH antennae
+        "sad": "droop",            # antennae back — sympathy without a big move
+        "question": "tilt",
+        "plain": "acknowledge",    # head and antennae, one command
+    }
+
     async def replying(self, text: str = "", amplitude: float = 0.45) -> bool:
         """Move with what he is saying: the same keyword heuristic the typed
         path uses (U36), rate-limited to about one gesture per reply."""
@@ -155,9 +178,9 @@ class ConversationBody:
         now = time.monotonic()
         if now - self._last_talk < _f("TALK_GESTURE_MIN_S", 6.0):
             return False
-        motion = gesture_for(text or "")
+        motion = self._TONE_MOTION.get(tone_for(text or ""), "acknowledge")
         if motion not in KEEPS_TRACKING:
-            motion = "nod"
+            motion = "acknowledge"
         self._last_talk = now
         return await self._move(motion, amplitude)
 

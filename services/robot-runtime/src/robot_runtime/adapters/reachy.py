@@ -1327,6 +1327,10 @@ class ReachyRobotAdapter(RobotAdapter):
         "nod", "tilt", "shake", "gesture", "wave",
         "mood_happy", "mood_excited", "mood_apologetic", "mood_curious", "mood_attentive",
         "listening", "thinking",  # U147: keep eyes on the speaker while listening
+        # U328: the antenna reactions. A cue that makes him look away from the
+        # person he is reacting to is not a reaction — and these barely move the
+        # head anyway, so pausing the tracker for them would be pure loss.
+        "acknowledge", "perk", "flick", "droop", "alert",
     })
 
     def _run_motion_tracked(self, command: MotionCommand) -> None:
@@ -1429,6 +1433,35 @@ class ReachyRobotAdapter(RobotAdapter):
             go(head=_rot("z", angle), antennas=[amp, amp])
             go(head=_rot("z", -angle), antennas=[-amp, -amp])
             go(head=_NEUTRAL, antennas=[0.0, 0.0])
+        elif motion == "acknowledge":  # U328: "mm-hm" — head AND antennae, one command
+            # Deliberately smaller than `nod`: this lands INSIDE the other
+            # person's sentence, and a full nod there reads as an interruption.
+            # Both in the same goto_target, because two commands would serialise
+            # on the motion lock and arrive as two separate events.
+            angle = 0.15 * amp
+            perk = 0.6 * amp
+            go(head=_rot("x", angle), antennas=[perk, perk], duration=dur * 0.7)
+            go(head=_NEUTRAL, antennas=[perk * 0.4, perk * 0.4], duration=dur * 0.7)
+        elif motion == "perk":  # U328: antennae forward, held — "I am listening"
+            # Antenna-only on purpose: no head movement means no eye contact
+            # lost, no fight with the face tracker, and no motor noise from the
+            # platform under the head while that head is hearing a sentence
+            # (U147's reason for keeping the listening cue small).
+            perk = 0.8 * amp
+            go(antennas=[perk, perk], duration=dur)
+            go(antennas=[perk * 0.35, perk * 0.35], duration=dur * 1.4)
+        elif motion == "flick":  # U328: one antenna twitches — "hm?"
+            a = 0.9 * amp
+            go(antennas=[a, a * 0.2], duration=dur * 0.5)
+            go(antennas=[0.0, 0.0], duration=dur * 0.8)
+        elif motion == "droop":  # U328: both back and down — sympathy, regret
+            a = -0.7 * amp
+            go(antennas=[a, a], duration=dur * 1.6)
+            go(antennas=[a * 0.4, a * 0.4], duration=dur * 1.6)
+        elif motion == "alert":  # U328: both up, fast — surprise, interest
+            a = 1.1 * amp
+            go(antennas=[a, a], duration=dur * 0.45)
+            go(antennas=[a * 0.5, a * 0.5], duration=dur)
         elif motion == "point":  # look at a point ahead-right
             mini.look_at_world(0.5, -0.3, 0.2, duration=dur * 2)
             go(head=_NEUTRAL, duration=dur * 2)

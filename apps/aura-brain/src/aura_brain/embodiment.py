@@ -29,18 +29,36 @@ _SAD_WORDS = (
 )
 
 
-def gesture_for(text: str) -> str:
-    """Pick a motion_id for a spoken reply."""
+def tone_for(text: str) -> str:
+    """greeting | excited | sad | question | plain.
+
+    U328: ONE classification of a reply's tone. The head gesture and the
+    antenna cue both read it, so the two can never drift into disagreeing about
+    the same sentence — which is what happens when a second caller grows its
+    own copy of the keyword lists.
+    """
     t = text.lower()
     if any(w in t for w in _GREETING_WORDS):
-        return "wave"
+        return "greeting"
     if any(w in t for w in _EXCITED_WORDS) or text.count("!") >= 2:
-        return "gesture"
+        return "excited"
     if any(w in t for w in _SAD_WORDS):
-        return "tilt"
+        return "sad"
     if t.rstrip().endswith("?"):
-        return "tilt"
-    return "nod"
+        return "question"
+    return "plain"
+
+
+#: The head gesture per tone — unchanged from the U36 heuristic.
+_TONE_GESTURE = {
+    "greeting": "wave", "excited": "gesture", "sad": "tilt",
+    "question": "tilt", "plain": "nod",
+}
+
+
+def gesture_for(text: str) -> str:
+    """Pick a motion_id for a spoken reply."""
+    return _TONE_GESTURE[tone_for(text)]
 
 
 def embodiment_plan(text: str, persona_config: Any | None) -> tuple[bool, str | None, float]:

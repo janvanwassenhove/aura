@@ -1866,3 +1866,49 @@ hem zet, ook over updates heen. Wat nog niet opgelost is: een oudere kopie van
 die instelling in de installatiemap wordt genegeerd zodra de userData-versie
 bestaat — voor deze installatie zeggen ze allebei "aan", dus dat valt samen.
 
+### U328 — reageren met de antennes, niet alleen met de kop
+
+Gevraagd: "het is niet alleen knikken of nodge of tracken, maar ook in
+combinatie met de antennes kan hij reactie tonen."
+
+Dat is niet alleen mooier, het is technisch het juiste kanaal voor een reactie
+die middenin jouw zin valt. Antennes bewegen de kop niet, en dat betekent drie
+dingen: geen oogcontact dat wegdraait, geen gevecht met de gezichtstracker, en
+geen motorgeluid van het platform ónder de kop vlak naast de microfoon die op
+dat moment jouw zin staat op te nemen — precies de reden waarom U147 de
+luistercue klein hield en U157 tijdens het praten alleen antennes gebruikte.
+
+Nieuw op de robot:
+
+* **`acknowledge`** — het "mm-hm": kop dipt een beetje én antennes klappen naar
+  voren, in **één** commando. Twee commando's zouden achter elkaar in de
+  bewegingslus vallen en als twee gebeurtenissen aankomen. Bewust kleiner dan
+  een echte `nod` (0,15 vs 0,35 rad): dit valt in iemands zin, en een volle
+  knik daar leest als een onderbreking.
+* **`perk`** — antennes naar voren en even zo houden: "ik luister".
+* **`flick`** — één antenne tikt kort: "hm?".
+* **`droop`** — allebei naar achteren/omlaag: medeleven, spijt.
+* **`alert`** — allebei snel omhoog: verrassing, interesse.
+
+Alle vijf staan in de lijst die het volgen intact laat.
+
+In het gesprek gebruikt hij ze nu ook echt: de reactie terwijl jij praat rouleert
+`perk` → `acknowledge` → `flick` → de leun van U147, dus antennes leiden en de
+kop doet af en toe mee. En de toon van zijn eigen antwoord bereikt de antennes:
+spijt laat ze zakken in plaats van de kop schuin te zetten, een groet zwaait,
+en alles gewoons is de kleine kop-plus-antennes in plaats van een kale knik.
+
+Onderweg één opruiming: de toon werd tot nu toe alleen binnen `gesture_for`
+bepaald. Een tweede lezer zou zijn eigen kopie van de trefwoordenlijsten
+krijgen en daarmee vroeg of laat iets anders vinden in dezelfde zin. Nu is er
+`tone_for` (greeting | excited | sad | question | plain) en leest `gesture_for`
+die — zelfde antwoorden als voorheen, vastgelegd in een test.
+
+Tests eerst rood: 10 op de robot (de bewegingen bestonden niet; ook dat ze de
+kop níet bewegen, dat ze het volgen niet pauzeren en dat de torso niet
+stiekem wordt gecentreerd) en 3 in de brain. Daarna robot-runtime 125 groen,
+aura-brain 625 groen.
+
+**Nog niet in een echte kamer gezien.** De amplitudes zijn gekozen naar analogie
+met de bestaande bewegingen, niet gemeten aan hoe ze er op tafel uitzien.
+
