@@ -5,7 +5,7 @@ owner: "apps/desktop + CI"
 priority: P1
 risk: High
 created: "2026-09-05"
-units: [U32, U33, U44, U55, U56, U151, U152, U166, U168, U168b, U168c, U168d, U168e, U169, U169b, U170, U171, U172, U173, U174, U176, U177, U178, U192, U193, U197, U201, U211, U228, U229, U230, U231, U232, U233, U234, U235, U236, U283, U284, U285, U285b, U297, U179, U184, U185, U186, U210, U317, U318]
+units: [U32, U33, U44, U55, U56, U151, U152, U166, U168, U168b, U168c, U168d, U168e, U169, U169b, U170, U171, U172, U173, U174, U176, U177, U178, U192, U193, U197, U201, U211, U228, U229, U230, U231, U232, U233, U234, U235, U236, U283, U284, U285, U285b, U297, U179, U184, U185, U186, U210, U317, U318, U327]
 amended: "2026-09-05"
 ---
 
@@ -44,7 +44,13 @@ and installers for Windows, macOS (arm64 and x64) and Linux.
 2. **Given** an update installs, **When** it does, **Then** the owner's people,
    memories, keys and settings survive. U177 is the reason this is FR-001:
    **all owner state lived inside the install directory**, so every update
-   wiped it.
+   wiped it. U327: it moved five files short of done — the quiet switch and
+   the mode policy, the owner's MCP servers, the connector preferences, the
+   latency traces and the downloaded gesture model kept the old relative
+   default, and so kept being wiped. Reported as *"in quiet mode he should not
+   talk, but he still talks"*: the switch had been on since September, an
+   update reset the file the brain reads, and he greeted people by name under
+   a header that said HUSHED.
 3. **Given** an installer has been downloaded, **When** it is about to run,
    **Then** it is verified first (U224).
 4. **Given** the update has installed, **When** it finishes, **Then** the app
@@ -141,7 +147,11 @@ and installers for Windows, macOS (arm64 and x64) and Linux.
 ## Functional Requirements
 
 - **FR-001**: Owner state (`./data`, keys, skills, prefs) lives **outside** the
-  install directory and survives every update.
+  install directory and survives every update. Checked, not trusted: a test
+  scans the brain and its services for every environment variable whose default
+  resolves against the working directory, and fails when the desktop app does
+  not pin it to `userData` — so the next such setting cannot be forgotten the
+  way five of them were (U327).
 - **FR-002**: Every push to `master` produces a versioned release with notes,
   screenshots and installers for all four targets.
 - **FR-003**: Release notes are English, generated from commit subjects by
@@ -176,3 +186,4 @@ and installers for Windows, macOS (arm64 and x64) and Linux.
 | U151, U152, U229, U234, U297 | Honest title-bar status; status polled rather than awaited; the app showing another project; resolving ports; the README screenshots regenerated from the demo stack |
 | U184, U185, U186, U230, U231, U232, U233, U236 | A README that sells; screenshots that match their captions; diagrams that render; where the robot comes from; screenshots that had been failing quietly for weeks |
 | U284, U285, U285b | Release notes a person wants to read, in English, without an empty section |
+| U327 | The five settings U177 left in the install directory — quiet and the mode policy among them — pinned to userData, with a test that finds the next one |

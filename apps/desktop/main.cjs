@@ -132,6 +132,18 @@ function brainEnv() {
   env.DATABASE_URL = env.DATABASE_URL || `sqlite+aiosqlite:///${posix(path.join(DATA_DIR, 'aura-memory.db'))}`
   env.SKILLS_DIR = env.SKILLS_DIR || SKILLS_DIR
   env.SCENARIOS_DIR = env.SCENARIOS_DIR || SCENARIOS_DIR  // U207: saved presentations
+  // U327: the settings U177 left behind. Their defaults are relative — ./data
+  // — which resolves against the brain's working directory, and for a packaged
+  // app that IS the install directory, replaced wholesale by every update.
+  // Reported as "quiet mode is on and he still talks": the switch had been on
+  // since September, an update reset the file the brain reads, and he greeted
+  // people by name under a header that said HUSHED. The mode overrides, the
+  // owner's MCP servers and the connector preferences were going the same way.
+  env.MODE_POLICY_PATH = env.MODE_POLICY_PATH || path.join(DATA_DIR, 'mode-policy.json')
+  env.MCP_SERVERS_PATH = env.MCP_SERVERS_PATH || path.join(DATA_DIR, 'mcp-servers.json')
+  env.CONNECTOR_PREFS_PATH = env.CONNECTOR_PREFS_PATH || path.join(DATA_DIR, 'connector-prefs.json')
+  env.TURN_TRACE_PATH = env.TURN_TRACE_PATH || path.join(DATA_DIR, 'turn_traces.jsonl')
+  env.GESTURE_MODEL_PATH = env.GESTURE_MODEL_PATH || path.join(DATA_DIR, 'models', 'hand_landmarker.task')
   // Desktop defaults (only when the wizard/.env didn't decide already).
   env.ROBOT_RUNTIME_URL = env.ROBOT_RUNTIME_URL || 'http://reachy-mini.local:8001'
   env.HEARTBEAT_ENABLED = env.HEARTBEAT_ENABLED || 'true'

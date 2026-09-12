@@ -1823,3 +1823,46 @@ knikte sowieso niets. Daarna aura-brain 620 groen.
 microfoon stoort, is de reden dat de bewegingen klein zijn (U147 koos de
 luisterleun precies daarom), maar gemeten is het niet.
 
+### U327 — "in quiet mode praat hij nog steeds"
+
+Met een schermafbeelding erbij: twee opgewekte openers om 09:43, onder een
+koptekst die *HUSHED* zei en "he answers when asked and never speaks first".
+
+Niet geraden maar nagemeten, want beide bekende "hij begint zelf"-paden
+(begroeting bij herkenning, proactieve lus) checken `quiet()` netjes:
+
+* de draaiende brain zei `quiet = true`;
+* het beleidsbestand onder `%APPDATA%` zei `quiet: true` — geschreven op
+  **1 september**;
+* maar er stond een twééde bestand, ín de installatiemap, aangemaakt
+  **vandaag om 15:25** — het moment waarop de eigenaar Quiet opnieuw aanzette
+  nadat hij hem hoorde praten;
+* de app start de brain met de installatiemap als werkmap, en zet wel
+  `KNOWLEDGE_DB_PATH`, `RECOGNITION_DB_PATH`, `DATABASE_URL`, `SKILLS_DIR` en
+  `SCENARIOS_DIR`, maar niet `MODE_POLICY_PATH`.
+
+Dus: de standaard `./data/mode-policy.json` landt binnen de installatie, en die
+map wordt bij élke update integraal vervangen. Quiet stond sinds september aan,
+een update gooide het bestand weg, en de brain las weer "mag praten". De console
+loog niet — die corrigeert zich aan de brain — maar wie niet op de chip lette,
+zag alleen een robot die begon te praten terwijl dat uit stond.
+
+U177 heette dit op te lossen ("persist everything under userData, so an update
+can never wipe it") en kwam vijf bestanden tekort: het modusbeleid met de
+quiet-schakelaar, de MCP-servers van de eigenaar, de connectorvoorkeuren, de
+latentiesporen en het gedownloade handmodel. Alle vijf staan nu onder
+`userData`; de bestaande migratie kopieert wat nog in de installatiemap stond
+mee bij de volgende start, dus er gaat niets verloren.
+
+De test is met opzet niet "staat MODE_POLICY_PATH erin": hij scant de brain en
+zijn services op élke omgevingsvariabele waarvan de standaard tegen de werkmap
+aanleunt, en faalt zolang de desktop-app die niet vastpint. Rood gezien met
+precies die vijf namen erin; daarna groen. Plus een tweede test die controleert
+dat de scan zelf nog iets vindt — een regex die stilletjes niets meer matcht,
+is erger dan geen test.
+
+**Wat dit voor jou betekent na de volgende update**: Quiet blijft staan waar je
+hem zet, ook over updates heen. Wat nog niet opgelost is: een oudere kopie van
+die instelling in de installatiemap wordt genegeerd zodra de userData-versie
+bestaat — voor deze installatie zeggen ze allebei "aan", dus dat valt samen.
+
