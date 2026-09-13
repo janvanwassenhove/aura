@@ -5,7 +5,7 @@ owner: "robot-runtime"
 priority: P1
 risk: Medium
 created: "2026-09-05"
-units: [U16, U36a, U36d, U36g, U37, U51, U99, U100, U101, U102, U111, U116, U126, U127, U137, U138, U139, U147, U157, U158, U161, U162, U164, U165, U175, U196, U212, U219, U237, U238, U252b, U252d, U253, U268, U270, U286, U325, U326, U328, U336, U341, U341b]
+units: [U16, U36a, U36d, U36g, U37, U51, U99, U100, U101, U102, U111, U116, U126, U127, U137, U138, U139, U147, U157, U158, U161, U162, U164, U165, U175, U196, U212, U219, U237, U238, U252b, U252d, U253, U268, U270, U286, U325, U326, U328, U336, U341, U341b, U357]
 ---
 
 # Feature Specification: Embodiment and Presence
@@ -286,6 +286,19 @@ while he is speaking, so that a conversation looks like a conversation.
 - Face recognition and who the person is — see
   [018-knowledge-people-and-judgment](../018-knowledge-people-and-judgment/spec.md).
 
+- **FR-041**: Going to sleep never commands the head upright. Turning follow-me
+  off recentres the head (U165) so an awake robot does not sit staring at the
+  last place it saw a face; the brain's sleep sequence turns follow-me off on
+  its way to the sleep pose, so lowering him included an explicit
+  `goto_target(head=NEUTRAL, duration=1.0)` issued immediately before
+  `goto_sleep()` — and on the real robot the two overlap, so the head-up move
+  lands *after* the emote. Reported as *"went down in the shell/torso, but once
+  this was finished, the head jumped back up"*. The recentre is now skipped
+  while `sleep_state.is_asleep()`, which is U237's rule applied where it was
+  missed: sleep means take no action of your own, and lifting the head is such
+  an action. Tracking is still paused — this is about the pose, not the tracker
+  (U357).
+
 ## Traceability
 
 | Units | What they delivered |
@@ -294,6 +307,7 @@ while he is speaking, so that a conversation looks like a conversation.
 | U36d, U147, U157, U111 | Idle look-around, upright after wake, listening pose, conversational body language, mood via head and antennae |
 | U37, U36g, U116, U126, U127, U158, U165, U253 | Follow-me: torso yaw, watchdog, re-acquire that holds, face-visible reporting, and a tracker that was dead rather than blind |
 | U161, U162, U164 | Drag-to-aim on the live picture; explicit Follow/Manual; the mirrored-axis fix |
+| U357 | Sleep stopped lifting his head on the way down — the recentre that follow-me-off owes an awake robot |
 | U99, U100, U101, U102, U237, U238 | Microphone toggle; sleep and wake; the sleep pose; sleep that stays; the 404 that read as success |
 | U341 | Sleep and wake asked for like any other action, where you pack him rather than where you configure him |
 | U341b | That marker rendered green on green — the app's own `--accent-wash` treatment, seen by looking at it |

@@ -618,3 +618,80 @@ async def test_watchdog_does_not_rebuild_while_tracker_ticks(adapter, monkeypatc
     await tick()
     names = [n for n, _ in mini.calls]
     assert "release_media" not in names
+
+
+# --------------------------------------------------------------------------- #
+# U357: going to sleep must not end with the head upright
+# --------------------------------------------------------------------------- #
+
+async def test_turning_tracking_off_while_asleep_does_not_lift_the_head(adapter) -> None:
+    """Reported as: "went down in the shell/torso, but once this was finished,
+    the head jumped back up".
+
+    Turning follow-me off recentres the head (U165) so he does not sit staring
+    wherever he last looked. That is right while awake and wrong while asleep:
+    the brain's sleep sequence turns tracking off on its way to the sleep pose,
+    so lowering the robot included an explicit command to put the head upright.
+
+    U237's rule decides it — sleep means take no action of your own, and
+    lifting the head is such an action.
+    """
+    from robot_runtime import sleep_state
+
+    await adapter.connect()
+    mini = adapter._created[0]
+    await adapter.set_tracking(True)
+    mini.calls.clear()
+
+    sleep_state.set_asleep(True)
+    try:
+        await adapter.set_tracking(False)
+    finally:
+        sleep_state.set_asleep(False)
+
+    lifts = [kw for name, kw in mini.calls
+             if name == "goto_target" and kw["head"] is not None]
+    assert lifts == [], "the head was commanded somewhere while the robot slept"
+    # Detection must still be paused — this is about the POSE, not the tracker.
+    assert ("start_head_tracking", {"weight": 0.0}) in mini.calls or \
+        any(name == "start_head_tracking" for name, _ in mini.calls), \
+        "tracking must still be paused when asleep"
+
+
+async def test_turning_tracking_off_while_awake_still_recentres(adapter) -> None:
+    """U165 stays: an awake robot that stops following must not keep staring
+    at the last place it saw a face."""
+    await adapter.connect()
+    mini = adapter._created[0]
+    await adapter.set_tracking(True)
+    mini.calls.clear()
+
+    await adapter.set_tracking(False)
+
+    lifts = [kw for name, kw in mini.calls
+             if name == "goto_target" and kw["head"] is not None]
+    assert lifts, "an awake robot should still recentre its head"
+
+
+async def test_the_sleep_pose_is_the_last_thing_that_moves_him(adapter) -> None:
+    """The whole sequence the brain sends, in order. Nothing may pose the head
+    after goto_sleep — that is the jump the owner sees."""
+    from robot_runtime import sleep_state
+
+    await adapter.connect()
+    mini = adapter._created[0]
+    await adapter.set_tracking(True)
+    mini.calls.clear()
+
+    sleep_state.set_asleep(True)          # 1. the runtime is told first (U237)
+    try:
+        await adapter.set_tracking(False)  # 2. follow-me off
+        await adapter.execute_motion(      # 3. the pose
+            MotionCommand(motion_id="sleep", speed=1.0, amplitude=0.6, direction=None))
+    finally:
+        sleep_state.set_asleep(False)
+
+    names = [name for name, _ in mini.calls]
+    assert "goto_sleep" in names, "he never lay down"
+    after = names[names.index("goto_sleep") + 1:]
+    assert "goto_target" not in after, f"something moved him after the sleep pose: {after}"

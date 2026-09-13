@@ -172,7 +172,17 @@ class ReachyRobotAdapter(RobotAdapter):
                 # the FaceTracker thread and its camera hookup; rebuilding that
                 # on every Manual/Follow flip made re-acquisition unreliable.
                 self._mini.start_head_tracking(0.0)
-                self._mini.goto_target(head=_NEUTRAL, duration=1.0, body_yaw=None)
+                # U357: recentring is right while awake — he should not sit
+                # staring at the last place he saw a face — and wrong while
+                # asleep. The brain turns follow-me off on its way to the sleep
+                # pose, so this put the head UPRIGHT as part of lying down: a
+                # one-second interpolation issued just before goto_sleep(), and
+                # on the real robot it lands after the emote. Reported as "went
+                # down in the shell/torso, but once this was finished, the head
+                # jumped back up". U237 already decides it — sleep means take
+                # no action of your own, and lifting the head is such an action.
+                if not sleep_state.is_asleep():
+                    self._mini.goto_target(head=_NEUTRAL, duration=1.0, body_yaw=None)
 
         async with self._motion_lock:
             await asyncio.to_thread(_toggle)

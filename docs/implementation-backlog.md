@@ -3771,3 +3771,54 @@ buttons ship without a disabled state. 271 console tests green.
 
 **Not verified by eye**: the dimmed button has not been looked at on screen,
 only asserted in the stylesheet.
+
+### U357 — he lay down, and then put his head back up
+
+Reported as *"when i tell it to go to sleep, it should remain in the sleep
+position (now it executes it and then jumps back)"*, and then precisely, which
+is what made it findable: *"went down in the shell/torso, but once this was
+finished, the head jumped back up"*.
+
+**Not the loops.** That was the obvious suspect, because U237 and U238 exist for
+exactly this shape of bug — the on-device loops that keep the robot from looking
+frozen used to stand it straight back up. Measured before touching anything:
+`POST /robot/sleep` answered `{"asleep": true, "stays_down": true}`, so the
+runtime *had* been told and its loops were suppressed. U237 is working. The
+torso staying down proved it too.
+
+**It was the head, and it was asked for.** The brain's sleep sequence is: tell
+the runtime, turn follow-me off, then strike the pose. The middle step is the
+problem. Turning follow-me off recentres the head (U165), for a good reason — an
+awake robot that stops following should not sit staring at the last place it saw
+a face. But it means going to sleep issues this, one step before `goto_sleep()`:
+
+```python
+self._mini.goto_target(head=_NEUTRAL, duration=1.0, body_yaw=None)
+```
+
+A one-second interpolation to *upright*, commanded as part of lying down. In the
+stubbed adapter the calls are synchronous and it merely looks redundant; on the
+real robot the move is still in flight when the emote runs, so it completes
+after `goto_sleep()` has finished and the head comes back up. Exactly what was
+described, and the reason the torso was unaffected: only the head was ever
+commanded.
+
+Fixed where the knowledge lives rather than at the call site: the adapter skips
+the recentre while `sleep_state.is_asleep()`. U237 already decided this — *sleep
+means take no action of your own* — and lifting the head is precisely such an
+action. Doing it in the runtime means it holds however the sequence is ordered,
+and for any future caller that turns follow-me off near a sleeping robot. The
+tracker is still paused; this is about the **pose**, not the tracking.
+
+**Tests**: three, against the stubbed SDK that records every call — the head is
+not commanded anywhere while asleep, an *awake* robot still recentres (U165 must
+not regress, and it is the kind of thing a fix like this quietly takes away),
+and the full brain sequence leaves `goto_sleep` as the last thing that moves
+him. The first was verified red and failed with the identity matrix in the
+message, which is the bug written out as an assertion. 138 robot-runtime tests
+green.
+
+**Not verified on the robot.** The stub cannot reproduce the overlap that makes
+this visible — in it the recentre simply happened before the emote — so the
+tests pin the command that must not be sent, not the jump itself. Whether the
+head now stays down needs a press of the button on the real robot.
