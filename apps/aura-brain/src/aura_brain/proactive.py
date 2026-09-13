@@ -61,18 +61,20 @@ class ProactiveEngine:
     def enabled(self) -> bool:
         return os.environ.get("PROACTIVE_ENABLED", "true").lower() == "true"
 
-    def should_speak(self, now: datetime | None = None) -> bool:
+    def should_speak(self, now: datetime | None = None, kind: str = "any") -> bool:
         if not self.enabled():
             return False
         if os.environ.get("ROBOT_ASLEEP", "false").lower() == "true":
             return False
-        # U256: the owner's Quiet switch. Same meaning as the overnight window
-        # below, but on demand — reminders still fire and still land in the
-        # app; what stops is the robot opening its mouth about them.
+        # U256: the owner's Quiet switch, and U335: the mode's own row. Work
+        # says "only for reminders", presentation says "never — cues only", and
+        # until U335 neither was enforced — the briefing spoke anyway. Reminders
+        # still fire and still land in the app; what stops is the robot opening
+        # its mouth about them.
         try:
             from orchestrator import mode_policy as _mp
 
-            if _mp.quiet():
+            if not _mp.may_speak_unprompted(kind):
                 return False
         except Exception:  # noqa: BLE001 — a missing policy must not mute him
             pass
@@ -85,10 +87,13 @@ class ProactiveEngine:
 
     # -- speaking --------------------------------------------------------
 
-    async def announce(self, text: str) -> bool:
-        """Voice a proactive line (unless gated). Returns whether it spoke."""
+    async def announce(self, text: str, kind: str = "any") -> bool:
+        """Voice a proactive line (unless gated). Returns whether it spoke.
+
+        `kind="reminder"` is what a mode set to "only for reminders" still
+        lets through (U335)."""
         text = (text or "").strip()
-        if not text or not self.should_speak():
+        if not text or not self.should_speak(kind=kind):
             return False
         await self._bus.publish(ResponseDrafted(
             session_id=self._session_id, response_text=text,
@@ -100,7 +105,7 @@ class ProactiveEngine:
         """Speak a fired reminder (ReminderTriggered handler)."""
         msg = getattr(event, "message", None) or getattr(event, "text", "")
         if msg:
-            await self.announce(f"Even een herinnering: {msg}")
+            await self.announce(f"Even een herinnering: {msg}", kind="reminder")
 
     # -- daily briefing --------------------------------------------------
 

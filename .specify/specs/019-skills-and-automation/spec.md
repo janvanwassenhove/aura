@@ -5,9 +5,7 @@ owner: "orchestrator"
 priority: P1
 risk: High
 created: "2026-09-05"
-units: [U40, U43, U50, U57, U58, U59, U60, U61, U62, U64, U65, U66, U70, U71,
-        U74, U75, U107, U108, U110, U118, U159, U194, U195, U247, U248, U249,
-        U250, U251, U253c, U259, U259b, U261, U296]
+units: [U40, U43, U50, U57, U58, U59, U60, U61, U62, U64, U65, U66, U70, U71, U74, U75, U107, U108, U110, U118, U159, U194, U195, U247, U248, U249, U250, U251, U253c, U259, U259b, U261, U296, U335]
 ---
 
 # Feature Specification: Skills, Automation and the Agentic Loop
@@ -127,6 +125,16 @@ about two questions:
 
 ## Functional Requirements
 
+- **FR-MODE-BEHAVIOUR**: A mode's behaviour row is enforced, not described.
+  `speaks_first` decides whether an unprompted line may be voiced at all —
+  *yes*, *only for reminders* (a due reminder and nothing else), or *never —
+  cues only* — and `memory_writing: off` stops the passive learning that
+  would otherwise remember whoever was in the room. Both read the row of the
+  **active** mode, so the Modes editor changes behaviour rather than a label,
+  and Quiet still overrides all of them. Until U335 nothing outside
+  `mode_policy` read those values at all: work briefed out loud under a row
+  that said "only for reminders", and a presentation learned about its
+  audience (U335).
 - **FR-001**: The loop is multi-round, steerable and stoppable, and its rounds
   are visible in the console while they run (U57, U62).
 - **FR-002**: Every tool that touches the outside world passes the approval
@@ -155,6 +163,7 @@ about two questions:
 | Units | What they delivered |
 |---|---|
 | U57, U58, U62 | The agentic loop; the automation ladder; live rounds, steering, stop and teach in the console |
+| U335 | The behaviour row of every mode enforced at its chokepoints: unprompted speech, and learning about people |
 | U59, U60, U64, U65, U66, U71 | Skills with triggers and scope; teach-mode; person-scoped skills; the starter skill |
 | U61 | Declarative hooks and scoped subagents |
 | U107, U108, U118, U159 | The self-optimising loop; proactive suggestions; polished at creation; the stuck "ready to optimize" |

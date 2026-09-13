@@ -611,10 +611,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         # U256: quiet hours mean exactly this too — he does not START. The
         # toggle used to live only in the browser's localStorage, so the header
         # said HUSHED while this handler cheerfully greeted someone by name.
+        # U335: a greeting IS speaking first, so it asks the same question as
+        # every other unprompted line — the mode's row, with Quiet on top.
         try:
             from orchestrator import mode_policy as _mp
 
-            _hushed = _mp.quiet()
+            _hushed = not _mp.may_speak_unprompted()
         except Exception:  # noqa: BLE001 — never let the check silence a fault
             _hushed = False
         if _hushed or os.environ.get("ROBOT_ASLEEP", "false").lower() == "true":

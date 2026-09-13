@@ -489,9 +489,39 @@ def presenting() -> bool:
     return _active_mode == "presentation"
 
 
-def speaks_first() -> bool:
-    """May he open his mouth unprompted right now?"""
-    return not quiet()
+def may_speak_unprompted(kind: str = "any") -> bool:
+    """May he open his mouth with nobody having asked?
+
+    U335: reads the ACTIVE mode's own behaviour row, so the dropdown in the
+    Modes editor IS the rule rather than a description of one. Until now
+    nothing outside this module read it at all — work briefed out loud under a
+    row that said "only for reminders".
+
+      yes                → anything he has to say
+      only for reminders → a due reminder, and nothing else
+      never — cues only  → nothing; on stage the scenario speaks (U334)
+
+    Quiet still wins over all three: it is the owner's switch, not the mode's.
+    """
+    if quiet():
+        return False
+    row = str(behaviour(active()).get("speaks_first", "yes")).strip().lower()
+    if row.startswith("never"):
+        return False
+    if row.startswith("only for reminders"):
+        return kind == "reminder"
+    return True
+
+
+def may_write_memory() -> bool:
+    """Does the active mode let him learn about people?
+
+    U335: presentation says "off" — an audience did not consent to being
+    remembered — and nothing enforced it, so a talk quietly learned about
+    whoever happened to be in the room.
+    """
+    row = str(behaviour(active()).get("memory_writing", "on")).strip().lower()
+    return row != "off"
 
 
 def describe(active_mode: str) -> dict:

@@ -50,6 +50,19 @@ def test_should_speak_respects_switches(monkeypatch) -> None:
     assert eng.should_speak() is False
 
 
+@pytest.fixture(autouse=True)
+def _at_home():
+    """U335: these tests are about the overnight window and the announcing
+    itself, not about the mode. The default mode is `work`, whose row says
+    "only for reminders" — so say out loud which mode is meant."""
+    from orchestrator import mode_policy
+
+    before = mode_policy.active()
+    mode_policy.set_active("home")
+    yield
+    mode_policy.set_active(before)
+
+
 def test_should_speak_quiet_hours(monkeypatch) -> None:
     monkeypatch.setenv("PROACTIVE_QUIET_START", "22:00")
     monkeypatch.setenv("PROACTIVE_QUIET_END", "08:00")

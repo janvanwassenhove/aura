@@ -118,6 +118,16 @@ class PersonMemory:
         user, assistant = (user or "").strip(), (assistant or "").strip()
         if not user or not assistant or assistant.startswith("[echo]"):
             return
+        # U335: the active mode may forbid learning about people at all —
+        # presentation does, because an audience did not consent to being
+        # remembered. Never raises: an unreadable policy must not lose memory.
+        try:
+            from orchestrator import mode_policy  # noqa: PLC0415
+
+            if not mode_policy.may_write_memory():
+                return
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("memory policy unreadable: %s", exc)
         buf = self._buffers.setdefault(person_id, [])
         buf.append((user, assistant))
         if len(buf) >= self._every:

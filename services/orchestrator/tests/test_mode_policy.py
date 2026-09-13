@@ -292,7 +292,10 @@ def test_an_owner_override_cannot_conjure_an_account() -> None:
 
 def test_quiet_is_off_until_someone_asks_for_it() -> None:
     assert mode_policy.quiet() is False
-    assert mode_policy.speaks_first() is True
+    # U335: "may he speak unprompted" is now a question about the MODE as well
+    # as the switch. The default mode is `work`, whose row says "only for
+    # reminders" — so a reminder is what proves the switch is off.
+    assert mode_policy.may_speak_unprompted("reminder") is True
 
 
 def test_quiet_survives_a_restart() -> None:
@@ -302,7 +305,8 @@ def test_quiet_survives_a_restart() -> None:
     mode_policy.set_quiet(True)
     mode_policy.reset_cache_for_tests()          # simulate a restart
     assert mode_policy.quiet() is True
-    assert mode_policy.speaks_first() is False
+    # U335: quiet wins over every mode row, reminders included.
+    assert mode_policy.may_speak_unprompted("reminder") is False
 
 
 def test_quiet_is_reported_to_the_console() -> None:

@@ -2138,3 +2138,49 @@ de route.
 
 Brain 637 groen, orchestrator 391 groen, ruff schoon.
 
+### U335 — de modi beloofden vier dingen, en dwongen er twee af
+
+Gevraagd na U334: *"kan je verifieren voor alle modi (family, work, present)
+dat alles correct wordt afgedwongen"*. Nagegaan, en het antwoord was: de helft.
+
+**Wat wél werd afgedwongen** (en al getest stond in
+`services/orchestrator/tests/test_mode_policy.py`): de capaciteitengrens.
+`allowed_tools()` bepaalt wat het model überhaupt aangeboden krijgt, een
+geblokkeerde tool die tóch wordt aangeroepen krijgt `mode_mismatch` terug, en
+elke tool van een groep op *asks* stopt bij de goedkeuringspoort. Presentatie
+laat bovendien alle MCP-tools vallen.
+
+**Wat níet werd afgedwongen:** de gedragsrij die de eigenaar in het
+Modes-scherm ziet én kan bewerken:
+
+| modus | speaks first | memory writing |
+|---|---|---|
+| home | yes | on |
+| work | only for reminders | on |
+| presentation | never — cues only | off |
+
+Buiten `mode_policy` las niemand die waarden. `behaviour()`, `speaks_first()`
+en `memory_writing` hadden precies één aanroeper: de route die ze *instelt*.
+Gevolg: in werkmodus sprak de dagelijkse briefing gewoon, onder een rij die
+"alleen herinneringen" zei, en tijdens een presentatie leerde hij passief bij
+over wie er in de zaal stond.
+
+Nu leest de afdwinging **de rij zelf** — dus de keuzelijsten in de
+Modes-editor doen echt iets — op twee knooppunten: de proactieve stem (met een
+`kind`, zodat "alleen herinneringen" een herinnering wél doorlaat) en het
+passieve leren (`PersonMemory.record`). De begroeting bij herkenning stelt nu
+dezelfde vraag, want een begroeting ís uit zichzelf spreken. Quiet blijft
+boven alles staan: dat is de schakelaar van de eigenaar, niet van de modus.
+
+`speaks_first()` is verwijderd: die had geen enkele aanroeper en zou met deze
+wijziging twee betekenissen krijgen.
+
+**Merkbare gedragswijziging, en het is de belofte:** standaard staat AURA in
+werkmodus, dus de dagelijkse briefing spreekt niet meer uit zichzelf —
+herinneringen wel. Wil je hem wél horen: zet `speaks first` voor work op *yes*
+in Modes. Drie bestaande proactieve tests legden het oude gedrag vast; die
+zeggen nu expliciet in welke modus ze zich afspelen.
+
+Tien nieuwe tests eerst rood. Brain 648 groen, orchestrator 391 groen, ruff
+schoon.
+
