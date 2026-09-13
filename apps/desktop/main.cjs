@@ -694,7 +694,9 @@ function createWindow() {
   // private repo", which is why automatic checking looked broken.
   ipcMain.handle('aura:check-update', async () => {
     if (!IS_PACKAGED) return { status: 'dev' }
-    const result = await checkForUpdate({ currentVersion: app.getVersion(), token: updateToken() })
+    const result = await checkForUpdate({ currentVersion: app.getVersion(), token: updateToken(),
+                                        // U353: an MSI install updates with an MSI.
+                                        perMachine: installedPerMachine(app.getPath('exe')) })
     if (result.status === 'update') setTimeout(() => maybeOfferUpdate(), 300)
     return result
   })
@@ -756,7 +758,8 @@ function createWindow() {
 // U173: update check — ask the owner when a newer GitHub release exists
 // ---------------------------------------------------------------------------
 
-const { checkForUpdate, downloadAsset, safeAssetName, verifyAsset } = require('./updater.cjs')
+const { checkForUpdate, downloadAsset, safeAssetName, verifyAsset,
+        installedPerMachine, installerCommand } = require('./updater.cjs')
 let updateDialogOpen = false
 
 function skippedVersionFile() { return path.join(app.getPath('userData'), 'update-skip.json') }
@@ -785,7 +788,9 @@ function skipUpdate(tag) {
 
 async function maybeOfferUpdate() {
   if (updateDialogOpen || stagedUpdate || !mainWindow) return
-  const result = await checkForUpdate({ currentVersion: app.getVersion(), token: updateToken() })
+  const result = await checkForUpdate({ currentVersion: app.getVersion(), token: updateToken(),
+                                        // U353: an MSI install updates with an MSI.
+                                        perMachine: installedPerMachine(app.getPath('exe')) })
   const update = result.status === 'update' ? result.update : null
   if (!update || update.tag === skippedVersion()) return
 
@@ -884,7 +889,9 @@ function installStagedUpdate() {
       // script target hands over control for good (the app would install and
       // never come back), and `start /wait` opens a console window and blocks.
       // `call` returns control for any target, silently.
-      `call "${stagedUpdate.installerPath}" /S`,
+      // U353: `call x.msi /S` does nothing — an MSI is data for msiexec, not
+      // a program. installerCommand() picks the right one for the file.
+      installerCommand(stagedUpdate.installerPath),
       // Brackets are not decoration: `exit=0>>` makes cmd read the 0 as a
       // stream number and redirect instead of echo, so the line vanishes.
       log('installer exit=[%errorlevel%]'),

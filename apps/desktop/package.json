@@ -11,7 +11,7 @@
   "scripts": {
     "start": "electron .",
     "build:console": "cd ../operator-console && npm run build",
-    "dist": "npm run build:console && electron-builder --win nsis"
+    "dist": "npm run build:console && electron-builder --win nsis msi"
   },
   "devDependencies": {
     "electron": "^33.0.0",
@@ -81,7 +81,8 @@
     "artifactName": "AURA-${version}-${os}-${arch}.${ext}",
     "win": {
       "target": [
-        "nsis"
+        "nsis",
+        "msi"
       ],
       "icon": "build/icon.ico",
       "sign": "./sign.cjs",
@@ -95,6 +96,13 @@
       "createDesktopShortcut": true,
       "shortcutName": "AURA",
       "artifactName": "AURA-${version}-windows-setup.${ext}"
+    },
+    "msi": {
+      "oneClick": false,
+      "perMachine": true,
+      "runAfterFinish": true,
+      "shortcutName": "AURA",
+      "artifactName": "AURA-${version}-windows.${ext}"
     },
     "mac": {
       "target": [

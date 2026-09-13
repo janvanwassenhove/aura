@@ -3535,3 +3535,73 @@ the hard question and brings him back for the last word, so the dry run pins it.
 
 **Not verified on a real projector.** The fade, and whether 350 ms reads as him
 stepping aside rather than as a glitch, needs a beamer and a room.
+
+### U353 — the work laptop would not run the installer at all
+
+Reported with the screenshot Windows actually shows:
+
+> Windows cannot access the specified device, path, or file. You may not have
+> the appropriate permissions to access the item.
+
+And beside it the observation that settles the diagnosis: *"for reachy mini
+control the SmartScreen prompt ... for aura i get the permissions one"*. The
+Reachy Mini Control MSI reaches its **wizard** on that laptop. AURA's installer
+never starts.
+
+**Measured before changing anything**, because the obvious answer was wrong.
+`Get-AuthenticodeSignature` on both files: **NotSigned**, both. Neither carries
+a Mark of the Web. So the unsigned warning really is identical, and signing is
+not what separates them — which matters, because U337 and U338 had already
+gone at this from the signing side and the honest note in U337 said so: signing
+removes "unknown publisher", but *"a managed work PC can still block installs
+by policy"*.
+
+The difference is what each installer **is**. An MSI is not a program; it is
+data handed to `msiexec.exe`, which is Microsoft-signed and already allowed,
+and it lands in `Program Files`. AURA shipped only an NSIS `.exe`, which has to
+be executed itself — and electron-builder defaults NSIS to a **per-user**
+install in `%LOCALAPPDATA%`, the user-writable location the default AppLocker
+rule set exists to deny. The error is Windows refusing to *execute*, before any
+wizard could exist.
+
+This is the same argument FR-014 already makes for starting the brain as
+`python -m aura_brain` instead of a generated `.venv\Scripts` launcher:
+*"unsigned and brand new by construction, which is exactly what a managed
+machine's ASR policy refuses; the interpreter is signed and allowed."* The
+installer had the identical problem and nobody had connected the two.
+
+**So Windows gets both.** The `.exe` stays untouched — it is the auto-update
+path and every install that already exists. The MSI is added with
+`perMachine: true`, because electron-builder defaults *that* to per-user too,
+and an MSI into `%LOCALAPPDATA%` would have changed nothing at all.
+
+**The part that would have been a defect if left out.** The updater is custom
+(U173) and hard-coded `windows-setup.exe`. Shipping an MSI without touching it
+means an MSI install auto-downloads the `.exe` and installs a **second** copy
+per-user, in a different directory, with the shortcut pointing at whichever won
+— a bug introduced by the fix. So an update now follows the way this copy was
+installed: the running executable's path decides, the MSI is preferred for a
+per-machine install, and it falls back to whatever the release actually carries
+because an older release has no MSI and answering "no update available" would
+be a lie. The apply script runs the staged file the way that file can be run —
+`msiexec /i` rather than `call … /S`, which does nothing useful to an MSI.
+
+That branch is deliberately **not** silent. A per-machine install needs
+elevation, and a UAC prompt appearing with no window to explain it is worse
+than a wizard the owner can see.
+
+**Tests**: 9 in `scripts/test_windows_installers.py` (both targets built, the
+MSI per-machine and assisted, distinct artifact names, the release actually
+building and publishing and signing both, the NSIS config pinned so it cannot
+drift) and 11 more in `test-updater-verify.cjs` (asset choice each way, the
+fallback for a release with no MSI, where-am-I-installed including case and
+trailing slashes, and that an MSI is never installed silently). All verified
+red first.
+
+**Not verified**: nothing here has been run on the work laptop, and I could not
+read its policy — this machine is `WORKGROUP` and AppLocker on it is
+`AuditOnly`. The reasoning is measured (both files unsigned; the MSI installed
+machine-wide into `Program Files` with an HKLM uninstall entry; the `.exe`
+refused before its wizard), but "the MSI will install there" is a prediction
+until it does. Nor has an MSI been built yet: the target is wired, and the
+first release to run it is the first proof that WiX packages this app cleanly.

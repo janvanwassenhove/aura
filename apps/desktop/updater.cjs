@@ -28,9 +28,55 @@ function isNewer(candidate, current) {
   return false
 }
 
-/** The one asset a Windows user should install. */
-function pickWindowsAsset(assets) {
-  return (assets || []).find((a) => /windows-setup\.exe$/i.test(a.name)) || null
+/** The one asset a Windows user should install.
+ *
+ * U353: a release carries two of them. The NSIS `.exe` installs per-user into
+ * %LOCALAPPDATA%; the MSI installs machine-wide into Program Files, which is
+ * the only one a locked-down laptop will run. Handing an MSI install the .exe
+ * would quietly produce a SECOND copy somewhere else, and which one the
+ * shortcut then starts is a coin toss — so the update follows the way this
+ * copy was installed.
+ *
+ * The fallback matters as much as the choice: an older release has no MSI at
+ * all, and answering "no update available" to a per-machine install because
+ * the preferred file is missing would be a lie.
+ */
+function pickWindowsAsset(assets, { perMachine = false } = {}) {
+  const list = assets || []
+  const msi = list.find((a) => /windows\.msi$/i.test(a.name)) || null
+  const exe = list.find((a) => /windows-setup\.exe$/i.test(a.name)) || null
+  return (perMachine ? msi || exe : exe || msi) || null
+}
+
+/** Was this copy installed for the whole machine (the MSI) or just this user?
+ *
+ * Decided by where the running executable lives, because that is the one thing
+ * that is true regardless of how it got there. Anything unrecognised counts as
+ * per-user: every install that exists before U353 is an NSIS per-user install,
+ * so that is the answer that cannot break one.
+ */
+function installedPerMachine(exePath, env = process.env) {
+  const exe = String(exePath || '').toLowerCase().replace(/\\+$/, '')
+  if (!exe) return false
+  const roots = [env.ProgramFiles, env['ProgramFiles(x86)'], env.ProgramW6432]
+  return roots.some((root) => {
+    if (!root) return false
+    const prefix = String(root).toLowerCase().replace(/\\+$/, '') + '\\'
+    return exe.startsWith(prefix)
+  })
+}
+
+/** How to run a staged installer from the apply script.
+ *
+ * `call x.msi /S` does nothing useful — an MSI is data for msiexec, not a
+ * program. And the MSI install is deliberately NOT silent: a per-machine
+ * install needs elevation, and a UAC prompt appearing with no window to
+ * explain it is worse than a wizard the owner can see.
+ */
+function installerCommand(installerPath) {
+  return /\.msi$/i.test(String(installerPath || ''))
+    ? `msiexec /i "${installerPath}"`
+    : `call "${installerPath}" /S`
 }
 
 /** U224: the release's SHA256SUMS.txt, when the build published one. */
@@ -97,7 +143,8 @@ async function verifyAsset({ asset, checksumsAsset, filePath, token,
  * explain the other outcomes instead of leaving the owner wondering whether
  * update checking works at all (it looked broken while the repo was private).
  */
-async function checkForUpdate({ currentVersion, token, fetchImpl = fetch }) {
+async function checkForUpdate({ currentVersion, token, fetchImpl = fetch,
+                                perMachine = false }) {
   try {
     const headers = { Accept: 'application/vnd.github+json', 'User-Agent': 'aura-desktop' }
     if (token) headers.Authorization = `Bearer ${token}`
@@ -117,7 +164,7 @@ async function checkForUpdate({ currentVersion, token, fetchImpl = fetch }) {
         tag: rel.tag_name,
         version: String(rel.tag_name).replace(/^v/, ''),
         htmlUrl: rel.html_url,
-        asset: pickWindowsAsset(rel.assets),
+        asset: pickWindowsAsset(rel.assets, { perMachine }),   // U353
         checksums: pickChecksums(rel.assets),   // U224
       },
     }
@@ -143,4 +190,5 @@ async function downloadAsset({ asset, token, destPath, fetchImpl = fetch, fsImpl
 }
 
 module.exports = { REPO, parseVersion, isNewer, pickWindowsAsset, pickChecksums,
-                   safeAssetName, fileSha256, verifyAsset, checkForUpdate, downloadAsset }
+                   safeAssetName, fileSha256, verifyAsset, checkForUpdate, downloadAsset,
+                   installedPerMachine, installerCommand }

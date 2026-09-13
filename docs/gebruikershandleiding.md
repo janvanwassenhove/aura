@@ -9,7 +9,25 @@ altijd met jouw goedkeuring — apps op je laptop.
 ## 1. Eerste start
 
 Installeer AURA met de Windows-installer (of start de desktop-app vanuit een
-dev-checkout). Bij de eerste start verschijnt een korte **setup-wizard**:
+dev-checkout). Een release bevat er **twee** — kies op basis van de machine,
+niet van voorkeur:
+
+| Bestand | Wanneer |
+|---|---|
+| `AURA-<versie>-windows-setup.exe` | je eigen pc. Installeert alleen voor jou en werkt zichzelf bij vanuit de app. |
+| `AURA-<versie>-windows.msi` | een **werk- of beheerde laptop**. Installeert in `Program Files` voor iedereen, via de installer van Windows zelf. |
+
+Geeft de `.exe` *"Windows cannot access the specified device, path, or file"*,
+dan weigert de machine een ongetekend programma uit je Downloads-map te
+draaien — het bestand is niet stuk. Gebruik dan de **`.msi`**: die gaat naar
+`msiexec` van Windows zelf, en dat staat hetzelfde beleid wél toe. Beide
+bestanden tonen de waarschuwing "onbekende uitgever" zolang de build niet
+ondertekend is; die waarschuwing is niet wat de `.exe` tegenhoudt.
+
+Een MSI-installatie vraagt eenmalig een beheerder, en werkt zichzelf bij met de
+volgende MSI in plaats van stilletjes — je krijgt de wizard te zien.
+
+Bij de eerste start verschijnt een korte **setup-wizard**:
 
 1. **Naam & taal** — geef je assistent een roepnaam (bv. "Richie"). Die wordt
    het wake-word en verschijnt in begroetingen en de titelbalk.

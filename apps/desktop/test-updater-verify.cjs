@@ -7,7 +7,8 @@ const fs = require('fs')
 const os = require('os')
 const path = require('path')
 
-const { safeAssetName, fileSha256, verifyAsset } = require('./updater.cjs')
+const { safeAssetName, fileSha256, verifyAsset,
+        pickWindowsAsset, installedPerMachine, installerCommand } = require('./updater.cjs')
 
 async function main() {
   // --- safeAssetName: the .cmd-injection guard -----------------------------
@@ -57,6 +58,54 @@ async function main() {
   assert.strictEqual(ok.reason, 'asset not listed in checksums')
 
   fs.rmSync(dir, { recursive: true, force: true })
+
+  // --- U353: update the way this copy was installed ------------------------
+  //
+  // A release now carries both installers. An MSI install lives in Program
+  // Files; the NSIS .exe installs per-user into %LOCALAPPDATA%. Handing an
+  // MSI install the .exe would quietly produce a SECOND copy in a different
+  // place, and which one the shortcut then starts is a coin toss.
+  const both = [
+    { name: 'AURA-2.0.150-windows-setup.exe' },
+    { name: 'AURA-2.0.150-windows.msi' },
+    { name: 'SHA256SUMS.txt' },
+  ]
+  assert.strictEqual(pickWindowsAsset(both, { perMachine: true }).name,
+                     'AURA-2.0.150-windows.msi')
+  assert.strictEqual(pickWindowsAsset(both, { perMachine: false }).name,
+                     'AURA-2.0.150-windows-setup.exe')
+  assert.strictEqual(pickWindowsAsset(both).name,
+                     'AURA-2.0.150-windows-setup.exe', 'per-user is the default')
+
+  // An older release has no MSI. A per-machine install must still be offered
+  // the .exe rather than nothing — "no update available" would be a lie.
+  const exeOnly = [{ name: 'AURA-2.0.140-windows-setup.exe' }]
+  assert.strictEqual(pickWindowsAsset(exeOnly, { perMachine: true }).name,
+                     'AURA-2.0.140-windows-setup.exe')
+  assert.strictEqual(pickWindowsAsset([], { perMachine: true }), null)
+
+  // Where the running copy lives is how we know which it was.
+  const env = { ProgramFiles: 'C:\\Program Files', LOCALAPPDATA: 'C:\\Users\\jan\\AppData\\Local' }
+  assert.strictEqual(installedPerMachine('C:\\Program Files\\AURA\\AURA.exe', env), true)
+  assert.strictEqual(
+    installedPerMachine('C:\\Users\\jan\\AppData\\Local\\Programs\\AURA\\AURA.exe', env), false)
+  // Case and trailing slashes are Windows being Windows, not a different place.
+  assert.strictEqual(installedPerMachine('c:\\program files\\AURA\\AURA.exe', env), true)
+  // Nothing known → assume per-user, which is what every install before U353 is.
+  assert.strictEqual(installedPerMachine('', env), false)
+  assert.strictEqual(installedPerMachine('D:\\portable\\AURA.exe', env), false)
+
+  // --- and run it the way that file can be run -----------------------------
+  //
+  // `call x.msi /S` does nothing useful: an MSI is data for msiexec, not a
+  // program. It is deliberately NOT silent — a per-machine install needs
+  // elevation, and a UAC prompt nobody asked for is worse than a wizard.
+  assert.match(installerCommand('C:\\tmp\\AURA-2.0.150-windows.msi'), /^msiexec /i)
+  assert.match(installerCommand('C:\\tmp\\AURA-2.0.150-windows.msi'), /\/i /i)
+  assert.ok(!/\/qn/i.test(installerCommand('C:\\tmp\\a.msi')), 'must not install silently')
+  assert.strictEqual(installerCommand('C:\\tmp\\AURA-2.0.150-windows-setup.exe'),
+                     'call "C:\\tmp\\AURA-2.0.150-windows-setup.exe" /S')
+
   console.log('updater verification: all assertions passed')
 }
 

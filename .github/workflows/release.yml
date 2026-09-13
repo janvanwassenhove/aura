@@ -227,7 +227,11 @@ jobs:
       matrix:
         include:
           - os: windows-latest
-            args: --win nsis
+            # U353: both. The .exe is the auto-update path and every
+            # existing install; the MSI is the one a managed laptop will
+            # actually run - it goes through msiexec into Program Files
+            # instead of executing itself from a user-writable directory.
+            args: --win nsis msi
           - os: macos-latest
             args: --mac dmg zip --arm64 --x64
           - os: ubuntu-latest
@@ -281,7 +285,11 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: unsigned-windows-installer
-          path: apps/desktop/dist/*.exe
+          # U353: both installers, or the one a work laptop runs would be
+          # the one left unsigned - which is the machine signing is for.
+          path: |
+            apps/desktop/dist/*.exe
+            apps/desktop/dist/*.msi
           if-no-files-found: error
           retention-days: 1
 
@@ -306,14 +314,18 @@ jobs:
         shell: pwsh
         continue-on-error: true
         run: |
-          $setup = Get-ChildItem dist -Filter '*windows-setup.exe' -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
-          if (-not $setup) { Write-Host 'no Windows installer in dist'; exit 0 }
-          $sig = Get-AuthenticodeSignature $setup.FullName
-          Write-Host "installer : $($setup.Name)"
-          Write-Host "signature : $($sig.Status)"
-          if ($sig.SignerCertificate) { Write-Host "publisher : $($sig.SignerCertificate.Subject)" }
-          $line = if ($sig.Status -eq 'Valid') { "signed — $($sig.SignerCertificate.Subject)" } else { "UNSIGNED ($($sig.Status)) — Windows will warn about an unknown publisher" }
-          Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value "**Windows installer**: $line"
+          # U353: two installers ship now, and reporting on only one of them
+          # would leave the file a managed laptop actually runs unexamined.
+          $found = @(Get-ChildItem dist -Recurse -ErrorAction SilentlyContinue -Include '*windows-setup.exe','*.msi')
+          if (-not $found) { Write-Host 'no Windows installer in dist'; exit 0 }
+          foreach ($file in $found) {
+            $sig = Get-AuthenticodeSignature $file.FullName
+            Write-Host "installer : $($file.Name)"
+            Write-Host "signature : $($sig.Status)"
+            if ($sig.SignerCertificate) { Write-Host "publisher : $($sig.SignerCertificate.Subject)" }
+            $line = if ($sig.Status -eq 'Valid') { "signed — $($sig.SignerCertificate.Subject)" } else { "UNSIGNED ($($sig.Status)) — Windows will warn about an unknown publisher" }
+            Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value "**$($file.Name)**: $line"
+          }
       - name: Verify packaged modules
         working-directory: apps/desktop
         # U176: every .cjs the main process requires MUST be inside app.asar.
@@ -339,6 +351,7 @@ jobs:
           name: installers-${{ matrix.os }}
           path: |
             apps/desktop/dist/*.exe
+            apps/desktop/dist/*.msi
             apps/desktop/dist/*.dmg
             apps/desktop/dist/*.zip
             apps/desktop/dist/*.AppImage

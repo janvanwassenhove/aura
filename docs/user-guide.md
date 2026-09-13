@@ -9,7 +9,25 @@ always with your approval — operates apps on your laptop.
 ## 1. First start
 
 Install AURA with the Windows installer (or run the desktop app from a dev
-checkout). On first start a short **setup wizard** appears:
+checkout). A release carries **two** of them — pick by the machine, not by
+preference:
+
+| File | Use it when |
+|---|---|
+| `AURA-<version>-windows-setup.exe` | your own PC. Installs for you only, and updates itself from inside the app. |
+| `AURA-<version>-windows.msi` | a **work or managed laptop**. Installs into `Program Files` for everyone, via Windows' own installer. |
+
+If the `.exe` gives you *"Windows cannot access the specified device, path, or
+file"*, that is the machine refusing to run an unsigned program from your
+Downloads folder — not a damaged download. Use the **`.msi`**: it is handed to
+Windows' own `msiexec`, which the same policy already allows. Both files show
+the "unknown publisher" warning until the build is signed; that warning is not
+what blocks the `.exe`.
+
+An MSI install needs an administrator once, and updates itself with the next
+MSI rather than silently — you will see the wizard.
+
+On first start a short **setup wizard** appears:
 
 1. **Name & language** — give your assistant a call name (e.g. "Richie"). This
    becomes the wake word and appears in greetings and the title bar.

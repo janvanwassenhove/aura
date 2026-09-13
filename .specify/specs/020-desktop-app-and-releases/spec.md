@@ -5,7 +5,7 @@ owner: "apps/desktop + CI"
 priority: P1
 risk: High
 created: "2026-09-05"
-units: [U32, U33, U44, U55, U56, U151, U152, U166, U168, U168b, U168c, U168d, U168e, U169, U169b, U170, U171, U172, U173, U174, U176, U177, U178, U192, U193, U197, U201, U211, U228, U229, U230, U231, U232, U233, U234, U235, U236, U283, U284, U285, U285b, U297, U179, U184, U185, U186, U210, U317, U318, U327, U330, U337, U338, U343, U344]
+units: [U32, U33, U44, U55, U56, U151, U152, U166, U168, U168b, U168c, U168d, U168e, U169, U169b, U170, U171, U172, U173, U174, U176, U177, U178, U192, U193, U197, U201, U211, U228, U229, U230, U231, U232, U233, U234, U235, U236, U283, U284, U285, U285b, U297, U179, U184, U185, U186, U210, U317, U318, U327, U330, U337, U338, U343, U344, U353]
 amended: "2026-09-13"
 ---
 
@@ -192,6 +192,33 @@ and installers for Windows, macOS (arm64 and x64) and Linux.
   publisher" is otherwise discovered at install time on somebody else's
   machine. A private key written to a runner is deleted in a `finally`
   (U337).
+- **FR-016**: Windows gets **two** installers, published side by side. The NSIS
+  `.exe` stays: it is the auto-update path and every install that already
+  exists. The **MSI** is added for a managed machine, and for the same reason
+  FR-014 starts `python -m aura_brain` rather than a generated launcher — an
+  MSI is not an executable, it is data handed to `msiexec.exe`, which is
+  Microsoft-signed and already allowed, and it installs into `Program Files`
+  instead of executing itself from a user-writable directory. The MSI is
+  therefore **per-machine** (`msi.perMachine: true`); electron-builder defaults
+  both installers to per-user, which puts the app in `%LOCALAPPDATA%` — the
+  location the default AppLocker rule set exists to deny. Reported with the
+  screenshot Windows actually shows: *"Windows cannot access the specified
+  device, path, or file. You may not have the appropriate permissions to access
+  the item."* — refusal to **execute**, before any wizard, while an unsigned
+  MSI for another product reached its wizard on the same laptop. Signing
+  (FR-011) is unaffected and still wanted; it is a different problem, and U337
+  already recorded that it would not by itself defeat a policy block (U353).
+- **FR-017**: An update installs **the way this copy was installed**. The
+  updater picks the MSI for a per-machine install and the `.exe` for a per-user
+  one, decided from where the running executable lives; it falls back to
+  whichever the release actually carries, because an older release has no MSI
+  and "no update available" would be a lie. The staged file is then run the way
+  that file can be run — `msiexec /i` for an MSI, `call … /S` for the `.exe`.
+  The MSI branch is deliberately **not** silent: a per-machine install needs
+  elevation, and a UAC prompt with no window to explain it is worse than a
+  wizard. Without this, an MSI install would update itself into a second,
+  per-user copy in a different directory, and which one the shortcut starts
+  would be a coin toss (U353).
 - **FR-002**: Every push to `master` produces a versioned release with notes,
   screenshots and installers for all four targets.
 - **FR-003**: Release notes are English, generated from commit subjects by
@@ -247,6 +274,7 @@ and installers for Windows, macOS (arm64 and x64) and Linux.
 | U55, U56, U166, U169, U169b | NSIS installer and the release pipeline; QA and user guides; automated releases; the first real release run |
 | U168, U168b, U168c, U168d, U168e, U283 | Making CI green *and honest* — spawn fix, Linux-only failures, an import-order race, a mutated singleton, clock precision, and the six hours I reported green while it was red |
 | U170, U171, U174, U176, U235 | About dialog; a real app icon; icons that were never committed; `updater.cjs` unpackaged; a missing module in the installer |
+| U353 | An MSI beside the .exe, per-machine, because a managed laptop refuses to execute the installer at all — and an update that follows the way this copy was installed |
 | U172, U173, U177, U178, U192, U197, U201, U224 | Semantic versioning from commit markers; in-app prompts; the data-loss bug; the silent check; the panic stop; verified on the real robot; the update that never came back; verifying the installer |
 | U151, U152, U229, U234, U297 | Honest title-bar status; status polled rather than awaited; the app showing another project; resolving ports; the README screenshots regenerated from the demo stack |
 | U184, U185, U186, U230, U231, U232, U233, U236 | A README that sells; screenshots that match their captions; diagrams that render; where the robot comes from; screenshots that had been failing quietly for weeks |
