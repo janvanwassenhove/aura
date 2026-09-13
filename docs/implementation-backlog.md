@@ -3598,10 +3598,65 @@ fallback for a release with no MSI, where-am-I-installed including case and
 trailing slashes, and that an MSI is never installed silently). All verified
 red first.
 
-**Not verified**: nothing here has been run on the work laptop, and I could not
-read its policy — this machine is `WORKGROUP` and AppLocker on it is
-`AuditOnly`. The reasoning is measured (both files unsigned; the MSI installed
+**Not verified** *(at the time of writing — see U354, which ran it)*: nothing
+here has been run on the work laptop, and I could not read its policy — this
+machine is `WORKGROUP` and AppLocker on it is `AuditOnly`. The reasoning is measured (both files unsigned; the MSI installed
 machine-wide into `Program Files` with an HKLM uninstall entry; the `.exe`
 refused before its wizard), but "the MSI will install there" is a prediction
 until it does. Nor has an MSI been built yet: the target is wired, and the
 first release to run it is the first proof that WiX packages this app cleanly.
+
+### U354 — the MSI installed, and then Defender would not let it start
+
+Reported with the toast: *"with the msi it installed, but then when launching it
+stopped and gave risk warning"*.
+
+**Half of U353 is now measured, and it was right.** The MSI installed on the
+managed laptop, into `C:\Program Files\AURA\AURA.exe` — per-machine, in
+Program Files, which is exactly what `msi.perMachine: true` was for and exactly
+what the `.exe` could never reach. The install path is no longer a prediction.
+
+**The other half found a second gate, and it is one this repository has already
+met.** Launching is refused by Defender:
+
+```
+Blocked by : Attack surface reduction
+Rule       : Block executable files from running unless they meet a
+             prevalence, age, or trusted list criteria
+Affected   : C:\Program Files\AURA\AURA.exe
+```
+
+That is ASR rule `01443614-CD74-433A-B99E-2ECDC07BFC25` — **the same rule, by
+id, that U344 hit** on `.venv\Scriptsura-brain.exe`, set by the same IT
+department with Tamper Protection on.
+
+U344 got around it because the thing being refused was a *shim*: `uv` writes a
+fresh 47 kB unsigned launcher, and there was a signed, prevalent `python.exe`
+sitting next to it doing the same job. Starting the brain as a module made the
+refused file stop existing.
+
+**There is no equivalent move here.** `AURA.exe` is not a shim standing in front
+of the app; it is the app. It is unsigned, it is minutes old, and almost nobody
+in the world has run this build — so it fails all three limbs of the rule at
+once, by construction, and will fail them again for every release. No build
+flag, install location or packaging target changes that. U353 solved *where the
+app installs*; this is *whether the binary may run*, and they are different
+gates with different keys.
+
+So the honest position, recorded rather than worked around:
+
+- **What unblocks it today** is an ASR exclusion for `C:\Program Files\AURA\`,
+  which only IT can add — Tamper Protection means the owner cannot, and should
+  not be able to.
+- **What unblocks it properly** is the signing already wired in U337 and U338.
+  A trusted publisher is the "trusted list" limb of that rule, and it is the one
+  limb a project can actually satisfy on purpose; prevalence and age cannot be
+  engineered. The wiring waits on a SignPath Foundation project and its token —
+  and U338 recorded that its action input names were written from memory, so the
+  first real run is also the first test of them.
+- **What does not help**, and is worth writing down so it is not tried again:
+  another installer format, a different install directory, or turning off
+  `runAfterFinish` so the block lands later. The rule is about the executable.
+
+No code changed in this unit. The measurement did: U353's "not verified" is
+answered, half confirmed and half replaced by a better-understood blocker.

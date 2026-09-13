@@ -5,7 +5,7 @@ owner: "apps/desktop + CI"
 priority: P1
 risk: High
 created: "2026-09-05"
-units: [U32, U33, U44, U55, U56, U151, U152, U166, U168, U168b, U168c, U168d, U168e, U169, U169b, U170, U171, U172, U173, U174, U176, U177, U178, U192, U193, U197, U201, U211, U228, U229, U230, U231, U232, U233, U234, U235, U236, U283, U284, U285, U285b, U297, U179, U184, U185, U186, U210, U317, U318, U327, U330, U337, U338, U343, U344, U353]
+units: [U32, U33, U44, U55, U56, U151, U152, U166, U168, U168b, U168c, U168d, U168e, U169, U169b, U170, U171, U172, U173, U174, U176, U177, U178, U192, U193, U197, U201, U211, U228, U229, U230, U231, U232, U233, U234, U235, U236, U283, U284, U285, U285b, U297, U179, U184, U185, U186, U210, U317, U318, U327, U330, U337, U338, U343, U344, U353, U354]
 amended: "2026-09-13"
 ---
 
@@ -208,6 +208,21 @@ and installers for Windows, macOS (arm64 and x64) and Linux.
   MSI for another product reached its wizard on the same laptop. Signing
   (FR-011) is unaffected and still wanted; it is a different problem, and U337
   already recorded that it would not by itself defeat a policy block (U353).
+  **Measured on the managed laptop (U354)**: the MSI installs, into
+  `C:\Program Files\AURA\AURA.exe`. Installation is solved.
+- **FR-018**: Installing and *running* are separate gates with different keys,
+  and only one of them is ours. Defender's ASR rule
+  `01443614-CD74-433A-B99E-2ECDC07BFC25` — "block executable files from running
+  unless they meet a prevalence, age, or trusted list criteria", the same rule
+  by id that FR-014 routes around for the brain launcher — refuses
+  `AURA.exe` itself. There is no equivalent route: the launcher was a shim with
+  a signed, prevalent `python.exe` beside it, whereas `AURA.exe` **is** the app,
+  and every release is unsigned, minutes old and run by almost nobody — all
+  three limbs of the rule, by construction. No installer format, install
+  directory or packaging flag changes it. The only limb a project can satisfy
+  deliberately is the trusted list, which is FR-011's signing; prevalence and
+  age cannot be engineered. Until then it takes an ASR exclusion for the install
+  directory, which only IT can add (Tamper Protection) (U354).
 - **FR-017**: An update installs **the way this copy was installed**. The
   updater picks the MSI for a per-machine install and the `.exe` for a per-user
   one, decided from where the running executable lives; it falls back to
@@ -274,6 +289,7 @@ and installers for Windows, macOS (arm64 and x64) and Linux.
 | U55, U56, U166, U169, U169b | NSIS installer and the release pipeline; QA and user guides; automated releases; the first real release run |
 | U168, U168b, U168c, U168d, U168e, U283 | Making CI green *and honest* — spawn fix, Linux-only failures, an import-order race, a mutated singleton, clock precision, and the six hours I reported green while it was red |
 | U170, U171, U174, U176, U235 | About dialog; a real app icon; icons that were never committed; `updater.cjs` unpackaged; a missing module in the installer |
+| U354 | The MSI installs on the managed laptop — and Defender's ASR rule then refuses to run the app itself, which is a different gate and needs signing or an IT exclusion |
 | U353 | An MSI beside the .exe, per-machine, because a managed laptop refuses to execute the installer at all — and an update that follows the way this copy was installed |
 | U172, U173, U177, U178, U192, U197, U201, U224 | Semantic versioning from commit markers; in-app prompts; the data-loss bug; the silent check; the panic stop; verified on the real robot; the update that never came back; verifying the installer |
 | U151, U152, U229, U234, U297 | Honest title-bar status; status polled rather than awaited; the app showing another project; resolving ports; the README screenshots regenerated from the demo stack |
