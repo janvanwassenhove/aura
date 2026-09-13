@@ -54,12 +54,13 @@ jobs:
         run: |
           pytest scripts/test_sync_agent_docs.py -q
           python scripts/sync_agent_docs.py --check
-      # U297: the README's screenshots are generated too, and a renamed shot
-      # would otherwise leave a broken picture on the front page.
-      - name: README-screenshot tests
+      # U337: every check in scripts/ runs, rather than a hand-kept list of
+      # them. Two had already fallen outside it — a test CI does not run is a
+      # comment with a docstring.
+      - name: Repository checks
         run: |
           pip install pillow
-          pytest scripts/test_readme_shots.py -q
+          pytest scripts/ -q
 
   test:
     runs-on: ubuntu-latest
@@ -138,7 +139,7 @@ jobs:
           node-version: "20"
       - name: Lint Electron main process
         working-directory: apps/desktop
-        run: npx --yes eslint@9 main.cjs preload.cjs updater.cjs serving.cjs
+        run: npx --yes eslint@9 main.cjs preload.cjs updater.cjs serving.cjs sign.cjs
       - name: Updater verification tests
         working-directory: apps/desktop
         run: node test-updater-verify.cjs

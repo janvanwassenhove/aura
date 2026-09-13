@@ -5,7 +5,7 @@ owner: "apps/desktop + CI"
 priority: P1
 risk: High
 created: "2026-09-05"
-units: [U32, U33, U44, U55, U56, U151, U152, U166, U168, U168b, U168c, U168d, U168e, U169, U169b, U170, U171, U172, U173, U174, U176, U177, U178, U192, U193, U197, U201, U211, U228, U229, U230, U231, U232, U233, U234, U235, U236, U283, U284, U285, U285b, U297, U179, U184, U185, U186, U210, U317, U318, U327, U330]
+units: [U32, U33, U44, U55, U56, U151, U152, U166, U168, U168b, U168c, U168d, U168e, U169, U169b, U170, U171, U172, U173, U174, U176, U177, U178, U192, U193, U197, U201, U211, U228, U229, U230, U231, U232, U233, U234, U235, U236, U283, U284, U285, U285b, U297, U179, U184, U185, U186, U210, U317, U318, U327, U330, U337]
 amended: "2026-09-05"
 ---
 
@@ -152,6 +152,16 @@ and installers for Windows, macOS (arm64 and x64) and Linux.
   resolves against the working directory, and fails when the desktop app does
   not pin it to `userData` — so the next such setting cannot be forgotten the
   way five of them were (U327).
+- **FR-011**: The Windows installer is signed when a certificate is configured,
+  and **says which** when it is not. Signing runs through `apps/desktop/
+  sign.cjs`: Azure Trusted Signing when the Azure secrets are present, a PFX
+  when those are, and otherwise a no-op that logs `UNSIGNED` — a fork, a pull
+  request and a local `npm run dist` must still produce a working installer,
+  and a missing secret must never fail a release. The release then verifies the
+  artefact and writes the answer into the run summary, because "unknown
+  publisher" is otherwise discovered at install time on somebody else's
+  machine. A private key written to a runner is deleted in a `finally`
+  (U337).
 - **FR-002**: Every push to `master` produces a versioned release with notes,
   screenshots and installers for all four targets.
 - **FR-003**: Release notes are English, generated from commit subjects by
@@ -196,3 +206,4 @@ and installers for Windows, macOS (arm64 and x64) and Linux.
 | U284, U285, U285b | Release notes a person wants to read, in English, without an empty section |
 | U327 | The five settings U177 left in the install directory — quiet and the mode policy among them — pinned to userData, with a test that finds the next one |
 | U330 | The published screenshots refreshed from the current app, one command to redo it, and two drawings that had stopped being true |
+| U337 | Windows code signing wired end to end (Azure Trusted Signing or a PFX), an unsigned build that admits it, and every check in scripts/ actually running in CI |

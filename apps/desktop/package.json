@@ -23,7 +23,8 @@
     "files": [
       "*.cjs",
       "!test-*.cjs",
-      "build/**"
+      "build/**",
+      "sign.cjs"
     ],
     "extraResources": [
       {
@@ -82,7 +83,11 @@
       "target": [
         "nsis"
       ],
-      "icon": "build/icon.ico"
+      "icon": "build/icon.ico",
+      "sign": "./sign.cjs",
+      "signingHashAlgorithms": [
+        "sha256"
+      ]
     },
     "nsis": {
       "oneClick": false,

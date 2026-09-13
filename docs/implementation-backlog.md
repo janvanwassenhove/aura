@@ -2217,3 +2217,46 @@ netwerk doodt de bewaking niet.
 zetten waar hij nog niet op zit. Kan hij het netwerk niet bereiken, dan kan
 niets hier hem bereiken. Dat blijft een eenmalige klus aan de robot zelf.
 
+### U337 — de installer was nergens ondertekend
+
+Gemeld: *"code signing moet toegevoegd te worden zodat ik ook kan installeren
+op werk pc en niet langer exceptie krijg."* Nagekeken: er stond **geen enkele**
+ondertekenconfiguratie in de bouw. Windows meldt dus bij elke installatie een
+onbekende uitgever, en een beheerde werk-pc weigert het ronduit. De mac-bouw
+staat expliciet op `identity: null`.
+
+Wat er nu is: `apps/desktop/sign.cjs`, met twee routes en één regel die
+belangrijker is dan beide. Azure Trusted Signing als de Azure-geheimen er zijn
+(de sleutel blijft in Microsofts HSM — sinds juni 2023 mág een nieuwe
+OV-sleutel sowieso niet meer als los bestand bestaan), een PFX als díe er is,
+en anders een bewuste no-op die `UNSIGNED` logt. Die laatste is de belangrijke:
+een fork, een pull request en een lokale `npm run dist` hebben geen geheimen en
+moeten gewoon een werkende installer opleveren. Een ontbrekend geheim mag nooit
+een release breken — maar het mag evenmin stilzwijgend gebeuren.
+
+Daarom controleert de release achteraf de handtekening van het bestand en zet
+het antwoord in de samenvatting van de run. "Onbekende uitgever" hoor je anders
+pas op de machine van iemand anders, op het slechtste moment.
+
+Een privésleutel die naar een runner geschreven wordt, verdwijnt in een
+`finally` — buildmappen worden gecached en teruggezet, dus een achtergebleven
+PFX ís een gelekte sleutel.
+
+**Wat jij nog moet doen, en het kost geld:** een certificaat. Twee routes:
+
+* **Azure Trusted Signing** — ongeveer $10 per maand, draait in CI, geen
+  hardware nodig. Vereist wel een geverifieerde organisatie-identiteit.
+* **OV- of EV-certificaat op een hardwaretoken** — duurder, en een token in een
+  CI-runner krijgen is bewerkelijk. EV geeft wel meteen SmartScreen-reputatie;
+  OV en Trusted Signing bouwen die op met het aantal downloads.
+
+En eerlijk over de grens: ondertekenen haalt "onbekende uitgever" weg, maar een
+beheerde werk-pc kan installaties nog steeds per beleid blokkeren
+(AppLocker/Intune). Het verschil is dat IT een ondertekende build **kan**
+toelaten op uitgever; een ongetekende niet.
+
+Onderweg ontdekt: CI draaide de controles in `scripts/` als een **met de hand
+bijgehouden lijst** van bestanden, en twee stonden er niet in — waaronder de
+schermafbeeldingstest van U330. Dat is nu `pytest scripts/`. Een test die CI
+niet draait, is een opmerking met een docstring.
+

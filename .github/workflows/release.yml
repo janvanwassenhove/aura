@@ -245,9 +245,36 @@ jobs:
         shell: bash
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: "false"   # unsigned mac build
+          # U337: Windows signing. Absent secrets mean an unsigned installer —
+          # the same build as before, never a failed release. sign.cjs says
+          # which of the two happened, and the step below verifies it.
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          TRUSTED_SIGNING_ENDPOINT: ${{ secrets.TRUSTED_SIGNING_ENDPOINT }}
+          TRUSTED_SIGNING_ACCOUNT: ${{ secrets.TRUSTED_SIGNING_ACCOUNT }}
+          TRUSTED_SIGNING_PROFILE: ${{ secrets.TRUSTED_SIGNING_PROFILE }}
+          WINDOWS_PFX_BASE64: ${{ secrets.WINDOWS_PFX_BASE64 }}
+          WINDOWS_PFX_PASSWORD: ${{ secrets.WINDOWS_PFX_PASSWORD }}
         run: |
           npm ci
           npx electron-builder ${{ matrix.args }} --publish never -c.extraMetadata.version=${{ needs.version.outputs.version }}
+
+      - name: Say whether the Windows installer is signed
+        if: runner.os == 'Windows'
+        # U337: "unknown publisher" is discovered at install time, on someone
+        # else's machine, at the worst moment. The build knows; it should say.
+        shell: pwsh
+        continue-on-error: true
+        run: |
+          $setup = Get-ChildItem dist -Filter '*windows-setup.exe' -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $setup) { Write-Host 'no Windows installer in dist'; exit 0 }
+          $sig = Get-AuthenticodeSignature $setup.FullName
+          Write-Host "installer : $($setup.Name)"
+          Write-Host "signature : $($sig.Status)"
+          if ($sig.SignerCertificate) { Write-Host "publisher : $($sig.SignerCertificate.Subject)" }
+          $line = if ($sig.Status -eq 'Valid') { "signed — $($sig.SignerCertificate.Subject)" } else { "UNSIGNED ($($sig.Status)) — Windows will warn about an unknown publisher" }
+          Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value "**Windows installer**: $line"
       - name: Verify packaged modules
         working-directory: apps/desktop
         # U176: every .cjs the main process requires MUST be inside app.asar.
