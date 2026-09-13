@@ -97,6 +97,8 @@ const brainUrl = () => `http://127.0.0.1:${brainPort}`
 const consoleUrl = () => `http://127.0.0.1:${consolePort}`
 
 let brainProc = null
+let brainExit = null   // exit code once the brain is gone; null while it lives
+let brainTail = ''     // last stderr, so a startup failure can name its cause
 let staticServer = null
 let mainWindow = null
 let tray = null
@@ -347,15 +349,23 @@ function startBrain() {
   const logPath = path.join(app.getPath('userData'), 'brain.log')
   const logStream = fs.createWriteStream(logPath, { flags: 'a' })
   logStream.write(`\n===== AURA brain start ${new Date().toISOString()} =====\n`)
+  brainExit = null
+  brainTail = ''
 
-  brainProc = spawn('uv', ['run', '--package', 'aura-brain', 'aura-brain'], {
+  // U344: `python -m aura_brain`, not the `aura-brain` console script. A
+  // corporate Defender ASR rule ("block executable files unless they meet a
+  // prevalence, age or trusted list criterion") refuses every launcher uv
+  // generates in .venv\Scripts, so the shim died with os error 5 and the app
+  // sat on the splash forever. The interpreter is signed and allowed.
+  brainProc = spawn('uv', ['run', '--package', 'aura-brain', 'python', '-m', 'aura_brain'], {
     cwd: REPO_ROOT,
     env: brainEnv(),
     shell: process.platform === 'win32', // uv.exe resolution via PATH on Windows
   })
   brainProc.stdout.on('data', (d) => logStream.write(d))
-  brainProc.stderr.on('data', (d) => logStream.write(d))
+  brainProc.stderr.on('data', (d) => { brainTail = (brainTail + d).slice(-2000); logStream.write(d) })
   brainProc.on('exit', (code) => {
+    brainExit = code
     logStream.write(`===== brain exited (code ${code}) =====\n`)
     if (!quitting && mainWindow) {
       dialog.showErrorBox(
@@ -385,6 +395,16 @@ function waitForBrain(timeoutMs = 90_000) {
   const deadline = Date.now() + timeoutMs
   return new Promise((resolve, reject) => {
     const tryOnce = () => {
+      // U344: a brain that already exited is never going to answer /health.
+      // Polling it for ninety seconds turned "the launcher is blocked" into a
+      // frozen splash and then a timeout that named no cause, while the reason
+      // sat in the log all along (constitution XI).
+      if (brainExit !== null) {
+        return reject(new Error(
+          `the brain exited immediately (code ${brainExit})`
+          + (brainTail.trim() ? `:\n\n${brainTail.trim().split('\n').slice(-6).join('\n')}` : ''),
+        ))
+      }
       const req = http.get(`${brainUrl()}/health`, { timeout: 2000 }, (res) => {
         res.resume()
         if (res.statusCode === 200) return resolve()

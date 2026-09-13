@@ -152,6 +152,9 @@ jobs:
       - name: Bootstrap extras tests
         working-directory: apps/desktop
         run: node test-bootstrap-extras.cjs
+      - name: Brain launch tests
+        working-directory: apps/desktop
+        run: node test-brain-launch.cjs
 
   lint:
     runs-on: ubuntu-latest
