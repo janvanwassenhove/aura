@@ -39,10 +39,15 @@ def test_config_sets_and_persists_without_echoing_secrets(client) -> None:
     assert "sk-supersecret" not in resp.text
     assert body["secrets_set"] == ["openai_api_key"]
     assert "ROBOT_RUNTIME_URL" in body["applied"]
-    # Persisted to the env file + effective in the process.
+    # Persisted + effective in the process. U340: settings go to the env file,
+    # the KEY does not — it goes to the OS credential store, because that file
+    # inherits its permissions from the profile directory.
+    from aura_brain import secret_store
+
     env = (tmp_path / ".env").read_text()
-    assert "OPENAI_API_KEY=sk-supersecret" in env
     assert "SETUP_DONE=true" in env
+    assert "sk-supersecret" not in env, "the key is lying in the env file again"
+    assert secret_store.get("OPENAI_API_KEY") == "sk-supersecret"
     status = c.get("/setup/status").json()
     assert status["setup_done"] is True
     assert status["openai_key_set"] is True

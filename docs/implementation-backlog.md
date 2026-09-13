@@ -2352,3 +2352,57 @@ hij bestaat door de 401 te krijgen en de broncode te lezen.
 Staat er nu bij, uitgecommentarieerd naast `ROBOT_RUNTIME_URL`, met waar het
 ding vandaan komt (de systemd drop-in op de Pi) en met de vermelding dat het in
 de app ook via Robot → Connection kan (U339).
+
+### U340 — de sleutels lagen in een bestand dat meer mensen mochten lezen
+
+Gevraagd: *"moeten we deze file niet beveiligen ook?"* — over
+`%APPDATA%\aura-desktop\.env`.
+
+Ja. En het vervelende is dat het argument al in de repo stond. U225 verhuisde
+de kennis-wachtwoordzin naar de credential store van het besturingssysteem, met
+in zijn eigen docstring exact de reden: dat bestand ligt naast de ciphertext met
+dezelfde rechten, dus "versleuteld op schijf" beschermde niets waar het in de
+praktijk tegenop moest. Alleen: er verhuisde **één** geheim. De OpenAI-,
+OpenRouter- en Gemini-sleutel, de agenda-deellink en sinds U339 ook de
+koppelsleutel van de robot bleven in platte tekst staan — in precies het
+bestand waar die alinea over ging.
+
+Wat ik op de machine zelf gemeten heb (alleen rechten, niet de inhoud): het
+bestand erft van `%APPDATA%\Roaming` een **leesrecht** voor de lokale groep
+`CodexSandboxUsers`, met `CodexSandboxOffline` en `CodexSandboxOnline` als
+leden. Twee sandbox-accounts op deze pc mochten dus de API-sleutel en de
+robotsleutel lezen. En Roaming is nu net wat een beheerde werklaptop met
+roaming profiles of OneDrive-mapback-up naar een bedrijfsshare synchroniseert —
+precies het scenario van deze week.
+
+Dezelfde behandeling als de wachtwoordzin, met dezelfde afwegingen:
+
+* **De omgeving wint nog altijd.** docker-compose, CI en een shell die een
+  sleutel exporteert houden de controle; een verouderde waarde in de
+  credential store mag die nooit overschaduwen.
+* **Geen keyring, dan het bestand.** Docker en CI hebben er geen. Die breken om
+  een desktopprobleem op te lossen is een slechte ruil (U225 maakte dezelfde
+  keuze).
+* **Bestaande platte tekst verhuist vanzelf**, één keer, bij de volgende start.
+  Een regel verdwijnt **pas** nadat de store de waarde heeft teruggegeven — een
+  kluis die schrijfacties aanneemt maar niets teruggeeft zou anders de laatste
+  kopie van je API-sleutel wissen.
+* **Het bestand zelf gaat op slot.** Overerving eraf, rechten alleen voor de
+  eigenaar, SYSTEM en Administrators (`icacls`), en op Linux/macOS `0600`. Dat
+  gebeurt bij élke schrijfactie, want een herschrijving zet de overerving
+  terug.
+* **`GITHUB_TOKEN` blijft bewust in het bestand**: de Electron-updater leest
+  hem daar rechtstreeks. Hem verplaatsen zou de updatecontrole breken terwijl
+  het eruitziet als een verbetering.
+
+**Wat dit níet doet, en wat ik er niet over ga beweren:** het houdt niets tegen
+dat draait ónder jouw account. De credential store geeft een geheim aan elk
+proces van die gebruiker. Wat het wegneemt is de *kopie* — een gesynchroniseerd
+profiel, een tweede account, een back-up, een zip onder een bugrapport, een
+screenshare.
+
+Twee bestaande tests legden de oude waarheid vast ("de sleutel staat in de
+.env") en zijn bijgewerkt naar wat ze nu bedoelen. 10 nieuwe tests, waaronder
+een echte `icacls`-controle op Windows en een die de hele brain opstart om te
+zien dat een sleutel die er al jaren in staat er daadwerkelijk uit verdwijnt.
+674 brain-tests groen.

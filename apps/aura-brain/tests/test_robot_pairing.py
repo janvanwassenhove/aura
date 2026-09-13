@@ -40,7 +40,13 @@ def test_the_secret_can_be_set_from_the_app(client) -> None:
     resp = c.post("/setup/config", json={"robot_shared_secret": "pair-me-42"})
     assert resp.status_code == 200, resp.text
     assert os.environ["ROBOT_SHARED_SECRET"] == "pair-me-42"
-    assert "ROBOT_SHARED_SECRET=pair-me-42" in env_file.read_text(encoding="utf-8")
+    # U340: kept out of the env file — a pairing key is a credential, and that
+    # file is readable by anything the profile directory grants read to.
+    from aura_brain import secret_store
+
+    assert secret_store.get("ROBOT_SHARED_SECRET") == "pair-me-42"
+    if env_file.exists():
+        assert "pair-me-42" not in env_file.read_text(encoding="utf-8")
 
 
 def test_it_is_never_echoed_back(client) -> None:

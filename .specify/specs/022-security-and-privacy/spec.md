@@ -5,7 +5,7 @@ owner: "cross-cutting"
 priority: P1
 risk: High
 created: "2026-09-05"
-units: [U121, U167, U182, U183, U215, U220, U221, U225, U226, U224, U323]
+units: [U121, U167, U182, U183, U215, U220, U221, U225, U226, U224, U323, U340]
 amended: "2026-09-11"
 ---
 
@@ -179,5 +179,6 @@ work below. The constitution states the principle — *no sensitive data in logs
 | U220 | S5 — shared secret between brain and robot |
 | U221 | S3 (console side), S14, S15 — no tokens in the browser, the unlock oracle closed, Electron links gated |
 | U225 | S9, S10 — owner key out of `.env`, modern KDF parameters, in-place rotation |
+| U340 | S16 — every remaining secret out of `.env` into the OS credential store, migrated on boot, and the file locked to its owner |
 | U226 | S3 (route deleted), S7, S12, and a leaked mediapipe model |
 | U323 | The hook had stopped refusing (U299 left the scan's exit code behind); now refuses again, with a test that commits through it |
