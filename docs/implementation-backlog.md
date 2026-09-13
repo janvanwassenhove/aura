@@ -3298,3 +3298,115 @@ operator-console tests fail on `60d0b10` before any of this — all on
 test-environment drift since U348 recorded the same 224 tests green — and two
 brain tests in `test_room_awareness.py` expect `_stt_language()` to be `nl`
 and get `en`.
+
+### U350 — the tests stopped believing in `localStorage`, and CI could not see it
+
+Reported at the end of U349, as the thing that unit deliberately did not touch:
+57 of the operator-console's tests fail on `60d0b10` before any product change,
+all of them on `localStorage.clear is not a function`, with vitest printing
+`--localstorage-file was provided without a valid path` alongside. It "looks
+like test-environment drift".
+
+It was drift. It was not in anything this repository installs.
+
+**What it looked like.** Nine of 28 test files died in `beforeEach`, on their
+first line, before asserting anything about the product — `themeStore`,
+`characterStore`, `OverlayView`, `PickerMenu`, `SettingsView` and four more.
+Every one of them persists a preference, so the obvious reading was that
+something in the stores had broken. Nothing in the stores had broken.
+
+**What was actually wrong** is three facts, each harmless on its own.
+
+1. Vitest builds the happy-dom environment by copying the window's properties
+   onto Node's `globalThis`, and `getWindowKeys` drops any name that is
+   *already* on `globalThis` unless that name appears on vitest's own
+   hard-coded list:
+
+   ```js
+   if (k in global) return keysArray.includes(k);
+   ```
+
+2. `localStorage` is not on that list. Not in 4.1.5, which
+   `package-lock.json` pins, and not in 4.1.11, the newest 4.x — both ship the
+   same content-hashed chunk, `index.DC7d2Pf8.js`, so the newer release is not
+   a fix waiting to be taken.
+
+3. **Node 25 has a `localStorage` global.** Measured here rather than assumed:
+   `'localStorage' in globalThis` is `false` on Node 20.20.2, 22.23.2 and
+   24.21.0, and `true` on 25.8.0. And without a `--localstorage-file` it is
+   inert — an object with no `getItem`, no `setItem`, no `clear`.
+
+Put together: on Node 25 the name collides, vitest yields to the incumbent,
+happy-dom's real `Storage` never lands, and what the console talks to for the
+rest of the file is a husk. On every Node before 25 there is nothing to collide
+with, so the copy happens and everything works.
+
+**Which makes the interesting number the one that stayed green.** The same
+commit, the same lockfile, the same `npm ci`, measured both ways:
+
+| | Node 20.20.2 (what CI pins) | Node 25.8.0 (this laptop) |
+|---|---|---|
+| Before | 243 passed, exit 0 | 57 failed / 186 passed, exit 1 |
+| After | 249 passed, exit 0 | 249 passed, exit 0 |
+
+(243, incidentally, not the 224 U349 wrote — that entry's own 19 console tests
+had already landed by the time it counted.)
+
+**What changed.** `apps/operator-console/tests/setup.ts`, wired in through
+`setupFiles`, installs a `Storage` on `globalThis` for both `localStorage` and
+`sessionStorage`. Two choices in it are deliberate and are argued in the file
+itself, because that is where whoever later wonders why it exists will be
+standing:
+
+- **happy-dom's own `Storage` class, not a hand-written stand-in.** It is the
+  exact object the environment was supposed to install, so the tests keep
+  browser semantics — a miss is `null`, a value is coerced to a string — rather
+  than a lookalike's approximation of them.
+- **Unconditionally, not `if (… is missing)`.** A suite that runs one
+  environment on the laptop and a different one in CI is how this unit happened
+  in the first place. A fresh instance per test file comes free, since setup
+  files re-run per file.
+
+`sessionStorage` is included even though no test uses it yet: Node 25 exposes
+that global too, on exactly the same terms, and the next test to reach for it
+would have found the identical husk.
+
+**No new dependency.** `happy-dom` is already in `package.json`. CLAUDE.md's
+rule about `uv sync` pruning what was only ever installed by hand has an npm
+twin, and nothing here was added to the working environment alone.
+
+**No drawing and no ADR.** The console's shape did not change — this is the
+test harness, not the product — and the decision is small enough to live in the
+header of the file it governs rather than outlive it in `docs/adr/`. The spec
+carries it as **FR-107**, next to FR-105's "mount tests are the only defence",
+because a defence that cannot reach the mount is not one.
+
+**The part worth remembering.** Nothing was wrong with the code. The lockfile
+was honest, `npm ci` was reproducible, CI was green, and the suite still could
+not run on the machine the repository is written on. A pinned CI Node is a
+floor, not a ceiling: it says nothing about a newer runtime growing a global
+that a test tool does not know to step around, and it cannot report a class of
+failure it is not able to reach. Bumping it, or adding a second version to the
+matrix, has the release workflow attached to it and is a decision with a real
+blast radius — which is why it is written down here rather than taken quietly
+inside a unit about test setup.
+
+**Tests**: 6 new in `tests/environment.test.ts`, asserting the environment
+itself — the full `Storage` surface on both globals, `null` for a miss and
+string coercion for a value, `window.localStorage` being the same object the
+app reaches, the two storages not sharing a `clear()`, and each file starting
+empty. Verified red first, on the same `localStorage.clear is not a function`.
+The other 57 are the rest of the evidence.
+
+**Still open, and deliberately not bundled here:**
+
+- The two brain tests in `test_room_awareness.py` that expect
+  `_stt_language()` to be `nl` and get `en` — unrelated, still unexplained,
+  still their own unit.
+- U349's note that the projector overlay's presenter strip should carry
+  `voice_note` beside `speech_error`. It was left out because `OverlayView`'s
+  tests could not run; they can now.
+- A `DOMException [AbortError]` from happy-dom's `teardownWindow`, printed
+  once during a full run and absent from the next one. It does not change the
+  exit code and predates this change, but it is a fetch still in flight when a
+  test file ends, which is a real thing somewhere in the suite.

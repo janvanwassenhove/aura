@@ -5,8 +5,8 @@ owner: "frontend"
 priority: P1
 risk: Medium
 created: "2026-04-25"
-amended: "2026-09-05"
-units: [U28, U30, U36c, U38, U53, U63, U68, U72, U76, U77, U78, U79, U95, U98, U112, U113, U114, U115, U117, U119, U120, U122, U123, U124, U125, U187, U188, U216, U217, U222, U223, U252, U252c, U252e, U253b, U262, U319]
+amended: "2026-09-13"
+units: [U28, U30, U36c, U38, U53, U63, U68, U72, U76, U77, U78, U79, U95, U98, U112, U113, U114, U115, U117, U119, U120, U122, U123, U124, U125, U187, U188, U216, U217, U222, U223, U252, U252c, U252e, U253b, U262, U319, U350]
 ---
 
 # Feature Specification: Operator Console
@@ -261,6 +261,13 @@ able to choose directly"*, and the same for the robot on the Talk screen.
 - **FR-106**: The overlay window has its own Pinia store; anything the two
   windows must agree on crosses through an explicit channel (a `storage` event
   or the brain), never by assumption.
+- **FR-107**: The suite supplies its own DOM Web Storage in
+  `apps/operator-console/tests/setup.ts` instead of trusting the environment to
+  provide one. Vitest does not copy a window property whose name already exists
+  on Node's `globalThis`, and `localStorage` is not on the list it makes an
+  exception for — so which `localStorage` the tests get is decided by whichever
+  Node the developer happens to have installed. FR-105's mount tests are only a
+  defence while they still reach the mount.
 
 ## Traceability
 
@@ -278,3 +285,4 @@ able to choose directly"*, and the same for the robot on the Talk screen.
 | U252, U252c, U252e, U253b | One surface and honest capability chips; the guessed field names; Settings that loaded nothing |
 | U262 | The cross that did nothing, and the typo that was forever |
 | U319 | `PickerMenu` — the identity chevron and the robot avatar open a list you choose from, instead of a control you press until it lands |
+| U350 | Node 25 brought its own inert `localStorage`, vitest yielded to it, and 57 console tests died before they asserted anything |

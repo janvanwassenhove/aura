@@ -11,5 +11,8 @@ export default defineConfig({
   test: {
     environment: 'happy-dom',
     globals: true,
+    // U350: happy-dom no longer reaches the tests' `localStorage` on its own.
+    // See tests/setup.ts — it is not boilerplate, it is load-bearing.
+    setupFiles: ['./tests/setup.ts'],
   },
 })
