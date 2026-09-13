@@ -5,7 +5,7 @@ owner: "apps/desktop + CI"
 priority: P1
 risk: High
 created: "2026-09-05"
-units: [U32, U33, U44, U55, U56, U151, U152, U166, U168, U168b, U168c, U168d, U168e, U169, U169b, U170, U171, U172, U173, U174, U176, U177, U178, U192, U193, U197, U201, U211, U228, U229, U230, U231, U232, U233, U234, U235, U236, U283, U284, U285, U285b, U297, U179, U184, U185, U186, U210, U317, U318, U327, U330, U337, U338, U343, U344, U353, U354]
+units: [U32, U33, U44, U55, U56, U151, U152, U166, U168, U168b, U168c, U168d, U168e, U169, U169b, U170, U171, U172, U173, U174, U176, U177, U178, U192, U193, U197, U201, U211, U228, U229, U230, U231, U232, U233, U234, U235, U236, U283, U284, U285, U285b, U297, U179, U184, U185, U186, U210, U317, U318, U327, U330, U337, U338, U343, U344, U353, U354, U355]
 amended: "2026-09-13"
 ---
 
@@ -222,7 +222,14 @@ and installers for Windows, macOS (arm64 and x64) and Linux.
   directory or packaging flag changes it. The only limb a project can satisfy
   deliberately is the trusted list, which is FR-011's signing; prevalence and
   age cannot be engineered. Until then it takes an ASR exclusion for the install
-  directory, which only IT can add (Tamper Protection) (U354).
+  directory, which only IT can add (Tamper Protection) (U354). **Measured
+  against the app that does run on that laptop (U355)**: Reachy Mini Control's
+  executable is unsigned too, so the trusted list is not what admits it — it
+  passes on prevalence and age, one build shipped to everyone for weeks. Under
+  FR-002 AURA cuts a release per push to `master` (162 `v2.0.*` tags) and so
+  never ships the same binary twice: prevalence and age are not merely hard for
+  this project, they are **unreachable by construction**, which leaves FR-011's
+  signing the only limb it can ever satisfy.
 - **FR-017**: An update installs **the way this copy was installed**. The
   updater picks the MSI for a per-machine install and the `.exe` for a per-user
   one, decided from where the running executable lives; it falls back to
@@ -289,6 +296,7 @@ and installers for Windows, macOS (arm64 and x64) and Linux.
 | U55, U56, U166, U169, U169b | NSIS installer and the release pipeline; QA and user guides; automated releases; the first real release run |
 | U168, U168b, U168c, U168d, U168e, U283 | Making CI green *and honest* — spawn fix, Linux-only failures, an import-order race, a mutated singleton, clock precision, and the six hours I reported green while it was red |
 | U170, U171, U174, U176, U235 | About dialog; a real app icon; icons that were never committed; `updater.cjs` unpackaged; a missing module in the installer |
+| U355 | Why the same ASR rule admits another unsigned app: prevalence and age, which a release-per-push project can never reach — so signing is the only door |
 | U354 | The MSI installs on the managed laptop — and Defender's ASR rule then refuses to run the app itself, which is a different gate and needs signing or an IT exclusion |
 | U353 | An MSI beside the .exe, per-machine, because a managed laptop refuses to execute the installer at all — and an update that follows the way this copy was installed |
 | U172, U173, U177, U178, U192, U197, U201, U224 | Semantic versioning from commit markers; in-app prompts; the data-loss bug; the silent check; the panic stop; verified on the real robot; the update that never came back; verifying the installer |

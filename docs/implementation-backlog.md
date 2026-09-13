@@ -3660,3 +3660,61 @@ So the honest position, recorded rather than worked around:
 
 No code changed in this unit. The measurement did: U353's "not verified" is
 answered, half confirmed and half replaced by a better-understood blocker.
+
+### U355 — why the same rule lets the other unsigned app run
+
+Asked, fairly, of U354's conclusion: *"why then does it work for reachy mini
+control app"*.
+
+It is the right question, because U354 said the ASR rule refuses `AURA.exe` for
+being unsigned, minutes old and run by nobody — and Reachy Mini Control is
+installed on the same laptop, from an installer already measured as
+`NotSigned`, and it starts.
+
+**Measured, and it takes the tidy version of the explanation apart.** The
+executables inside that MSI:
+
+```
+C:\Program Files\Reachy Mini Control\reachy-mini-control.exe   30 MB  NotSigned
+C:\Program Files\Reachy Mini Control\uv-trampoline.exe        343 KB  NotSigned
+```
+
+Also unsigned — and it ships a `uv` trampoline of its own, the same *kind* of
+file U344 watched this very rule refuse. So signing is not what separates them,
+in either direction. U353 established that for the installers; it holds for the
+binaries too.
+
+The rule has exactly three limbs — **prevalence, age, or trusted list** — and
+one pass is enough. Signing is the trusted-list limb and neither app has it. By
+elimination the answer is the other two, and that is where the two projects stop
+being comparable:
+
+| | Reachy Mini Control | AURA |
+|---|---|---|
+| Signed | no | no |
+| Binary age | built 2026-08-25, ~3 weeks old | minutes |
+| Copies of *this exact binary* in the world | one build, every user who installs it | one build, one user |
+
+**The second row is the one that matters, and it is structural.** FR-002: every
+push to `master` produces a versioned release, and there are **162** `v2.0.*`
+tags. AURA has never shipped the same binary twice and by design never will, so
+every release starts at zero prevalence and zero age and stays there —
+Microsoft's cloud has seen that file exactly once, on the machine asking about
+it. Reachy ships one build for weeks to everybody, so their file is common and
+old by the time a corporate laptop meets it.
+
+So U354's *"prevalence and age cannot be engineered"* was true but too gentle.
+For this project they cannot be **reached at all**, at any point in the future,
+under the release model the product is built on. That is not a gap waiting to
+close with time or downloads: signing is not the best of three doors, it is the
+only door there is — which makes the SignPath work in U337/U338 not a polish
+item but the entire path to AURA running on a managed machine.
+
+Worth stating plainly beside it, because it is the part I cannot promise: a
+fresh certificate proves *who* built the file, and how quickly this particular
+rule honours a publisher it has not seen before is not measurable from here. The
+exclusion IT can add is the certain route; signing is the durable one.
+
+No code changed. What changed is that one of the three doors is now known to be
+permanently shut — worth finding out before spending money on a certificate in
+the hope that downloads would eventually do the job instead.
