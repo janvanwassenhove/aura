@@ -3718,3 +3718,56 @@ exclusion IT can add is the certain route; signing is the durable one.
 No code changed. What changed is that one of the three doors is now known to be
 permanently shut — worth finding out before spending money on a certificate in
 the hope that downloads would eventually do the job instead.
+
+### U356 — the button was disabled, and nothing anywhere said so
+
+Reported as *"brain import -> clicking button does not work"*, with a
+screenshot of **Move him to another laptop** and its empty passphrase field.
+
+It works exactly as written. Both buttons are gated:
+
+```
+:disabled="transferPass.length < 8 || transferring"
+```
+
+and the field was empty, so `Import…` was dead. The defect is not the gate —
+Import genuinely needs the passphrase the file was sealed with, so it belongs
+there. The defect is that **nothing said so**, and one line of CSS made it
+worse than silent:
+
+```css
+.d2-ghost-btn { … cursor: pointer; }
+.d2-ghost-btn:hover { border-color: var(--accent); color: var(--accent); }
+```
+
+No `:disabled` rule at all. So a disabled ghost button kept full contrast, kept
+`cursor: pointer`, and **lit up accent on hover** — it advertised itself as
+clickable and then ate the click. `.d2-primary-btn` had `opacity: 0.5;
+cursor: not-allowed` from the start, so this was a gap in one class, not a
+decision.
+
+It is not one button. `.d2-ghost-btn` is the app's workhorse: **17** of them
+across ten views are `:disabled` under some condition — *Save key*, *Refresh*,
+*Connect*, the realtime test, and the two here. Every one of them has been
+lying by omission. (`.d2-danger-btn` has the same missing rule; checked, and no
+danger button is ever disabled, so it is left alone rather than changed on
+spec.)
+
+Two fixes, because dimming alone would only have said *no*:
+
+- `:hover` is now `:hover:not(:disabled)` and there is a real `:disabled` rule.
+  The hover rule is the one that actively misled, so guarding it matters more
+  than the dimming.
+- The transfer row says **why**. The passphrase gates *both* buttons, which is
+  not guessable from a field that sits beside them looking like an export-only
+  setting.
+
+**Tests**: 3 on the transfer row (both buttons disabled while the passphrase is
+short, a hint that explains it, and both released the moment it is long enough)
+and 3 on the stylesheet itself. The style tests are a poor substitute for
+looking at it — there is no `vue-tsc` here and jsdom applies none of this CSS —
+but they are a great deal better than the nothing that let a whole class of
+buttons ship without a disabled state. 271 console tests green.
+
+**Not verified by eye**: the dimmed button has not been looked at on screen,
+only asserted in the stylesheet.

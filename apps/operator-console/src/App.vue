@@ -153,7 +153,12 @@ body {
   border: 1px solid var(--line-strong); color: var(--ink-2);
   font-size: 12.5px; font-weight: 600; cursor: pointer; font-family: inherit;
 }
-.d2-ghost-btn:hover { border-color: var(--accent); color: var(--accent); }
+/* U356: the hover rule is the one that actively lied - accent border on a
+   button that would do nothing. Reported as "brain import -> clicking button
+   does not work": it was disabled, looked live, and kept cursor:pointer.
+   17 ghost buttons across ten views are :disabled under some condition. */
+.d2-ghost-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+.d2-ghost-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .d2-primary-btn {
   padding: 8px 16px; border-radius: 10px; background: var(--accent);

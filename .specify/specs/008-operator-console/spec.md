@@ -6,7 +6,7 @@ priority: P1
 risk: Medium
 created: "2026-04-25"
 amended: "2026-09-13"
-units: [U28, U30, U36c, U38, U53, U63, U68, U72, U76, U77, U78, U79, U95, U98, U112, U113, U114, U115, U117, U119, U120, U122, U123, U124, U125, U187, U188, U216, U217, U222, U223, U252, U252c, U252e, U253b, U262, U319, U350]
+units: [U28, U30, U36c, U38, U53, U63, U68, U72, U76, U77, U78, U79, U95, U98, U112, U113, U114, U115, U117, U119, U120, U122, U123, U124, U125, U187, U188, U216, U217, U222, U223, U252, U252c, U252e, U253b, U262, U319, U350, U356]
 ---
 
 # Feature Specification: Operator Console
@@ -268,6 +268,15 @@ able to choose directly"*, and the same for the robot on the Talk screen.
   exception for — so which `localStorage` the tests get is decided by whichever
   Node the developer happens to have installed. FR-105's mount tests are only a
   defence while they still reach the mount.
+
+- **FR-108**: A control that cannot be used must not look usable. `.d2-ghost-btn`
+  is the app's workhorse — 17 of them across ten views are `:disabled` under
+  some condition — and it carried no disabled styling at all: full contrast,
+  `cursor: pointer`, and a `:hover` rule that lit it accent. A disabled one was
+  indistinguishable from a live one and actively invited the click it would
+  swallow. It now dims, refuses the cursor, and stops responding to hover; and
+  where the gate is not guessable from the control itself, the panel says what
+  would lift it (U356).
 
 ## Traceability
 

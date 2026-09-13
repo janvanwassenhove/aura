@@ -332,6 +332,13 @@
           <input ref="bundleInput" type="file" accept=".aura,.json" class="hidden-input"
                  aria-label="Bundle file" @change="importBundle">
         </div>
+        <!-- U356: dimming the buttons says they are dead; this says why. The
+             passphrase gates BOTH, which is not guessable from a field sitting
+             beside them looking like an export-only setting. -->
+        <p v-if="transferPass.length < 8" class="sec-note" data-test="transfer-hint">
+          Type the passphrase first - both buttons need it. Export seals the file
+          with it; Import needs the one the file was sealed with.
+        </p>
         <p v-if="transferResult" class="sec-note" role="status">{{ transferResult }}</p>
       </section>
 

@@ -122,3 +122,43 @@ describe('taking him to another laptop', () => {
     expect(said.toLowerCase()).toMatch(/face/)
   })
 })
+
+/** U356: reported as "brain import -> clicking button does not work".
+ *
+ *  It works exactly as written: both buttons are gated on a passphrase of at
+ *  least 8 characters, and the field was empty. The defect is that nothing
+ *  said so. `.d2-ghost-btn` had no `:disabled` rule at all, so a disabled
+ *  ghost button kept `cursor: pointer` and still lit up accent on hover — it
+ *  invited the click and then swallowed it.
+ */
+describe('U356 — a button that cannot be pressed must not look pressable', () => {
+  it('disables both transfer buttons until the passphrase is long enough', async () => {
+    stubFetch([])
+    const w = mount(SettingsView)
+    await flushPromises()
+
+    expect(w.find('[data-test="transfer-import"]').attributes('disabled')).toBeDefined()
+    expect(w.find('[data-test="transfer-export"]').attributes('disabled')).toBeDefined()
+  })
+
+  it('says WHY they are dead, instead of leaving you clicking', async () => {
+    stubFetch([])
+    const w = mount(SettingsView)
+    await flushPromises()
+
+    const hint = w.find('[data-test="transfer-hint"]')
+    expect(hint.exists()).toBe(true)
+    expect(hint.text().toLowerCase()).toContain('passphrase')
+  })
+
+  it('lets go the moment the passphrase is long enough', async () => {
+    stubFetch([])
+    const w = mount(SettingsView)
+    await flushPromises()
+
+    await w.find('input[aria-label="Export passphrase"]').setValue('longenough')
+    expect(w.find('[data-test="transfer-import"]').attributes('disabled')).toBeUndefined()
+    expect(w.find('[data-test="transfer-export"]').attributes('disabled')).toBeUndefined()
+    expect(w.find('[data-test="transfer-hint"]').exists()).toBe(false)
+  })
+})
