@@ -202,6 +202,70 @@ async def test_frame_jpg_falls_back_when_the_robot_is_older(monkeypatch) -> None
     assert robot_api._robot_has_frame_jpg is False   # probed once, remembered
 
 
+# ------------------------------------------------------------------
+# U346: the pairing key must reach the still-frame path too
+# ------------------------------------------------------------------
+
+def test_frame_client_does_not_bake_in_the_pairing_key(monkeypatch) -> None:
+    """Measured live: paired through the console (U339 promises no restart),
+    the header went green and the video panel stayed dark with 401s.
+
+    `_client()` caches one AsyncClient for the life of the process and used to
+    pass `headers=robot_auth_headers()` at construction. The brain had started
+    before the key existed, so that client carried an empty header forever. The
+    MJPEG stream beside it worked, because it builds a client per request —
+    which is why this looked like a camera fault rather than a missing key.
+    """
+    robot_api._frame_client = None
+    monkeypatch.setenv("ROBOT_SHARED_SECRET", "the-key-at-startup")
+    cached = robot_api._client()                     # built while paired
+
+    assert "X-AURA-Secret" not in cached.headers, (
+        "the cached client must carry no key at all — one frozen at "
+        "construction outlives every later change, and an unpaired start "
+        "freezes an EMPTY one")
+    assert robot_api._client() is cached, "still the same cached client"
+    robot_api._frame_client = None
+
+
+async def test_frame_jpg_sends_the_key_set_after_startup(monkeypatch) -> None:
+    """The request itself must carry whatever key is set right now."""
+    seen: dict = {}
+
+    class _Resp:
+        status_code = 200
+        content = _jpeg(320, 180)
+
+    class _Client:
+        async def get(self, url, *a, **k):
+            seen.update(k.get("headers") or {})
+            return _Resp()
+
+    monkeypatch.setattr(robot_api, "_client", lambda: _Client())
+    monkeypatch.setattr(robot_api, "_robot", type("R", (), {"_base_url": "http://r"})())
+    monkeypatch.setenv("ROBOT_SHARED_SECRET", "shhh")
+
+    assert _client_for(robot_api).get("/robot/camera/frame.jpg").status_code == 200
+    assert seen.get("X-AURA-Secret") == "shhh", \
+        "a key set after startup must reach the robot on the next frame"
+
+
+async def test_frame_jpg_401_is_not_blamed_on_the_camera(monkeypatch) -> None:
+    """"camera unavailable" alone sends the owner to look at the lens."""
+    request = httpx.Request("GET", "http://r/robot/camera/frame.jpg")
+
+    class _Client:
+        async def get(self, url, *a, **k):
+            return httpx.Response(401, json={"error": "unauthorized"}, request=request)
+
+    monkeypatch.setattr(robot_api, "_client", lambda: _Client())
+    monkeypatch.setattr(robot_api, "_robot", type("R", (), {"_base_url": "http://r"})())
+
+    resp = _client_for(robot_api).get("/robot/camera/frame.jpg")
+    assert resp.status_code == 401
+    assert "401" in resp.json()["reason"]
+
+
 def test_shrink_downscales_a_legacy_frame() -> None:
     """An old robot's 1280px frame renders into a panel a few hundred px wide."""
     import io
@@ -269,6 +333,82 @@ def test_status_failure_carries_the_reason(monkeypatch) -> None:
     body = resp.json()
     assert body["reason"]
     assert body["robot_url"] == "http://reachy-mini.local:8001"
+
+
+# ------------------------------------------------------------------
+# U345: U339 taught `reason` the difference; `error` and the address
+# probe had not heard about it yet
+# ------------------------------------------------------------------
+
+def _status_error(code: int) -> httpx.HTTPStatusError:
+    request = httpx.Request("GET", "http://192.168.0.178:8001/robot/status")
+    response = httpx.Response(code, request=request)
+    return httpx.HTTPStatusError(f"HTTP {code}", request=request, response=response)
+
+
+def test_status_error_does_not_open_with_unreachable(monkeypatch) -> None:
+    """`error` is the line the console leads with, and it still said "robot
+    unreachable: HTTPStatusError" beside a `reason` that said he answered.
+    Measured on a real robot: up, healthy, returning 401 because the Pi had a
+    pairing key this laptop did not. Two fields, two different stories.
+    """
+    class _Refusing:
+        _base_url = "http://192.168.0.178:8001"
+
+        async def status(self):
+            raise _status_error(401)
+
+    monkeypatch.setattr(robot_api, "_robot", _Refusing())
+    body = _client_for(robot_api).get("/robot/status").json()
+    assert "unreachable" not in body["error"].lower(), \
+        "it answered; leading with 'unreachable' sends the owner after the network"
+    assert "401" in body["error"]
+    assert "401" in body["reason"]          # U339 already gets this right
+
+
+def test_status_without_a_response_still_says_unreachable(monkeypatch) -> None:
+    """The wording must only soften when there really was an answer."""
+    class _Gone:
+        _base_url = "http://192.168.0.178:8001"
+
+        async def status(self):
+            raise httpx.ConnectError("[Errno 11001] getaddrinfo failed")
+
+    monkeypatch.setattr(robot_api, "_robot", _Gone())
+    body = _client_for(robot_api).get("/robot/status").json()
+    assert "unreachable" in body["error"].lower()
+
+
+def test_set_address_does_not_call_a_refusing_robot_reachable(
+        monkeypatch, tmp_path) -> None:
+    """/health is not gated, so it answers 200 for a robot that refuses every
+    real call. Telling the owner the address works while the header keeps
+    saying offline is the contradiction this whole endpoint exists to avoid.
+    """
+    monkeypatch.setenv("AURA_ENV_FILE", str(tmp_path / ".env"))
+    monkeypatch.setattr(robot_api, "_robot",
+                        type("R", (), {"_base_url": "http://192.168.0.178:8001"})())
+
+    def _handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/health":
+            return httpx.Response(200, json={"status": "ok"})
+        return httpx.Response(401, json={"error": "unauthorized"})
+
+    transport = httpx.MockTransport(_handler)
+    real_client = httpx.AsyncClient
+
+    def _patched(*args, **kwargs):
+        kwargs["transport"] = transport
+        return real_client(*args, **kwargs)
+
+    monkeypatch.setattr(robot_api.httpx, "AsyncClient", _patched)
+
+    body = _client_for(robot_api).post(
+        "/robot/address", json={"url": "http://192.168.0.178:8001"}).json()
+    assert body["reachable"] is False, \
+        "a robot that refuses every real call is not a working address"
+    assert "401" in body["detail"]
+    assert "pairing key" in body["detail"]   # U339's wording, reused not copied
 
 
 # ------------------------------------------------------------------

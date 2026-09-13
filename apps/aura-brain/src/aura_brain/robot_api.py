@@ -71,8 +71,14 @@ def _diagnose(exc: Exception) -> str:
 
 
 def _unavailable(exc: Exception) -> JSONResponse:
+    # U345: U339 taught `reason` to tell 401 apart from a network fault, but
+    # `error` still opened with "robot unreachable" — and that is the line the
+    # console leads with. One field said the robot answered while the other
+    # said it could not be found.
+    status = getattr(getattr(exc, "response", None), "status_code", None)
     return JSONResponse(
-        {"error": f"robot unreachable: {type(exc).__name__}",
+        {"error": (f"robot refused the request: HTTP {status}" if status is not None
+                   else f"robot unreachable: {type(exc).__name__}"),
          "reason": _diagnose(exc),
          "robot_url": getattr(_robot, "_base_url", "")},
         status_code=503,
@@ -273,6 +279,17 @@ async def set_address(body: dict) -> JSONResponse:
             reachable = r.status_code == 200
             if not reachable:
                 detail = f"saved, but {url} answered HTTP {r.status_code}"
+            else:
+                # U345: /health is not gated, so it answers 200 for a robot that
+                # refuses every real call. Measured on an unpaired laptop: this
+                # said "saved, reachable" while the header kept reading offline.
+                # Ask something that needs the pairing key (U339).
+                probe = await c.get(f"{url}/robot/status")
+                if probe.status_code != 200:
+                    reachable = False
+                    why = _diagnose(httpx.HTTPStatusError(
+                        "probe", request=probe.request, response=probe))
+                    detail = f"saved, and {url} is up — but {why}"
     except (httpx.HTTPError, OSError) as exc:
         reachable, detail = False, _diagnose(exc)
     return JSONResponse({"url": url, "reachable": reachable, "detail": detail})
@@ -372,10 +389,15 @@ def _base() -> str:
 
 
 def _client() -> httpx.AsyncClient:
+    # U346: no `headers=` here. The client is cached for the life of the
+    # process, so baking the pairing key in froze whatever was set at first use
+    # — pair a robot while running (U339 promises no restart) and the still
+    # frames kept going out unauthenticated, 401, "camera unavailable", while
+    # the stream beside them worked because it builds a client per request.
+    # Every call site passes headers=robot_auth_headers() instead.
     global _frame_client
     if _frame_client is None:
-        _frame_client = httpx.AsyncClient(timeout=httpx.Timeout(5.0),
-                                          headers=robot_auth_headers())
+        _frame_client = httpx.AsyncClient(timeout=httpx.Timeout(5.0))
     return _frame_client
 
 
@@ -394,6 +416,7 @@ async def _pump_latest_frame() -> None:
         try:
             async with _client().stream(
                 "GET", f"{_base()}/robot/camera/stream",
+                headers=robot_auth_headers(),
                 timeout=httpx.Timeout(10.0, read=None),
             ) as resp:
                 if resp.status_code != 200:
@@ -448,7 +471,8 @@ async def camera_frame_jpeg() -> Response:
 
     if _robot_has_frame_jpg is not False:
         try:
-            resp = await _client().get(f"{_base()}/robot/camera/frame.jpg")
+            resp = await _client().get(f"{_base()}/robot/camera/frame.jpg",
+                                       headers=robot_auth_headers())
         except (httpx.HTTPError, OSError) as exc:
             if _robot_has_frame_jpg is None:
                 _robot_has_frame_jpg = False       # can't probe → assume old
@@ -464,8 +488,13 @@ async def camera_frame_jpeg() -> Response:
             if resp.status_code == 404:
                 _robot_has_frame_jpg = False       # older robot — fall through
             else:
-                return JSONResponse({"error": "camera unavailable"},
-                                    status_code=resp.status_code)
+                # U346: "camera unavailable" for a 401 blames the camera for a
+                # pairing problem, and the owner goes looking at the lens.
+                return JSONResponse(
+                    {"error": "camera unavailable",
+                     "reason": _diagnose(httpx.HTTPStatusError(
+                         "frame", request=resp.request, response=resp))},
+                    status_code=resp.status_code)
 
     # Old robot: serve the newest frame the background reader has seen.
     if _LATEST["task"] is None or _LATEST["task"].done():
