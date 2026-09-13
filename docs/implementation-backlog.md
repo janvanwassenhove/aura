@@ -2428,3 +2428,52 @@ schakelaar, die nu met dezelfde functie werkt. Mislukt de oproep, dan zegt het
 paneel dat (U238: een 404 die als "gelukt" leest is precies wat hier nooit mag).
 
 4 mount-tests, 212 consoletests groen.
+
+### U342 — hem meenemen, inclusief de gezichten
+
+Gevraagd: *"can we add option to do export of brain, so i can import it on
+other laptop? so he doesn't need to learn everything all over again"*.
+
+Er *was* een exportknop, sinds U104. Er waren drie dingen mis mee, en pas
+samen verklaren ze waarom het antwoord "die bestaat toch al" niet klopte:
+
+1. **Er was geen import.** `GET /knowledge/export` bestond, en niets kon het
+   ooit teruglezen. Een bestand dat je nergens kan laden is een souvenir.
+2. **Er zaten geen gezichten in.** Mensen en feiten reisden mee, de embeddings
+   niet. Op de nieuwe laptop wist hij dus alles over je en herkende hij je
+   niet — precies de helft die de eigenaar bedoelt met "alles opnieuw leren".
+3. **Het was platte tekst.** Elk feit over het gezin, in een bestand op een
+   USB-stick. De kennisopslag is versleuteld op schijf juist omdat een kópie
+   waardeloos hoort te zijn; een export die dat ongedaan maakt, maakt de
+   belofte ongedaan.
+
+Nu: één verzegeld bestand (`.aura`) met mensen, feiten, signalen, gezichten en
+aangeleerde skills. De kop blijft leesbaar en zegt wát erin zit — aantallen,
+nooit namen — want je moet twee exports uit elkaar kunnen houden zonder er een
+te openen. De rest zit achter AES-256-GCM met een scrypt-sleutel uit een
+wachtwoordzin die de eigenaar zelf kiest. De KDF-parameters reizen mee in het
+bestand, zodat het verhogen van de werkfactor (wat U225 al eens deed) oude
+exports niet onleesbaar maakt.
+
+Importeren **voegt samen**, het vervangt niet:
+
+* wat de andere machine al weet blijft staan;
+* hetzelfde bestand twee keer importeren voegt niets dubbel toe — iemand gáát
+  dat doen, en dan moet het saai zijn;
+* een skill die daar al bestaat wordt nooit overschreven, want die kan de
+  nieuwere zijn, en stilletjes andermans bewerking wissen is de vervelendste
+  verrassing die een knop met "toevoegen" erop kan geven. Het paneel zegt
+  hoeveel er bewaard zijn gebleven.
+
+De import staat in **Settings**, niet bij een persoon. Dat is geen smaak: een
+verse laptop kent niemand, dus er is geen persoonspaneel om het bestand in te
+laten vallen. De oude platte export blijft trouwens bestaan waar hij stond —
+dat is het antwoord op "wat weet je eigenlijk over mij", en dat hoort leesbaar
+te zijn.
+
+De embeddings konden niet als bytes mee: elk monster is met AES-GCM aan zijn
+persoon gebonden via AAD. De matcher kreeg daarom `samples()`, zodat ze op één
+plek geopend worden in plaats van de OMK op twee plekken te laten bestaan.
+
+11 brain-tests, 4 mount-tests. 685 brain-tests, 216 consoletests, 142
+shared-schemas-tests groen.

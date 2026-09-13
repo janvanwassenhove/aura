@@ -12,6 +12,14 @@ Export — one honest JSON dump of everything AURA knows.
     People + facts + signals, straight from the (encrypted) store. What you
     see is literally what exists; there is no hidden remainder.
 
+Transfer (U342) — the same knowledge, sealed, so it can travel to another
+    machine and be read back. Three things the plain export could not do: it
+    had no import at all, it carried no faces (so the new machine knew
+    everything about you and recognised nobody), and it was plain text — every
+    fact about the household on a memory stick, which is exactly the case the
+    store's encryption at rest exists for. The bundle is sealed with a
+    passphrase the owner picks, and importing merges rather than replaces.
+
 Both formats are auto-detected:
     ChatGPT: [{"title", "mapping": {id: {"message": {"author": {"role"},
               "content": {"parts": [...]}}}}}, ...]
@@ -232,3 +240,209 @@ async def export_knowledge(store: Any) -> dict:
             "signals": [s.model_dump(mode="json") for s in signals],
         })
     return out
+
+
+# ── U342: the brain, sealed, so it can travel ──────────────────────────────
+
+FORMAT = "aura-brain-export"
+VERSION = 1
+_AAD = b"aura-brain-export/1"
+
+
+class BundleError(Exception):
+    """The file is not a bundle, or the passphrase does not open it."""
+
+
+def _skills_dir(override=None):
+    from pathlib import Path
+
+    return Path(override or os.environ.get("SKILLS_DIR", "./skills"))
+
+
+def _read_skills(directory) -> dict[str, str]:
+    from pathlib import Path
+
+    folder = Path(directory)
+    if not folder.is_dir():
+        return {}
+    out: dict[str, str] = {}
+    for file in sorted(folder.glob("*.md")):
+        try:
+            out[file.name] = file.read_text(encoding="utf-8")
+        except OSError:
+            continue
+    return out
+
+
+async def collect_bundle(store: Any, matcher: Any = None, *, skills_dir=None) -> dict:
+    """Everything worth carrying, in the clear. Sealed by :func:`seal_bundle`."""
+    payload: dict[str, Any] = {"people": [], "faces": {}, "skills": {}}
+    for person in await store.list_people():
+        pid = person.person_id
+        payload["people"].append({
+            "person": person.model_dump(mode="json"),
+            "facts": [f.model_dump(mode="json") for f in await store.get_facts(pid)],
+            "signals": [s.model_dump(mode="json") for s in await store.get_signals(pid)],
+        })
+        if matcher is not None:
+            samples = matcher.samples(pid)
+            if samples:
+                payload["faces"][pid] = samples
+    payload["skills"] = _read_skills(_skills_dir(skills_dir))
+    return payload
+
+
+async def seal_bundle(store: Any, matcher: Any = None, passphrase: str = "",
+                      *, skills_dir=None) -> bytes:
+    """One transferable file: a readable header, and everything else sealed.
+
+    The header says what the file HOLDS — counts, never names — because you
+    have to be able to tell one export from another without opening it, and
+    "4 people, 37 facts, 12 faces" answers that without saying who.
+    """
+    import base64
+
+    from shared_schemas.knowledge import crypto
+
+    if not passphrase or len(passphrase) < 8:
+        raise BundleError("the passphrase must be at least 8 characters")
+
+    payload = await collect_bundle(store, matcher, skills_dir=skills_dir)
+    salt = os.urandom(16)
+    key = crypto.derive_omk(passphrase, salt)
+    sealed = crypto.encrypt(key, json.dumps(payload).encode(), aad=_AAD)
+
+    faces = sum(len(v) for v in payload["faces"].values())
+    envelope = {
+        "format": FORMAT,
+        "version": VERSION,
+        "created": datetime.now(UTC).isoformat(),
+        "kdf": {"name": "scrypt", "n": crypto.SCRYPT_N, "r": crypto.SCRYPT_R,
+                "p": crypto.SCRYPT_P, "salt": base64.b64encode(salt).decode()},
+        "contents": {
+            "people": len(payload["people"]),
+            "facts": sum(len(p["facts"]) for p in payload["people"]),
+            "signals": sum(len(p["signals"]) for p in payload["people"]),
+            "faces": faces,
+            "skills": len(payload["skills"]),
+        },
+        "sealed": base64.b64encode(sealed).decode(),
+    }
+    return json.dumps(envelope, indent=2).encode("utf-8")
+
+
+def _unseal(blob: bytes, passphrase: str) -> dict:
+    import base64
+
+    from shared_schemas.knowledge import crypto
+
+    try:
+        envelope = json.loads(blob)
+    except Exception as exc:  # noqa: BLE001
+        raise BundleError("that file is not an AURA brain export") from exc
+    if not isinstance(envelope, dict) or envelope.get("format") != FORMAT:
+        raise BundleError("that file is not an AURA brain export")
+    if int(envelope.get("version", 0)) > VERSION:
+        raise BundleError("that export was written by a newer AURA — update this one first")
+    kdf = envelope.get("kdf") or {}
+    try:
+        # The parameters travel WITH the file: raising the work factor later
+        # (U225 already did once) must not make older exports unreadable.
+        key = crypto.derive_omk(
+            passphrase, base64.b64decode(kdf.get("salt", "")),
+            n=int(kdf.get("n", crypto.SCRYPT_N)), r=int(kdf.get("r", crypto.SCRYPT_R)),
+            p=int(kdf.get("p", crypto.SCRYPT_P)))
+        plain = crypto.decrypt(key, base64.b64decode(envelope.get("sealed", "")), aad=_AAD)
+    except BundleError:
+        raise
+    except Exception as exc:  # noqa: BLE001 — InvalidTag and every malformed field
+        raise BundleError("that passphrase does not open this file") from exc
+    try:
+        return json.loads(plain)
+    except Exception as exc:  # noqa: BLE001
+        raise BundleError("the contents of that file are damaged") from exc
+
+
+async def open_bundle(store: Any, matcher: Any, blob: bytes, passphrase: str,
+                      *, skills_dir=None) -> dict:
+    """Merge a sealed bundle into this machine. Never replaces, never doubles.
+
+    Merging rather than replacing is the only safe rule: the far machine may
+    already know people, and someone WILL import the same file twice.
+    """
+    from pathlib import Path
+
+    from shared_schemas.knowledge import ObservedSignal, Person, ProfileFact
+
+    payload = _unseal(blob, passphrase)
+    added = {"people": 0, "facts": 0, "signals": 0, "faces": 0,
+             "skills": 0, "skills_kept": 0}
+
+    for entry in payload.get("people", []):
+        try:
+            person = Person(**entry["person"])
+        except Exception:  # noqa: BLE001 — one bad record must not stop the rest
+            logger.warning("skipped an unreadable person record in the bundle")
+            continue
+        pid = person.person_id
+        if await store.get_person(pid) is None:
+            await store.upsert_person(person)
+            added["people"] += 1
+
+        have = {(f.key.lower(), f.value.strip().lower())
+                for f in await store.get_facts(pid)}
+        for raw in entry.get("facts", []):
+            try:
+                fact = ProfileFact(**raw)
+            except Exception:  # noqa: BLE001
+                continue
+            mark = (fact.key.lower(), fact.value.strip().lower())
+            if mark in have:
+                continue
+            await store.add_fact(fact)
+            have.add(mark)
+            added["facts"] += 1
+
+        seen = {(s.kind.lower(), s.value.strip().lower())
+                for s in await store.get_signals(pid)}
+        for raw in entry.get("signals", []):
+            try:
+                signal = ObservedSignal(**raw)
+            except Exception:  # noqa: BLE001
+                continue
+            mark = (signal.kind.lower(), signal.value.strip().lower())
+            if mark in seen:
+                continue
+            await store.record_signal(signal)
+            seen.add(mark)
+            added["signals"] += 1
+
+    if matcher is not None:
+        for pid, samples in (payload.get("faces") or {}).items():
+            known = matcher.samples(pid)
+            for embedding in samples:
+                if embedding in known:
+                    continue          # the same file, imported twice
+                matcher.enroll(pid, embedding)
+                added["faces"] += 1
+
+    folder = _skills_dir(skills_dir)
+    for name, text in (payload.get("skills") or {}).items():
+        if "/" in name or "\\" in name or not name.endswith(".md"):
+            continue                  # a name is a file name, never a path
+        target = Path(folder) / name
+        if target.exists():
+            # The copy here may well be the newer one. Silently overwriting
+            # what somebody edited is the worst possible surprise from a button
+            # they pressed to ADD things.
+            added["skills_kept"] += 1
+            continue
+        try:
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(text, encoding="utf-8")
+            added["skills"] += 1
+        except OSError:
+            logger.warning("could not write skill %s", name)
+
+    logger.info("brain bundle merged: %s", added)
+    return added

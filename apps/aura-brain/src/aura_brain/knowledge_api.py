@@ -18,9 +18,10 @@ with tests.
 
 from __future__ import annotations
 
+import json
 from enum import StrEnum
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 from fastapi.responses import JSONResponse
 from shared_schemas.knowledge import (
     ConsentError,
@@ -497,6 +498,59 @@ async def export_brain(_: None = Depends(_require_sensitive)) -> JSONResponse:
     from aura_brain.brain_transfer import export_knowledge
 
     return JSONResponse(await export_knowledge(_require()))
+
+
+# ── U342: move him to another laptop ───────────────────────────────────────
+#
+# The plain export above stays what it is: the answer to "what do you actually
+# hold about me", which must be readable. This is the other job — carrying him
+# somewhere — and it has different rules. It takes the faces (a machine that
+# knows everything about you and recognises nobody has not moved him), it is
+# sealed with a passphrase (a memory stick is precisely the case the store's
+# encryption at rest exists for), and it can be read back, which the export
+# never could.
+
+
+def _live_matcher():
+    from aura_brain import recognition_api
+
+    try:
+        return recognition_api.matcher()
+    except Exception:  # noqa: BLE001 — recognition may legitimately be off
+        return None
+
+
+@router.post("/transfer/export")
+async def transfer_export(body: dict, _: None = Depends(_require_sensitive)) -> Response:
+    """Seal everything he has learned into one file."""
+    from aura_brain.brain_transfer import BundleError, seal_bundle
+
+    passphrase = str((body or {}).get("passphrase", ""))
+    try:
+        blob = await seal_bundle(_require(), _live_matcher(), passphrase)
+    except BundleError as exc:
+        return JSONResponse({"error": str(exc)}, status_code=422)
+    return Response(
+        content=blob, media_type="application/json",
+        headers={"Content-Disposition": 'attachment; filename="aura-brain.aura"'},
+    )
+
+
+@router.post("/transfer/import")
+async def transfer_import(body: dict, _: None = Depends(_require_sensitive)) -> JSONResponse:
+    """Merge a sealed bundle into this machine."""
+    from aura_brain.brain_transfer import BundleError, open_bundle
+
+    raw = (body or {}).get("bundle")
+    passphrase = str((body or {}).get("passphrase", ""))
+    if not raw:
+        return JSONResponse({"error": "bundle is required"}, status_code=422)
+    blob = raw.encode("utf-8") if isinstance(raw, str) else json.dumps(raw).encode("utf-8")
+    try:
+        summary = await open_bundle(_require(), _live_matcher(), blob, passphrase)
+    except BundleError as exc:
+        return JSONResponse({"error": str(exc)}, status_code=422)
+    return JSONResponse(summary)
 
 
 @router.delete("/facts/{fact_id}")
