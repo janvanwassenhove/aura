@@ -5,7 +5,7 @@ owner: "robot-runtime / scripts"
 priority: P1
 risk: Medium
 created: "2026-09-05"
-units: [U17, U26, U198, U199, U200, U239, U240, U241, U242, U242b, U339]
+units: [U17, U26, U198, U199, U200, U239, U240, U241, U242, U242b, U339, U339b]
 ---
 
 # Feature Specification: Getting Code onto the Robot
@@ -128,3 +128,4 @@ no.
 | U242, U242b | Move the updater out of the tree it updates; pin line endings |
 | U26 | On-Pi budget guard — shed non-essential work when hot or saturated |
 | U339 | A 401 named as a pairing problem, and the robot's key settable from the Connection card |
+| U339b | `ROBOT_SHARED_SECRET` documented in `.env.example`, for a machine started from source |

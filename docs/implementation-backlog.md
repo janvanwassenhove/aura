@@ -2339,3 +2339,16 @@ terugkaatsen, `robot_secret_set` in de status, wissen), twee op de diagnose
 (401 wél een koppelprobleem, 403/500 níet) en vijf mount-tests op de console —
 deze app heeft geen `vue-tsc`, dus een mount-test is het enige dat tussen een
 typfout en een grijs paneel staat.
+
+### U339b — en de sleutel stond nergens beschreven
+
+Vraag erachteraan: *"ik start app op vanuit repo in vscode — wat moet er nu
+juist gebeuren?"* Een dev-run leest `infra/dev/.env`, niet de `.env` onder
+`%APPDATA%`. En in `infra/dev/.env.example` — het bestand dat je kopieert als
+je op een nieuwe machine begint — stond `ROBOT_SHARED_SECRET` niet. Niet als
+waarde, niet als commentaar. Wie vanaf de bron start, kon dus alleen weten dat
+hij bestaat door de 401 te krijgen en de broncode te lezen.
+
+Staat er nu bij, uitgecommentarieerd naast `ROBOT_RUNTIME_URL`, met waar het
+ding vandaan komt (de systemd drop-in op de Pi) en met de vermelding dat het in
+de app ook via Robot → Connection kan (U339).
