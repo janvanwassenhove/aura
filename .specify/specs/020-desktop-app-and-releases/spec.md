@@ -5,7 +5,7 @@ owner: "apps/desktop + CI"
 priority: P1
 risk: High
 created: "2026-09-05"
-units: [U32, U33, U44, U55, U56, U151, U152, U166, U168, U168b, U168c, U168d, U168e, U169, U169b, U170, U171, U172, U173, U174, U176, U177, U178, U192, U193, U197, U201, U211, U228, U229, U230, U231, U232, U233, U234, U235, U236, U283, U284, U285, U285b, U297, U179, U184, U185, U186, U210, U317, U318, U327, U330, U337]
+units: [U32, U33, U44, U55, U56, U151, U152, U166, U168, U168b, U168c, U168d, U168e, U169, U169b, U170, U171, U172, U173, U174, U176, U177, U178, U192, U193, U197, U201, U211, U228, U229, U230, U231, U232, U233, U234, U235, U236, U283, U284, U285, U285b, U297, U179, U184, U185, U186, U210, U317, U318, U327, U330, U337, U338]
 amended: "2026-09-05"
 ---
 
@@ -152,6 +152,14 @@ and installers for Windows, macOS (arm64 and x64) and Linux.
   resolves against the working directory, and fails when the desktop app does
   not pin it to `userData` — so the next such setting cannot be forgotten the
   way five of them were (U327).
+- **FR-012**: The free route for an open-source project is wired: SignPath
+  Foundation signs the Windows installer through the release workflow. The
+  unsigned installer is uploaded, submitted, and the signed file lands back on
+  top of it, so the ordinary upload publishes the signed one without knowing
+  anything about signing. Skipped entirely without a token and never able to
+  fail a release; the order (upload → sign → verify → publish) is checked,
+  because reversing two of those steps publishes an unsigned build under a
+  summary that says it is signed (U338).
 - **FR-011**: The Windows installer is signed when a certificate is configured,
   and **says which** when it is not. Signing runs through `apps/desktop/
   sign.cjs`: Azure Trusted Signing when the Azure secrets are present, a PFX
@@ -207,3 +215,4 @@ and installers for Windows, macOS (arm64 and x64) and Linux.
 | U327 | The five settings U177 left in the install directory — quiet and the mode policy among them — pinned to userData, with a test that finds the next one |
 | U330 | The published screenshots refreshed from the current app, one command to redo it, and two drawings that had stopped being true |
 | U337 | Windows code signing wired end to end (Azure Trusted Signing or a PFX), an unsigned build that admits it, and every check in scripts/ actually running in CI |
+| U338 | SignPath Foundation wired into the release: free signing for an open-source project, guarded and order-checked |

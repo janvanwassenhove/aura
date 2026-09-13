@@ -59,7 +59,7 @@ jobs:
       # comment with a docstring.
       - name: Repository checks
         run: |
-          pip install pillow
+          pip install pillow pyyaml
           pytest scripts/ -q
 
   test:

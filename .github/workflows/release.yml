@@ -216,6 +216,9 @@ jobs:
 
   build:
     needs: [version, test]
+    env:
+      # U338: readable from a step `if`, which cannot look at `secrets`.
+      SIGNPATH_API_TOKEN: ${{ secrets.SIGNPATH_API_TOKEN }}
     strategy:
       fail-fast: false
       matrix:
@@ -259,6 +262,38 @@ jobs:
         run: |
           npm ci
           npx electron-builder ${{ matrix.args }} --publish never -c.extraMetadata.version=${{ needs.version.outputs.version }}
+
+      # ── U338: SignPath Foundation — free code signing for open source ──
+      # Two steps, both skipped entirely when the token is absent, and neither
+      # allowed to fail a release: an unsigned build is the status quo and the
+      # step below says which one came out.
+      #
+      # SignPath signs an ARTIFACT, so the unsigned installer is uploaded
+      # first, submitted, and the signed file is written back over it — which
+      # is why the existing upload at the end of this job then ships the signed
+      # one without knowing anything about signing.
+      - name: Upload the unsigned installer for signing
+        id: unsigned
+        if: runner.os == 'Windows' && env.SIGNPATH_API_TOKEN != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: unsigned-windows-installer
+          path: apps/desktop/dist/*.exe
+          if-no-files-found: error
+
+      - name: SignPath — sign the Windows installer
+        if: runner.os == 'Windows' && env.SIGNPATH_API_TOKEN != ''
+        continue-on-error: true
+        uses: signpath/github-action-submit-signing-request@v1
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ vars.SIGNPATH_POLICY_SLUG }}
+          artifact-configuration-slug: ${{ vars.SIGNPATH_ARTIFACT_CONFIG_SLUG }}
+          github-artifact-id: ${{ steps.unsigned.outputs.artifact-id }}
+          wait-for-completion: true
+          output-artifact-directory: apps/desktop/dist
 
       - name: Say whether the Windows installer is signed
         if: runner.os == 'Windows'

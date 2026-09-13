@@ -2260,3 +2260,39 @@ bijgehouden lijst** van bestanden, en twee stonden er niet in — waaronder de
 schermafbeeldingstest van U330. Dat is nu `pytest scripts/`. Een test die CI
 niet draait, is een opmerking met een docstring.
 
+### U338 — SignPath: gratis ondertekenen, omdat dit project open source is
+
+Gevraagd: *"er is geen gratis alternatief?"* Voor een publiek vertrouwd
+certificaat: niet te koop voor nul. Maar deze repo is **publiek en
+Apache-2.0**, en dat opent de route van SignPath Foundation — die geeft
+certificaten weg aan opensourceprojecten en ondertekent via hun dienst.
+
+De koppeling zit nu in de release. SignPath ondertekent een *artefact*, dus de
+volgorde is: ongetekende installer uploaden, laten ondertekenen, en het
+ondertekende bestand landt terug bovenop het ongetekende. Daardoor publiceert
+de bestaande uploadstap vanzelf de ondertekende versie, zonder iets van
+ondertekenen te weten.
+
+Twee eigenschappen zijn belangrijker dan de koppeling zelf:
+
+* **Zonder token gebeurt er niets.** Een fork of een pull request heeft geen
+  geheimen en moet gewoon een werkende installer opleveren.
+* **Een verkeerde instelling kost nooit de release.** De stap staat op
+  `continue-on-error`, en de controle uit U337 zegt daarna eerlijk of er een
+  handtekening op zit.
+
+Een test legt de vólgorde vast (uploaden → ondertekenen → controleren →
+publiceren). Draai je twee van die stappen om, dan publiceer je een ongetekende
+build onder een samenvatting die zegt dat hij ondertekend is — precies het
+soort stille leugen dat dit project nergens wil.
+
+De projectgegevens staan als repository-variabelen, niet als geheimen: een
+organisatie-id en een paar slugs zijn configuratie, en zo is een verkeerde
+waarde leesbaar in de repo in plaats van onzichtbaar in een geheim. Alleen het
+API-token is een geheim.
+
+**Eerlijk over wat ik niet kon verifiëren:** de exacte invoernamen van de
+GitHub-actie van SignPath heb ik uit het hoofd opgeschreven, zonder toegang tot
+hun documentatie. Ze zijn daarom bewust niet-fataal bedraad. Klopt er iets
+niet, dan zegt de release het en is het één regel werk.
+
