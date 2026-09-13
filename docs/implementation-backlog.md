@@ -1912,3 +1912,39 @@ aura-brain 625 groen.
 **Nog niet in een echte kamer gezien.** De amplitudes zijn gekozen naar analogie
 met de bestaande bewegingen, niet gemeten aan hoe ze er op tafel uitzien.
 
+### U329 — "wanneer hij spreekt is zijn audio heel stil"
+
+Gemeten in plaats van gedraaid aan een knop, en de meting wees drie dingen aan:
+
+* de **hardwaremixer** van de Pi stond op 100% (0,00 dB) — daar zat het niet;
+* de **digitale versterking** in de robotdienst stond op zijn standaard 0,8 —
+  dat is 2 dB, geen fluisterstem;
+* maar **alle** afspeelacties liepen via `POST /robot/speak/segment` (twaalf op
+  rij, geen enkele via het hele-zin-pad), want de engine staat op `realtime` en
+  die streamt altijd.
+
+En daar zit het verschil: het hele-zin-pad tilt stille TTS eerst naar een piek
+van 0,95 en past dán het volume toe (~0,76 uit de luidspreker). Het
+segmentpad doet dat bewust niet — U153 koos dat omdat normaliseren *per segment*
+het volume binnen één zin op en neer laat pompen — en vertrouwde op een
+opmerking in de code dat het model toch al bijna vol bereik stuurt. Nagemeten op
+een echte opname: **piek 0,35**. Keer 0,8 is 0,28. Dat is ~9 dB stiller, en met
+`VOICE_ENGINE=realtime` geldt dat voor élk antwoord.
+
+De fix houdt de reden van U153 overeind: **één versterking per uiting**, bepaald
+op het eerste segment en daarna nooit meer omhoog — dus niets pompt. Een later,
+luider segment trekt hem wel omláág, en dat is precies wat vervorming
+voorkomt. Stilte wordt niet versterkt (dat zou de ruisvloer optillen naar een
+microfoon zonder echo-onderdrukking), de versterking heeft een plafond, en het
+appvolume blijft er gewoon overheen gaan. Uit te zetten met
+`ROBOT_TTS_NORMALIZE=false`.
+
+Tien tests eerst rood gezien, waaronder de twee die het echte pad doorlopen met
+een nep-mediabackend: een segment van 0,35 moet de luidspreker bereiken op
+0,95 × het appvolume, en het appvolume moet er nog steeds over heersen.
+Robot-runtime 135 groen, ruff schoon.
+
+**Nog te doen**: dit zit in de robot-runtime, dus het werkt pas na een flash van
+de Pi. En het is in de kamer nog niet beluisterd — de meting zegt dat het gat
+dicht is, jouw oren moeten zeggen of het nu góed staat.
+

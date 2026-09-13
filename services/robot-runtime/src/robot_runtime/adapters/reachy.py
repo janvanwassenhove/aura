@@ -109,6 +109,9 @@ class ReachyRobotAdapter(RobotAdapter):
         # (start_playing re-stamps the PTS so the mixer doesn't place it in the
         # past after a silence gap).
         self._appsrc_until = 0.0
+        # U329: one loudness decision per spoken utterance (see _segment_gain).
+        self._utt_peak = 0.0
+        self._utt_gain = 0.0
         # U156: whether the WebRTC AEC pipeline was activated on connect.
         self._aec_active = False
         # U157: conversational body language while speaking + idle re-acquire.
@@ -920,6 +923,45 @@ class ReachyRobotAdapter(RobotAdapter):
         async with self._motion_lock:  # hold the lock so nothing cuts the speech
             await asyncio.to_thread(_play)
 
+    # U329: streamed speech reached the speaker about 9 dB quieter than
+    # spoken speech, which is what "zijn audio is heel stil" was. The
+    # whole-utterance path lifts quiet TTS to a 0.95 peak before applying the
+    # volume; this path deliberately did not (U153: normalising every segment
+    # pumps the volume inside one sentence) and trusted a comment claiming the
+    # model sends near-full-scale audio. Measured on a real reply: it peaks at
+    # 0.35. Both reasons survive here — ONE gain per utterance, decided on its
+    # first segment, never raised afterwards.
+    TTS_TARGET_PEAK = 0.95
+    TTS_MAX_GAIN = 4.0
+
+    def _segment_gain(self, pcm: np.ndarray, new_utterance: bool) -> float:
+        """How much to lift this segment, given the utterance it belongs to.
+
+        Raising the gain mid-sentence is audible (that is the pumping U153
+        avoided), so it only ever goes DOWN — which is also what keeps a louder
+        later segment from clipping.
+        """
+        if os.environ.get("ROBOT_TTS_NORMALIZE", "true").lower() != "true":
+            return 1.0
+        try:
+            target = float(os.environ.get("ROBOT_TTS_TARGET_PEAK", self.TTS_TARGET_PEAK))
+            ceiling = float(os.environ.get("ROBOT_TTS_MAX_GAIN", self.TTS_MAX_GAIN))
+        except ValueError:
+            target, ceiling = self.TTS_TARGET_PEAK, self.TTS_MAX_GAIN
+        if new_utterance:
+            self._utt_peak = 0.0
+            self._utt_gain = 0.0
+        peak = float(np.max(np.abs(pcm))) if len(pcm) else 0.0
+        self._utt_peak = max(self._utt_peak, peak)
+        if self._utt_peak <= 0.01:
+            # Silence, or a gap between words: nothing to lift, and lifting it
+            # would raise the noise floor into a microphone that has no echo
+            # cancellation (U156).
+            return self._utt_gain if self._utt_gain > 0.0 else 1.0
+        want = min(ceiling, max(1.0, target / self._utt_peak))
+        self._utt_gain = want if self._utt_gain <= 0.0 else min(self._utt_gain, want)
+        return self._utt_gain
+
     async def play_stream_segment(self, audio_bytes: bytes, sample_rate: int = 24_000) -> None:
         """U155: gapless streaming playback via the SDK's appsrc pipeline.
 
@@ -939,7 +981,10 @@ class ReachyRobotAdapter(RobotAdapter):
             import time
 
             pcm = np.frombuffer(audio_bytes, dtype=np.int16).astype(np.float32) / 32768.0
-            pcm = np.clip(pcm * self._volume, -1.0, 1.0)
+            # U329: a new utterance is the same condition the PTS re-stamp uses
+            # below — the previous one has finished playing.
+            gain = self._segment_gain(pcm, time.monotonic() >= self._appsrc_until)
+            pcm = np.clip(pcm * gain * self._volume, -1.0, 1.0)
             out_rate = media.get_output_audio_samplerate() or 16_000
             if sample_rate != out_rate and len(pcm):
                 n_out = int(len(pcm) * out_rate / sample_rate)

@@ -5,7 +5,7 @@ owner: "aura-brain / conversation"
 priority: P1
 risk: High
 created: "2026-09-05"
-units: [U22, U36b, U36e, U36h, U45, U46, U47, U49, U54, U67, U73, U80, U81, U82, U83, U84, U85, U86, U87, U88, U89, U91, U92, U96, U128, U129, U130, U131, U132, U133, U134, U135, U140, U141, U142, U143, U144, U145, U146, U148, U149, U150, U153, U154, U155, U156, U163, U203, U209, U256, U257, U258, U260, U273, U275, U287, U288, U289, U291, U292, U321, U322, U324]
+units: [U22, U36b, U36e, U36h, U45, U46, U47, U49, U54, U67, U73, U80, U81, U82, U83, U84, U85, U86, U87, U88, U89, U91, U92, U96, U128, U129, U130, U131, U132, U133, U134, U135, U140, U141, U142, U143, U144, U145, U146, U148, U149, U150, U153, U154, U155, U156, U163, U203, U209, U256, U257, U258, U260, U273, U275, U287, U288, U289, U291, U292, U321, U322, U324, U329]
 ---
 
 # Feature Specification: Voice and Language
@@ -225,6 +225,14 @@ stated on screen.
   pruning trap. A contract test pins every SDK resource the four speech paths
   and the orchestrator call, so a future major bump cannot remove one quietly
   (U322).
+- **FR-019**: Every speech path leaves the speaker at the same loudness. The
+  whole-utterance path peak-normalises quiet TTS to 0.95 before the app volume;
+  the streamed path gets there with **one gain per utterance**, decided on its
+  first segment and never raised afterwards (raising it mid-sentence is the
+  pumping U153 avoided; a louder later segment pulls it down, which is what
+  prevents clipping). Measured: streamed replies peak at 0.35, so the speaker
+  received 0.28 where the other path delivers 0.76 — about 9 dB quieter, and
+  with `VOICE_ENGINE=realtime` that is **every** reply (U329).
 - **FR-014**: GPT-Live opens with **client** delegation. Delegated work goes to
   the orchestrator's agentic loop with `announce=False`, so tools and the
   approval gate behave exactly as on the typed path; the result returns with
@@ -295,3 +303,4 @@ the same series as this backfill.
 | U321 | `gpt-live-1` measured and not pinned (ADR-011); the classifier and the Settings guard stop offering and accepting models that serve neither endpoint; the pipeline guarded against a realtime-only transcriber; `REALTIME_STT_MODEL` |
 | U322 | OpenAI SDK 2.33 → 3.13 (a major bump), declared by aura-brain itself, with a contract test for every resource AURA uses |
 | U324 | GPT-Live as an opt-in fourth engine (`live_session.py`): delegation to the orchestrator, silence gate, mic mute, idle close, meter, probe, measured voices; the dispatch finally follows the per-character engine (U203) |
+| U329 | Streamed speech was ~9 dB quieter than spoken speech: one loudness gain per utterance on the segment path, measured against a real reply |
