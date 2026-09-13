@@ -124,6 +124,8 @@ async def status() -> JSONResponse:
         "voice_mode": os.environ.get("VOICE_MODE", "off"),
         "llm_provider": os.environ.get("LLM_PROVIDER", "openai"),
         "openai_key_set": bool(os.environ.get("OPENAI_API_KEY")),
+        # U339: enough for the console to say "paired", and nothing more.
+        "robot_secret_set": bool(os.environ.get("ROBOT_SHARED_SECRET", "").strip()),
         "openrouter_key_set": bool(os.environ.get("OPENROUTER_API_KEY")),
         "gemini_key_set": bool(os.environ.get("GEMINI_API_KEY")),
         "people_count": people_count,
@@ -153,9 +155,14 @@ _CONFIG_KEYS = {
     # U298: the calendar sharing link. Anyone holding it can read the calendar,
     # so it is treated as a secret: stored, never echoed back to the console.
     "calendar_ics_url": "CALENDAR_ICS_URL",
+    # U339: the shared secret the robot expects (U220). It was read in two
+    # places and written by nothing — so a second laptop could only be paired
+    # by finding the .env file and typing it in, which is the "advice with
+    # nowhere to act on it" U199 called worse than saying nothing.
+    "robot_shared_secret": "ROBOT_SHARED_SECRET",
 }
 _SECRET_KEYS = {"openai_api_key", "openrouter_api_key", "gemini_api_key",
-                "calendar_ics_url"}
+                "calendar_ics_url", "robot_shared_secret"}
 
 
 @router.post("/config")
@@ -175,6 +182,11 @@ async def set_config(body: dict) -> JSONResponse:
         updates[env_var] = value
     if body.get("setup_done") is not None:
         updates["SETUP_DONE"] = "true" if body["setup_done"] else "false"
+    # U339: a robot WITHOUT a secret must stay reachable (U220 made it
+    # opt-in), so a machine has to be able to drop the value it holds. An
+    # empty string is ignored above — dropping one is a deliberate act.
+    if body.get("clear_robot_secret"):
+        updates["ROBOT_SHARED_SECRET"] = ""
     if not updates:
         return JSONResponse({"error": "nothing to update"}, status_code=422)
     os.environ.update(updates)

@@ -51,7 +51,10 @@ work below. The constitution states the principle — *no sensitive data in logs
    opt-in shared secret is required (`ROBOT_SHARED_SECRET`, `hmac.compare_digest`,
    `/health` and docs exempt), and every brain→robot client sends it. It is
    still bound to the LAN by design — the brain is on a different host (S5,
-   U220).
+   U220). A second machine can be given that secret from the app, under the
+   same write-only rule as the API keys — stored, never logged, never returned,
+   reported only as set or not set (U339, spec
+   [021](../021-robot-deployment/spec.md)).
 4. **Given** the discovery endpoints, **When** they are called, **Then** they
    are POST with a JSON content type, so a cross-origin scan hits a CORS
    preflight and the Origin guard refuses it before any port is touched (S12,

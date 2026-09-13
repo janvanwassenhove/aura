@@ -5,7 +5,7 @@ owner: "robot-runtime / scripts"
 priority: P1
 risk: Medium
 created: "2026-09-05"
-units: [U17, U26, U198, U199, U200, U239, U240, U241, U242, U242b]
+units: [U17, U26, U198, U199, U200, U239, U240, U241, U242, U242b, U339]
 ---
 
 # Feature Specification: Getting Code onto the Robot
@@ -79,6 +79,11 @@ no.
 3. **Given** an older runtime, **When** the brain calls something it does not
    have, **Then** the call fails alone, the sequence around it completes, and
    the degradation is reported (U196, U238).
+4. **Given** a robot that answers and refuses us (HTTP 401), **When** the
+   console shows it, **Then** it is named as a pairing problem rather than as a
+   network fault, and the robot's pairing key can be entered on that same
+   screen — write-only, never echoed back, and clearable for a robot that has
+   none (U339).
 
 ### User Story 4 — The Pi does not fall over under load (Priority: P2)
 
@@ -96,14 +101,20 @@ no.
 - **FR-004**: Every brain→runtime call added after this spec tolerates a 404
   from an older runtime and reports the degradation instead of success.
 - **FR-005**: An unreachable robot is diagnosed, not spun on, and the fix (an
-  address, a scan) is offered on the same screen.
+  address, a scan, a pairing key) is offered on the same screen.
+- **FR-006**: A second machine is paired with a robot that holds a shared
+  secret (U220) from the app — `ROBOT_SHARED_SECRET` is settable through
+  `/setup/config`, reported only as set/not set, and takes effect without a
+  restart.
 
 ## Out of scope
 
 - The laptop's own updates — see
   [020-desktop-app-and-releases](../020-desktop-app-and-releases/spec.md).
-- The shared secret between brain and robot — see
+- How the shared secret is checked on the robot — see
   [022-security-and-privacy](../022-security-and-privacy/spec.md) (U220).
+  Setting it on a second machine is here (U339), because that is where the
+  owner meets the problem.
 
 ## Traceability
 
@@ -116,3 +127,4 @@ no.
 | U241 | Let the robot follow releases by itself |
 | U242, U242b | Move the updater out of the tree it updates; pin line endings |
 | U26 | On-Pi budget guard — shed non-essential work when hot or saturated |
+| U339 | A 401 named as a pairing problem, and the robot's key settable from the Connection card |

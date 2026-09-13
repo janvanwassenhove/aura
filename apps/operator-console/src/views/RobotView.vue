@@ -259,6 +259,22 @@
           <button v-for="d in discovered" :key="d.url" class="conn-hit mono" @click="robotAddr = d.url; saveAddr()">{{ d.url }}</button>
         </div>
         <p v-if="addrResult" class="conn-result" role="status">{{ addrResult }}</p>
+        <!-- U339: the robot may hold a pairing key (U220). A second laptop has
+             none, so every call comes back 401 — and until now there was
+             nowhere to type it but a file inside the app's data directory. -->
+        <div class="conn-edit">
+          <input v-model="pairingKey" type="password" class="d2-field mono conn-addr"
+                 :placeholder="paired ? '•••••••• · paired with this robot' : 'his pairing key · only if he has one'"
+                 aria-label="Robot pairing key" @keydown.enter="savePairing">
+          <button class="d2-ghost-btn" data-test="pair" :disabled="savingPairing || !pairingKey.trim()"
+                  @click="savePairing">{{ savingPairing ? 'Pairing…' : 'Pair' }}</button>
+          <button v-if="paired" class="d2-ghost-btn" data-test="forget-pairing" @click="forgetPairing">Forget</button>
+        </div>
+        <p class="conn-result">
+          {{ paired ? 'This machine is paired — it sends his key with every request.'
+             : 'Not paired. Only needed if you gave the robot a key; leave empty otherwise.' }}
+        </p>
+        <p v-if="pairResult" class="conn-result" role="status">{{ pairResult }}</p>
       </section>
     </div>
   </main>
@@ -649,9 +665,56 @@ async function scan(): Promise<void> {
   } catch { addrResult.value = 'The brain did not respond.' } finally { scanning.value = false }
 }
 
+// ── Pairing key (U339) ─────────────────────────────────────────────────────
+// Write-only, like every other credential here: the brain stores it and never
+// hands it back. What the console may know is whether one is set, which is all
+// it needs to say "paired".
+const pairingKey = ref('')
+const paired = ref(false)
+const savingPairing = ref(false)
+const pairResult = ref('')
+
+async function loadPaired(): Promise<void> {
+  try {
+    const r = await fetch(`${BRAIN_URL}/setup/status`)
+    if (r.ok) paired.value = (await r.json()).robot_secret_set === true
+  } catch { /* offline */ }
+}
+async function writeSecret(body: Record<string, unknown>): Promise<boolean> {
+  const r = await fetch(`${BRAIN_URL}/setup/config`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  return r.ok
+}
+async function savePairing(): Promise<void> {
+  const key = pairingKey.value.trim()
+  if (!key) return
+  savingPairing.value = true
+  pairResult.value = ''
+  try {
+    const ok = await writeSecret({ robot_shared_secret: key })
+    pairingKey.value = ''                 // never leave a credential on screen
+    if (!ok) { pairResult.value = 'The brain did not accept that.'; return }
+    await loadPaired()
+    await syncStatus()
+    pairResult.value = robot.connected ? 'Paired — he answers now.'
+      : 'Saved. He is still not answering — see the line above.'
+  } catch { pairResult.value = 'The brain did not respond.' } finally { savingPairing.value = false }
+}
+async function forgetPairing(): Promise<void> {
+  pairResult.value = ''
+  try {
+    await writeSecret({ robot_shared_secret: '', clear_robot_secret: true })
+    pairingKey.value = ''
+    await loadPaired()
+    await syncStatus()
+  } catch { pairResult.value = 'The brain did not respond.' }
+}
+
 let statusTimer: ReturnType<typeof setInterval> | undefined
 onMounted(() => {
-  fetchPersonas(); fetchSleep(); fetchProactive(); fetchVolume(); syncStatus(); loadAddr()
+  fetchPersonas(); fetchSleep(); fetchProactive(); fetchVolume(); syncStatus(); loadAddr(); loadPaired()
   knowledge.fetchPeople()
   statusTimer = setInterval(syncStatus, 8000)
 })

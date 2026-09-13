@@ -55,6 +55,18 @@ def _diagnose(exc: Exception) -> str:
     if isinstance(exc, httpx.ConnectError) or "refused" in text:
         return (f"{host} refused the connection — the robot is reachable but "
                 f"robot-runtime is not running on it. Start it there.")
+    # U339: the fourth cause. He answers perfectly well and turns us away —
+    # which "unreachable (HTTPStatusError)" described as a network fault, on a
+    # machine where nothing was wrong with the network. A second laptop hits
+    # this the moment it is installed, because the robot's pairing key (U220)
+    # lives on the first one.
+    status = getattr(getattr(exc, "response", None), "status_code", None)
+    if status == 401:
+        return (f"{host} answered, and turned us away (HTTP 401). He has a "
+                f"pairing key and this machine has none, or a different one — "
+                f"enter his key under Connection below.")
+    if status is not None:
+        return f"{host} answered HTTP {status}, which is not an answer we can use."
     return f"{host} is unreachable ({name})."
 
 

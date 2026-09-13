@@ -2296,3 +2296,46 @@ GitHub-actie van SignPath heb ik uit het hoofd opgeschreven, zonder toegang tot
 hun documentatie. Ze zijn daarom bewust niet-fataal bedraad. Klopt er iets
 niet, dan zegt de release het en is het één regel werk.
 
+
+### U339 — de tweede laptop kon nergens zeggen dat hij bij deze robot hoort
+
+Gemeld: *"bij gebruik aura op andere laptop klaagt hij over
+`ROBOT_SHARED_SECRET`"* — elke oproep naar de robot kwam terug als **HTTP
+401**.
+
+Wat er werkelijk aan de hand was: de robot draagt sinds U220 een gedeeld
+geheim. De laptop thuis heeft dat, de nieuwe niet. `ROBOT_SHARED_SECRET` werd
+op **twee** plaatsen gelezen (`robot_client.py`, `robot-runtime/main.py`) en
+door **niets** geschreven: geen endpoint, geen veld, geen wizardstap. De enige
+manier om een tweede machine te koppelen was `%APPDATA%\aura-desktop\.env`
+zoeken en het er met de hand in typen. Dat is exact het patroon dat U199 erger
+noemde dan zwijgen: advies zonder plek om het uit te voeren.
+
+Twee dingen zijn gerepareerd.
+
+**De diagnose wees de verkeerde kant op.** `_diagnose()` kende sinds U198 drie
+oorzaken — naam lost niet op, verbinding geweigerd, geen antwoord — en alles
+daarbuiten werd *"is unreachable (HTTPStatusError)"*. Een robot die keurig
+antwoordt en ons afwijst, is geen netwerkstoring; hij staat aan, hij is
+bereikbaar, en er is precies één ding mis. Nu zegt hij: *hij antwoordde, en
+wees ons af (HTTP 401) — hij heeft een koppelsleutel en deze machine niet, of
+een andere; vul de zijne in onder Verbinding hieronder.* Een 403 of een 500
+krijgt bewust **niet** dat verhaal: die worden niet opgelost door een sleutel
+te typen, en het zou de eigenaar naar de verkeerde knop sturen.
+
+**En daar staat nu het veld.** In de Connection-kaart, op hetzelfde scherm als
+de zin die het probleem noemt. Het volgt de regel die de API-sleutels al
+volgen: opslaan, nooit loggen, nooit teruggeven. De console mag één ding weten
+— *is er een sleutel gezet* — en dat is genoeg om "gekoppeld" te zeggen.
+Wissen kan ook, want U220 maakte het geheim opt-in: een robot zónder sleutel
+moet bereikbaar blijven, dus een machine moet de waarde die hij draagt weer
+kwijt kunnen.
+
+Het werkt zonder herstart: `robot_auth_headers()` leest de omgeving bij elke
+oproep, dus de eerstvolgende call draagt de sleutel al.
+
+Tests eerst rood gezien: vier op de brain-kant (zetten en bewaren, nooit
+terugkaatsen, `robot_secret_set` in de status, wissen), twee op de diagnose
+(401 wél een koppelprobleem, 403/500 níet) en vijf mount-tests op de console —
+deze app heeft geen `vue-tsc`, dus een mount-test is het enige dat tussen een
+typfout en een grijs paneel staat.
