@@ -80,7 +80,13 @@
           <div class="ask-chips">
             <button
               v-for="a in g.items" :key="a.label" class="ask-chip"
-              :disabled="acting" :title="`Run “${a.label}” now`" @click="runAction(a)"
+              :class="{ 'is-state': a.power && (a.power === 'sleep') === asleep }"
+              :disabled="acting"
+              :aria-pressed="a.power ? String((a.power === 'sleep') === asleep) : undefined"
+              :title="a.power ? (a.power === 'sleep' ? 'Motors off — safe to pick him up and pack him'
+                                                     : 'Motors live again')
+                              : `Run “${a.label}” now`"
+              @click="runAction(a)"
             >{{ a.label }}</button>
           </div>
         </div>
@@ -401,13 +407,18 @@ const asleep = ref(false)
 async function fetchSleep(): Promise<void> {
   try { const r = await fetch(`${BRAIN_URL}/robot/sleep`); asleep.value = (await r.json()).asleep === true } catch { /* offline */ }
 }
-async function toggleSleep(): Promise<void> {
-  const target = !asleep.value
+async function setSleep(target: boolean): Promise<void> {
+  acting.value = true
+  actError.value = ''
   try {
     const r = await fetch(`${BRAIN_URL}/robot/${target ? 'sleep' : 'wake'}`, { method: 'POST' })
     if (r.ok) asleep.value = target
-  } catch { /* offline */ }
+    else actError.value = 'Robot unreachable — is it switched on?'
+  } catch {
+    actError.value = 'Robot unreachable — is it switched on?'
+  } finally { acting.value = false }
 }
+function toggleSleep(): Promise<void> { return setSleep(!asleep.value) }
 function toggleWakeWord(): void {
   prefs.save({ voice_mode: prefs.voiceMode === 'wake_word' ? 'off' : 'wake_word' })
 }
@@ -562,8 +573,15 @@ const PERFORMANCES: Record<string, { text: string[]; motion: string }> = {
   },
   'give a compliment': { text: ['You are doing great today — keep it up!'], motion: 'nod' },
 }
-interface ActionItem { label: string; motion?: string }
+interface ActionItem { label: string; motion?: string; power?: 'sleep' | 'wake' }
 async function runAction(a: ActionItem): Promise<void> {
+  // U341: sleeping is not a motion. A motion called "sleep" would lower the
+  // head and leave the motors live — exactly wrong for the thing this is for,
+  // which is picking him up and putting him in a bag.
+  if (a.power) {
+    await setSleep(a.power === 'sleep')
+    return
+  }
   const perf = PERFORMANCES[a.label]
   if (perf) {
     acting.value = true
@@ -584,9 +602,15 @@ async function runAction(a: ActionItem): Promise<void> {
 const actionGroups = computed(() => {
   const calm = prefs.density === 'calm'
   if (calm) {
-    return [{ title: 'Gestures', items: [
-      { label: 'wave' }, { label: 'nod' }, { label: 'dance' }, { label: 'say hi' },
-    ] }]
+    return [
+      { title: 'Gestures', items: [
+        { label: 'wave' }, { label: 'nod' }, { label: 'dance' }, { label: 'say hi' },
+      ] },
+      { title: 'Rest', items: [
+        { label: 'go to sleep', power: 'sleep' as const },
+        { label: 'wake up', power: 'wake' as const },
+      ] },
+    ]
   }
   if (full.value) {
     return [
@@ -598,6 +622,10 @@ const actionGroups = computed(() => {
       { title: 'Speak & move', items: [
         { label: 'say hi' }, { label: 'introduce himself' }, { label: 'tell a joke' }, { label: 'give a compliment' },
       ] },
+      { title: 'Rest', items: [
+        { label: 'go to sleep', power: 'sleep' as const },
+        { label: 'wake up', power: 'wake' as const },
+      ] },
     ]
   }
   return [
@@ -605,6 +633,10 @@ const actionGroups = computed(() => {
       { label: 'wave' }, { label: 'nod' }, { label: 'look around', motion: 'look_around' }, { label: 'bow' },
     ] },
     { title: 'Speak & move', items: [{ label: 'say hi' }, { label: 'tell a joke' }, { label: 'dance' }] },
+    { title: 'Rest', items: [
+      { label: 'go to sleep', power: 'sleep' as const },
+      { label: 'wake up', power: 'wake' as const },
+    ] },
   ]
 })
 function fmtTime(iso: string): string { return new Date(iso).toLocaleTimeString() }
@@ -769,6 +801,12 @@ onUnmounted(() => clearInterval(statusTimer))
 .ask-group { margin-bottom: 13px; }
 .ask-group-title { font-size: 11.5px; font-weight: 600; color: var(--ink-3); margin-bottom: 6px; }
 .ask-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.ask-chip.is-state {
+  /* U341: this one is not an instruction, it is where he already is. */
+  background: var(--accent-soft, rgba(0, 0, 0, .06));
+  border-color: var(--accent, currentColor);
+  font-weight: 600;
+}
 .ask-chip {
   padding: 6px 12px; border-radius: 999px; background: var(--surface-2);
   border: 1px solid var(--line); color: var(--ink-2);

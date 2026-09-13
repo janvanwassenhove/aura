@@ -2406,3 +2406,25 @@ Twee bestaande tests legden de oude waarheid vast ("de sleutel staat in de
 een echte `icacls`-controle op Windows en een die de hele brain opstart om te
 zien dat een sleutel die er al jaren in staat er daadwerkelijk uit verdwijnt.
 674 brain-tests groen.
+
+### U341 — slapen stond bij de instellingen, niet bij wat je hem vraagt
+
+Gevraagd: *"for robot gestures ask -> add sleep and awake (so i can easily take
+him along when going to travel)"*.
+
+Slapen bestond al sinds U100, als schakelaar in de lichaamsstrip naast Mic,
+Follow en Proactive. Dat is waar je kijkt als je hem aan het *instellen* bent.
+Het is niet waar je kijkt met een tas in je hand. "Ask him to…" is de lijst van
+dingen die je hem opdraagt, en gaan slapen is er daar één van.
+
+Twee chips, in élke dichtheid — ook in `calm`, want inpakken doe je niet op een
+bepaald zoomniveau. De chip die overeenkomt met de toestand waarin hij nu staat
+is gemarkeerd (`aria-pressed`), zodat je niet hoeft te raden of hij al slaapt.
+
+Bewust géén motion. Een beweging die "sleep" heet zou het hoofd laten zakken en
+de motoren aan laten staan — precies verkeerd voor waar dit voor dient. De
+chips gaan naar `/robot/sleep` en `/robot/wake`, dezelfde route als de
+schakelaar, die nu met dezelfde functie werkt. Mislukt de oproep, dan zegt het
+paneel dat (U238: een 404 die als "gelukt" leest is precies wat hier nooit mag).
+
+4 mount-tests, 212 consoletests groen.

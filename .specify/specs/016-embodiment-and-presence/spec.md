@@ -5,7 +5,7 @@ owner: "robot-runtime"
 priority: P1
 risk: Medium
 created: "2026-09-05"
-units: [U16, U36a, U36d, U36g, U37, U51, U99, U100, U101, U102, U111, U116, U126, U127, U137, U138, U139, U147, U157, U158, U161, U162, U164, U165, U175, U196, U212, U219, U237, U238, U252b, U252d, U253, U268, U270, U286, U325, U326, U328, U336]
+units: [U16, U36a, U36d, U36g, U37, U51, U99, U100, U101, U102, U111, U116, U126, U127, U137, U138, U139, U147, U157, U158, U161, U162, U164, U165, U175, U196, U212, U219, U237, U238, U252b, U252d, U253, U268, U270, U286, U325, U326, U328, U336, U341]
 ---
 
 # Feature Specification: Embodiment and Presence
@@ -100,6 +100,11 @@ living room is not a thing that reacts all evening.
    route, **When** Sleep is pressed, **Then** the console says the robot did
    not accept it, rather than reporting success (U238). *A 404 that reads as
    "done" is the exact failure constitution X exists to prevent.*
+3. **Given** the owner is about to pick him up and travel with him, **When**
+   they look for sleep, **Then** it is in "Ask him to…" beside the gestures —
+   as two plain instructions ("go to sleep", "wake up") that show which one he
+   is in, at every density. They are not motions: a motion would lower the head
+   and leave the motors live (U341).
 3. **Given** the robot wakes, **When** it wakes, **Then** it comes back upright
    before doing anything else (U36d), and follow-me is restored (U116).
 4. **Given** the microphone is switched off, **When** anything is said,
@@ -290,6 +295,7 @@ while he is speaking, so that a conversation looks like a conversation.
 | U37, U36g, U116, U126, U127, U158, U165, U253 | Follow-me: torso yaw, watchdog, re-acquire that holds, face-visible reporting, and a tracker that was dead rather than blind |
 | U161, U162, U164 | Drag-to-aim on the live picture; explicit Follow/Manual; the mirrored-axis fix |
 | U99, U100, U101, U102, U237, U238 | Microphone toggle; sleep and wake; the sleep pose; sleep that stays; the 404 that read as success |
+| U341 | Sleep and wake asked for like any other action, where you pack him rather than where you configure him |
 | U137, U138, U139 | Quick actions that are not swallowed by a tracking conflict; dance, including the torso and a synthesised groove |
 | U51 | Mode behaviour profiles — embodiment follows the active persona |
 | U252d, U268, U286 | Per-character move; the one-letter SVG bug that froze all ten faces; the overlay following the character choice |
