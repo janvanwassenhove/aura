@@ -102,6 +102,15 @@ async def _character_for_active_person():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    # U340: secrets first, before anything reads a key. They live in the OS
+    # credential store; the environment still wins, and a key still sitting
+    # in plain text in the env file is moved out of it once, here.
+    from aura_brain import secret_store
+
+    secret_store.migrate_env_file(
+        os.environ.get("AURA_ENV_FILE", "./infra/dev/.env"))
+    secret_store.load_into_env()
+
     await ctx.bus.start()
 
     # One in-process ASGI client for all intra-brain seams (U8/U9): connector,

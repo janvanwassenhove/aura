@@ -115,6 +115,24 @@ class EmbeddingMatcher:
     def sample_count(self, person_id: str) -> int:
         return len(self._enrolled.get(person_id, []))
 
+    def samples(self, person_id: str) -> list[list[float]]:
+        """The enrolled embeddings for one person, decrypted.
+
+        U342: moving him to another laptop means moving the faces, and every
+        sample is AES-GCM bound to its person through AAD — so they cannot be
+        copied as bytes, only opened here and re-enrolled there. Reaching into
+        the private dictionary from outside would put the OMK in two places;
+        this keeps it in one.
+        """
+        out: list[list[float]] = []
+        for blob in self._enrolled.get(person_id, []):
+            try:
+                out.append(json.loads(
+                    crypto.decrypt(self._omk, blob, aad=person_id.encode())))
+            except Exception:  # noqa: BLE001 — an unreadable sample is skipped
+                continue
+        return out
+
     @property
     def threshold(self) -> float:
         """The bar a match must clear. U277: shown beside a near-miss, so

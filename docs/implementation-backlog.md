@@ -2756,6 +2756,154 @@ terugkaatsen, `robot_secret_set` in de status, wissen), twee op de diagnose
 deze app heeft geen `vue-tsc`, dus een mount-test is het enige dat tussen een
 typfout en een grijs paneel staat.
 
+### U339b — en de sleutel stond nergens beschreven
+
+Vraag erachteraan: *"ik start app op vanuit repo in vscode — wat moet er nu
+juist gebeuren?"* Een dev-run leest `infra/dev/.env`, niet de `.env` onder
+`%APPDATA%`. En in `infra/dev/.env.example` — het bestand dat je kopieert als
+je op een nieuwe machine begint — stond `ROBOT_SHARED_SECRET` niet. Niet als
+waarde, niet als commentaar. Wie vanaf de bron start, kon dus alleen weten dat
+hij bestaat door de 401 te krijgen en de broncode te lezen.
+
+Staat er nu bij, uitgecommentarieerd naast `ROBOT_RUNTIME_URL`, met waar het
+ding vandaan komt (de systemd drop-in op de Pi) en met de vermelding dat het in
+de app ook via Robot → Connection kan (U339).
+
+### U340 — de sleutels lagen in een bestand dat meer mensen mochten lezen
+
+Gevraagd: *"moeten we deze file niet beveiligen ook?"* — over
+`%APPDATA%\aura-desktop\.env`.
+
+Ja. En het vervelende is dat het argument al in de repo stond. U225 verhuisde
+de kennis-wachtwoordzin naar de credential store van het besturingssysteem, met
+in zijn eigen docstring exact de reden: dat bestand ligt naast de ciphertext met
+dezelfde rechten, dus "versleuteld op schijf" beschermde niets waar het in de
+praktijk tegenop moest. Alleen: er verhuisde **één** geheim. De OpenAI-,
+OpenRouter- en Gemini-sleutel, de agenda-deellink en sinds U339 ook de
+koppelsleutel van de robot bleven in platte tekst staan — in precies het
+bestand waar die alinea over ging.
+
+Wat ik op de machine zelf gemeten heb (alleen rechten, niet de inhoud): het
+bestand erft van `%APPDATA%\Roaming` een **leesrecht** voor de lokale groep
+`CodexSandboxUsers`, met `CodexSandboxOffline` en `CodexSandboxOnline` als
+leden. Twee sandbox-accounts op deze pc mochten dus de API-sleutel en de
+robotsleutel lezen. En Roaming is nu net wat een beheerde werklaptop met
+roaming profiles of OneDrive-mapback-up naar een bedrijfsshare synchroniseert —
+precies het scenario van deze week.
+
+Dezelfde behandeling als de wachtwoordzin, met dezelfde afwegingen:
+
+* **De omgeving wint nog altijd.** docker-compose, CI en een shell die een
+  sleutel exporteert houden de controle; een verouderde waarde in de
+  credential store mag die nooit overschaduwen.
+* **Geen keyring, dan het bestand.** Docker en CI hebben er geen. Die breken om
+  een desktopprobleem op te lossen is een slechte ruil (U225 maakte dezelfde
+  keuze).
+* **Bestaande platte tekst verhuist vanzelf**, één keer, bij de volgende start.
+  Een regel verdwijnt **pas** nadat de store de waarde heeft teruggegeven — een
+  kluis die schrijfacties aanneemt maar niets teruggeeft zou anders de laatste
+  kopie van je API-sleutel wissen.
+* **Het bestand zelf gaat op slot.** Overerving eraf, rechten alleen voor de
+  eigenaar, SYSTEM en Administrators (`icacls`), en op Linux/macOS `0600`. Dat
+  gebeurt bij élke schrijfactie, want een herschrijving zet de overerving
+  terug.
+* **`GITHUB_TOKEN` blijft bewust in het bestand**: de Electron-updater leest
+  hem daar rechtstreeks. Hem verplaatsen zou de updatecontrole breken terwijl
+  het eruitziet als een verbetering.
+
+**Wat dit níet doet, en wat ik er niet over ga beweren:** het houdt niets tegen
+dat draait ónder jouw account. De credential store geeft een geheim aan elk
+proces van die gebruiker. Wat het wegneemt is de *kopie* — een gesynchroniseerd
+profiel, een tweede account, een back-up, een zip onder een bugrapport, een
+screenshare.
+
+Twee bestaande tests legden de oude waarheid vast ("de sleutel staat in de
+.env") en zijn bijgewerkt naar wat ze nu bedoelen. 10 nieuwe tests, waaronder
+een echte `icacls`-controle op Windows en een die de hele brain opstart om te
+zien dat een sleutel die er al jaren in staat er daadwerkelijk uit verdwijnt.
+674 brain-tests groen.
+
+### U341 — slapen stond bij de instellingen, niet bij wat je hem vraagt
+
+Gevraagd: *"for robot gestures ask -> add sleep and awake (so i can easily take
+him along when going to travel)"*.
+
+Slapen bestond al sinds U100, als schakelaar in de lichaamsstrip naast Mic,
+Follow en Proactive. Dat is waar je kijkt als je hem aan het *instellen* bent.
+Het is niet waar je kijkt met een tas in je hand. "Ask him to…" is de lijst van
+dingen die je hem opdraagt, en gaan slapen is er daar één van.
+
+Twee chips, in élke dichtheid — ook in `calm`, want inpakken doe je niet op een
+bepaald zoomniveau. De chip die overeenkomt met de toestand waarin hij nu staat
+is gemarkeerd (`aria-pressed`), zodat je niet hoeft te raden of hij al slaapt.
+
+Bewust géén motion. Een beweging die "sleep" heet zou het hoofd laten zakken en
+de motoren aan laten staan — precies verkeerd voor waar dit voor dient. De
+chips gaan naar `/robot/sleep` en `/robot/wake`, dezelfde route als de
+schakelaar, die nu met dezelfde functie werkt. Mislukt de oproep, dan zegt het
+paneel dat (U238: een 404 die als "gelukt" leest is precies wat hier nooit mag).
+
+4 mount-tests, 212 consoletests groen.
+
+### U342 — hem meenemen, inclusief de gezichten
+
+Gevraagd: *"can we add option to do export of brain, so i can import it on
+other laptop? so he doesn't need to learn everything all over again"*.
+
+Er *was* een exportknop, sinds U104. Er waren drie dingen mis mee, en pas
+samen verklaren ze waarom het antwoord "die bestaat toch al" niet klopte:
+
+1. **Er was geen import.** `GET /knowledge/export` bestond, en niets kon het
+   ooit teruglezen. Een bestand dat je nergens kan laden is een souvenir.
+2. **Er zaten geen gezichten in.** Mensen en feiten reisden mee, de embeddings
+   niet. Op de nieuwe laptop wist hij dus alles over je en herkende hij je
+   niet — precies de helft die de eigenaar bedoelt met "alles opnieuw leren".
+3. **Het was platte tekst.** Elk feit over het gezin, in een bestand op een
+   USB-stick. De kennisopslag is versleuteld op schijf juist omdat een kópie
+   waardeloos hoort te zijn; een export die dat ongedaan maakt, maakt de
+   belofte ongedaan.
+
+Nu: één verzegeld bestand (`.aura`) met mensen, feiten, signalen, gezichten en
+aangeleerde skills. De kop blijft leesbaar en zegt wát erin zit — aantallen,
+nooit namen — want je moet twee exports uit elkaar kunnen houden zonder er een
+te openen. De rest zit achter AES-256-GCM met een scrypt-sleutel uit een
+wachtwoordzin die de eigenaar zelf kiest. De KDF-parameters reizen mee in het
+bestand, zodat het verhogen van de werkfactor (wat U225 al eens deed) oude
+exports niet onleesbaar maakt.
+
+Importeren **voegt samen**, het vervangt niet:
+
+* wat de andere machine al weet blijft staan;
+* hetzelfde bestand twee keer importeren voegt niets dubbel toe — iemand gáát
+  dat doen, en dan moet het saai zijn;
+* een skill die daar al bestaat wordt nooit overschreven, want die kan de
+  nieuwere zijn, en stilletjes andermans bewerking wissen is de vervelendste
+  verrassing die een knop met "toevoegen" erop kan geven. Het paneel zegt
+  hoeveel er bewaard zijn gebleven.
+
+De import staat in **Settings**, niet bij een persoon. Dat is geen smaak: een
+verse laptop kent niemand, dus er is geen persoonspaneel om het bestand in te
+laten vallen. De oude platte export blijft trouwens bestaan waar hij stond —
+dat is het antwoord op "wat weet je eigenlijk over mij", en dat hoort leesbaar
+te zijn.
+
+De embeddings konden niet als bytes mee: elk monster is met AES-GCM aan zijn
+persoon gebonden via AAD. De matcher kreeg daarom `samples()`, zodat ze op één
+plek geopend worden in plaats van de OMK op twee plekken te laten bestaan.
+
+11 brain-tests, 4 mount-tests. 685 brain-tests, 216 consoletests, 142
+shared-schemas-tests groen.
+
+### U341b — de actieve chip was groen op groen
+
+De markering uit U341 ("hier staat hij nu") greep naar `--accent-soft`, en die
+token *is* de accentkleur. Resultaat: een massief groene pil met onleesbare
+tekst. Gevonden door er in de browser naar te kijken, niet door een test — een
+kleur die klopt is geen assertie die faalt, en dat blijft zo.
+
+Nu dezelfde behandeling als elke andere "aan"-knop in de app (`App.vue`):
+`--accent-wash` als achtergrond, `--accent` voor rand en tekst. Gemeten na de
+fix: `rgb(228,239,231)` op `rgb(31,111,70)`.
 ### U343 — the launcher stood still for two months while the app moved on
 
 Asked on a fresh clone on a second machine: *"how do I start the app locally,

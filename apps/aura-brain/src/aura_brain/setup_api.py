@@ -101,6 +101,11 @@ def _write_env(updates: dict[str, str]) -> bool:
         out.extend(f"{k}={v}" for k, v in updates.items())
         env_path.parent.mkdir(parents=True, exist_ok=True)
         env_path.write_text("\n".join(out) + "\n", encoding="utf-8")
+        # U340: a rewrite restores whatever inheritance we dropped, so the
+        # lockdown runs on every write rather than once at install time.
+        from aura_brain import secret_store
+
+        secret_store.harden(env_path)
         return True
     except OSError as exc:
         logger.warning("could not persist passphrase to %s: %s", env_path, exc)
@@ -190,7 +195,23 @@ async def set_config(body: dict) -> JSONResponse:
     if not updates:
         return JSONResponse({"error": "nothing to update"}, status_code=422)
     os.environ.update(updates)
-    persisted = _write_env(updates)
+    # U340: a secret belongs in the OS credential store, not in a file that
+    # inherits its permissions from the profile directory — on a managed
+    # laptop that file lives under Roaming, and Roaming is synchronised. The
+    # env file stays the fallback for docker, CI and headless, which have no
+    # keyring at all.
+    from aura_brain import secret_store
+
+    to_file = dict(updates)
+    for name in secret_store.MANAGED:
+        if name not in to_file:
+            continue
+        value = to_file[name]
+        if value and secret_store.put(name, value):
+            to_file.pop(name)          # stored safely; keep it out of the file
+        elif not value:
+            secret_store.forget(name)  # cleared: drop both copies
+    persisted = _write_env(to_file) if to_file else True
     # Apply the LLM switch live (same path as the Settings panel).
     if "LLM_PROVIDER" in updates:
         try:

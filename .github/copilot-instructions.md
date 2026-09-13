@@ -81,11 +81,19 @@ units while the specs stood still.
 
 ### Documentation is in English
 
-Every word committed under `docs/` and `.specify/` is English — the ledger
-included, and reported problems included. The ledger was Dutch for its first
-~366 entries (U344 translated them), which put the only record of *why* the
-product is shaped this way behind a language barrier in an otherwise English,
-public repository.
+Every word written under `docs/` and `.specify/` from U347 onwards is English —
+the ledger included, and reported problems included. The ledger was Dutch, which
+put the only record of *why* the product is shaped this way behind a language
+barrier in an otherwise English, public repository.
+
+**The conversion of the existing ledger is under way, not finished.** U347
+established the rule, translated the working agreement and converted the
+Phase 3.5–6 lists and the agentic phase. The ledger holds entries in three
+shapes — phase bullets, dated progress-log lines and `###` entries — and most of
+them are still Dutch. Claiming otherwise here would be the exact defect this
+repository keeps writing units about, so it is written down instead: anything
+you *add* is English, and a Dutch entry you happen to edit is translated while
+you are in it.
 
 A reported problem is still quoted, because the owner's own words are usually
 sharper than any summary — but it is rendered in English and marked
@@ -192,7 +200,7 @@ and CI fails on any of them. Mentioning a unit in prose does **not** claim it.
 | `.specify/memory/constitution.md` | The governing principles. Read first. |
 | `.specify/specs/NNN-*/` | `spec.md` (what and why), `plan.md`, `tasks.md` |
 | `.specify/coverage.json` | The spec-coverage baseline |
-| `docs/implementation-backlog.md` | The unit ledger — history, in English (U344) |
+| `docs/implementation-backlog.md` | The unit ledger — history; English from U347, older entries still being converted |
 | `docs/adr/` + `docs/adr/README.md` | Decisions, with the rejected alternatives |
 | `docs/architecture/overview.md` | How the parts fit together today |
 | `docs/diagrams/` | The canonical drawings (part of the contract) |

@@ -308,6 +308,31 @@
             <span v-if="!caps.autoApproved.length" class="row-sub">None — every sensitive action still asks.</span>
           </div>
         </div>
+
+        <!-- U342: the whole brain, sealed, so it can travel. It lives here and
+             not in a person's pane because a fresh laptop knows nobody, and
+             there would be no pane to open the file in. -->
+        <div class="row">
+          <div class="row-text">
+            <div class="row-title">Move him to another laptop</div>
+            <div class="row-sub">
+              People, facts, faces and learned skills in one sealed file. Pick a passphrase
+              for it — you will need the same one on the other machine, and nothing keeps
+              a copy of it.
+            </div>
+          </div>
+          <input v-model="transferPass" type="password" class="d2-field row-field"
+                 placeholder="At least 8 characters" aria-label="Export passphrase">
+          <button class="d2-ghost-btn" data-test="transfer-export"
+                  :disabled="transferPass.length < 8 || transferring"
+                  @click="exportBundle">{{ transferring ? 'Sealing…' : 'Export' }}</button>
+          <button class="d2-ghost-btn" data-test="transfer-import"
+                  :disabled="transferPass.length < 8 || transferring"
+                  @click="pickBundle">Import…</button>
+          <input ref="bundleInput" type="file" accept=".aura,.json" class="hidden-input"
+                 aria-label="Bundle file" @change="importBundle">
+        </div>
+        <p v-if="transferResult" class="sec-note" role="status">{{ transferResult }}</p>
       </section>
 
       <!-- ═══ Voice & wake word ═══ -->
@@ -732,6 +757,65 @@ async function securePassphrase(): Promise<void> {
   securing.value = false
 }
 
+// ── U342: take him with you ────────────────────────────────────────────────
+// The passphrase is typed, used and dropped. It is not the vault passphrase:
+// losing this one costs an export file, not a knowledge base.
+const transferPass = ref('')
+const transferring = ref(false)
+const transferResult = ref('')
+const bundleInput = ref<HTMLInputElement | null>(null)
+
+async function exportBundle(): Promise<void> {
+  transferring.value = true
+  transferResult.value = ''
+  try {
+    const r = await fetch(`${BRAIN_URL}/knowledge/transfer/export`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ passphrase: transferPass.value }),
+    })
+    if (!r.ok) { transferResult.value = 'He would not seal that — is the passphrase long enough?'; return }
+    const blob = await r.blob()
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(blob)
+    a.download = 'aura-brain.aura'
+    a.click()
+    URL.revokeObjectURL(a.href)
+    transferResult.value = 'Sealed. Copy the file over and import it there with the same passphrase.'
+  } catch { transferResult.value = 'The brain did not respond.' } finally { transferring.value = false }
+}
+
+function pickBundle(): void { bundleInput.value?.click() }
+
+async function importBundle(e: Event): Promise<void> {
+  const file = (e.target as HTMLInputElement).files?.[0]
+  if (!file) return
+  transferring.value = true
+  transferResult.value = ''
+  try {
+    const r = await fetch(`${BRAIN_URL}/knowledge/transfer/import`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ bundle: await file.text(), passphrase: transferPass.value }),
+    })
+    const body = await r.json()
+    if (!r.ok) { transferResult.value = body?.error ?? 'That file could not be read.'; return }
+    // Say what arrived. "Imported" alone would hide a file that carried
+    // nothing, which is exactly when you need to know.
+    const bits = [
+      `${body.people} ${body.people === 1 ? 'person' : 'people'}`,
+      `${body.facts} ${body.facts === 1 ? 'fact' : 'facts'}`,
+      `${body.faces} ${body.faces === 1 ? 'face' : 'faces'}`,
+      `${body.skills} ${body.skills === 1 ? 'skill' : 'skills'}`,
+    ]
+    const kept = body.skills_kept
+      ? ` ${body.skills_kept} skill${body.skills_kept === 1 ? '' : 's'} already here were left alone.`
+      : ''
+    transferResult.value = `Added ${bits.join(', ')}.${kept} Anything already known was kept.`
+  } catch { transferResult.value = 'That file could not be read.' } finally {
+    transferring.value = false
+    if (bundleInput.value) bundleInput.value.value = ''
+  }
+}
+
 // Every section loads INDEPENDENTLY. They used to sit in one arrow function,
 // so the first line that threw took the other six with it — a single wrong
 // method name left Connections, Capabilities, the vault state and the voice
@@ -834,4 +918,5 @@ watch(() => themeStore.theme, () => { /* persisted by the store's own watcher */
   padding: 3px 9px; border-radius: 999px; background: var(--warn-wash); color: var(--warn);
 }
 .chip-x { background: none; border: none; color: inherit; cursor: pointer; padding: 0; font-size: 11px; }
+.hidden-input { display: none; }
 </style>

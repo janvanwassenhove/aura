@@ -5,7 +5,7 @@ owner: "aura-brain / knowledge"
 priority: P1
 risk: High
 created: "2026-09-05"
-units: [U18, U19a, U19b, U19c, U19d, U19e, U20, U29, U93, U94, U97, U103, U104, U105, U106, U109, U136, U160, U180, U181, U189, U190, U204, U213, U214, U218, U243, U244, U245, U271, U272, U274, U276, U277, U278, U279, U280, U281, U290, U293, U294, U36f]
+units: [U18, U19a, U19b, U19c, U19d, U19e, U20, U29, U93, U94, U97, U103, U104, U105, U106, U109, U136, U160, U180, U181, U189, U190, U204, U213, U214, U218, U243, U244, U245, U271, U272, U274, U276, U277, U278, U279, U280, U281, U290, U293, U294, U36f, U342]
 amended: "2026-09-05"
 ---
 
@@ -145,9 +145,16 @@ while he was, in fact, remembering.
    (U103, U105).
 2. **Given** a ChatGPT or Claude export, **When** it is imported, **Then** it
    is mined into the brain, and the whole store can be exported as JSON (U104).
-3. **Given** a large graph, **When** it is explored, **Then** it can be panned,
+3. **Given** a second machine, **When** the owner moves him to it, **Then**
+   people, facts, signals, **faces** and learned skills travel in one file
+   sealed with a passphrase they choose; importing MERGES — what the far
+   machine already knows is kept, the same file imported twice adds nothing a
+   second time, and a skill that exists there is never overwritten. The import
+   lives in Settings, because a fresh laptop has no person pane to open a file
+   in (U342).
+4. **Given** a large graph, **When** it is explored, **Then** it can be panned,
    zoomed (U106) and filtered by person (U214).
-4. **Given** a fresh install, **When** it starts, **Then** exactly one
+5. **Given** a fresh install, **When** it starts, **Then** exactly one
    fictional demo persona exists (U160) — which is what makes the release
    screenshots safe to publish by construction.
 
@@ -202,6 +209,7 @@ while he was, in fact, remembering.
 | U18, U271, U213, U218, U244 | Recognition: the embedding matcher, faces at 34 pixels, honest teach feedback, surviving updates, and a deleted person who kept their face |
 | U136, U181, U189, U190 | Flagging a wrong recognition; guest profiles; naming or attaching a guest; capping the guest explosion |
 | U103, U104, U105, U106, U214 | Growing from sources, import/export, provenance, pan/zoom, filter by person |
+| U342 | The brain as one sealed, importable file — faces and skills included, merged rather than replaced |
 | U109, U276, U278 | Long-term memory per person — written, shown, and correctable |
 | U272, U279, U280 | Memory in the graph: split into lines with keywords, its own styling and legend, and edges to the people it mentions |
 | U281, U293, U294 | Creating a profile without duplicating one; knowing the household before the conversation; looking somebody up on his own |
