@@ -5,7 +5,7 @@ owner: "robot-runtime"
 priority: P1
 risk: Medium
 created: "2026-09-05"
-units: [U16, U36a, U36d, U36g, U37, U51, U99, U100, U101, U102, U111, U116, U126, U127, U137, U138, U139, U147, U157, U158, U161, U162, U164, U165, U175, U196, U212, U219, U237, U238, U252b, U252d, U253, U268, U270, U286, U325, U326, U328, U336, U341]
+units: [U16, U36a, U36d, U36g, U37, U51, U99, U100, U101, U102, U111, U116, U126, U127, U137, U138, U139, U147, U157, U158, U161, U162, U164, U165, U175, U196, U212, U219, U237, U238, U252b, U252d, U253, U268, U270, U286, U325, U326, U328, U336, U341, U341b]
 ---
 
 # Feature Specification: Embodiment and Presence
@@ -296,6 +296,7 @@ while he is speaking, so that a conversation looks like a conversation.
 | U161, U162, U164 | Drag-to-aim on the live picture; explicit Follow/Manual; the mirrored-axis fix |
 | U99, U100, U101, U102, U237, U238 | Microphone toggle; sleep and wake; the sleep pose; sleep that stays; the 404 that read as success |
 | U341 | Sleep and wake asked for like any other action, where you pack him rather than where you configure him |
+| U341b | That marker rendered green on green — the app's own `--accent-wash` treatment, seen by looking at it |
 | U137, U138, U139 | Quick actions that are not swallowed by a tracking conflict; dance, including the torso and a synthesised groove |
 | U51 | Mode behaviour profiles — embodiment follows the active persona |
 | U252d, U268, U286 | Per-character move; the one-letter SVG bug that froze all ten faces; the overlay following the character choice |

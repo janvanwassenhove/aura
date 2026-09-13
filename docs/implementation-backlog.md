@@ -2477,3 +2477,14 @@ plek geopend worden in plaats van de OMK op twee plekken te laten bestaan.
 
 11 brain-tests, 4 mount-tests. 685 brain-tests, 216 consoletests, 142
 shared-schemas-tests groen.
+
+### U341b — de actieve chip was groen op groen
+
+De markering uit U341 ("hier staat hij nu") greep naar `--accent-soft`, en die
+token *is* de accentkleur. Resultaat: een massief groene pil met onleesbare
+tekst. Gevonden door er in de browser naar te kijken, niet door een test — een
+kleur die klopt is geen assertie die faalt, en dat blijft zo.
+
+Nu dezelfde behandeling als elke andere "aan"-knop in de app (`App.vue`):
+`--accent-wash` als achtergrond, `--accent` voor rand en tekst. Gemeten na de
+fix: `rgb(228,239,231)` op `rgb(31,111,70)`.

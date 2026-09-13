@@ -802,9 +802,13 @@ onUnmounted(() => clearInterval(statusTimer))
 .ask-group-title { font-size: 11.5px; font-weight: 600; color: var(--ink-3); margin-bottom: 6px; }
 .ask-chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .ask-chip.is-state {
-  /* U341: this one is not an instruction, it is where he already is. */
-  background: var(--accent-soft, rgba(0, 0, 0, .06));
-  border-color: var(--accent, currentColor);
+  /* U341: this one is not an instruction, it is where he already is. Same
+     treatment as every other "on" control in the app (App.vue) — a wash, not
+     the solid accent: --accent-soft IS the accent, so using it here painted
+     green text on green. */
+  background: var(--accent-wash);
+  border-color: var(--accent);
+  color: var(--accent);
   font-weight: 600;
 }
 .ask-chip {
