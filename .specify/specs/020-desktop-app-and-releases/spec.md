@@ -5,8 +5,8 @@ owner: "apps/desktop + CI"
 priority: P1
 risk: High
 created: "2026-09-05"
-units: [U32, U33, U44, U55, U56, U151, U152, U166, U168, U168b, U168c, U168d, U168e, U169, U169b, U170, U171, U172, U173, U174, U176, U177, U178, U192, U193, U197, U201, U211, U228, U229, U230, U231, U232, U233, U234, U235, U236, U283, U284, U285, U285b, U297, U179, U184, U185, U186, U210, U317, U318, U327, U330, U337, U338]
-amended: "2026-09-05"
+units: [U32, U33, U44, U55, U56, U151, U152, U166, U168, U168b, U168c, U168d, U168e, U169, U169b, U170, U171, U172, U173, U174, U176, U177, U178, U192, U193, U197, U201, U211, U228, U229, U230, U231, U232, U233, U234, U235, U236, U283, U284, U285, U285b, U297, U179, U184, U185, U186, U210, U317, U318, U327, U330, U337, U338, U343, U344]
+amended: "2026-09-13"
 ---
 
 # Feature Specification: The Desktop App and its Releases
@@ -134,6 +134,28 @@ and installers for Windows, macOS (arm64 and x64) and Linux.
    real ports and tells the console which ones (U234). U229: the window loaded
    somebody else's project because `localhost` resolved to `::1` first and a
    different process held the port there.
+6. **Given** a **source checkout** rather than an installer, **When**
+   `start-aura.bat` is double-clicked, **Then** the same stack comes up —
+   including the Python environment. U343: the launcher had been unchanged
+   since July while `ensureBootstrap()` stayed packaged-only
+   (`if (!IS_PACKAGED) return`), so a checkout never synced and never got the
+   extras; it keyed the console build on the *existence* of `dist/index.html`,
+   so every pull left an old console talking to a new brain; and it baked
+   `VITE_*` at `localhost:8020`, which U234 had already replaced and U229 had
+   already warned about.
+7. **Given** a **managed laptop**, **When** the app starts the brain, **Then**
+   it starts. U344: on a corporate machine the Defender ASR rule
+   `01443614-CD74-433A-B99E-2ECDC07BFC25` ("block executable files unless they
+   meet a prevalence, age or trusted list criterion") refuses every launcher
+   `uv` generates in `.venv\Scripts` — the brain died with `Access is denied.
+   (os error 5)` before its first line, while `python.exe` in the same folder
+   ran fine.
+8. **Given** the brain has already exited, **When** the shell is waiting for
+   it, **Then** it says so at once and quotes the reason. U344's second half,
+   and the worse one: the app polled `/health` for ninety seconds against a
+   process that was already gone, then reported a timeout naming no cause —
+   while the answer sat in `brain.log` the whole time. From the owner's side
+   that is a frozen splash screen (constitution XI).
 
 ### User Story 5 — The repository is presentable and safe to publish (Priority: P2)
 
@@ -193,6 +215,23 @@ and installers for Windows, macOS (arm64 and x64) and Linux.
 - **FR-009**: A release that does not publish explains itself in the run log,
   naming the setting to check. Silence is the failure mode this whole feature
   cannot afford (constitution XI).
+- **FR-013**: Starting from a source checkout is one action and leaves nothing
+  stale. `start-aura.bat` syncs the Python environment itself — the packaged
+  bootstrap does not run for a checkout — down the same extras ladder
+  (`recognition`, `computeruse`, `presentation`), on the interpreter CI
+  actually tests. It rebuilds the console whenever the console's git tree hash
+  differs from the one recorded in the last build, and it bakes no endpoint:
+  the shell injects the ports it really got (FR-008).
+- **FR-014**: The brain is started as `python -m aura_brain`, never through a
+  generated console script. Launchers written into `.venv\Scripts` are
+  unsigned and brand new by construction, which is exactly what a managed
+  machine's ASR policy refuses; the interpreter is signed and allowed. Checked,
+  not trusted: `apps/desktop/test-brain-launch.cjs` asserts the spawn argv and
+  that `aura_brain/__main__.py` calls the same `run()` the console script
+  declares, so the two entry points cannot drift.
+- **FR-015**: A brain that exited fails the startup wait **immediately**,
+  quoting its own last stderr. Waiting out a timeout on a dead process turns a
+  named, logged cause into an unexplained freeze.
 
 ## Out of scope
 
@@ -216,3 +255,5 @@ and installers for Windows, macOS (arm64 and x64) and Linux.
 | U330 | The published screenshots refreshed from the current app, one command to redo it, and two drawings that had stopped being true |
 | U337 | Windows code signing wired end to end (Azure Trusted Signing or a PFX), an unsigned build that admits it, and every check in scripts/ actually running in CI |
 | U338 | SignPath Foundation wired into the release: free signing for an open-source project, guarded and order-checked |
+| U343 | The from-source launcher caught up with the app it starts: it syncs Python with the extras, rebuilds a stale console, and stops baking a port |
+| U344 | The brain launched through the interpreter instead of a shim a corporate ASR rule forbids, and a dead brain that now names its cause instead of freezing the splash |

@@ -5,7 +5,7 @@ owner: "build"
 priority: P1
 risk: Low
 created: "2026-09-05"
-units: [U299, U300, U301, U302, U303, U304, U305, U306, U307, U308, U309, U310, U311, U312, U313, U314, U315, U316]
+units: [U299, U300, U301, U302, U303, U304, U305, U306, U307, U308, U309, U310, U311, U312, U313, U314, U315, U316, U347]
 ---
 
 # Feature Specification: Spec Coverage — traceability that a machine checks
@@ -156,6 +156,15 @@ spec-first rule and the per-unit obligations, and points at the constitution.
 - **FR-009**: Relative links in the documentation resolve
   (`scripts/check_doc_links.py`, in CI). Twenty-five were broken, five of them
   the contract paths in `AGENTS.md`'s Key Interfaces block (U315).
+- **FR-010**: Documentation under `docs/` and `.specify/` is **English**,
+  reported problems included; a quote is rendered in English and marked
+  *(translated)*, because a translated quote is a paraphrase wearing quotation
+  marks. Three things stay in their original language and the working agreement
+  names them: the demo scenario YAML (input the app speaks, not prose), evidence
+  where the language is itself the finding, and `docs/gebruikershandleiding.md`
+  (an owner-facing manual for a Dutch-speaking household, twinned with
+  `docs/user-guide.md` since U38). The historical ledger is **mid-conversion**,
+  and the agreement says so rather than describing a finished state (U347).
 
 ## Out of scope
 
@@ -187,3 +196,4 @@ spec-first rule and the per-unit obligations, and points at the constitution.
 | U314 | The guided one-time registration; defaults.py made a ready slot with tests; identity-service reaches CI |
 | U315 | ADRs 001/003 amended, an ADR index, and a link checker after 25 broken links — five of them the contract paths in AGENTS.md |
 | U316 | One working agreement injected into all three agent files; Copilot's instructions were for a different repository |
+| U347 | English as the documented language for docs and specs, with the three deliberate exceptions named — and a ledger conversion that admits it is unfinished |

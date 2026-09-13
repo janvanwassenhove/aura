@@ -25,11 +25,47 @@ correct in one is broken in the others):
 > Traceability is checked, not trusted.
 
 `.specify/specs/` describes what the product does **today**.
-`docs/implementation-backlog.md` is the ledger: one Dutch entry per unit,
-recording *how we got here*. **One is not a substitute for the other.** A reader
-who needs to know how the product behaves must not have to read 420 kB of
-history to find out — and writing a careful ledger entry is what *felt* like
-documenting for 292 units while the specs stood still.
+`docs/implementation-backlog.md` is the ledger: one entry per unit, recording
+*how we got here*. **One is not a substitute for the other.** A reader who needs
+to know how the product behaves must not have to read 500 kB of history to find
+out — and writing a careful ledger entry is what *felt* like documenting for 292
+units while the specs stood still.
+
+### Documentation is in English
+
+Every word written under `docs/` and `.specify/` from U347 onwards is English —
+the ledger included, and reported problems included. The ledger was Dutch, which
+put the only record of *why* the product is shaped this way behind a language
+barrier in an otherwise English, public repository.
+
+**The conversion of the existing ledger is under way, not finished.** U347
+established the rule, translated the working agreement and converted the
+Phase 3.5–6 lists and the agentic phase. The ledger holds entries in three
+shapes — phase bullets, dated progress-log lines and `###` entries — and most of
+them are still Dutch. Claiming otherwise here would be the exact defect this
+repository keeps writing units about, so it is written down instead: anything
+you *add* is English, and a Dutch entry you happen to edit is translated while
+you are in it.
+
+A reported problem is still quoted, because the owner's own words are usually
+sharper than any summary — but it is rendered in English and marked
+*(translated)* on first use in an entry. That marking is not pedantry: a
+translated quote is a paraphrase wearing quotation marks, and a reader deciding
+what was actually said deserves to know which one they are holding.
+
+**Two things stay in their original language**, because they are not prose:
+
+- **Sample data the app consumes** — `docs/demo/*.scenario.yaml` and the
+  scenario snippets quoted from it. Those are lines the robot speaks at a
+  Dutch-language talk; translating them breaks the demo.
+- **Evidence where the language *is* the finding** — a transcript that shows
+  him mishandling Dutch proves nothing in English. Keep the original, add a
+  translation beside it.
+
+**And one thing is deliberately both.** `docs/gebruikershandleiding.md` is the
+owner-facing manual for a Dutch-speaking household and stays Dutch;
+`docs/user-guide.md` is its English twin (U38). They are not drift — they are
+two audiences, and a change to one belongs in the other.
 
 ## One unit, one commit — and what a unit owes
 
@@ -116,7 +152,7 @@ and CI fails on any of them. Mentioning a unit in prose does **not** claim it.
 | `.specify/memory/constitution.md` | The governing principles. Read first. |
 | `.specify/specs/NNN-*/` | `spec.md` (what and why), `plan.md`, `tasks.md` |
 | `.specify/coverage.json` | The spec-coverage baseline |
-| `docs/implementation-backlog.md` | The unit ledger — history, in Dutch |
+| `docs/implementation-backlog.md` | The unit ledger — history; English from U347, older entries still being converted |
 | `docs/adr/` + `docs/adr/README.md` | Decisions, with the rejected alternatives |
 | `docs/architecture/overview.md` | How the parts fit together today |
 | `docs/diagrams/` | The canonical drawings (part of the contract) |

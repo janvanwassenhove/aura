@@ -5,7 +5,7 @@ owner: "robot-runtime / scripts"
 priority: P1
 risk: Medium
 created: "2026-09-05"
-units: [U17, U26, U198, U199, U200, U239, U240, U241, U242, U242b, U339]
+units: [U17, U26, U198, U199, U200, U239, U240, U241, U242, U242b, U339, U345, U346]
 ---
 
 # Feature Specification: Getting Code onto the Robot
@@ -84,6 +84,16 @@ no.
    network fault, and the robot's pairing key can be entered on that same
    screen — write-only, never echoed back, and clearable for a robot that has
    none (U339).
+5. **Given** that same robot, **When** the console reads the *headline* rather
+   than the reason, **Then** it says the same thing. U345: U339 taught `reason`
+   the difference and left `error` opening with "robot unreachable:
+   HTTPStatusError" — two fields of one response telling two different
+   stories, and the console leads with the wrong one.
+6. **Given** an address is saved, **When** the endpoint reports back, **Then**
+   it does not call the robot reachable on the strength of `/health` alone.
+   That route is not gated, so it answers `200` for a robot that refuses every
+   real call — and "saved, reachable" beside a header still reading *offline*
+   is the contradiction this endpoint exists to prevent (U345).
 
 ### User Story 4 — The Pi does not fall over under load (Priority: P2)
 
@@ -106,6 +116,20 @@ no.
   secret (U220) from the app — `ROBOT_SHARED_SECRET` is settable through
   `/setup/config`, reported only as set/not set, and takes effect without a
   restart.
+- **FR-007**: **Not reached** and **reached and refused** are distinguished in
+  every field the owner sees, not only in the diagnosis sentence. An HTTP
+  status from the robot is evidence the network is fine; leading with
+  "unreachable" reports something that was not verified (constitution XI). The
+  address probe asks a gated route as well as `/health`, so "reachable" means
+  the brain can actually use it.
+- **FR-008**: The pairing key is read **per request**, never bound into a cached
+  client. U346: `_client()` froze `robot_auth_headers()` at construction, so a
+  brain started before pairing sent an empty header for the rest of its life —
+  the live video panel stayed dark with 401s while the MJPEG stream beside it
+  worked, because that one builds a client per call. U339 promises pairing takes
+  effect without a restart; a cached header silently exempts one path from that
+  promise. Checked by a test that builds the client while a key is set and
+  asserts it carries none.
 
 ## Out of scope
 
@@ -128,3 +152,5 @@ no.
 | U242, U242b | Move the updater out of the tree it updates; pin line endings |
 | U26 | On-Pi budget guard — shed non-essential work when hot or saturated |
 | U339 | A 401 named as a pairing problem, and the robot's key settable from the Connection card |
+| U345 | The two places U339's distinction had not reached: the headline field, and an address probe that only asked the ungated route |
+| U346 | The pairing key read per request instead of frozen into a cached client — the one path where "no restart needed" was not true |

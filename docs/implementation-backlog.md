@@ -106,12 +106,26 @@ the human can unblock it.
 - [x] **U23 — per-turn latency instrumentation** · deps: U5 · `aec8518`
   `TurnLatencyMeasured` event (total/llm/tool ms, first_audio_ms=None until voice) emitted every turn, wired through broadcaster → console. Orchestrator 114 green.
   Emit first-audio + full-turn timings into the event stream; show in console.
-- [x] **U24/U54 — gestreamde TTS + barge-in (logica-laag)** · deps: U22 · `pending`
-  `streaming.py`: `split_speech_chunks` (zinsgrenzen, min 60 tekens, staart-cap) + `stream_speech` — chunk N+1 wordt gesynthetiseerd TERWIJL chunk N op de robot speelt → eerste audio na één korte TTS-call i.p.v. één lange. `_embody_reply` gebruikt het gestreamde pad (SPEAK_STREAMING, default aan). Barge-in in de VoiceLoop: tijdens het spreken luistert de lus in korte vensters; een duidelijk luidere stem (BARGE_IN_FACTOR×gate, filtert speaker-echo) kapt de wachttijd en wordt direct als reply behandeld (BARGE_IN, default aan). Brain 125 (+8) groen. Rest van U24 (echte streaming-STT over een live socket) blijft 🔒 SECRET+HW bij U22.
+- [x] **U24/U54 — streamed TTS + barge-in (logic layer)** · deps: U22 · `pending`
+  `streaming.py`: `split_speech_chunks` (sentence boundaries, min 60 characters,
+  tail cap) + `stream_speech` — chunk N+1 is synthesized WHILE chunk N plays on
+  the robot, so the first audio arrives after one short TTS call instead of one
+  long one. `_embody_reply` uses the streamed path (SPEAK_STREAMING, on by
+  default). Barge-in in the VoiceLoop: while speaking, the loop listens in short
+  windows; a clearly louder voice (BARGE_IN_FACTOR×gate, which filters speaker
+  echo) cuts the wait short and is treated directly as a reply (BARGE_IN, on by
+  default). Brain 125 (+8) green. The rest of U24 (real streaming STT over a
+  live socket) stays 🔒 SECRET+HW with U22.
 - [x] **U25 — parallel tool calling** · deps: U5 · `afdb299`
   Tool loop split into a sequential gate pass + a concurrent (asyncio.gather) execution pass for independent tools; approval-gated tools still serialize. A multi-tool turn pays the slowest tool, not the sum. Orchestrator 115, brain 13 green.
 - [x] **U26 — on-Pi budget guard** · deps: U16 · `pending`
-  `budget_guard.py`: BudgetGuard samplet CPU (/proc/stat-delta), geheugen (/proc/meminfo) en SoC-temperatuur (thermal_zone0) elke 5s; boven budget (BUDGET_CPU_PCT=85 / BUDGET_MEM_PCT=90 / BUDGET_TEMP_C=75) → CONSTRAINED. De offline-idle-lus slaat idle-animaties over zolang constrained (Pi krijgt headroom); `GET /robot/budget` toont de status voor de console. Readers injecteerbaar (getest off-Pi; degradeert naar unconstrained op niet-Linux). Robot 54 (+6) groen; live op de Pi geverifieerd (temp 47°C, mem 16%, unconstrained).
+  `budget_guard.py`: BudgetGuard samples CPU (/proc/stat delta), memory
+  (/proc/meminfo) and SoC temperature (thermal_zone0) every 5s; over budget
+  (BUDGET_CPU_PCT=85 / BUDGET_MEM_PCT=90 / BUDGET_TEMP_C=75) → CONSTRAINED. The
+  offline idle loop skips idle animations while constrained, giving the Pi
+  headroom; `GET /robot/budget` exposes the status to the console. Readers are
+  injectable (tested off-Pi; degrades to unconstrained on non-Linux). Robot 54
+  (+6) green; verified live on the Pi (temp 47°C, mem 16%, unconstrained).
 
 ## Phase 4 — presentations & polish
 
@@ -133,133 +147,535 @@ the human can unblock it.
 
 ## Phase 6 — commercial desktop app v1.0  (plan: [desktop-v1-plan.md](desktop-v1-plan.md))
 
-- [x] **U33 — design system, theming & custom titelbalk** · deps: U32 · `8667599`
-  `styles/tokens.css` (volledige var-set, dark/light + 4 accenten via data-theme/data-accent) + `themeStore` (localStorage-persist) + Appearance-tab in Settings. Alle emoji → lucide lined icons (TitleBar/Robot/Conversation/Approval/Knowledge/Settings; status-glyphs ●○✕⟳ ook vervangen). Frameless window + `TitleBar.vue` (drag-region, naam+statusdots, min/max/close via preload contextBridge IPC; verbergt vensterknoppen in gewone browser). Line-art bot-icoon (PIL → png+ico) + splash in huisstijl. Dode `ConnectionsPanel.vue` verwijderd. Console 53 groen (8 nieuwe themeStore-tests), build clean, app live geverifieerd.
-- [x] **U34/U53 — in-app onboarding & robot-setupwizard** · deps: U33 · `pending`
-  Brain: `GET /setup/status` (setup_done/encrypted/naam/robot-url/voice/llm-keys/people_count), `POST /setup/config` (env write+persist; secrets write-only — nooit geëchood, live LLM-switch via orchestrator.config), `POST /setup/test-robot` (probe /robot/status), `GET /setup/discover` (geconfigureerde URL + reachy-mini.local + /24-subnet-sweep :8001, 0.8s timeouts, 50 concurrent). Console: full-screen `SetupWizard.vue` bij eerste start (6 stappen: naam+taal → robot vinden/testen/scannen → LLM-provider+key → wake-word → security-passphrase (hergebruikt /setup/secure) → klaar; skip/later per stap; verschijnt alleen als de brain bereikbaar is en SETUP_DONE ontbreekt) + `setupStore` + Robot-tab in Settings (adres+Test+netwerk-scan+Save). Mensen-stap verwijst naar het bestaande brein-paneel. Brain 117 (+5), console 56 groen, build clean.
-- [x] **U35/U52 — connecties: eerlijke statussen + Chrome-connector** · deps: — · `pending`
-  Registry kreeg `ConnectorStatus.MOCK` (Mock-klasse of `is_mock` → nooit meer groen "Connected"; overall telt mock als functioneel). `/connector/health` rapporteert nu ook `music: mock|ok`; `POST /connector/test/{key}` = per-connector probe (één echte call, eerlijk "MOCK data"-label). Console: amberen "Mock data"-badge, Test-knop per connector + resultaatregel, Spotify/Sonos-kaart met token-hint. NIEUW: Chrome-connector (`browser.py`, CDP :9222 via HTTP — `list_browser_tabs` vrij, `open_browser_url` APPROVAL_REQUIRED; alleen http(s), duidelijke hint als Chrome zonder debug-poort draait). VS Code-control bestond al (open_in_vscode). Token-in-log greptest (geen logger-call interpoleert token/secret). Connector 40, orchestrator 154, policies 6, console 56 groen. GitHub device-flow/PAT, Google client-ID-wizard en Slack auth.test bestonden al.
-- [x] **U36-rest / U51 — modus-gedragsprofielen (embodiment per modus)** · `pending`
-  `embodiment_plan(text, persona_config)`: het `GestureProfile` van de actieve persona (shared-personas, bestond al maar werd genegeerd) bepaalt nu HOE belichaamd een antwoord is — silent_desk volledig stil+mute (voice_style="silent"), work houdt het bij een ingehouden nod (motion_ids-allow-list), home nod+tilt, presentation/demo expressief (amplitude 0.8/1.0, wave blijft in demo). Pipeline kreeg publieke `persona_config` property; `_embody_reply` past het plan toe (geldt ook voor begroetingen — zelfde pad). VS Code-koppeling in work-modus bestond al (open_in_vscode). Brain +6 tests, orchestrator 154 groen.
-- [~] **U36 — belichaamde conversatie: LIVE VIDEO + BEGROETING gedaan** · deps: U34 · `a1d3684`
-  Gedaan (U36a): Pi-media werkend (daemon vereist `/api/media/acquire` vóór SDK-init — `_prime_media()` in de adapter wacht op :8443; frame-retry 5s; service op REACHY_MEDIA=default) → `GET /robot/camera/frame` levert echte frames. Brain `/robot`-proxy (status/camera/motion, alles single-origin voor de console). Begroetingsflow: PersonRecognized(known) → wave + speak + ResponseDrafted in de console (debounced door de perceptielus). Console: **VideoPanel** (live feed 1fps, LIVE-badge, herkenning-overlay, "This is me"-enroll, nette lege-states), **Quick Actions** (wave/nod/gesture/bow) in RobotPanel, getting-started-kaart met suggestie-chips in Conversation. `build_embedder` degradeert nu graceful zonder insightface; desktop default RECOGNITION_ENABLED=true + FACE_EMBEDDER=insightface (activeert pas mét passphrase); insightface+onnxruntime geïnstalleerd op de laptop. Brain 47 groen (4 nieuw), robot 42, console 53, live geverifieerd (camera 811kB via brain-proxy, wave {"ok":true}). Rest van U36: modus-gedragsprofielen, ResponseDrafted→gebaar per modus, VS Code-koppeling in work-modus.
-- [x] **U37-installer/U55 — installer & release-pipeline** · deps: U33–U36 · `pending`
-  DECIDE opgelost (repo janvanwassenhove/aura bestaat). electron-builder NSIS-config in apps/desktop (extraResources: Python-workspace → resources/aura excl. tests/pycache, console-dist → resources/console; app v1.0.0). main.cjs: packaged-mode paden (`app.isPackaged` → resourcesPath) + first-run bootstrap `ensureBootstrap` (uv-install via astral.sh-installer als afwezig, `uv sync --all-packages`, marker in userData, voortgang op de splash). `.github/workflows/release.yml`: tag v* → alle Python-suites + console-tests → NSIS-build op windows-latest → GitHub Release met de .exe (`generate_release_notes`). CHANGELOG.md geseeded met v1.0.0. Config geverifieerd met `electron-builder --dir` (resources-layout klopt, 271MB unpacked). Niet gedaan: Playwright-screenshots in release, electron-updater (opt-in later).
+- [x] **U33 — design system, theming & custom title bar** · deps: U32 · `8667599`
+  `styles/tokens.css` (complete var set, dark/light + 4 accents via
+  data-theme/data-accent) + `themeStore` (localStorage-persisted) + an Appearance
+  tab in Settings. Every emoji → lucide line icons
+  (TitleBar/Robot/Conversation/Approval/Knowledge/Settings; the status glyphs
+  ●○✕⟳ replaced too). Frameless window + `TitleBar.vue` (drag region, name +
+  status dots, min/max/close through the preload contextBridge IPC; hides the
+  window buttons in an ordinary browser). Line-art bot icon (PIL → png+ico) and a
+  splash in the house style. Dead `ConnectionsPanel.vue` removed. Console 53
+  green (8 new themeStore tests), build clean, verified live in the app.
+- [x] **U34/U53 — in-app onboarding & robot setup wizard** · deps: U33 · `pending`
+  Brain: `GET /setup/status`
+  (setup_done/encrypted/name/robot-url/voice/llm-keys/people_count),
+  `POST /setup/config` (env write + persist; secrets are write-only — never
+  echoed, live LLM switch via orchestrator.config), `POST /setup/test-robot`
+  (probe /robot/status), `GET /setup/discover` (the configured URL +
+  reachy-mini.local + a /24 subnet sweep on :8001, 0.8s timeouts, 50 concurrent).
+  Console: full-screen `SetupWizard.vue` on first start (6 steps: name+language →
+  find/test/scan the robot → LLM provider+key → wake word → security passphrase
+  (reuses /setup/secure) → done; skip/later per step; only appears when the brain
+  is reachable and SETUP_DONE is missing) + `setupStore` + a Robot tab in
+  Settings (address + Test + network scan + Save). The people step points at the
+  existing brain panel. Brain 117 (+5), console 56 green, build clean.
+- [x] **U35/U52 — connections: honest statuses + a Chrome connector** · deps: — · `pending`
+  The registry gained `ConnectorStatus.MOCK` (a Mock class or `is_mock` → never a
+  green "Connected" again; the overall count still treats mock as functional).
+  `/connector/health` now also reports `music: mock|ok`;
+  `POST /connector/test/{key}` is a per-connector probe (one real call, an honest
+  "MOCK data" label). Console: amber "Mock data" badge, a Test button per
+  connector with a result line, and a Spotify/Sonos card with a token hint. NEW:
+  a Chrome connector (`browser.py`, CDP :9222 over HTTP — `list_browser_tabs`
+  free, `open_browser_url` APPROVAL_REQUIRED; http(s) only, with a clear hint when
+  Chrome runs without the debug port). VS Code control already existed
+  (open_in_vscode). A token-in-log grep test (no logger call interpolates a token
+  or secret). Connector 40, orchestrator 154, policies 6, console 56 green.
+  GitHub device flow/PAT, the Google client-ID wizard and Slack auth.test already
+  existed.
+- [x] **U36-rest / U51 — mode behaviour profiles (embodiment per mode)** · `pending`
+  `embodiment_plan(text, persona_config)`: the active persona's `GestureProfile`
+  (shared-personas, which already existed but was being ignored) now decides HOW
+  embodied a reply is — silent_desk fully silent and muted (voice_style="silent"),
+  work keeps to a restrained nod (motion_ids allow-list), home nod+tilt,
+  presentation/demo expressive (amplitude 0.8/1.0, wave stays in demo). The
+  pipeline gained a public `persona_config` property; `_embody_reply` applies the
+  plan (greetings included — same path). The VS Code link in work mode already
+  existed (open_in_vscode). Brain +6 tests, orchestrator 154 green.
+- [~] **U36 — embodied conversation: LIVE VIDEO + GREETING done** · deps: U34 · `a1d3684`
+  Done (U36a): Pi media working (the daemon requires `/api/media/acquire` BEFORE
+  SDK init — `_prime_media()` in the adapter waits for :8443; frame retry 5s;
+  service on REACHY_MEDIA=default) → `GET /robot/camera/frame` delivers real
+  frames. Brain `/robot` proxy (status/camera/motion, all single-origin for the
+  console). Greeting flow: PersonRecognized(known) → wave + speak +
+  ResponseDrafted in the console (debounced by the perception loop). Console:
+  **VideoPanel** (live feed 1fps, LIVE badge, recognition overlay, "This is me"
+  enrol, tidy empty states), **Quick Actions** (wave/nod/gesture/bow) in
+  RobotPanel, a getting-started card with suggestion chips in Conversation.
+  `build_embedder` now degrades gracefully without insightface; desktop default
+  RECOGNITION_ENABLED=true + FACE_EMBEDDER=insightface (only activates with a
+  passphrase); insightface+onnxruntime installed on the laptop. Brain 47 green (4
+  new), robot 42, console 53, verified live (camera 811 kB through the brain
+  proxy, wave {"ok":true}). Rest of U36: mode behaviour profiles,
+  ResponseDrafted→gesture per mode, VS Code link in work mode.
+- [x] **U37-installer/U55 — installer & release pipeline** · deps: U33–U36 · `pending`
+  DECIDE resolved (the repo janvanwassenhove/aura exists). electron-builder NSIS
+  config in apps/desktop (extraResources: the Python workspace → resources/aura
+  excluding tests/pycache, console dist → resources/console; app v1.0.0).
+  main.cjs: packaged-mode paths (`app.isPackaged` → resourcesPath) + a first-run
+  bootstrap `ensureBootstrap` (installs uv through the astral.sh installer when
+  absent, `uv sync --all-packages`, marker in userData, progress on the splash).
+  `.github/workflows/release.yml`: tag v* → every Python suite + the console tests
+  → NSIS build on windows-latest → a GitHub Release with the .exe
+  (`generate_release_notes`). CHANGELOG.md seeded with v1.0.0. Config verified
+  with `electron-builder --dir` (the resources layout is right, 271 MB unpacked).
+  Not done: Playwright screenshots in the release, electron-updater (opt-in
+  later).
 - [x] **U38/U56 — commercial polish & QA** · deps: U37 · `pending`
-  Log-viewer zonder telemetrie: `logs_api.py` (ring buffer op de root-logger, `GET /logs/recent?level=&limit=`, niets naar schijf/netwerk) + Logs-tab in Settings (level-filter, refresh, nieuwste eerst, "Local only"-notitie). A11y: aria-labels op alle icon-only titelbalkknoppen + globale `:focus-visible`-outline in tokens.css. Gebruikersgids NL (`docs/gebruikershandleiding.md`) + EN (`docs/user-guide.md`): wizard, praten/handsfree/barge-in, mensen & herkenning, capabilities & approvals, connecties, muziek, troubleshooting. CI uitgebreid: aura-brain-suite + console-job (npm test+build) draaien nu ook mee. Brain 128 (+3), console 56 groen. Niet gedaan: Playwright-E2E-smoke en release-screenshots (aparte iteratie).
+  A log viewer without telemetry: `logs_api.py` (ring buffer on the root logger,
+  `GET /logs/recent?level=&limit=`, nothing to disk or network) + a Logs tab in
+  Settings (level filter, refresh, newest first, a "Local only" note). A11y:
+  aria-labels on every icon-only title-bar button + a global `:focus-visible`
+  outline in tokens.css. User guide in Dutch (`docs/gebruikershandleiding.md`) and
+  English (`docs/user-guide.md`): wizard, talking/hands-free/barge-in, people &
+  recognition, capabilities & approvals, connections, music, troubleshooting. CI
+  extended: the aura-brain suite and a console job (npm test+build) now run too.
+  Brain 128 (+3), console 56 green. Not done: a Playwright E2E smoke test and
+  release screenshots (a separate iteration).
 
 ---
 
-- [x] **U37 — body-yaw follow (romp meedraaien)** · deps: U16 · `pending`
-  Geen eigen volglus nodig: de SDK heeft `set_automatic_body_yaw(enabled)` — de daemon draait de romp zelf mee met het getrackte gezicht. Adapter `set_body_follow()` (+ herstel bij tracking-hertoggle, reset naar 0.0 bij uit), route `POST /robot/body_follow`, brain-proxy + `RobotClient.set_body_follow`, capability-toggle `body_follow` (BODY_FOLLOW, default uit, live hook). FakeRobotAdapter kreeg set_tracking/set_body_follow → tracking-route nu ook testbaar. Robot 48 (+3), brain 106 groen; live geverifieerd op de Pi (aan/uit → {"body_follow":true/false}).
+- [x] **U37 — body-yaw follow (the torso turns along)** · deps: U16 · `pending`
+  No follow loop of our own needed: the SDK has
+  `set_automatic_body_yaw(enabled)` — the daemon turns the torso along with the
+  tracked face itself. Adapter `set_body_follow()` (+ restore when tracking is
+  re-toggled, reset to 0.0 on off), route `POST /robot/body_follow`, brain proxy +
+  `RobotClient.set_body_follow`, capability toggle `body_follow` (BODY_FOLLOW,
+  off by default, live hook). FakeRobotAdapter gained set_tracking/set_body_follow
+  → the tracking route is now testable too. Robot 48 (+3), brain 106 green;
+  verified live on the Pi (on/off → {"body_follow":true/false}).
 
-- [x] **U40 — capabilities/permissions center + app launcher** · deps: U20,U35 · `d943f88`
-  Brain `/capabilities` (GET/POST toggles: dev_agent, app_launch, follow_me, speak_replies, gestures, recognition, maintenance; persist .env + live-apply hooks voor dev_agent/follow_me/speak_replies). `launch_app` orchestrator-tool + ALLOWED_APPS allow-list (name=command, argv-only, approval-gated, per-call env-check). Console CapabilitiesPanel (shield-knop titelbalk) met toggles + uitleg beveiligingsmodel + geregistreerde apps. Nooit een bypass van de approval-gate. Brain 86, orchestrator 143, policies 6, console 56 groen.
+- [x] **U40 — capabilities/permissions centre + app launcher** · deps: U20,U35 · `d943f88`
+  Brain `/capabilities` (GET/POST toggles: dev_agent, app_launch, follow_me,
+  speak_replies, gestures, recognition, maintenance; persisted to .env +
+  live-apply hooks for dev_agent/follow_me/speak_replies). A `launch_app`
+  orchestrator tool + an ALLOWED_APPS allow-list (name=command, argv only,
+  approval-gated, env check per call). Console CapabilitiesPanel (shield button
+  in the title bar) with toggles, an explanation of the security model, and the
+  registered apps. Never a bypass of the approval gate. Brain 86, orchestrator
+  143, policies 6, console 56 green.
 
-- [x] **U39 — Spotify + Sonos muziekbesturing** · deps: U35 · `34c9178`
-  `connector_service/music.py` (SpotifyMusic: Web API met SPOTIFY_ACCESS_TOKEN; play/pause/next/playlists/devices/favorites; **Sonos via Spotify Connect** — targeten op device-naam, geen aparte Sonos-API; MOCK-modus zonder token). Routes `/connector/music/*` + orchestrator-tools (play_music/pause_music/next_track/list_music_playlists/list_speakers) in work+home-mode. Connector 32, policies 6, orchestrator 146 groen; live geverifieerd (list_speakers + play in mock). Echte weergave: eenmalig Spotify-token.
-- [x] **U41 — Claude Code dev-workflow hersteld** · deps: U20 · `d252950`
-  `_execute_claude` gebruikte niet-bestaande flags → echte headless-aanroep `claude -p prompt --output-format text --permission-mode acceptEdits`, cwd via subprocess, eigen 600s-timeout, shutil.which. "bouw een app met VS Code + Claude Code" draait nu een echte coding-sessie (na approval-escalatie).
-- [x] **U42 — gespreksgeheugen (echte dialoog)** · deps: U5 · `d252950`
-  Pipeline hield per turn GEEN geschiedenis bij → nu per-session rolling window (MAX_CONTEXT_TURNS*2), prior turns meegestuurd; conversationele identity-prefix (elk onderwerp, spraakvriendelijk). Live: "wat is mijn lievelingskleur?" onthouden over turns. Orchestrator 146 (6 nieuw).
+- [x] **U39 — Spotify + Sonos music control** · deps: U35 · `34c9178`
+  `connector_service/music.py` (SpotifyMusic: Web API with SPOTIFY_ACCESS_TOKEN;
+  play/pause/next/playlists/devices/favorites; **Sonos through Spotify Connect** —
+  target by device name, no separate Sonos API; MOCK mode without a token).
+  Routes `/connector/music/*` + orchestrator tools
+  (play_music/pause_music/next_track/list_music_playlists/list_speakers) in work
+  and home mode. Connector 32, policies 6, orchestrator 146 green; verified live
+  (list_speakers + play in mock). Real playback: a one-off Spotify token.
+- [x] **U41 — Claude Code dev workflow repaired** · deps: U20 · `d252950`
+  `_execute_claude` used flags that do not exist → a real headless invocation
+  `claude -p prompt --output-format text --permission-mode acceptEdits`, cwd via
+  subprocess, its own 600s timeout, shutil.which. "build an app with VS Code +
+  Claude Code" now runs a real coding session (after approval escalation).
+- [x] **U42 — conversational memory (a real dialogue)** · deps: U5 · `d252950`
+  The pipeline kept NO history between turns → now a per-session rolling window
+  (MAX_CONTEXT_TURNS*2) with prior turns sent along; conversational identity
+  prefix (any topic, speech-friendly). Live: "what is my favourite colour?"
+  remembered across turns. Orchestrator 146 (6 new).
 
-- [x] **U43 — desktop media control (Windows media-toetsen)** · deps: U40 · `d47bd6f`
-  `media_control` orchestrator-tool: stuurt de Windows media/volume-toetsen (play_pause/next/previous/stop/volume/mute) via ctypes keybd_event → bedient de ECHTE draaiende app (Spotify/browser), geen token nodig; graceful op niet-Windows. Work+home-mode. Spotify-launcher default via `explorer.exe spotify:` (URI-protocol, geen exe-pad nodig). "volgende track" live geverifieerd (toets verzonden); "open Spotify + play" = launch_app (approval) → media_control. Orchestrator 150 (4 nieuw), policies 6 groen.
+- [x] **U43 — desktop media control (Windows media keys)** · deps: U40 · `d47bd6f`
+  `media_control` orchestrator tool: sends the Windows media/volume keys
+  (play_pause/next/previous/stop/volume/mute) through ctypes keybd_event → drives
+  the app that is ACTUALLY running (Spotify/browser), no token needed; graceful
+  on non-Windows. Work and home mode. The Spotify launcher defaults to
+  `explorer.exe spotify:` (URI protocol, no exe path needed). "next track"
+  verified live (key sent); "open Spotify + play" = launch_app (approval) →
+  media_control. Orchestrator 150 (4 new), policies 6 green.
 
-- [x] **U44 — splash-encoding, restart-badge UX, audio-VU-meter** · deps: U40 · `0ccd410`
-  (1) Splash: `data:text/html;charset=utf-8` + `&hellip;`/`&middot;` entities → geen mojibake ("startingâ€¦" fix). (2) Restart-badges: gestures + maintenance nu LIVE toggelbaar (hooks: gesture-detector attach/detach; maintenance-loop start/stop) — alleen recognition blijft restart; badge toont nu enkel bij een openstaande wijziging (client `pending`), niet permanent. (3) Audio: live VU-meter (WebAudio AnalyserNode, RMS→12 balkjes) tijdens opname + "no sound yet"-hint → je ZIET dat de mic hoort. Brain 86, console 56 groen; live geverifieerd (gestures/maintenance applied_live=true).
+- [x] **U44 — splash encoding, restart-badge UX, audio VU meter** · deps: U40 · `0ccd410`
+  (1) Splash: `data:text/html;charset=utf-8` + `&hellip;`/`&middot;` entities → no
+  more mojibake (the "startingâ€¦" fix). (2) Restart badges: gestures and
+  maintenance are now toggleable LIVE (hooks: gesture detector attach/detach;
+  maintenance loop start/stop) — only recognition still needs a restart; the badge
+  now appears only for an outstanding change (client `pending`), not permanently.
+  (3) Audio: a live VU meter (WebAudio AnalyserNode, RMS → 12 bars) while
+  recording plus a "no sound yet" hint — so you can SEE that the mic hears you.
+  Brain 86, console 56 green; verified live (gestures/maintenance
+  applied_live=true).
 
-- [x] **U45 — praten via Richie''s eigen mic + Knowledge editable** · deps: U36e · `a2227b5`
-  (1) Robot-mic: reachy `capture_audio` resamplet naar 16kHz mono s16le; nieuwe `POST /robot/listen` → WAV; RobotClient.listen; brain `POST /voice/listen` (neemt op op de Pi → transcribeert → pipeline-turn, antwoord gesproken op de robot). Bot-mic-knop in ConversationPanel ("Richie is listening on his own mic…"). Live geverifieerd: /robot/listen → geldige 16kHz WAV (86kB/3s); /voice/listen graceful bij stilte. (2) Knowledge editable: naam + rol inline bewerkbaar (blur→renamePerson/upsertPerson) en fact key+value inline bewerkbaar (blur→updateFact = add+delete). Robot 45, brain 86, console 56 groen.
+- [x] **U45 — talking through Richie's own mic + Knowledge editable** · deps: U36e · `a2227b5`
+  (1) Robot mic: reachy `capture_audio` resamples to 16 kHz mono s16le; a new
+  `POST /robot/listen` → WAV; RobotClient.listen; brain `POST /voice/listen`
+  (records on the Pi → transcribes → pipeline turn, the answer spoken on the
+  robot). A bot-mic button in ConversationPanel ("Richie is listening on his own
+  mic…"). Verified live: /robot/listen → a valid 16 kHz WAV (86 kB/3s);
+  /voice/listen graceful on silence. (2) Knowledge editable: name and role
+  editable inline (blur→renamePerson/upsertPerson) and a fact's key and value
+  editable inline (blur→updateFact = add+delete). Robot 45, brain 86, console 56
+  green.
 
-- [x] **U46 — mic-versterking + UI ademruimte** · deps: U45 · `deba026`
-  Robot-mic: de Reachy-mic-array is weinig gevoelig zelfs op max ALSA-gain (RMS 0.0008 ≈ stilte) → adaptieve peak-normalisatie in capture_audio (target 0.5, gain-cap 40, MIC_TARGET_PEAK/MIC_MAX_GAIN env). Live: opname nu RMS 0.08 / piek 0.5 (bruikbaar voor Whisper, was ~100× te stil). UI: ruimere spacing (panel-padding, status-row-gap, section-labels, mt-3, quick-action-knoppen) — minder gedrongen. Robot 45 groen, console build clean.
+- [x] **U46 — mic gain + UI breathing room** · deps: U45 · `deba026`
+  Robot mic: the Reachy mic array is barely sensitive even at maximum ALSA gain
+  (RMS 0.0008 ≈ silence) → adaptive peak normalisation in capture_audio (target
+  0.5, gain cap 40, MIC_TARGET_PEAK/MIC_MAX_GAIN env). Live: a recording is now
+  RMS 0.08 / peak 0.5 (usable for Whisper, was ~100× too quiet). UI: roomier
+  spacing (panel padding, status row gap, section labels, mt-3, quick-action
+  buttons) — less cramped. Robot 45 green, console build clean.
 
-- [x] **U47 — hands-free wake-word + doorpraat-conversatie** · deps: U45,U46 · `c1702f1`
-  `VoiceLoop` (brain): draait continu op de robotmic, gedrag via env (VOICE_MODE=off|wake_word, WAKE_WORD, live leesbaar). VAD via raw mic-peak (X-Audio-Peak header van /robot/listen) → stilte overslaan zonder STT-kosten. Wake-word start ("Richie, …" → commando = rest); na ÉLK gesproken antwoord (ook een begroeting) opent een follow-up-venster zodat je zonder wake-word kunt doorpraten; echo-guard (wacht tot de robot klaar is met spreken). Instelling in Settings→Appearance (Hands-free: off/wake word + wake-word-veld) via /setup/prefs (voice_mode+wake_word, persist). Live geverifieerd: loop pollt /robot/listen elke ~4s in wake_word-modus. Brain 92, robot 45, console 56 groen.
+- [x] **U47 — hands-free wake word + keep-talking conversation** · deps: U45,U46 · `c1702f1`
+  `VoiceLoop` (brain): runs continuously on the robot mic, behaviour set by env
+  (VOICE_MODE=off|wake_word, WAKE_WORD, readable live). VAD from the raw mic peak
+  (the X-Audio-Peak header of /robot/listen) → skip silence without paying for
+  STT. The wake word starts a turn ("Richie, …" → the command is the remainder);
+  after EVERY spoken answer (a greeting included) a follow-up window opens so you
+  can keep talking without the wake word; echo guard (waits until the robot has
+  finished speaking). Setting in Settings→Appearance (Hands-free: off/wake word +
+  a wake-word field) through /setup/prefs (voice_mode+wake_word, persisted).
+  Verified live: the loop polls /robot/listen roughly every 4s in wake_word mode.
+  Brain 92, robot 45, console 56 green.
 
-- [x] **U48 — eerlijke Spotify-mock + "altijd toestaan"-geheugen** · deps: U39,U40 · `e25f181`
-  (1) Mock `play_music` liegt niet meer over succes → geeft "NOT PLAYED, geen account verbonden" + wijst op media-key-fallback of token; AURA meldt nu eerlijk dat het niet speelt. (2) ApprovalManager auto-approve-set (AUTO_APPROVE_TOOLS env + .env-persist): grant(remember=True) → onthoudt tool → volgende keer geen dialoog; `/orchestrator/approval/auto` GET + `/auto/{tool}` POST. ApprovalPanel: "Always allow"-checkbox bij Grant. CapabilitiesPanel: "Always-allowed actions"-lijst met revoke (terug naar vragen). Live geverifieerd: eerlijk antwoord + auto-approve set/lijst/revoke. Orchestrator 154, connector 32, console 56 groen.
+- [x] **U48 — an honest Spotify mock + an "always allow" memory** · deps: U39,U40 · `e25f181`
+  (1) The mock `play_music` no longer lies about success → it returns "NOT PLAYED,
+  no account connected" and points at the media-key fallback or a token; AURA now
+  says honestly that it is not playing. (2) ApprovalManager auto-approve set
+  (AUTO_APPROVE_TOOLS env + .env persist): grant(remember=True) → remembers the
+  tool → no dialogue next time; `/orchestrator/approval/auto` GET and
+  `/auto/{tool}` POST. ApprovalPanel: an "Always allow" checkbox beside Grant.
+  CapabilitiesPanel: an "Always-allowed actions" list with revoke (back to
+  asking). Verified live: honest answer plus auto-approve set/list/revoke.
+  Orchestrator 154, connector 32, console 56 green.
 
-- [x] **U49 — wake-word hallucinaties + begroeting-spam + Spotify-play** · deps: U47,U48 · `61a92cf`
-  (1) "Бурын": de wake-word-lus transcribeerde kamerruis → Whisper hallucineerde tekst → als commando ingevoerd. Fix: `is_plausible_command()` filter (verwerpt te kort, bekende hallucinatie-frases, en niet-Latijns schrift bij nl/en/fr) + mic-normalisatie-gate 0.0015→0.008 (echte stilte blijft stil → Whisper geeft leeg i.p.v. hallucinatie). (2) Dubbele begroetingen die het voorlezen van de mop onderbraken → per-persoon greet-cooldown (GREET_COOLDOWN_S=120). (3) Spotify: mock-melding nu directief — instrueert launch_app+media_control(play_pause) om de ECHTE desktop-Spotify te starten (je bent ingelogd); volledige favorieten/Sonos-targeting blijft token-afhankelijk. Brain 92→, robot 45, connector 32 groen.
-- [x] **U50 — gated Computer Use (scherm zien + muis/toetsenbord besturen)** · deps: U40 · `pending`
-  Antwoord op "secure OpenClaw"-vraag: Anthropic's eigen computer-use tool (`computer_20251124`, beta-header `computer-use-2025-11-24`, Opus 4.8) laat AURA elk desktop-app bedienen — screenshot → één actie → screenshot ter verificatie — als launch_app/media_control niet volstaan. `ComputerUseAgent` (loop met injecteerbare Anthropic-client + `InputBackend`-protocol; `PyAutoGuiBackend` als echte Windows-driver). Nieuwe `use_computer` orchestrator-tool → in `APPROVAL_REQUIRED` + work/home-modi (approval-gate NOOIT omzeild). Capability-toggle `computer_use` **standaard UIT**, vereist `ANTHROPIC_API_KEY` + `[computeruse]` extra (anthropic+pyautogui+pillow); live-hook in main. Step-cap (`COMPUTER_USE_MAX_STEPS`), per-actie logging, systeemprompt verbiedt zelf wachtwoorden/betalingen/onomkeerbare acties (spiegelt globale safety). 8 nieuwe tests (fakes, geen anthropic/pyautogui nodig); brain+orchestrator+policies groen.
+- [x] **U49 — wake-word hallucinations + greeting spam + Spotify play** · deps: U47,U48 · `61a92cf`
+  (1) "Бурын": the wake-word loop transcribed room noise → Whisper hallucinated
+  text → that text was fed in as a command. Fix: an `is_plausible_command()`
+  filter (rejects too-short input, known hallucination phrases, and non-Latin
+  script for nl/en/fr) plus a mic-normalisation gate raised 0.0015→0.008 (real
+  silence stays silent → Whisper returns empty instead of a hallucination).
+  (2) Duplicate greetings that interrupted the telling of a joke → a per-person
+  greet cooldown (GREET_COOLDOWN_S=120). (3) Spotify: the mock message is now
+  directive — it instructs launch_app+media_control(play_pause) to start the REAL
+  desktop Spotify (you are logged in); full favourites/Sonos targeting remains
+  token-dependent. Brain 92→, robot 45, connector 32 green.
+- [x] **U50 — gated Computer Use (see the screen, drive mouse and keyboard)** · deps: U40 · `pending`
+  An answer to the "secure OpenClaw" question: Anthropic's own computer-use tool
+  (`computer_20251124`, beta header `computer-use-2025-11-24`, Opus 4.8) lets AURA
+  operate any desktop app — screenshot → one action → screenshot to verify — when
+  launch_app/media_control are not enough. `ComputerUseAgent` (a loop with an
+  injectable Anthropic client + an `InputBackend` protocol; `PyAutoGuiBackend` as
+  the real Windows driver). A new `use_computer` orchestrator tool → in
+  `APPROVAL_REQUIRED` and the work/home modes (the approval gate is NEVER
+  bypassed). Capability toggle `computer_use` **OFF by default**, requires
+  `ANTHROPIC_API_KEY` + the `[computeruse]` extra (anthropic+pyautogui+pillow);
+  live hook in main. A step cap (`COMPUTER_USE_MAX_STEPS`), per-action logging,
+  and a system prompt that forbids passwords, payments and irreversible actions
+  on its own (mirroring the global safety rules). 8 new tests (fakes, no
+  anthropic/pyautogui needed); brain, orchestrator and policies green.
 
-## Agentic fase (plan: [agentic-plan.md](agentic-plan.md))
+## Agentic phase (plan: [agentic-plan.md](agentic-plan.md))
 
-- [x] **U57 — agentic loop core** · deps: — · ESSENTIEEL · `pending`
-  `_orchestrate_impl` is nu een echte multi-ronde loop: redeneren → tools kiezen → (approval-gate per call, elke ronde) → uitvoeren → resultaten terug in de context → volgende ronde; stopt bij finaal antwoord (geen tool-calls meer), AGENT_MAX_ROUNDS (default 8, dan geforceerde tool-loze synthese "budget op"), of eigenaars-stop (afronden na huidige ronde). `AgentRoundStarted/Completed`-events (shared-schemas) op de bus → console-eventlog. Steering: `pipeline.steer()` + `POST /orchestrator/agent/steer` (guidance wordt volgende ronde als system-note geïnjecteerd), `request_stop()` + `POST /orchestrator/agent/stop`. Ronde-1-gedrag identiek aan voorheen (alle 154 bestaande tests bleven groen). +5 looptests (multi-ronde, budget, steering mid-loop, stop mid-loop, approval×2 over 2 rondes). Orchestrator 159, schemas 123, brain 128 groen.
-- [x] **U58 — tool-ladder + basistools** · deps: U57 · `pending`
-  `TOOL_LAYERS` + `LADDER_NOTE` in de systeemprompt (API→CLI→FS→browser→GUI; use_computer expliciet "emergency exit", escalatie stap voor stap). Nieuwe module `laptop_tools.py`: `run_powershell` (APPROVAL, -NoProfile -NonInteractive, timeout 60s), `read_file` (vrij, pad-begrensd tot AGENT_FS_ROOTS — resolved paden, ..-escapes geweigerd), `write_file` (APPROVAL, zelfde grenzen), `git_prepare` (read-only status/diff/diff_staged/log; commit/push blijft bij run_dev_task-tiers). Output gecapt op 6000 tekens per resultaat. Alle vier in work-mode. Tests/builds draaien al via run_dev_task (read-tier auto-approved) — geen aparte presets nodig. Orchestrator 173 (+14), policies 6 groen.
-- [x] **U59 — skills-systeem** · deps: U57 · `pending`
-  `orchestrator/skills.py`: Skill + SkillStore — markdown-files in SKILLS_DIR (default ./skills) met mini-frontmatter (name/description/triggers/personas/person/enabled; geen yaml-dep), file-backed met lazy reload (externe edits + U60-self-training worden opgepikt zonder restart). Matching: enabled + persona-filter + persoon-scope (digital twin) + trigger-substrings (geen triggers → altijd relevant). Prompt-injectie in de agentic loop: relevante skills volledig (max 3, body-cap 2000), overige bij naam+beschrijving; "volg een relevante skill exact en benoem welke". `/skills` CRUD-API in de brain (owner bewerkt vrij; de AGENT schrijft via U60 approval-gated); store gedeeld met de pipeline in de lifespan. Orchestrator 178 (+5), brain 130 (+2) groen. Console-paneel volgt in U62.
-- [x] **U60 — self-training & teach-mode** · deps: U59 · `pending`
-  `save_skill` als agent-tool in APPROVAL_REQUIRED (+ work/home): de agent stelt een skill(-update) voor, de eigenaar ziet en keurt élke schrijf goed; deny → niets weggeschreven (getest). Prompt-nudge: "als de eigenaar je corrigeert of zijn werkwijze toont → stel save_skill voor" (ook zonder bestaande skills). Teach-mode: `POST /orchestrator/agent/feedback` frame't eigenaarsfeedback als teaching moment door de agentic loop — de agent beslist zelf of het een skill wordt (gated) en bevestigt wat hij leerde. Persoon-scope op skills (U59) + persoon-feiten (U19) = digital-twin-opbouw. Orchestrator 182 (+4) groen.
+- [x] **U57 — agentic loop core** · deps: — · ESSENTIAL · `pending`
+  `_orchestrate_impl` is now a genuine multi-round loop: reason → choose tools →
+  (approval gate per call, every round) → execute → results back into the context
+  → next round; it stops at a final answer (no more tool calls), at
+  AGENT_MAX_ROUNDS (default 8, then a forced tool-less synthesis saying the
+  budget is spent), or on an owner stop (finish after the current round).
+  `AgentRoundStarted/Completed` events (shared-schemas) on the bus → the console
+  event log. Steering: `pipeline.steer()` + `POST /orchestrator/agent/steer`
+  (guidance is injected as a system note in the next round), `request_stop()` +
+  `POST /orchestrator/agent/stop`. Round-1 behaviour is identical to before (all
+  154 existing tests stayed green). +5 loop tests (multi-round, budget, steering
+  mid-loop, stop mid-loop, approval×2 across 2 rounds). Orchestrator 159, schemas
+  123, brain 128 green.
+- [x] **U58 — tool ladder + base tools** · deps: U57 · `pending`
+  `TOOL_LAYERS` + `LADDER_NOTE` in the system prompt (API→CLI→FS→browser→GUI;
+  use_computer explicitly the "emergency exit", escalation one step at a time). A
+  new module `laptop_tools.py`: `run_powershell` (APPROVAL, -NoProfile
+  -NonInteractive, 60s timeout), `read_file` (free, path-bounded to
+  AGENT_FS_ROOTS — resolved paths, `..` escapes refused), `write_file` (APPROVAL,
+  same bounds), `git_prepare` (read-only status/diff/diff_staged/log; commit/push
+  stays with the run_dev_task tiers). Output capped at 6000 characters per
+  result. All four in work mode. Tests and builds already run through run_dev_task
+  (read tier auto-approved) — no separate presets needed. Orchestrator 173 (+14),
+  policies 6 green.
+- [x] **U59 — skills system** · deps: U57 · `pending`
+  `orchestrator/skills.py`: Skill + SkillStore — markdown files in SKILLS_DIR
+  (default ./skills) with a mini frontmatter
+  (name/description/triggers/personas/person/enabled; no yaml dependency),
+  file-backed with lazy reload (external edits and U60 self-training are picked up
+  without a restart). Matching: enabled + persona filter + person scope (the
+  digital twin) + trigger substrings (no triggers → always relevant). Prompt
+  injection in the agentic loop: relevant skills in full (max 3, body capped at
+  2000), the rest by name and description; "follow a relevant skill exactly and
+  say which one". A `/skills` CRUD API in the brain (the owner edits freely; the
+  AGENT writes through U60, approval-gated); the store is shared with the pipeline
+  in the lifespan. Orchestrator 178 (+5), brain 130 (+2) green. The console panel
+  follows in U62.
+- [x] **U60 — self-training & teach mode** · deps: U59 · `pending`
+  `save_skill` as an agent tool in APPROVAL_REQUIRED (+ work/home): the agent
+  proposes a skill or an update, the owner sees and approves EVERY write; deny →
+  nothing is written (tested). Prompt nudge: "if the owner corrects you or shows
+  you their way of working → propose save_skill" (also when no skills exist yet).
+  Teach mode: `POST /orchestrator/agent/feedback` frames owner feedback as a
+  teaching moment through the agentic loop — the agent decides for itself whether
+  it becomes a skill (gated) and confirms what it learned. Person scope on skills
+  (U59) plus person facts (U19) is how the digital twin builds up. Orchestrator
+  182 (+4) green.
 - [x] **U61 — hooks & subagents** · deps: U57 · `pending`
-  `hooks.py`: declaratieve JSON-hooks (AGENT_HOOKS env of hooks.json, live-editbaar) — `pre`+`block` vervangt de tool-call deterministisch door de hook-boodschap (bv. "eerst tests draaien" vóór `git push`; het model leest waarom en past zich de volgende ronde aan), `post`+`note` hangt een vervolg-notitie aan het resultaat (bv. linter na write_file). Hooks zijn policy, geen modelgedrag — ze vuren altijd, en vervangen nooit de approval-gate. `delegate_subtask`-tool: spawnt een scoped subagent-subloop met hard-afgedwongen read-only allowlist (restrict-parameter in `_run_tool_round` — buiten de lijst geweigerd óók als de modus het toelaat), eigen rondebudget (max 6), geen verdere delegatie/schrijvers. Orchestrator 187 (+5), policies 6 groen.
-- [x] **U62 — console agent-UX** · deps: U57 · `pending`
-  ConversationPanel kreeg een live **agent-strip** (verschijnt tijdens een loop): "Working — round X/Y · tools", steer-invoerveld (→ /agent/steer, landt volgende ronde) en Stop-knop (→ /agent/stop, afronden na huidige ronde). **🎓 Teach-knop** naast Send: stuurt de invoer als trainingsfeedback (→ /agent/feedback; de agent stelt evt. een skill voor — approval-gated). Settings kreeg een **Skills-tab**: lijst (naam/@persoon/beschrijving/aan-uit-toggle), editor (naam/beschrijving/triggers/persoon/body), delete; nieuwe skills en edits gaan vrij via de owner-API. conversationStore trackt AgentRoundStarted/Completed van de WS-stream. Console 56 groen, build clean. Daarmee is het agentic plan (A–F, U57–U62) volledig af.
+  `hooks.py`: declarative JSON hooks (AGENT_HOOKS env or hooks.json, editable
+  live) — `pre`+`block` deterministically replaces the tool call with the hook's
+  message (for example "run the tests first" before `git push`; the model reads
+  why and adapts in the next round), `post`+`note` appends a follow-up note to the
+  result (for example a linter after write_file). Hooks are policy, not model
+  behaviour — they always fire, and they never replace the approval gate. A
+  `delegate_subtask` tool: spawns a scoped subagent subloop with a hard-enforced
+  read-only allowlist (the restrict parameter in `_run_tool_round` — anything
+  outside the list is refused EVEN IF the mode would allow it), its own round
+  budget (max 6), and no further delegation or writers. Orchestrator 187 (+5),
+  policies 6 green.
+- [x] **U62 — console agent UX** · deps: U57 · `pending`
+  ConversationPanel gained a live **agent strip** (appears during a loop):
+  "Working — round X/Y · tools", a steer input field (→ /agent/steer, lands next
+  round) and a Stop button (→ /agent/stop, finish after the current round). A
+  **🎓 Teach button** beside Send: sends the input as training feedback (→
+  /agent/feedback; the agent may propose a skill — approval-gated). Settings
+  gained a **Skills tab**: a list (name/@person/description/on-off toggle), an
+  editor (name/description/triggers/person/body), delete; new skills and edits go
+  through the owner API without a gate. conversationStore tracks
+  AgentRoundStarted/Completed from the WS stream. Console 56 green, build clean.
+  That completes the agentic plan (A–F, U57–U62).
 
-- [x] **U63 — persoonsprofiel: beschrijving + skills-referentie; Settings-layout** · `pending`
-  Person kreeg een `description`-veld (vrije-tekst-portret, encrypted at rest, backward compatible) — bewerkbaar in het brein-paneel ("About", auto-save op blur) en geïnjecteerd in de judgment-context ("About them: …") zodat gesprekken erop personaliseren. PUT /knowledge/people kreeg merge-semantiek (alleen-description-update raakt naam/rol niet). Persoonsprofiel toont nu ook de SKILLS met die persoon-scope ("their way of working") met hint naar 🎓/Settings→Skills — profiel = één plek met alles wat AURA over iemand weet. Settings-modal: 36rem breed (tabs kapten af op 26rem met 6 tabs), tab-bar nowrap+scroll, ruimere body-padding. Brain 132 (+2), schemas 123, console 56 groen.
+- [x] **U63 — person profile: description + skills reference; Settings layout** · `pending`
+  Person gained a `description` field (a free-text portrait, encrypted at rest,
+  backward compatible) — editable in the brain panel ("About", auto-saved on blur)
+  and injected into the judgment context ("About them: …") so conversations
+  personalise on it. PUT /knowledge/people gained merge semantics (a
+  description-only update leaves name and role alone). The person profile now also
+  shows the SKILLS scoped to that person ("their way of working") with a pointer
+  to 🎓/Settings→Skills — the profile is one place with everything AURA knows about
+  someone. Settings modal: 36rem wide (the tabs were cut off at 26rem with six
+  tabs), tab bar nowrap+scroll, roomier body padding. Brain 132 (+2), schemas 123,
+  console 56 green.
 
-- [x] **U64 — schermcontrole zonder Anthropic-key (OpenAI-fallback)** · `pending`
-  `OpenAIComputerAgent`: dezelfde screenshot→act→verify-loop, gedreven door de OpenAI-key die gesprekken al gebruiken (vision + function-calling, default gpt-4o, COMPUTER_USE_OPENAI_MODEL overridebaar). Provider-ladder in `create_default_agent`: Anthropic native als de key er is (beste in dit werk) → anders OpenAI → anders uit. Zelfde systeem-prompt/safety, zelfde step-cap, zelfde approval-gate. Capability-tekst bijgewerkt. Brain +3 tests (klik→done, step-cap, ladder).
-- [x] **U65 — stemkeuze (globaal + per persona)** · `pending`
-  `TTS_VOICES` (11 gpt-4o-mini-tts-stemmen) + `resolve_voice(persona)`: per-persona override via `TTS_VOICE_<MODE>` env, anders globale voorkeur `TTS_VOICE` (live gelezen). Prefs-API kreeg `tts_voice` (gevalideerd); Settings kreeg een "Robot voice"-dropdown met omschrijving per stem (Onyx — deep male, Nova — energetic female, …). `_embody_reply` synthesiseert met de persona-stem op beide TTS-paden (streamed + klassiek).
-- [x] **U66 — skills toevoegen vanuit het persoonsscherm + 🎓-UX** · `pending`
-  Persoonsprofiel kreeg een quick-add-rij onder SKILLS (naam + procedure → POST /skills met person-scope, beschrijving automatisch "X's way of working"). 🎓-knop: altijd klikbaar; met leeg invoerveld verschijnt nu een inline hint ("typ eerst je les…") i.p.v. stil niets doen — dat was het "🎓 reageert niet"-probleem (backend-endpoint werkte, curl 200).
+- [x] **U64 — screen control without an Anthropic key (OpenAI fallback)** · `pending`
+  `OpenAIComputerAgent`: the same screenshot→act→verify loop, driven by the OpenAI
+  key conversations already use (vision + function calling, default gpt-4o,
+  COMPUTER_USE_OPENAI_MODEL overridable). A provider ladder in
+  `create_default_agent`: Anthropic native when the key is there (best at this
+  work) → otherwise OpenAI → otherwise off. Same system prompt and safety, same
+  step cap, same approval gate. Capability text updated. Brain +3 tests
+  (click→done, step cap, ladder).
+- [x] **U65 — voice choice (global and per persona)** · `pending`
+  `TTS_VOICES` (11 gpt-4o-mini-tts voices) + `resolve_voice(persona)`: a
+  per-persona override through `TTS_VOICE_<MODE>` env, otherwise the global
+  preference `TTS_VOICE` (read live). The prefs API gained `tts_voice`
+  (validated); Settings gained a "Robot voice" dropdown with a description per
+  voice (Onyx — deep male, Nova — energetic female, …). `_embody_reply`
+  synthesizes with the persona voice on both TTS paths (streamed and classic).
+- [x] **U66 — adding skills from the person screen + 🎓 UX** · `pending`
+  The person profile gained a quick-add row under SKILLS (name + procedure → POST
+  /skills with person scope, description automatically "X's way of working"). The
+  🎓 button: always clickable; with an empty input field an inline hint now appears
+  ("type your lesson first…") instead of silently doing nothing — that was the
+  "🎓 does not respond" problem (the backend endpoint worked, curl 200).
 
-- [x] **U67 — zelfconversatie-fix + eerlijke muziek + skills-cards** · `pending`
-  (1) "Nordmeer-incident": Spotify speelde door de robotspeaker → de mic hoorde songteksten → elk follow-up-venster voedde de volgende beurt → oneindige zelfconversatie. Fix: follow-up-keten gecapt (FOLLOWUP_CHAIN_MAX=2 wake-word-loze beurten, daarna is het wake-word weer verplicht; het wake-word horen reset de keten) + BARGE_IN_FACTOR 2.5→3.0 (robotspeaker-echo). (2) "Favorieten"-leugen: de muziek-mock-directive verbiedt nu expliciet te claimen dát specifieke muziek speelt — media-key hervat alleen wat er al klaarstond; het antwoord moet naar Settings → Connections verwijzen voor echte favorieten/Sonos. (3) Skills-tab: cards i.p.v. rijen (naam + @persoon + beschrijving + body-preview + trigger/modus-chips, gedimd bij uit). Brain 136 (+1), connector 40, console 56 groen.
-- [x] **U68 — brain vault (optie a) + [[link]]-rendering in-app** · DECIDE: eigenaar koos (a)+links · `pending`
-  Vault: de skills-map is nu een self-describing Obsidian-compatibele vault (auto-README bij eerste save, uitgesloten van de skill-loader); persoonsdata blijft versleuteld in-app. [[links]]: `WikiText.vue` rendert `[[target]]` als klikbare links; `navStore` regelt kruisnavigatie (klik `[[jan]]` in een skill → Knowledge-paneel op die persoon; klik een skillnaam/`[[skill]]` in een profiel → Settings→Skills met de editor open; @persoon-badge op skill-cards klikbaar). Backlinks: skills die `[[persoon]]` vermelden verschijnen in het profiel met "backlink"-chip (naast scope-skills). Beschrijving-veld kreeg live linkpreview + hint. Editor-placeholder legt [[..]] uit. Orchestrator 187, brain 137, console 56 groen. Vervolgstap (c: graph-view) blijft open als latere iteratie.
+- [x] **U67 — self-conversation fix + honest music + skill cards** · `pending`
+  (1) The "Nordmeer incident": Spotify played through the robot speaker → the mic
+  heard lyrics → every follow-up window fed the next turn → an endless
+  self-conversation. Fix: the follow-up chain is capped (FOLLOWUP_CHAIN_MAX=2
+  wake-word-less turns, after which the wake word is required again; hearing the
+  wake word resets the chain) + BARGE_IN_FACTOR 2.5→3.0 (robot-speaker echo).
+  (2) The "favourites" lie: the music mock directive now explicitly forbids
+  claiming that specific music is playing — a media key only resumes whatever was
+  already queued; the answer must point at Settings → Connections for real
+  favourites and Sonos. (3) Skills tab: cards instead of rows (name + @person +
+  description + body preview + trigger/mode chips, dimmed when off). Brain 136
+  (+1), connector 40, console 56 green.
+- [x] **U68 — brain vault (option a) + [[link]] rendering in-app** · DECIDE: the owner chose (a)+links · `pending`
+  Vault: the skills directory is now a self-describing Obsidian-compatible vault
+  (an auto-README on first save, excluded from the skill loader); person data
+  stays encrypted in-app. [[links]]: `WikiText.vue` renders `[[target]]` as
+  clickable links; `navStore` handles cross-navigation (click `[[jan]]` in a skill
+  → the Knowledge panel on that person; click a skill name or `[[skill]]` in a
+  profile → Settings→Skills with the editor open; the @person badge on skill cards
+  is clickable). Backlinks: skills mentioning `[[person]]` appear in the profile
+  with a "backlink" chip (beside scope skills). The description field gained a
+  live link preview and a hint. The editor placeholder explains [[..]].
+  Orchestrator 187, brain 137, console 56 green. The follow-up step (c: graph
+  view) stays open as a later iteration.
 
-- [x] **U69 — music guard: lyrics kunnen géén gesprek meer worden** · `pending`
-  Structurele fix bovenop U67 (die was nog niet herstart bij het NOFX-incident): zodra AURA zelf muziek start/bedient (ToolCallSucceeded op play_music/media_control/next_track → `note_music_started()`), gaan follow-up-vensters volledig uit voor MUSIC_GUARD_S (default 180s) — alleen het wake-word komt er nog doorheen (lyrics bevatten zelden "Richie"; getest dat wake-word-commando's blijven werken tijdens de guard). Plus promptfix in LADDER_NOTE: "je KUNT Spotify openen — claim nooit van niet; bij een muziekvraag HANDEL (launch + play) i.p.v. doorvragen, en rapporteer eerlijk wat je niet kon kiezen" (tegen het tegenstrijdige 'kan niet openen'/'open ik toch'-gedrag). Brain 139 (+2), orchestrator 187 groen.
+- [x] **U69 — music guard: lyrics can no longer become a conversation** · `pending`
+  A structural fix on top of U67 (which had not been restarted yet at the time of
+  the NOFX incident): as soon as AURA starts or operates music itself
+  (ToolCallSucceeded on play_music/media_control/next_track →
+  `note_music_started()`), follow-up windows are disabled entirely for
+  MUSIC_GUARD_S (default 180s) — only the wake word still gets through (lyrics
+  rarely contain "Richie"; tested that wake-word commands keep working during the
+  guard). Plus a prompt fix in LADDER_NOTE: "you CAN open Spotify — never claim
+  otherwise; on a music request ACT (launch + play) instead of asking more
+  questions, and report honestly what you could not choose" (against the
+  contradictory 'cannot open'/'opening anyway' behaviour). Brain 139 (+2),
+  orchestrator 187 green.
 
-- [x] **U70 — Computer Use werkend gemaakt: pyautogui + schaal-laag + nummer-via-scherm** · `pending`
-  (1) Warning "No module named 'pyautogui'" → pyautogui in de venv geïnstalleerd (`uv pip install pyautogui`; backend live geverifieerd, scherm 3440×1440). (2) `ScaledBackend`: het model ziet screenshots op max COMPUTER_USE_MAX_DIM=1456px (vision-modellen herschalen ultrawide-screenshots intern → kliks zaten ernaast); kliks/drags/scrolls worden terug omhooggeschaald naar echte pixels; no-op op kleine schermen. (3) LADDER_NOTE: een specifiek nummer kiezen MAG via use_computer (Spotify openen, op het scherm zoeken, afspelen) — legitiem GUI-gebruik omdat geen lagere laag een specifiek nummer kan selecteren; approval blijft per gebruik. Brain 141 (+2), orchestrator 187 groen.
+- [x] **U70 — Computer Use made to work: pyautogui + a scaling layer + picking a track on screen** · `pending`
+  (1) The warning "No module named 'pyautogui'" → pyautogui installed in the venv
+  (`uv pip install pyautogui`; backend verified live, screen 3440×1440).
+  (2) `ScaledBackend`: the model sees screenshots at most COMPUTER_USE_MAX_DIM=1456px
+  (vision models rescale ultrawide screenshots internally → clicks landed beside
+  their target); clicks, drags and scrolls are scaled back up to real pixels;
+  a no-op on small screens. (3) LADDER_NOTE: choosing a specific track MAY go
+  through use_computer (open Spotify, search on screen, play) — legitimate GUI use,
+  because no lower layer can select a specific track; approval still applies per
+  use. Brain 141 (+2), orchestrator 187 green.
 
-- [x] **U71 — starter-skill: specifiek nummer via het scherm** · `pending`
-  Antwoord op "kan hij dat niet aanleren in een skill?" — ja, precies daarvoor: `skills/spotify-specifiek-nummer.md` geseed (triggers: spotify/speel/nummer/…, work+home). De skill verbiedt gokken met media_control bij een specifieke vraag en schrijft de use_computer-procedure voor (ctrl+k → zoek '<artiest> <nummer>' → play bovenste resultaat → screenshot-verificatie → eerlijk rapporteren welk nummer speelt). Geverifieerd: triggert + wordt volledig in de prompt geïnjecteerd. De eigenaar kan hem bijschaven in Settings → Skills; de agent stelt zelf verbeteringen voor via save_skill (approval-gated). De 23:40-zelfconversatie draaide nóg op de pre-U67/U69-brain (6 beurten — kan niet meer na herstart: keten-cap 2 + music guard).
+- [x] **U71 — starter skill: a specific track through the screen** · `pending`
+  An answer to "can't he learn that in a skill?" — yes, that is exactly what they
+  are for: `skills/spotify-specifiek-nummer.md` seeded (triggers:
+  spotify/speel/nummer/…, work+home). The skill forbids guessing with
+  media_control on a specific request and prescribes the use_computer procedure
+  (ctrl+k → search '<artist> <track>' → play the top result → screenshot
+  verification → report honestly which track is playing). Verified: it triggers and
+  is injected into the prompt in full. The owner can refine it in Settings →
+  Skills; the agent proposes improvements itself through save_skill
+  (approval-gated). The 23:40 self-conversation was still running on the
+  pre-U67/U69 brain (6 turns — no longer possible after a restart: chain cap 2 +
+  music guard).
 
-- [x] **U72 — Brain-paneel: skills-bibliotheek + brein per persoon (commerciële layout)** · `pending`
-  Nieuw `BrainPanel.vue` achter de brein-knop in de titelbalk: links een rail met avatar-initialen (Skills library + personen met rol-badges), rechts (a) de **skills-bibliotheek** — "General skills" als hover-cards in een grid + per-persoon-groepen ("Jan's way of working"), inline nieuwe skill toevoegen, potlood → Settings-editor, [[links]] klikbaar; (b) het **brein per persoon** — hero met avatar/rol, About (auto-save + linkpreview), feiten als chips met × en inline toevoegen, hun skills (incl. backlink-chips) met persoon-gescopete quick-add. "Security & faces"-knop opent het oude Knowledge-paneel (lock/tier/enroll/unknown visitors blijven daar). [[persoon]]-links elders openen nu dit paneel. Console 56 groen, build clean.
+- [x] **U72 — Brain panel: skills library + a brain per person (commercial layout)** · `pending`
+  A new `BrainPanel.vue` behind the brain button in the title bar: on the left a
+  rail with avatar initials (Skills library + people with role badges), on the
+  right either (a) the **skills library** — "General skills" as hover cards in a
+  grid plus per-person groups ("Jan's way of working"), add a new skill inline,
+  pencil → the Settings editor, [[links]] clickable; or (b) the **brain per
+  person** — a hero with avatar and role, About (auto-save + link preview), facts
+  as chips with × and inline adding, their skills (including backlink chips) with
+  a person-scoped quick-add. A "Security & faces" button opens the old Knowledge
+  panel (lock/tier/enrol/unknown visitors stay there). [[person]] links elsewhere
+  now open this panel. Console 56 green, build clean.
 
-- [x] **U73 — barge-in vereist wake-word + GUI-dwaling gefixt** · `pending`
-  Diagnose van "Er war in den 18.": Richies speaker zit naast zijn eigen mic — luidheid alléén kan self-echo nooit van de gebruiker onderscheiden, dus de barge-in triggerde op zijn eigen TTS (verhaspeld als Duits getranscribeerd). Fix: een barge-in telt nu alleen als het transcript het WAKE-WORD bevat ("Richie, stop") — eigen echo zegt nooit z'n eigen naam; loudness-gate blijft als voorfilter (goedkoop). `use_computer` toegevoegd aan de music-guard-triggerset (een GUI-run kan audio starten). Skill aangescherpt: UITSLUITEND in het Spotify-venster werken, nooit help/Connect-links of een browser (dwaalde naar support.spotify.com), overlays sluiten met esc, en bij "speelt op ander apparaat" het apparaten-icoon → 'Deze computer' kiezen + voortgangsbalk-verificatie. Brain 142 (+1 nieuw, 1 aangepast) groen. NB: de keten-cap (U67) werkte zichtbaar al — 2 spookbeurten i.p.v. 6.
+- [x] **U73 — barge-in requires the wake word + GUI wandering fixed** · `pending`
+  Diagnosis of "Er war in den 18.": Richie's speaker sits next to his own mic —
+  loudness alone can never tell self-echo apart from the user, so the barge-in
+  triggered on his own TTS (transcribed, garbled, as German). Fix: a barge-in now
+  only counts when the transcript contains the WAKE WORD ("Richie, stop") — his own
+  echo never says his own name; the loudness gate stays as a cheap pre-filter.
+  `use_computer` added to the music-guard trigger set (a GUI run can start audio).
+  The skill was tightened: work ONLY in the Spotify window, never help/Connect
+  links or a browser (it had wandered off to support.spotify.com), close overlays
+  with esc, and on "playing on another device" pick the devices icon → 'This
+  computer' and verify with the progress bar. Brain 142 (+1 new, 1 adjusted)
+  green. Note: the chain cap (U67) was visibly working already — 2 phantom turns
+  instead of 6.
 
-- [x] **U74 — upgrade naar gpt-5.1 (chat + schermbesturing)** · `pending`
-  De key blijkt gpt-5/5.1/5.2 te hebben. Omgezet: `OPENAI_MODEL=gpt-5.1` (conversaties, agentic loop, tool-keuzes — moet de doelloze uitweidingen en inconsistente tool-claims flink verminderen) en `COMPUTER_USE_OPENAI_MODEL=gpt-5.1` (visueel sterker dan gpt-4o voor de Spotify-GUI-runs). Compat-fix: de OpenAI-computer-agent gebruikt nu `max_completion_tokens` (gpt-5.x weigert `max_tokens`; werkt ook op gpt-4o). Alles instelbaar gebleven via Settings → LLM / env. Brain-computer-use-tests 13 groen.
+- [x] **U74 — upgrade to gpt-5.1 (chat + screen control)** · `pending`
+  The key turns out to have gpt-5/5.1/5.2. Switched over: `OPENAI_MODEL=gpt-5.1`
+  (conversations, the agentic loop, tool choices — which should sharply reduce the
+  aimless digressions and inconsistent tool claims) and
+  `COMPUTER_USE_OPENAI_MODEL=gpt-5.1` (visually stronger than gpt-4o for the
+  Spotify GUI runs). Compatibility fix: the OpenAI computer agent now uses
+  `max_completion_tokens` (gpt-5.x refuses `max_tokens`; it works on gpt-4o too).
+  Everything remains configurable through Settings → LLM / env. Brain computer-use
+  tests 13 green.
 
-- [x] **U75 — scherm-overlay + abort + brain-graph** · `pending`
-  (1) **Muis licht op**: `ComputerControlStarted/Ended`-events rond elke use_computer-run → console → Electron-IPC → click-through always-on-top overlay met gloeiende cursor-ring (volgt de muis, 40ms) en banner "AURA bestuurt het scherm — druk Esc om af te breken". (2) **Abort**: `request_abort()` op beide computer-agents (checkt per stap) + wall-clock-timeout COMPUTER_USE_TIMEOUT_S=180s + `POST /orchestrator/computeruse/abort`; afbreekbaar via Esc (globalShortcut zolang de overlay staat, werkt in élke app) én een Abort-knop in de conversatie-strip. (3) **Graph**: `BrainGraph.vue` — dependency-vrije force-directed canvas-constellatie in het Brain-paneel (rail-item "Graph"): personen amber, skills blauw, feiten als kleine sterren; edges uit persoon-scope, [[wikilinks]] en feiten; hover-tooltip, klik → persoon/skill openen. Schemas 123, orchestrator 187, computer-use 13, console 56 groen.
+- [x] **U75 — screen overlay + abort + brain graph** · `pending`
+  (1) **The mouse lights up**: `ComputerControlStarted/Ended` events around every
+  use_computer run → console → Electron IPC → a click-through always-on-top
+  overlay with a glowing cursor ring (following the mouse, 40ms) and a banner
+  "AURA is controlling the screen — press Esc to abort". (2) **Abort**:
+  `request_abort()` on both computer agents (checked every step) + a wall-clock
+  timeout COMPUTER_USE_TIMEOUT_S=180s + `POST /orchestrator/computeruse/abort`;
+  abortable with Esc (a globalShortcut while the overlay is up, so it works in ANY
+  app) and
+  with an Abort button in the conversation strip. (3) **Graph**: `BrainGraph.vue` —
+  a dependency-free force-directed canvas constellation in the Brain panel (rail
+  item "Graph"): people amber, skills blue, facts as small stars; edges from
+  person scope, [[wikilinks]] and facts; hover tooltip, click → open the person or
+  skill. Schemas 123, orchestrator 187, computer-use 13, console 56 green.
 
-- [x] **U76 — VS Code-achtige workspace: Brain als dokbaar paneel** · `pending`
-  Geen popup meer: de main-layout is een **workspace** met versleepbare splitters (pointer-drag, min/max-clamps) en een **rechter dock met tabs Brain | Events**. Brain-paneel kreeg een `docked`-modus (zelfde component: rail met personen/skills/graph, smaller in dock) — de brein-knop en [[persoon]]-links openen nu de dock (verbreedt automatisch naar 480px voor Brain). Titelbalk kreeg VS Code-stijl **layout-toggles** (PanelLeft/PanelRight-iconen) om linker- en rechterpaneel te tonen/verbergen. Breedtes, zichtbaarheid en actieve tab persistent in localStorage (`layoutStore`, aura-layout-v1). EventLog verhuisde van vaste kolom naar de Events-tab. Console 56 groen, build clean.
+- [x] **U76 — a VS Code-like workspace: Brain as a dockable panel** · `pending`
+  No more popup: the main layout is a **workspace** with draggable splitters
+  (pointer drag, min/max clamps) and a **right-hand dock with Brain | Events
+  tabs**. The Brain panel gained a `docked` mode (same component: a rail with
+  people/skills/graph, narrower in the dock) — the brain button and [[person]]
+  links now open the dock (which widens automatically to 480px for Brain). The
+  title bar gained VS Code-style **layout toggles** (PanelLeft/PanelRight icons) to
+  show or hide the left and right panels. Widths, visibility and the active tab
+  persist in localStorage (`layoutStore`, aura-layout-v1). The EventLog moved from
+  a fixed column into the Events tab. Console 56 green, build clean.
 
-- [x] **U77 — bottom-dock Events, per-persoon bronnen, RobotPanel-fix, meedansen** · `pending`
-  (1) **Events onderaan** (terminal-stijl): horizontale splitter onder de chat, verticaal resizable (110–520px), PanelBottom-toggle in de titelbalk; rechter dock is nu puur Brain. (2) **Bronnen per persoon**: SOURCES-sectie in het persoon-brein (instagram/facebook/x-twitter/linkedin/blog/website/gmail/github + handle/url) — opgeslagen als `source:<kind>`-facts: encrypted at rest én automatisch in de gespreks-context via de judgment layer; groene chips, apart van gewone facts. Actief ingesteld ophalen/lezen van die bronnen = latere unit. (3) **RobotPanel afgekapt**: flex-children kregen `flex-shrink: 0` zodat de linkerkolom écht scrollt i.p.v. clipt. (4) **Meedansen**: zodra AURA muziek start danst Richie mee — losse loop van nod/tilt/shake/gesture/wave met random amplitude/tempo, DANCE_DURATION_S=25, DANCE_ON_MUSIC=true (uitzetbaar), best-effort. Brain 142, console 56 groen.
+- [x] **U77 — bottom-dock Events, per-person sources, RobotPanel fix, dancing along** · `pending`
+  (1) **Events at the bottom** (terminal style): a horizontal splitter under the
+  chat, vertically resizable (110–520px), a PanelBottom toggle in the title bar;
+  the right-hand dock is now purely Brain. (2) **Sources per person**: a SOURCES
+  section in the person brain
+  (instagram/facebook/x-twitter/linkedin/blog/website/gmail/github + handle/url) —
+  stored as `source:<kind>` facts: encrypted at rest and automatically in the
+  conversation context through the judgment layer; green chips, separate from
+  ordinary facts. Actively fetching and reading those sources is a later unit.
+  (3) **RobotPanel was cut off**: the flex children gained `flex-shrink: 0` so the
+  left column really scrolls instead of clipping. (4) **Dancing along**: as soon
+  as AURA starts music, Richie dances along — a separate loop of
+  nod/tilt/shake/gesture/wave with random amplitude and tempo,
+  DANCE_DURATION_S=25, DANCE_ON_MUSIC=true (can be turned off), best effort. Brain
+  142, console 56 green.
 
-- [x] **U78 — Richie-avatar in de conversatie** · `pending`
-  `RichieAvatar.vue`: vector-portret van Richie Mini (witte kop, coil-antennes, donkere goggles, schouders — naar de aangeleverde illustratie; theme-aware via CSS-vars) bij elke assistent-beurt in de chat, met de ingestelde roepnaam i.p.v. hardcoded "AURA". De "is thinking…"-bubbel kreeg een zachtjes wiebelende Richie. Wil de eigenaar de échte artwork-PNG: in src/assets droppen en in RichieAvatar.vue swappen (genoteerd in de component). Console 56 groen.
+- [x] **U78 — a Richie avatar in the conversation** · `pending`
+  `RichieAvatar.vue`: a vector portrait of Richie Mini (white head, coil antennae,
+  dark goggles, shoulders — after the supplied illustration; theme-aware through
+  CSS vars) beside every assistant turn in the chat, with the configured calling
+  name instead of a hardcoded "AURA". The "is thinking…" bubble gained a gently
+  wobbling Richie. If the owner wants the real artwork PNG: drop it in src/assets
+  and swap it in RichieAvatar.vue (noted in the component). Console 56 green.
 
-- [x] **U79 — robot vast/geen tracking: brain-link-diagnose + status-touch** · `pending`
-  Symptoom (robot stond stil, volgde/herkende niet): de brain kon de robot niet bereiken — de mDNS-naam `reachy-mini.local` resolvete niet meer vanaf de laptop (proxy gaf `robot unreachable: ConnectError`), waardoor de robot naar de offline-idle-lus viel (idle_fidget-nods die de kop vasthouden) en herkenning stopte (draait op de brain, die camerabeelden ophaalt). Live opgelost: robotadres op het vaste IP gezet via `/setup/config` (Settings → Robot; persistent) + head-tracking heraangezet op de Pi. Robuustheidsfix: `GET /robot/status` roept nu `_touch()` aan — een brain die leeft en pollt maar even niet commandeert (gewoon gesprek) tript niet langer onterecht naar offline na BRAIN_LINK_TIMEOUT. Op de Pi gedeployed + herstart. Aanbeveling in setup: gebruik het IP i.p.v. .local als mDNS wisselvallig is.
+- [x] **U79 — robot stuck / no tracking: brain-link diagnosis + status touch** · `pending`
+  Symptom (the robot stood still, did not follow or recognise): the brain could
+  not reach the robot — the mDNS name `reachy-mini.local` no longer resolved from
+  the laptop (the proxy said `robot unreachable: ConnectError`), so the robot fell
+  back to the offline idle loop (idle_fidget nods that hold the head) and
+  recognition stopped (it runs on the brain, which fetches the camera frames).
+  Fixed live: the robot address set to the fixed IP through `/setup/config`
+  (Settings → Robot; persisted) + head tracking switched back on on the Pi. A
+  robustness fix: `GET /robot/status` now calls `_touch()` — a brain that is alive
+  and polling but briefly not commanding (an ordinary conversation) no longer
+  trips wrongly to offline after BRAIN_LINK_TIMEOUT. Deployed on the Pi and
+  restarted. Recommendation in setup: use the IP rather than .local when mDNS is
+  unreliable.
 
-- [x] **U80 — spraak afgekapt na één woord ("Zeker…") gefixt** · `pending`
-  Root cause: `play_audio` deed één grote `media.push_audio_sample(hele-zin)` en keerde direct terug — de SDK draint een klein buffertje en stopt als er niets bijgevoed wordt, dus lange antwoorden werden tot ~0.5s afgekapt (de 1s-testtoon paste nog net, vandaar dat die wél klonk). Fix: audio in ~200ms-blokken pushen op afspeeltempo (sleep per blok) en **blokkeren tot de hele utterance gespeeld is** + korte staart; motion_lock vastgehouden zodat niets de spraak onderbreekt. Bijkomend voordeel: gestreamde TTS (U54) wacht nu netjes per chunk. Live op de Pi geverifieerd (4s-toon: call blokkeert ~volledige duur i.p.v. <0.5s). Gedeployed + herstart.
+- [x] **U80 — speech cut off after one word ("Zeker…") fixed** · `pending`
+  Root cause: `play_audio` did one big `media.push_audio_sample(whole sentence)`
+  and returned immediately — the SDK drains a small buffer and stops when nothing
+  feeds it, so long answers were cut off at roughly 0.5s (the 1s test tone just
+  fitted, which is why that one did sound). Fix: push the audio in ~200ms blocks
+  at playback pace (sleeping per block) and **block until the whole utterance has
+  played** plus a short tail; the motion_lock is held so nothing interrupts the
+  speech. A side benefit: streamed TTS (U54) now waits properly per chunk.
+  Verified live on the Pi (a 4s tone: the call blocks for roughly the full
+  duration instead of <0.5s). Deployed and restarted.
 
-- [x] **U81 — spraak nog afgekapt (underrun) + volgen tijdens spreken** · `pending`
-  (1) Afkap-vervolg op U80: het exacte realtime-pacen liet de device-buffer tussen blokjes leeglopen (underrun → SDK stopt) — nu wordt ~80% van de blokduur geslapen zodat de buffer altijd vooruit-gevoed is, plus een langere staart (0.4s). 6s-toon getest: call blokkeert de volledige duur, geen afkap. (2) **Volgen tijdens spreken**: reply-gebaren (nod/tilt/shake/gesture/wave) pauzeren de head-tracking niet meer (FOLLOW_WHILE_SPEAKING, default aan) — Richie houdt zijn ogen op je terwijl hij gebaart én praat; grote emotes (wake_up/sleep/look_around/point) beheren de kop nog zelf. Robot 54 groen, live geverifieerd, tracking heraan op de Pi. Gedeployed + herstart.
+- [x] **U81 — speech still cut off (underrun) + following while speaking** · `pending`
+  (1) A follow-up to U80's cut-off: pacing exactly in real time let the device
+  buffer run dry between blocks (underrun → the SDK stops) — now roughly 80% of a
+  block's duration is slept so the buffer is always fed ahead, plus a longer tail
+  (0.4s). Tested with a 6s tone: the call blocks the full duration, no cut-off.
+  (2) **Following while speaking**: reply gestures (nod/tilt/shake/gesture/wave) no
+  longer pause head tracking (FOLLOW_WHILE_SPEAKING, on by default) — Richie keeps
+  his eyes on you while he gestures and talks; the big emotes
+  (wake_up/sleep/look_around/point) still manage the head themselves. Robot 54
+  green, verified live, tracking switched back on on the Pi. Deployed and
+  restarted.
 
-- [x] **U82 — spraak enorm stil: hardware-volume (ALSA) op max bij connect** · `pending`
-  Root cause: de SDK/daemon zet de speaker-ALSA-control `PCM` bij init terug op ~62% = **-23dB** (fors gedempt) — vandaar "enorm stil" ondanks digitale normalisatie. De adapter zette wél een digitale gain (self._volume) maar raakte de hardware-mixer nooit aan. Fix: `_set_hardware_volume_max()` zet `PCM` op 100%/0dB bij élke connect (amixer; overridebaar via SPEAKER_ALSA_CARD/CONTROL, uit te zetten met SPEAKER_ALSA_MAX=false); fijnregeling blijft digitaal via de app-slider. Live geverifieerd (55% → 100% na herstart) + ALSA-state opgeslagen. Robot 54 groen. Gedeployed + herstart.
+- [x] **U82 — speech very quiet: hardware volume (ALSA) to maximum on connect** · `pending`
+  Root cause: the SDK/daemon resets the speaker ALSA control `PCM` at init to
+  about 62% = **-23dB** (heavily attenuated) — hence "very quiet" despite the
+  digital normalisation. The adapter did set a digital gain (self._volume) but
+  never touched the hardware mixer. Fix: `_set_hardware_volume_max()` sets `PCM` to
+  100%/0dB on EVERY connect (amixer; overridable through
+  SPEAKER_ALSA_CARD/CONTROL, disable with SPEAKER_ALSA_MAX=false); fine control
+  stays digital through the app slider. Verified live (55% → 100% after a restart)
+  and the ALSA state saved. Robot 54 green. Deployed and restarted.
 
-- [x] **U83 — spraak in stukjes: via GStreamer playbin i.p.v. appsrc-push + streaming uit** · `pending`
-  De echte oorzaak: het appsrc/`push_audio_sample`-pad draint een klein buffertje en stopt — vandaar het hakken, hoeveel pacing ik er ook op zette. De SDK heeft `media.play_sound(bestand)` (GStreamer playbin naar dezelfde sink). `play_audio` schrijft de (genormaliseerde) PCM nu naar een tijdelijke WAV in /dev/shm en speelt die end-to-end af, blokkerend tot klaar; aplay kon niet (device door daemon bezet). Bijkomend: gestreamde TTS standaard UIT (SPEAK_STREAMING=false) — per-chunk waren dat losse playbin-bestandjes met gaatjes; één synthese + één bestand speelt de hele zin vloeiend. Live geverifieerd (7s-toon end-to-end, geen fouten). Robot 54 groen. Robot-fix gedeployed+herstart; brain-fix (streaming-default) vereist app-herstart.
+- [x] **U83 — speech in fragments: through GStreamer playbin instead of appsrc push + streaming off** · `pending`
+  The real cause: the appsrc/`push_audio_sample` path drains a small buffer and
+  stops — hence the chopping, however much pacing I put on it. The SDK has
+  `media.play_sound(file)` (GStreamer playbin into the same sink). `play_audio`
+  now writes the (normalised) PCM to a temporary WAV in /dev/shm and plays that
+  end to end, blocking until done; aplay was not an option (the device is held by
+  the daemon). Additionally: streamed TTS off by default (SPEAK_STREAMING=false) —
+  per chunk those were separate playbin files with gaps between them; one synthesis
+  and one file plays the whole sentence smoothly. Verified live (a 7s tone end to
+  end, no errors). Robot 54 green. The robot fix was deployed and restarted; the
+  brain fix (the streaming default) needs an app restart.
 
 - [x] **U84 — natuurlijke conversatie: state machine + echte barge-in + karakters** · `pending`
   Per de conversation-fix-brief, kleinste veilige refactor van alleen de conversatie/audio-laag. (1) `docs/conversation_diagnosis.md` — flow-map, wat werkt/kapot is, latency, waarom barge-in niet kon. (2) `conversation_manager.py`: state machine (IDLE…INTERRUPTED…SHUTTING_DOWN), turn-id's, cancel-tokens voor LLM én TTS, gestructureerde logging per transitie (turn/tts_playing/llm_active/cancel_requested; nooit audio/secrets), one-shot interruptie-context voor de volgende beurt. (3) Barge-in end-to-end: `POST /robot/audio/stop` (playbin→NULL, abortbare play-lus, ook FakeAdapter), speak als geregistreerde cancelbare task, LLM-call geraced tegen cancel-event (breekt mídden in de call), geannuleerde beurt blijft stil. (4) Karakterlaag: `characters.py` + `personas/*.json` (5 seeds: friendly_assistant/dry_tech_butler/kids_companion/workshop_coach/quiet_mode) met alle briefvelden — stuurt prompt, verbosity/humor, stem+snelheid (TTS speed-param), motion-energie en interruptibility (wake_word/vad/off). (5) Settings: character/interrupt_sensitivity/session_memory in prefs + `GET /setup/characters`. Suites: brain 151 (+9), orchestrator 187, robot 54, conversation 20 groen. Robot-deel op de Pi gedeployed. Bewust behouden: modi, skills, guards (U67/U69/U73), lifecycle.
@@ -2339,3 +2755,249 @@ terugkaatsen, `robot_secret_set` in de status, wissen), twee op de diagnose
 (401 wél een koppelprobleem, 403/500 níet) en vijf mount-tests op de console —
 deze app heeft geen `vue-tsc`, dus een mount-test is het enige dat tussen een
 typfout en een grijs paneel staat.
+
+### U343 — the launcher stood still for two months while the app moved on
+
+Asked on a fresh clone on a second machine: *"how do I start the app locally,
+is start-aura.bat up to date?"* (translated). No. One commit from 14 July, and
+more than three hundred units have landed since. Every path still resolved, so
+nothing looked wrong — the script started, and what it skipped only shows up
+later.
+
+Three gaps, all the same shape: the script still knew something from July that
+had since been solved somewhere else.
+
+**No `uv sync`.** The Python bootstrap in the Electron shell opens with
+`if (!IS_PACKAGED) return` — it exists for an installed build, not for a
+checkout. The script trusted `uv run` to do the rest. It does, but only for the
+default dependencies: the extras are never asked for and are therefore
+**pruned**. Exactly the trap that has sprung four times already (U179, U213,
+U246, U266). Concretely: a brain without insightface (face recognition),
+without pyautogui (every skill that drives a real window) and without pywin32
+(slide detection) — three capabilities that are not broken but simply absent,
+which under constitution XI is the worst kind of silence. The script now walks
+the same ladder as the bootstrap, so a wheel that will not build on this
+machine does not take the rest down with it.
+
+**The console was never rebuilt.** The condition was `if not exist
+dist\index.html`. After the first run that file exists, so every `git pull` left
+an old console talking to a new brain — one half of a change, which is worse
+than neither. The tree hash of `apps/operator-console` is now compared against
+the hash recorded by the previous build; it changes precisely when something in
+the console changed.
+
+**Six baked-in `VITE_*` variables** pointing at `localhost:8020`. Redundant
+since U234: the shell injects `window.__AURA_RUNTIME__` with the port it really
+got, and runtime beats build time. And `localhost` is the very thing U229 warns
+against, because on Windows it resolves to `::1` first. Gone. (They also sat
+inside an `if` block without delayed expansion, so whether they did anything at
+all was an open question.)
+
+Two things you only learn in batch by hitting them. `echo %HASH%>file` writes to
+**stream 9** when the hash ends in a 9; the redirect now comes first. And the
+failure paths in the build blocks did `pause & exit` without `popd`, so a
+failure left the shell in the wrong directory.
+
+**No tests** — this is a `.bat` at the root and there is no harness for it.
+Instead the control flow was walked through with a throwaway script first (the
+ladder fails on rung 1 and succeeds on rung 2; the hash comparison picks the
+right branch), and then the real script was run end to end on a fresh clone:
+CPython 3.11.15, 115 packages including insightface, onnxruntime, pyautogui and
+pywin32, console built, Electron started. Afterwards verified that the stamp
+equals the tree hash, so a second start skips the build.
+
+Reverted what did not belong: `npm install` under npm 11 removed 512 lines from
+`package-lock.json` (the platform-specific optional esbuild entries for
+netbsd/openbsd-arm64). The release build on macOS and Linux needs those; not in
+this unit.
+
+**Another decision that is yours, and it is the same one as U332.** The script
+now pins `--python 3.11`, because that is the only version CI runs. That is a
+plaster over the place where `requires-python = ">=3.11"` sits: a fresh machine
+without this pin still lands on whatever uv happens to pick. The choice between
+closing the range (`<3.14`) and adding 3.14 to CI is still open.
+
+### U344 — it hung on the splash screen, and the log knew why
+
+Reported with the log attached, which is the only reason this took half an hour
+rather than an evening:
+
+```
+===== AURA brain start 2026-09-13T15:00:47.542Z =====
+error: Failed to spawn: `aura-brain`
+  Caused by: Access is denied. (os error 5)
+===== brain exited (code 2) =====
+```
+
+`Access is denied` on a file that plainly exists and on which `icacls` reports a
+tidy `BUILTIN\Users:(I)(RX)`. That is not a permissions problem but a policy.
+Measured in the Defender log, event 1121:
+
+```
+ID: 01443614-CD74-433A-B99E-2ECDC07BFC25
+Path: C:\devenv\aura\.venv\Scripts\aura-brain.exe
+```
+
+That is the ASR rule *"block executable files from running unless they meet a
+prevalence, age, or trusted list criterion"*, set by IT, with Tamper Protection
+on. Every console script `uv` writes into `.venv\Scripts` is by construction a
+fresh, unsigned 47 kB launcher — precisely the profile that rule refuses. And it
+is not one file: `uvicorn.exe` fails just as hard, while `python.exe` in the
+same folder runs fine. Nothing is wrong with the app; on a corporate laptop the
+shim is simply not allowed to exist as an entry point.
+
+Fixed by starting the brain as a **module**: `uv run --package aura-brain python
+-m aura_brain` instead of `... aura-brain`. There is now an
+`aura_brain/__main__.py` calling the same `run()` the console script in
+`pyproject.toml` declares — that declaration stays, and the test guards against
+the two paths drifting apart.
+
+**The second half is the worse one, and it is ours.** The brain was already dead
+before the shell began waiting, and `waitForBrain()` kept knocking on `/health`
+for **ninety seconds** at a process that no longer existed. Then a message
+saying the brain "did not become healthy in time" — not a word about why, while
+the reason sat in `brain.log` the whole time. From the owner's side that is a
+minute and a half of frozen splash screen followed by a sentence that explains
+nothing, exactly what constitution XI forbids. The exit handler now records an
+exit code, the wait gives up the moment there is one, and the message quotes the
+brain's own last lines of stderr.
+
+Seen on the way: the error dialog for a dead brain hung off `mainWindow`, which
+does not exist yet during the splash — so at the earliest failure nothing
+appeared at all.
+
+Test: `apps/desktop/test-brain-launch.cjs`, verified red against the old code
+(`found: spawn('uv', ['run', '--package', 'aura-brain', 'aura-brain']`), then
+green. Added to CI beside the four existing desktop tests. Eslint clean, all
+five desktop suites green.
+
+Then the real path on this machine: brain started, the buffalo_l model fetched
+once (282 MB — that is why the first start takes a while, and it is work, not a
+hang), `/health` 200, websocket open, console filling in.
+
+### U345 — U339 taught one field the difference, and not the two beside it
+
+Found while chasing a robot that said "offline" for the same owner — parallel to
+U339, and in the places U339 did not touch.
+
+The robot was up: `GET /health` returned 200, `connected: true`, adapter
+`reachy`, commit `d2a4200`, in step with master. `GET /robot/status` returned
+**401**, because the Pi carries a pairing key and this laptop does not. U339
+fixed exactly that in `reason`. But two other things sit in the same response,
+and they had not heard about it.
+
+**The headline contradicted itself.** `_unavailable()` still set `error` to
+`"robot unreachable: HTTPStatusError"` while `reason` underneath explained
+politely that it had answered. One response, two stories — and the console leads
+with the headline. "Unreachable" is a claim about the *network*, and it was
+false: it sent me half an hour in the wrong direction, through ping, mDNS and
+subnets, while the robot was simply saying no. `error` now names the status code
+as soon as there was an answer, and keeps "unreachable" for the case where there
+really was no contact.
+
+**And the address field gave a false pass.** `POST /robot/address` probed only
+`/health`, and that route is *not* gated. So it reported `reachable: true,
+saved` for a robot that refuses every real call — save an address, be told it
+works, and watch the header keep reading "offline". That contradiction is
+exactly what this endpoint has existed to prevent since U199. The probe now also
+asks a gated route, and borrows the sentence from `_diagnose()` rather than
+writing a second one.
+
+What else came out, and is not a bug: `reachy-mini.local` did not resolve here,
+while `Resolve-DnsName reachy-mini.local` returned `192.168.0.178` without
+complaint. Windows treats `.local` as reserved for mDNS and never sends such a
+name to the ordinary DNS server through `getaddrinfo`, even when the router does
+know it. `Resolve-DnsName` bypasses that rule; `ping`, Python and the app do
+not. Hence a name that "works" when you test it and fails when the app uses it —
+so U198's advice (use an IP) is right, but the reason is more specific than
+"mDNS is not working". Worth putting in the setup guide, together with the note
+that a DHCP address moves and a fixed reservation on the router is the durable
+form.
+
+Three tests, verified red first. Brain green, ruff clean.
+
+### U346 — paired, and the video panel still stayed dark
+
+Reported straight after pairing: *"added it, do i need to restart? still not
+seeing video"* (translated). No restart needed — `robot_secret_set: true`,
+`connected: true`, `face_visible: true`. And yet no picture.
+
+Measured, and the answer was split in an odd way: `/robot/camera/stream` through
+the brain returned 248 kB of real JPEG frames in three seconds, while
+`/robot/camera/frame.jpg` returned **401** with `camera unavailable`. The stream
+worked and the still frames did not — from the same brain, to the same robot,
+one second apart.
+
+The cause is one keyword argument in the wrong place. `_client()` caches a single
+`httpx.AsyncClient` for the life of the process and built it with
+`headers=robot_auth_headers()`. The brain had started before the pairing key
+existed, so that client froze an **empty** header and kept sending it forever.
+The MJPEG stream beside it worked precisely because it builds a client per
+request. So U339's promise — pair without restarting — held everywhere except on
+the path the live video panel polls.
+
+That is the trap named in `robot_auth_headers()`'s own docstring: *"a forgotten
+one would look exactly like 'the robot is down'"*. It was not forgotten; it was
+bound once and never re-read.
+
+Fixed by not baking the key into the cached client at all: both call sites pass
+`headers=robot_auth_headers()` per request. Taken along in the same unit: a 401
+on `frame.jpg` answered a bare `camera unavailable`, which blames the camera for
+a pairing problem and sends the owner to look at the lens. It now carries the
+`reason` from `_diagnose()`.
+
+Three tests, all verified red against the pre-fix code — the first one had to be
+sharpened, because the version I wrote first passed against the old code too and
+so proved nothing. Then the real path on the real robot: `frame.jpg` HTTP 200,
+17004 bytes of JPEG.
+
+### U347 — the ledger was Dutch, in an English repository
+
+Asked plainly: *"the implementation backlog has Dutch in it, always use English
+in docs"* (translated).
+
+The Dutch was not an accident — it was written into the working agreement three
+times, and that agreement is copied verbatim into `AGENTS.md`, `CLAUDE.md` and
+`.github/copilot-instructions.md` with CI failing when the three drift. So the
+first thing this unit owes is the rule itself: changing the practice without
+changing `docs/agent-working-agreement.md` would have left the rule and the
+repository saying different things, which is the failure mode the agreement
+exists to prevent.
+
+**What the rule now says.** Everything under `docs/` and `.specify/` is English,
+reported problems included. A quote is still a quote, but rendered in English and
+marked *(translated)* on first use — because a translated quote is a paraphrase
+wearing quotation marks, and a reader deciding what was actually said deserves to
+know which one they are holding.
+
+**Three things deliberately stay Dutch**, and the agreement names them so the
+next reader does not "fix" them. `docs/demo/*.scenario.yaml` is not prose but
+input: those are lines the robot speaks at a Dutch-language talk, and translating
+them breaks the demo. Evidence where the language *is* the finding — a transcript
+showing him mishandling Dutch proves nothing in English. And
+`docs/gebruikershandleiding.md`, the owner-facing manual for a Dutch-speaking
+household, which has had an English twin since U38; the owner confirmed it stays.
+
+**I got the size of this wrong three times, and that is the part worth
+recording.** First 366 entries, taken from a sentence in the agreement rather
+than a count. Then 47, from a regex that only matched `### U` headings. The
+ledger actually holds entries in **three** shapes — 224 phase bullets, 98 dated
+progress-log lines and 47 `###` entries — and only counting all three gives the
+real number. Each wrong estimate was reported confidently before it was measured,
+which is the same defect as reporting a robot "unreachable" because one field was
+never checked.
+
+**So this unit deliberately does not claim to be finished.** It establishes the
+rule, translates the agreement, and converts the Phase 3.5–6 lists and the
+agentic phase (roughly thirty items). The rest is still Dutch, and the agreement
+says so in as many words rather than describing an end state that does not exist
+yet. Anything added from here is English; a Dutch entry someone edits gets
+translated while they are in it.
+
+One self-inflicted error found and fixed on the way: a stray Chinese character
+landed in the U75 translation (`checked每 step`). That is exactly the noise a
+long translation pass produces, and the reason the remainder should be measured
+rather than assumed good.
+
+`sync_agent_docs.py --check` in step across the three copies, `check_doc_links`
+213 links, `privacy_scan` clean.
