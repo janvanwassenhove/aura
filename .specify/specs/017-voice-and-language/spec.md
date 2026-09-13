@@ -5,7 +5,7 @@ owner: "aura-brain / conversation"
 priority: P1
 risk: High
 created: "2026-09-05"
-units: [U22, U36b, U36e, U36h, U45, U46, U47, U49, U54, U67, U73, U80, U81, U82, U83, U84, U85, U86, U87, U88, U89, U91, U92, U96, U128, U129, U130, U131, U132, U133, U134, U135, U140, U141, U142, U143, U144, U145, U146, U148, U149, U150, U153, U154, U155, U156, U163, U203, U209, U256, U257, U258, U260, U273, U275, U287, U288, U289, U291, U292, U321, U322, U324, U329, U331]
+units: [U22, U36b, U36e, U36h, U45, U46, U47, U49, U54, U67, U73, U80, U81, U82, U83, U84, U85, U86, U87, U88, U89, U91, U92, U96, U128, U129, U130, U131, U132, U133, U134, U135, U140, U141, U142, U143, U144, U145, U146, U148, U149, U150, U153, U154, U155, U156, U163, U203, U209, U256, U257, U258, U260, U273, U275, U287, U288, U289, U291, U292, U321, U322, U324, U329, U331, U333]
 ---
 
 # Feature Specification: Voice and Language
@@ -225,6 +225,20 @@ stated on screen.
   pruning trap. A contract test pins every SDK resource the four speech paths
   and the orchestrator call, so a future major bump cannot remove one quietly
   (U322).
+- **FR-021**: **Stop means now.** The panic stop cuts the current audio, drops
+  every segment already queued for the speaker, and ends the session without
+  waiting out the speaker tail. The tail exists so the mic teardown cannot clip
+  the end of a reply (U157); after Stop there is no reply left to protect, and
+  waiting it out *is* the "he keeps talking" the button exists to end. Both
+  session engines behave identically, or the button means nothing in whichever
+  one happens to be running (U333).
+- **FR-022**: **Hushed means no open microphone.** While Quiet is on, a turn is
+  never handed to a session that listens without a wake word. Measured in
+  Present mode with a film playing: he answered the television's dialogue, line
+  after line, under a header promising "he answers when asked and never speaks
+  first" — because an open session makes whatever is loudest the one asking.
+  Answering is untouched: the wake word gates every turn, which is what Quiet
+  always meant (U333, U256).
 - **FR-020**: The Conversation engine setting says **where it applies** and
   **when it cannot**. It governs one path — a spoken turn the robot hears
   itself, after the wake word or inside the follow-up window; typed messages,
@@ -313,3 +327,4 @@ the same series as this backfill.
 | U324 | GPT-Live as an opt-in fourth engine (`live_session.py`): delegation to the orchestrator, silence gate, mic mute, idle close, meter, probe, measured voices; the dispatch finally follows the per-character engine (U203) |
 | U329 | Streamed speech was ~9 dB quieter than spoken speech: one loudness gain per utterance on the segment path, measured against a real reply |
 | U331 | The engine row says which path it governs, warns when hands-free voice makes it unreachable, and marks the realtime voice model unused under Live |
+| U333 | Stop drops queued audio and skips the speaker tail in both session engines; Quiet keeps the wake word in charge instead of letting the room talk |

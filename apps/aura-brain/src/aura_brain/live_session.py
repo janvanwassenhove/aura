@@ -197,6 +197,10 @@ class LiveSession:
         self._muted = False
         self._last_activity = time.monotonic()
         self._stopping = False
+        # U332: the queue Stop has to empty. Cutting the current audio is not
+        # enough — what is already buffered keeps being posted, so he talks on
+        # after the button.
+        self._play_q: asyncio.Queue | None = None
         self._closed = asyncio.Event()
         self._user_parts: list[str] = []
         self._reply_parts: list[str] = []
@@ -325,7 +329,11 @@ class LiveSession:
                 try:
                     await self._supervise(mic, events, conn, started)
                 finally:
-                    tail = self._playing_until - time.monotonic()
+                    # U332: the tail exists so a reply is not clipped by the
+                    # mic teardown (U157). After Stop there is no reply left to
+                    # protect — waiting it out is exactly the "he keeps talking"
+                    # the button is supposed to end.
+                    tail = 0.0 if self._stopping else self._playing_until - time.monotonic()
                     if tail > 0:
                         await asyncio.sleep(min(tail + 0.3, self._f("REALTIME_TAIL_MAX_S", "20")))
                     for task in list(self._in_flight):
@@ -381,8 +389,21 @@ class LiveSession:
             logger.debug("live session close: %s", exc)
 
     def request_stop(self) -> None:
-        """U184: the panic stop ends this conversation at the next tick."""
+        """U184: the panic stop ends this conversation at the next tick.
+
+        U332: and it silences what is already on its way. The queue holds the
+        segments the model has sent but the robot has not played; without
+        emptying it, Stop cut one segment and the next arrived a moment later.
+        """
         self._stopping = True
+        self._playing_until = 0.0
+        q = self._play_q
+        if q is not None:
+            while True:
+                try:
+                    q.get_nowait()
+                except asyncio.QueueEmpty:
+                    break
 
     # -- mic → server --------------------------------------------------
 
@@ -411,6 +432,7 @@ class LiveSession:
 
     async def _pump_events(self, conn: Any) -> None:
         play_q: asyncio.Queue[bytes | None] = asyncio.Queue()
+        self._play_q = play_q
 
         async def _consume() -> None:
             first = True
@@ -418,6 +440,8 @@ class LiveSession:
                 data = await play_q.get()
                 if data is None:
                     return
+                if self._stopping:
+                    continue          # U332: the owner pressed Stop
                 if first and self._trace is not None:
                     self._trace.mark("tts_first_audio")
                     self._trace.mark("playback_first_sample")
@@ -430,6 +454,8 @@ class LiveSession:
         consumer = asyncio.ensure_future(_consume())
 
         async def _play(data: bytes) -> None:
+            if self._stopping:
+                return                # U332: nothing new after Stop
             now = time.monotonic()
             self._playing_until = max(now, self._playing_until) + len(data) / _BYTES_PER_S
             await play_q.put(data)

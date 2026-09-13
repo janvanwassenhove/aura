@@ -751,6 +751,20 @@ class VoiceLoop:
             return ""
         return (await voice.transcribe(wav, filename="robot.wav") or "").strip()
 
+    @staticmethod
+    def _hushed() -> bool:
+        """U256's Quiet switch, read live. Never raises — a policy that cannot
+        be read must not quietly take an engine away."""
+        import importlib
+
+        try:
+            policy = importlib.import_module("orchestrator.mode_policy")
+            quiet = getattr(policy, "quiet", None)
+            return bool(quiet()) if callable(quiet) else False
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("quiet policy unreadable: %s", exc)
+            return False
+
     async def _speech_turn(self, wav: bytes, command: str = "") -> bool:
         """Route a confirmed turn to the engine that owns it. False → pipeline.
 
@@ -761,6 +775,15 @@ class VoiceLoop:
         whenever the global said realtime. The resolver had tests; the
         dispatch never asked it.
         """
+        # U332: hushed means he does not act on the room. A Live or realtime
+        # SESSION keeps the microphone open with no wake word, so whatever is
+        # loudest becomes the person asking — measured with a film on the
+        # television in Present mode: he answered its dialogue, one line after
+        # another, under a header promising "he answers when asked and never
+        # speaks first". While Quiet is on, every turn goes back through the
+        # wake word; answering is untouched, which is what Quiet always meant.
+        if self._hushed():
+            return False
         engine = self._engine()
         if engine == "live":
             return await self._live_session_turn(wav, command)

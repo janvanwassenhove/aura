@@ -30,7 +30,7 @@ class ApprovalDeniedError(PermissionError):
     """Raised when the user explicitly denies the approval request."""
 
 
-def _new_future() -> "asyncio.Future[bool]":
+def _new_future() -> asyncio.Future[bool]:
     """A future owned by the loop that will actually await it (U332).
 
     This used to be the deprecated get_event_loop lookup, evaluated in the

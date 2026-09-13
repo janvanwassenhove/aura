@@ -149,6 +149,9 @@ class RealtimeSession:
         self._first_segment_played = False
         # U184: panic stop — set from outside to end this session NOW.
         self._stopping = False
+        # U332: what Stop has to empty — buffered segments kept playing after
+        # the button, because cutting the current audio does not unqueue them.
+        self._play_q: asyncio.Queue | None = None
         self.turns = 0
         self.closed_reason = ""
 
@@ -299,7 +302,10 @@ class RealtimeSession:
                 # U157: let the tail of the last reply finish before closing
                 # the mic stream — its teardown stops the robot's SHARED audio
                 # pipeline (stop_recording → NULL), which would clip the reply.
-                tail = self._playing_until - time.monotonic()
+                # U332: the tail protects the end of a REPLY (U157). After
+                # Stop there is no reply left to protect, and waiting it out is
+                # exactly the "he keeps talking" the button exists to end.
+                tail = 0.0 if self._stopping else self._playing_until - time.monotonic()
                 if tail > 0:
                     cap = float(os.environ.get("REALTIME_TAIL_MAX_S", "20"))
                     await asyncio.sleep(min(tail + 0.3, cap))
@@ -310,8 +316,19 @@ class RealtimeSession:
 
     def request_stop(self) -> None:
         """U184: end this conversation at the next tick (<=1s). Used by the
-        panic stop when ambient noise has the session talking to itself."""
+        panic stop when ambient noise has the session talking to itself.
+
+        U332: and drop the audio already on its way, so Stop is silent rather
+        than eventually silent."""
         self._stopping = True
+        self._playing_until = 0.0
+        q = self._play_q
+        if q is not None:
+            while True:
+                try:
+                    q.get_nowait()
+                except asyncio.QueueEmpty:
+                    break
 
     # -- mic → server --------------------------------------------------
 
@@ -349,12 +366,15 @@ class RealtimeSession:
         # segments out of order and hit the 10 s HTTP timeout on long replies
         # (segments queued behind earlier playback) → audible hangs mid-reply.
         play_q: asyncio.Queue[bytes | None] = asyncio.Queue()
+        self._play_q = play_q
 
         async def _consume() -> None:
             while True:
                 data = await play_q.get()
                 if data is None:
                     return
+                if self._stopping:
+                    continue          # U332: the owner pressed Stop
                 if not self._first_segment_played:
                     self._first_segment_played = True
                     if self._trace is not None:
@@ -368,6 +388,8 @@ class RealtimeSession:
         consumer = asyncio.ensure_future(_consume())
 
         async def _play(data: bytes) -> None:
+            if self._stopping:
+                return                # U332: nothing new after Stop
             dur = len(data) / (24_000 * 2)
             now = time.monotonic()
             # The robot's appsrc path buffers and returns immediately →

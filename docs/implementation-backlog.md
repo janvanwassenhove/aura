@@ -2067,3 +2067,43 @@ installeert een verse machine op wat uv toevallig kiest. Twee opties: het
 bereik dichtzetten (`<3.14`) zodat installaties op een geteste versie landen,
 of 3.14 aan CI toevoegen en het echt ondersteunen. Niet stil beslist.
 
+### U333 — Stop stopte niet, en quiet hield de televisie niet buiten
+
+Twee klachten in één adem, allebei terug te zien op de schermafbeelding:
+Present-modus, Quiet aan, kaartje "Speaking · live" — en een gesprek waarin hij
+op filmzinnen antwoordt ("Maravó?", "there has been a new presence, Mr.
+Swann").
+
+**Quiet had geen effect, en kón dat niet.** Een Live- of realtime-sessie houdt
+de microfoon open zónder wekwoord. Dat is precies wat die engines waardevol
+maakt, maar het betekent ook dat wat het luidst is, de vragensteller wordt. Met
+een film op tv beantwoordde hij de dialoog, regel na regel, onder een koptekst
+die belooft: *he answers when asked and never speaks first*. Nu geldt: zolang
+Quiet aan staat, gaat een beurt nooit naar een sessie met open microfoon — het
+wekwoord bewaakt elke beurt. Antwoorden blijft onaangeroerd; dat is altijd de
+betekenis van Quiet geweest.
+
+**Stop stopte niet.** De paniekknop sneed het lopende geluid af en vroeg de
+sessie te eindigen — maar daarna wachtte de sessie de *spreekstaart* uit (tot
+`REALTIME_TAIL_MAX_S`, 20 seconden) én de afspeelwachtrij bleef de al
+gebufferde fragmenten naar de robot posten. Hij praatte dus door na de knop.
+Die staart staat er met reden (U157: de microfoon-afbouw mag het einde van een
+antwoord niet afkappen), maar ná Stop is er geen antwoord meer te beschermen —
+en dan is dat wachten exact het probleem dat de knop moet oplossen. Nu:
+wachtrij leeg, afspeelklok op nul, geen staart. In **beide** sessie-engines,
+anders betekent de knop niets in degene die je toevallig gebruikt.
+
+Zes tests eerst rood, waaronder de tijdmeting (de sessie moet binnen enkele
+seconden eindigen in plaats van de staart uit te zitten) en de wachtrij die
+leeg moet zijn. Eén test van mezelf gaf eerst een niet-awaitbare lambda mee;
+hersteld. Brain 632 groen.
+
+Meegenomen: de lintfout die U332 achterliet (een aanhalingsteken in een
+annotatie). Mijn `&&`-keten slikte de exitcode van ruff op via een pipe —
+dezelfde val als bij het deployscript vanmorgen.
+
+**Nog te doen, en dit is de belangrijkere:** ook zónder Quiet blijft een open
+sessie met een televisie erbij een probleem. FR-007 zegt dat achtergrondmedia
+geen beurt mogen opleveren; voor de pipeline doet het wekwoord dat werk, voor
+een open sessie bestaat dat vangnet nog niet.
+
