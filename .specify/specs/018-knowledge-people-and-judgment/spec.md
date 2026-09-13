@@ -5,7 +5,7 @@ owner: "aura-brain / knowledge"
 priority: P1
 risk: High
 created: "2026-09-05"
-units: [U18, U19a, U19b, U19c, U19d, U19e, U20, U29, U93, U94, U97, U103, U104, U105, U106, U109, U136, U160, U180, U181, U189, U190, U204, U213, U214, U218, U243, U244, U245, U271, U272, U274, U276, U277, U278, U279, U280, U281, U290, U293, U294, U36f, U342]
+units: [U18, U19a, U19b, U19c, U19d, U19e, U20, U29, U93, U94, U97, U103, U104, U105, U106, U109, U136, U160, U180, U181, U189, U190, U204, U213, U214, U218, U243, U244, U245, U271, U272, U274, U276, U277, U278, U279, U280, U281, U290, U293, U294, U36f, U342, U348]
 amended: "2026-09-05"
 ---
 
@@ -153,7 +153,12 @@ while he was, in fact, remembering.
    lives in Settings, because a fresh laptop has no person pane to open a file
    in (U342).
 4. **Given** a large graph, **When** it is explored, **Then** it can be panned,
-   zoomed (U106) and filtered by person (U214).
+   zoomed (U106) and filtered by person (U214). **When** he learns something
+   while it is on screen — a source read, a fact added — **Then** the drawing
+   follows within the frame, keeping the positions of the nodes that were
+   already there, including any the owner dragged (U348). A graph that has
+   silently stopped matching the list beside it is the diagram rule of
+   constitution IX applied to a live canvas.
 5. **Given** a fresh install, **When** it starts, **Then** exactly one
    fictional demo persona exists (U160) — which is what makes the release
    screenshots safe to publish by construction.
@@ -210,6 +215,7 @@ while he was, in fact, remembering.
 | U136, U181, U189, U190 | Flagging a wrong recognition; guest profiles; naming or attaching a guest; capping the guest explosion |
 | U103, U104, U105, U106, U214 | Growing from sources, import/export, provenance, pan/zoom, filter by person |
 | U342 | The brain as one sealed, importable file — faces and skills included, merged rather than replaced |
+| U348 | The graph follows what he learns instead of caching the picture until you click somebody else |
 | U109, U276, U278 | Long-term memory per person — written, shown, and correctable |
 | U272, U279, U280 | Memory in the graph: split into lines with keywords, its own styling and legend, and edges to the people it mentions |
 | U281, U293, U294 | Creating a profile without duplicating one; knowing the household before the conversation; looking somebody up on his own |

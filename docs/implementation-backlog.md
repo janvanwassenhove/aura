@@ -3149,3 +3149,45 @@ rather than assumed good.
 
 `sync_agent_docs.py --check` in step across the three copies, `check_doc_links`
 213 links, `privacy_scan` clean.
+
+### U348 — the graph went stale the moment he learned something
+
+Reported as *"when reading sources, should knowledge graph not be updated
+then?"* (translated), and then precisely: *"it does do it when opening, but on
+adding, the small window on the right does not update"* (translated).
+
+Both right, and it came down to one line. The canvas cached its node set per
+**person**, and the only thing that ever threw that cache away was clicking
+somebody else:
+
+```ts
+if (graph && graph.pid === pid && graph.nodes.length) return graph
+```
+
+So read eight facts off a website: the store updated, the list beside it grew,
+and the picture kept drawing the graph from before. No error, no hint — a
+drawing that had quietly stopped being true. Reopening the view rebuilt it,
+which is exactly why it looked like it worked.
+
+That is the rule this repository already applies to its own diagrams
+(constitution IX: *a diagram that used to be true is worse than no diagram,
+because it is believed*), now applied to a canvas that watches live data.
+
+The cache is keyed on **what he knows** — a short signature of fact ids, skills
+and signals — instead of on who he is. Rebuilding costs nothing because the
+layout is deterministically seeded, and on a rebuild existing nodes inherit
+their position: the layout settles over the first few seconds, and a node the
+owner dragged somewhere is a decision, not a coordinate. The camera stays put
+too — yanking the view back to centre because one fact arrived would be its own
+small betrayal. Only a different person gets a fresh camera.
+
+Along the way the construction moved out of the canvas component into
+`lib/personGraph.ts`, beside `lib/memoryGraph.ts` where that kind of logic
+already lives. That is what made it testable for the first time: 8 tests,
+including "a dragged node stays where it was put", "a fact that is gone leaves
+the graph" and "links never point past the end of the node list".
+
+**Verified by looking, not only by the tests**: an isolated brain on port 8031
+(throwaway paths, never `./data`), a fact added through the button, 22 → 23
+facts, and the graph on the right rebuilt immediately without reopening
+anything. 224 console tests green.
