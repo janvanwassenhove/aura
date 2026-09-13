@@ -1,0 +1,36 @@
+# Build artifacts are not an archive. The installers that matter are attached to their GitHub
+# Release, and every build is reproducible from its commit, so a run's own copies only have to
+# survive until the release job takes them — while Actions storage is shared across the whole
+# account, so leaving them around fills up every other repository's quota too. The uploads
+# themselves expire after a day; this is the backstop that clears whatever is left.
+name: Tidy build artifacts
+on:
+  schedule:
+    - cron: '17 4 * * 1'          # every Monday, early
+  workflow_dispatch:
+    inputs:
+      keep:
+        description: How many of each artifact to keep
+        default: '3'
+permissions:
+  actions: write
+jobs:
+  tidy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete all but the newest few of each artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+          KEEP: ${{ inputs.keep || '3' }}
+        run: |
+          set -euo pipefail
+          # Newest first, then keep the first $KEEP of every artifact name and list the rest.
+          gh api "repos/$GITHUB_REPOSITORY/actions/artifacts" --paginate \
+            -q '.artifacts[] | select(.expired==false) | [.created_at,.name,.id,.size_in_bytes] | @tsv' \
+            | sort -r | awk -F'\t' -v keep="$KEEP" '{ if (++seen[$2] > keep) print $3"\t"$4 }' > stale.tsv
+          freed=0; gone=0
+          while IFS=$'\t' read -r id size; do
+            gh api -X DELETE "repos/$GITHUB_REPOSITORY/actions/artifacts/$id" --silent
+            freed=$((freed+size)); gone=$((gone+1))
+          done < stale.tsv
+          echo "::notice::Deleted $gone artifacts, $((freed/1048576)) MB freed; kept the newest $KEEP of each."

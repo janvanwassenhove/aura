@@ -208,11 +208,14 @@ jobs:
           npx playwright install --with-deps chromium
           CONSOLE_URL=http://localhost:4173 OUT_DIR=shots \
             node .github/scripts/release-screenshots.mjs
+      # A hand-off to the release job in the same run, not an archive: the screenshots end up
+      # in the release notes. Actions storage is shared across the account, so it is not free.
       - uses: actions/upload-artifact@v4
         with:
           name: screenshots
           path: shots/*.png
           if-no-files-found: error
+          retention-days: 1
 
   build:
     needs: [version, test]
@@ -280,6 +283,7 @@ jobs:
           name: unsigned-windows-installer
           path: apps/desktop/dist/*.exe
           if-no-files-found: error
+          retention-days: 1
 
       - name: SignPath — sign the Windows installer
         if: runner.os == 'Windows' && env.SIGNPATH_API_TOKEN != ''
@@ -340,6 +344,9 @@ jobs:
             apps/desktop/dist/*.AppImage
             apps/desktop/dist/*.deb
           if-no-files-found: error
+          # Every push builds these; the copies that matter are the ones attached to the
+          # release, so the run's own copy only has to survive until the release job takes it.
+          retention-days: 1
 
   release:
     needs: [version, test, build]
