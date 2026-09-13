@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1000" height="880" viewBox="0 0 1000 880" role="img"
-     aria-label="The media paths. What it sees: the camera behind the eyes makes one JPEG at request time, downscaled on the Pi, fetched by the brain over GET /robot/camera/frame.jpg with never more than one frame in flight; the brain proxies every frame, caches it for eighty milliseconds so two viewers cost one grab, and matches faces on the laptop. Pull rather than push, because the MJPEG stream drifted to two and a half seconds behind while this holds a flat quarter of a second. What it hears: the microphone array sends sixteen kilohertz mono audio plus a raw peak level over POST /robot/listen or a chunked audio stream; speech-to-text runs in the cloud or locally with Whisper, and the wake word is matched in the transcript on the laptop. What it says: text-to-speech happens on the laptop, cloud or Kokoro and Piper offline, and the resulting PCM is posted to the robot, which plays it and holds no key.">
+     aria-label="The media paths. What it sees: the camera behind the eyes makes one JPEG at request time, downscaled on the Pi, fetched by the brain over GET /robot/camera/frame.jpg with never more than one frame in flight; the brain proxies every frame, caches it for eighty milliseconds so two viewers cost one grab, and matches faces on the laptop. Pull rather than push, because the MJPEG stream drifted to two and a half seconds behind while this holds a flat quarter of a second. What it hears: the microphone array sends sixteen kilohertz mono audio plus a raw peak level over POST /robot/listen or a chunked audio stream; speech-to-text runs in the cloud or locally with Whisper, and the wake word is matched in the transcript on the laptop. What it says: text-to-speech happens on the laptop, cloud or Kokoro and Piper offline, and the resulting PCM is posted to the robot in segments, each played as it lands, which plays them and holds no key.">
   <defs>
     <pattern id="grid" width="24" height="24" patternUnits="userSpaceOnUse">
       <path d="M24 0H0V24" fill="none" stroke="#c9b998" stroke-width="0.5" opacity="0.35"/>
@@ -67,7 +67,7 @@
     <text x="72" y="718">and does nothing</text>
     <text x="72" y="748">else with it</text>
   </g>
-  <text x="500" y="692" text-anchor="middle" font-family="Consolas, ui-monospace, monospace" font-size="18" fill="#c0522d">POST /robot/speak</text>
+  <text x="500" y="692" text-anchor="middle" font-family="Consolas, ui-monospace, monospace" font-size="18" fill="#c0522d">POST /robot/speak/segment</text>
   <line x1="604" y1="712" x2="396" y2="712" stroke="#c0522d" stroke-width="2.4" marker-end="url(#arrowaccent)"/>
   <text x="500" y="744" text-anchor="middle" font-family="Consolas, ui-monospace, monospace" font-size="17" fill="#8a7a55">PCM 24 kHz, base64</text>
   <g font-family="Consolas, ui-monospace, monospace" font-size="19" fill="#34302b">
@@ -75,5 +75,5 @@
     <text x="628" y="718">cloud, or Kokoro</text>
     <text x="628" y="748">and Piper offline</text>
   </g>
-  <text x="72" y="798" font-family="Consolas, ui-monospace, monospace" font-size="17" fill="#8a7a55">In a live session the reply arrives in segments, each played as it lands rather than buffered</text>
+  <text x="72" y="798" font-family="Consolas, ui-monospace, monospace" font-size="17" fill="#8a7a55">Segments are the normal case: each is played as it lands. A whole utterance goes in one POST /robot/speak</text>
 </svg>

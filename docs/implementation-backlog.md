@@ -1948,3 +1948,55 @@ Robot-runtime 135 groen, ruff schoon.
 de Pi. En het is in de kamer nog niet beluisterd — de meting zegt dat het gat
 dicht is, jouw oren moeten zeggen of het nu góed staat.
 
+### U330 — de schermafbeeldingen liepen achter (en waarom dat bleef gebeuren)
+
+Gemeld als "ik merk daar nog oude layouts & visualisaties". Twee lagen gevonden:
+
+* `docs/screenshots/*.webp` — de beelden die de README toont, voor het laatst
+  vernieuwd op 4 september (U297). De Settings-opname miste daardoor twee
+  units: de herschreven uitleg bij de engine én de hele rij **Calendar by
+  link** (U298), die er in de oude foto simpelweg niet is.
+* `design_handoff_aura_console_d2/screenshots/` — 17 beelden van 17 augustus.
+  Dat is een ontwerpbriefing: referentiebeelden van de app zoals die er tóen
+  uitzag, als invoer voor een herontwerp dat intussen gebouwd is. Die
+  bijwerken zou het document zelf onwaar maken, dus die blijven — ze horen bij
+  hun datum.
+
+**Waarom ze stilstonden.** De release maakt dezelfde beelden, maar kan ze niet
+terugzetten in de repo; de gecommitte bestanden veranderen dus alleen als
+iemand met de hand een demo-stack optuigt: console bouwen tegen de juiste
+poort, twee diensten starten met acht geïsoleerde paden, console serveren,
+browser installeren, opnemen, omzetten. Zes stappen die niemand herhaalt.
+Daarom nu één commando — `python scripts/refresh_screenshots.py` — dat dat
+allemaal zelf doet, op vrije poorten, en achteraf opruimt.
+
+De twee veiligheidsregels staan er als code in, niet als opmerking: elk
+eigenaarspad wordt naar een wegwerpmap geleid, en de run **weigert te starten**
+als er eentje toch binnen de repo uitkomt (`./data` is op een
+ontwikkelaarsmachine een echte kennisopslag — een schermafbeelding daarvan is
+een gepubliceerd gezin). Vijf tests leggen dat vast.
+
+**Ook bijgewerkt, want tekeningen die niet meer kloppen zijn erger dan geen
+tekening:**
+
+* `media-paths.svg` wees met de pijl naar `POST /robot/speak`, terwijl vandaag
+  élk antwoord via `/robot/speak/segment` gaat (U329 heeft dat gemeten). De
+  segmenten stonden alleen in een voetnoot; nu andersom.
+* `build-loop.svg` zei "U1 . . . U226, in order" — een getal in een tekening is
+  een datumstempel die veroudert. Nu "U1 . . . today".
+
+**Twee fouten van mezelf onderweg, allebei zichtbaar in de opnames:**
+
+1. Ik bouwde de console eerst tegen `localhost:8020` — de **echte** brain van
+   de eigenaar. Op tijd gezien, vóór er iets opgenomen of geserveerd was: er
+   is niets vastgelegd. De demo hoort op vrije poorten, en dat zit nu in het
+   script.
+2. De eerste "robot offline"-foto toonde een robot die gewoon `connected` was.
+   Oorzaak: op Windows doodt `terminate()` alleen de `uv`-starter, niet de
+   server eronder — de "gestopte" nep-robot bleef antwoorden. Ik heb de brain
+   even ten onrechte verdacht van een oneerlijke status; het lag aan mijn
+   eigen opruimen. Nu een echte procesboom-stop, en de offline-foto krijgt een
+   brain die naar een dode poort wijst (ondubbelzinnig, in plaats van een
+   robot die net wegviel). Het script weigert die foto te maken zolang de
+   console nog een verbonden robot tekent.
+

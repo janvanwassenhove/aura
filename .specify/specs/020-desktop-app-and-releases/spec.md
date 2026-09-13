@@ -5,7 +5,7 @@ owner: "apps/desktop + CI"
 priority: P1
 risk: High
 created: "2026-09-05"
-units: [U32, U33, U44, U55, U56, U151, U152, U166, U168, U168b, U168c, U168d, U168e, U169, U169b, U170, U171, U172, U173, U174, U176, U177, U178, U192, U193, U197, U201, U211, U228, U229, U230, U231, U232, U233, U234, U235, U236, U283, U284, U285, U285b, U297, U179, U184, U185, U186, U210, U317, U318, U327]
+units: [U32, U33, U44, U55, U56, U151, U152, U166, U168, U168b, U168c, U168d, U168e, U169, U169b, U170, U171, U172, U173, U174, U176, U177, U178, U192, U193, U197, U201, U211, U228, U229, U230, U231, U232, U233, U234, U235, U236, U283, U284, U285, U285b, U297, U179, U184, U185, U186, U210, U317, U318, U327, U330]
 amended: "2026-09-05"
 ---
 
@@ -156,6 +156,14 @@ and installers for Windows, macOS (arm64 and x64) and Linux.
   screenshots and installers for all four targets.
 - **FR-003**: Release notes are English, generated from commit subjects by
   `scripts/release_notes.py`, and unit-tested.
+- **FR-010**: Refreshing the published screenshots is **one command**
+  (`scripts/refresh_screenshots.py`): it boots the demo stack on free ports,
+  captures, converts and cleans up. The release captures the same pictures but
+  cannot commit them, so the committed ones only ever change here — and a
+  six-step manual dance is why they stood still for weeks. The isolation is
+  enforced in code: every owner-state path is redirected into a throwaway
+  directory and the run refuses to start if one still resolves inside the
+  repository (U330).
 - **FR-004**: Screenshots come from a stack booted with the fake adapter, the
   echo model and the demo persona only. The capture job may fail without
   blocking a release; the page then says so.
@@ -187,3 +195,4 @@ and installers for Windows, macOS (arm64 and x64) and Linux.
 | U184, U185, U186, U230, U231, U232, U233, U236 | A README that sells; screenshots that match their captions; diagrams that render; where the robot comes from; screenshots that had been failing quietly for weeks |
 | U284, U285, U285b | Release notes a person wants to read, in English, without an empty section |
 | U327 | The five settings U177 left in the install directory — quiet and the mode policy among them — pinned to userData, with a test that finds the next one |
+| U330 | The published screenshots refreshed from the current app, one command to redo it, and two drawings that had stopped being true |

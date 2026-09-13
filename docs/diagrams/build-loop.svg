@@ -22,7 +22,7 @@
   <!-- backlog -->
   <rect x="128" y="100" width="372" height="88" fill="#34302b"/>
   <text x="152" y="136" font-family="Consolas, ui-monospace, monospace" font-size="22" letter-spacing="1" fill="#f4efe3">THE BACKLOG</text>
-  <text x="152" y="168" font-family="Consolas, ui-monospace, monospace" font-size="18" fill="#c9b998">U1 . . . U226, in order</text>
+  <text x="152" y="168" font-family="Consolas, ui-monospace, monospace" font-size="18" fill="#c9b998">U1 . . . today, in order</text>
 
   <line x1="314" y1="188" x2="314" y2="222" stroke="#34302b" stroke-width="2.5" marker-end="url(#a7)"/>
 
