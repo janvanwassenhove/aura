@@ -5,7 +5,7 @@ owner: "robot-runtime"
 priority: P1
 risk: Medium
 created: "2026-09-05"
-units: [U16, U36a, U36d, U36g, U37, U51, U99, U100, U101, U102, U111, U116, U126, U127, U137, U138, U139, U147, U157, U158, U161, U162, U164, U165, U175, U196, U212, U219, U237, U238, U252b, U252d, U253, U268, U270, U286, U325, U326, U328, U336, U341, U341b, U357]
+units: [U16, U36a, U36d, U36g, U37, U51, U99, U100, U101, U102, U111, U116, U126, U127, U137, U138, U139, U147, U157, U158, U161, U162, U164, U165, U175, U196, U212, U219, U237, U238, U252b, U252d, U253, U268, U270, U286, U325, U326, U328, U336, U341, U341b, U357, U357b]
 ---
 
 # Feature Specification: Embodiment and Presence
@@ -297,7 +297,11 @@ while he is speaking, so that a conversation looks like a conversation.
   while `sleep_state.is_asleep()`, which is U237's rule applied where it was
   missed: sleep means take no action of your own, and lifting the head is such
   an action. Tracking is still paused — this is about the pose, not the tracker
-  (U357).
+  (U357). The suppression lasts exactly as long as the sleep: boot starts
+  following (a fresh runtime is never asleep), the wake sequence gives follow-me
+  back, and once awake the U165 recentre returns. All three are pinned, because
+  a suppression that outlived its sleep would be a robot that wakes up and never
+  looks at anyone again (U357b).
 
 ## Traceability
 
@@ -307,6 +311,7 @@ while he is speaking, so that a conversation looks like a conversation.
 | U36d, U147, U157, U111 | Idle look-around, upright after wake, listening pose, conversational body language, mood via head and antennae |
 | U37, U36g, U116, U126, U127, U158, U165, U253 | Follow-me: torso yaw, watchdog, re-acquire that holds, face-visible reporting, and a tracker that was dead rather than blind |
 | U161, U162, U164 | Drag-to-aim on the live picture; explicit Follow/Manual; the mirrored-axis fix |
+| U357b | Follow-me checked on both paths that matter — boot and wake — before the fix went to the Pi |
 | U357 | Sleep stopped lifting his head on the way down — the recentre that follow-me-off owes an awake robot |
 | U99, U100, U101, U102, U237, U238 | Microphone toggle; sleep and wake; the sleep pose; sleep that stays; the 404 that read as success |
 | U341 | Sleep and wake asked for like any other action, where you pack him rather than where you configure him |

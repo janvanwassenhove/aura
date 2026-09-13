@@ -3822,3 +3822,41 @@ green.
 this visible — in it the recentre simply happened before the emote — so the
 tests pin the command that must not be sent, not the jump itself. Whether the
 head now stays down needs a press of the button on the real robot.
+
+### U357b — follow-me, checked before the fix went to the robot
+
+Asked before deploying U357: *"ensure follow me will still keep working when
+starting aura, or when doing wake up; if so you can deploy"*.
+
+The right question. U357 stops the head being recentred while asleep, and the
+failure mode of a fix like that is a suppression that outlives the sleep it was
+for — a robot that wakes up and never looks at anyone again. Reading the code
+says it cannot happen; the code said the loops could not stand him up either,
+and they were not the problem.
+
+Three tests, one per way it could go wrong:
+
+- **Boot.** A fresh runtime is never asleep — `sleep_state` starts `False` — so
+  connect starts the tracker. Pinned, including the assumption about the
+  starting state, since the whole guard rests on it.
+- **Wake.** The full sequence the brain sends, in its real order: clear the
+  sleep state, play the wake emote, turn follow-me back on. Tracking comes back
+  and `_tracking_on` is `True`.
+- **Scope.** Once awake, turning follow-me off recentres again. This is the one
+  that would catch a leak, and it is the reason U165 is still whole.
+
+**One thing the check found, which is why it was worth writing.** The boot test
+first asserted he also settles upright on connect, and it failed — not a
+product bug but a hole in the stub: `FakeMini` has no `enable_motors`, so
+connect's wake-and-settle block raises and is logged before the emote is
+reached. Every test in this file has been connecting to a robot that throws
+half-way through `connect()`. The tracker start sits after that block, which is
+why the half this unit cares about is genuinely observable — and the assertion
+that is not observable was removed and written down rather than quietly
+softened into something that passes.
+
+Worth fixing on its own: a stub that cannot complete `connect()` leaves the boot
+pose path untested for everyone.
+
+141 robot-runtime tests green, 403 orchestrator, ruff clean. Deployed to the Pi
+after this.

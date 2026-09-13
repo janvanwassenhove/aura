@@ -695,3 +695,79 @@ async def test_the_sleep_pose_is_the_last_thing_that_moves_him(adapter) -> None:
     assert "goto_sleep" in names, "he never lay down"
     after = names[names.index("goto_sleep") + 1:]
     assert "goto_target" not in after, f"something moved him after the sleep pose: {after}"
+
+
+# --------------------------------------------------------------------------- #
+# U357: and follow-me must survive the fix — asked for before deploying it
+# --------------------------------------------------------------------------- #
+
+async def test_starting_up_awake_still_starts_following(adapter) -> None:
+    """Boot is the path U357 must not touch. A fresh runtime is never asleep
+    (`sleep_state` starts False), so connect wakes him, settles him upright and
+    starts the tracker."""
+    from robot_runtime import sleep_state
+
+    assert sleep_state.is_asleep() is False, "a fresh runtime must boot awake"
+    await adapter.connect()
+    mini = adapter._created[0]
+    names = [n for n, _ in mini.calls]
+    assert "start_head_tracking" in names, "follow-me never started on boot"
+    # The wake-and-settle half of connect cannot be reached here: FakeMini has
+    # no `enable_motors`, so that try-block raises and logs before the emote.
+    # Noted rather than asserted — pretending to cover it would be worse than
+    # saying the stub stops short. The tracker start is after that block, which
+    # is why this half IS observable.
+
+
+async def test_waking_from_sleep_gives_follow_me_back(adapter) -> None:
+    """The whole wake sequence the brain sends, in its real order: clear the
+    runtime's sleep state, play the wake emote, turn follow-me back on.
+
+    The risk U357 introduces is a suppression that outlives the sleep it was
+    for — a robot that wakes up and never looks at anyone again.
+    """
+    from robot_runtime import sleep_state
+
+    await adapter.connect()
+    await adapter.set_tracking(True)
+
+    sleep_state.set_asleep(True)
+    try:
+        await adapter.set_tracking(False)
+        await adapter.execute_motion(MotionCommand(motion_id="sleep", direction=None))
+        assert adapter._tracking_on is False
+    finally:
+        sleep_state.set_asleep(False)          # 1. the brain clears this first
+
+    mini = adapter._created[0]
+    mini.calls.clear()
+    await adapter.execute_motion(MotionCommand(motion_id="wake_up", direction=None))  # 2.
+    await adapter.set_tracking(True)                                                  # 3.
+
+    names = [n for n, _ in mini.calls]
+    assert "start_head_tracking" in names, "he woke up and never followed again"
+    assert adapter._tracking_on is True
+
+
+async def test_the_suppression_lasts_exactly_as_long_as_the_sleep(adapter) -> None:
+    """Once awake, turning follow-me off must recentre again (U165). If the
+    U357 skip leaked past waking, he would keep staring wherever he last
+    looked, for the rest of the session."""
+    from robot_runtime import sleep_state
+
+    await adapter.connect()
+    await adapter.set_tracking(True)
+
+    sleep_state.set_asleep(True)
+    try:
+        await adapter.set_tracking(False)
+    finally:
+        sleep_state.set_asleep(False)
+
+    await adapter.set_tracking(True)
+    mini = adapter._created[0]
+    mini.calls.clear()
+    await adapter.set_tracking(False)          # awake this time
+
+    assert any(name == "goto_target" and kw["head"] is not None
+               for name, kw in mini.calls), "U165's recentre did not come back"
