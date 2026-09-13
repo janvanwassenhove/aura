@@ -106,6 +106,35 @@ async def synthesize_b64(text: str, voice: str | None = None,
         return None
 
 
+# The robot plays PCM s16le mono @ 24 kHz — the only thing synthesize_b64 ever
+# returns, which is what makes joining two voices a byte concatenation.
+TTS_SAMPLE_RATE = 24000
+_BYTES_PER_SAMPLE = 2
+
+
+def join_pcm_b64(parts: list[str | None], pause_ms: int = 0) -> str:
+    """Join base64 PCM segments into ONE base64 utterance (U349).
+
+    A line that changes persona halfway is synthesized once per voice, and the
+    pieces have to reach the robot as a single utterance: the robot decides
+    playback gain **per utterance** (FR-019), so handing it the halves
+    separately would make the character change audible as a volume change too.
+    Same provider, same model, same rate — so the join is the bytes.
+
+    ``pause_ms`` of silence between the pieces makes the hand-over sound
+    deliberate rather than spliced. It is never added at the ends: a leading
+    gap is just latency, and a trailing one delays the next beat.
+    """
+    usable = [p for p in parts if p]
+    if not usable:
+        return ""
+    if len(usable) == 1:
+        return usable[0]           # nothing to join, nothing to re-encode
+    gap = b"\x00" * (TTS_SAMPLE_RATE * _BYTES_PER_SAMPLE * max(pause_ms, 0) // 1000)
+    return base64.b64encode(
+        gap.join(base64.b64decode(p) for p in usable)).decode()
+
+
 # U135: Whisper reports the language as a full English name ("dutch") or an
 # ISO code depending on model/version — accept both spellings.
 _LANG_ALIASES = {

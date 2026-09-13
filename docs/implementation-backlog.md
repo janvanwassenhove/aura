@@ -3191,3 +3191,110 @@ the graph" and "links never point past the end of the node list".
 (throwaway paths, never `./data`), a fact added through the button, 22 → 23
 facts, and the graph on the right rebuilt immediately without reopening
 anything. 224 console tests green.
+
+### U349 — one robot, one voice, however many characters the talk needed
+
+Reported as *"for presentator mode, in scenario add the ability to change
+persona robot (also in one text so it can swtich to diffrent kind of vocals)"*.
+
+Two asks in one sentence, and the second is the interesting one.
+
+**What was there.** A scenario could set the mode, the trigger, the gesture and
+the engine of every beat — but not who was speaking. The presentation had
+exactly one voice for its whole length, resolved once, in one line:
+
+```python
+audio_b64 = await voice.synthesize_b64(text, voice.resolve_voice(mode="presentation"))
+```
+
+Meanwhile the brain has had *characters* since U84 — `dry_tech_butler` at
+`ash` 0.95, `kids_companion` at `nova` 1.05, each with its own prompt and
+speaking style — and the beat path was the one speaking path in the app that
+never consulted them. U273 had already fixed this once for the Present panel's
+Voice dropdown; the characters themselves were still invisible from a scenario.
+
+**A beat now names one.** `persona: kids_companion` gives that beat the
+character's own voice *and* speed, and when the beat improvises, the character's
+note is **appended** to the system prompt so the words are in character too — a
+butler's line and a kids' line differ in what they say long before they differ
+in timbre. Appended, never substituted: U291 is the unit where a persona
+replaced the whole instruction string and deleted the language rule with it.
+
+**And a single line can change character halfway**, which is what the second
+half of the request asked for:
+
+```yaml
+text: "Misschien. [persona:kids_companion]Of iets veel leukers![persona] De rest typ ik wel."
+```
+
+The parsing is a pure function in `shared_schemas/presentation/vocals.py`, with
+one rule doing most of the work: **a marker that is nearly right is an error,
+not prose.** `[persona:]` does not match the marker grammar, so without a second
+deliberately sloppy pattern to catch it, it would have fallen through as text
+and been read out loud — "bracket persona colon" — in front of an audience. A
+malformed marker is now refused when the scenario is saved, on a screen, at a
+desk.
+
+**The part that took the thinking was what happens to the pieces afterwards.**
+Two voices means two TTS calls, and the app already has machinery that looks
+like the obvious answer: `stream_speech` cuts a reply into chunks and feeds them
+to `/robot/speak/segment` one at a time. Reaching for it would have been wrong.
+The robot decides playback gain **per utterance** (U153, U329, FR-019), and two
+`speak` calls are two normalisation decisions — so the quieter of the two voices
+would be pulled up to match the louder one, and the hand-over would land in the
+room as a step in volume. The segments are concatenated into one PCM buffer in
+the brain instead and sent as a single utterance, which gets the loudness right
+*by construction* rather than by coordination. It also adds no new brain→runtime
+call on a Pi that is older than the app, and keeps the behaviour engine's
+playback events and gesture timeline. Written up as
+[ADR-012](adr/ADR-012-a-line-is-one-utterance-however-many-voices-it-has.md),
+because the next person to read this will ask why it does not stream.
+
+They are synthesized concurrently, not one after another: a slide-triggered beat
+has 500 ms to start speaking (SC-002), and a flourish must not spend that budget.
+
+**What it refuses to do quietly.** A persona id that matches no character is
+still spoken — losing a line mid-talk over a typo would be worse — but in the
+presentation voice, with `voice_note` in the status naming the id it could not
+find, and a warning strip in the Present panel. That is a separate field from
+`speech_error` on purpose: *he was heard in the wrong voice* and *he was not
+heard* need different reactions from a presenter mid-sentence (constitution XI).
+The builder warns about unknown inline ids before the talk, too, where it is
+still cheap. And if any one segment fails to synthesize, the line is not played
+at all: a sentence quietly missing from the middle of a talk is the harder
+failure to notice than a beat that says it could not speak.
+
+**No drawing changed.** `media-paths.svg` is keyed to formats, endpoints and
+where synthesis runs; all three are exactly as they were — same PCM s16le mono
+@ 24 kHz, same `POST /robot/speak`, still synthesized in the brain. Only the
+number of synthesis calls behind one utterance changed, which is not a shape.
+
+**Tests**: 15 in the brain (per-beat voice and speed, the Present Voice setting
+still winning when no persona is named, three voices in one line arriving as one
+utterance, a dead segment not passing a half line off as whole, the unknown-id
+note appearing, clearing, and not carrying into the next talk, the improvised
+line written in character), 19 in shared-schemas for the splitter and the beat
+validation, 4 in the runner, 2 more in the shipped-scenario dry run, and 19 in
+the console. All verified red first. The demo scenario — the repository's
+worked example of every beat type — now exercises both shapes, so the dry run
+pins them.
+
+The one place this unit *should* have gone and did not is the projector
+overlay's presenter strip, which already carries `speech_error` for exactly the
+reason `voice_note` exists. `OverlayView.test.ts` is one of the 57 below: it
+fails before it mounts, so a change there could not have been verified, and an
+unverifiable line in a file about honest reporting is the wrong trade. It goes
+in once that suite runs again.
+
+**Not verified on the real robot.** Everything here is covered by fakes and by
+the FakeRobot path; the one thing tests cannot show is whether 120 ms of silence
+between two voices *sounds* like a hand-over in a room. That needs a run on the
+actual stack, and it has not had one.
+
+**Also found, not fixed here** (they are their own units): 57 of the 224
+operator-console tests fail on `60d0b10` before any of this — all on
+`localStorage.clear is not a function` (vitest warns
+`--localstorage-file was provided without a valid path`), which looks like
+test-environment drift since U348 recorded the same 224 tests green — and two
+brain tests in `test_room_awareness.py` expect `_stt_language()` to be `nl`
+and get `en`.

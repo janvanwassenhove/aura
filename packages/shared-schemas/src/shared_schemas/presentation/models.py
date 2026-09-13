@@ -16,6 +16,13 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, model_validator
 
+from shared_schemas.presentation.vocals import (
+    PERSONA_ID,
+    VoiceSegment,
+    persona_marker_problem,
+    split_persona_segments,
+)
+
 
 class SlideScript(BaseModel):
     """A single slide's script entry."""
@@ -64,6 +71,12 @@ class Beat(BaseModel):
     # this beat (a beat that needs a tool lookup must be "pipeline" — U203).
     engine: str = ""
     once: bool = True       # chime_in: fire at most once per run
+    # U349: which character speaks this beat — a brain character id, e.g.
+    # "dry_tech_butler". Empty means the presentation's own voice (Present →
+    # Persona). It sets the voice AND the way the line is written when the beat
+    # improvises. Within `text`, `[persona:other_id]` hands the line over
+    # mid-sentence and `[persona]` hands it back.
+    persona: str = ""
 
     @property
     def trigger_kind(self) -> str:
@@ -82,6 +95,16 @@ class Beat(BaseModel):
                 return None
         return None
 
+    def speech_segments(self, text: str | None = None) -> list[VoiceSegment]:
+        """This beat's line, cut up by who says which part (U349).
+
+        `text` overrides the beat's own — improvise and chime_in have no
+        written line, but what the LLM hands back still comes out in this
+        beat's persona.
+        """
+        return split_persona_segments(
+            self.text if text is None else text, self.persona)
+
     @model_validator(mode="after")
     def _check(self) -> Beat:
         if self.trigger_kind not in ("manual", "slide", "keyword"):
@@ -99,6 +122,14 @@ class Beat(BaseModel):
             raise ValueError(f"beat {self.id!r}: chime_in must use a keyword trigger")
         if self.engine and self.engine not in ("pipeline", "realtime"):
             raise ValueError(f"beat {self.id!r}: engine must be pipeline or realtime")
+        # U349: a marker that is nearly right is prose, and prose is read out
+        # loud. Catching it here puts it on the presenter's screen instead of
+        # in the room.
+        if self.persona and not PERSONA_ID.match(self.persona):
+            raise ValueError(
+                f"beat {self.id!r}: persona must be an id like 'dry_tech_butler'")
+        if problem := persona_marker_problem(self.text):
+            raise ValueError(f"beat {self.id!r}: {problem}")
         return self
 
 

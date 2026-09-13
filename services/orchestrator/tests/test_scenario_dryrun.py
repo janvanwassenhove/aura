@@ -32,15 +32,16 @@ async def test_a_full_run_of_the_test_presentation() -> None:
     said: list[str] = []
     gestured: list[str] = []
 
-    async def speak(t): said.append(t)
+    async def speak(t, persona=""): said.append((t, persona))
     async def gesture(g): gestured.append(g)
-    async def generate(topic, guardrails, engine): return f"[{topic[:20]}…]"
+    async def generate(topic, guardrails, engine, persona=""):
+        return f"[{topic[:20]}…]"
 
     r = ScenarioRunner(_load(), speak=speak, generate=generate, gesture=gesture)
 
     # Slide 1 → the robot introduces itself (verbatim).
     assert [b.id for b in await r.on_slide(1)] == ["intro"]
-    assert said[0].startswith("Hallo allemaal")
+    assert said[0][0].startswith("Hallo allemaal")
 
     # Jan says "Java" → the kids beat chimes in, once.
     assert [b.id for b in await r.on_speech("...niemand leert nog Java...")] == ["kids-java"]
@@ -60,8 +61,25 @@ async def test_a_full_run_of_the_test_presentation() -> None:
 
     # The closing is hand-advanced.
     assert (await r.next()).id == "closing"
-    assert said[-1].startswith("Dus:")
+    assert said[-1][0].startswith("Dus:")
 
     # Everything fired exactly once.
     assert sorted(r.status()["fired"]) == [
         "agent-factory", "closing", "intro", "kids-java", "the-question", "thesis"]
+
+
+async def test_the_shipped_scenario_hands_beats_to_another_character() -> None:
+    """U349: the demo is the repository's worked example of every beat type, so
+    it is also where persona switching has to be visible — both shapes of it."""
+    sc = _load()
+    beats = {b.id: b for b in sc.beats}
+
+    # A whole beat spoken by another character...
+    assert beats["kids-java"].persona == "kids_companion"
+
+    # ...and a single line that changes character halfway and comes back.
+    closing = beats["closing"].speech_segments()
+    assert [s.persona for s in closing] == ["", "kids_companion", ""]
+    assert closing[1].text == "Of iets veel leukers!"
+    # The markup is never part of what is said.
+    assert all("[" not in s.text for s in closing)

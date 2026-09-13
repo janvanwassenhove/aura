@@ -22,6 +22,11 @@ export interface PresentationStatus {
   /** U269: why the last beat was not heard, if it was not. A beat that fires
    *  into silence used to be indistinguishable from one that was spoken. */
   speech_error?: string
+  /** U349: he WAS heard, but not as the scenario asked - a beat named a
+   *  persona that is not a character here, so it fell back to the
+   *  presentation voice. Distinct from speech_error, which means the room
+   *  heard nothing at all. */
+  voice_note?: string
   fired?: string[]
   armed_keywords?: string[]
   /** U263: `watching` means a watcher is running; `slides_state` says whether
@@ -45,6 +50,7 @@ export const usePresentationStore = defineStore('presentation', () => {
   const subtitle = ref('')           // the robot's last spoken line
   const lastBeat = ref('')           // id of the last beat that fired
   const lastMode = ref('')
+  const lastPersona = ref('')   // U349: which character said it
   const busy = ref(false)
   const error = ref('')
 
@@ -53,6 +59,9 @@ export const usePresentationStore = defineStore('presentation', () => {
     if (raw.event_type !== 'PresentationBeatFired') return
     lastBeat.value = String(raw.beat_id ?? '')
     lastMode.value = String(raw.mode ?? '')
+    // U349: with two characters in one show, a subtitle that does not say
+    // who is talking is worse than no attribution at all.
+    lastPersona.value = String(raw.persona ?? '')
     const spoken = String(raw.spoken ?? '')
     // A silent beat says nothing — keep the previous subtitle rather than blank.
     if (spoken) subtitle.value = spoken
@@ -152,7 +161,7 @@ export const usePresentationStore = defineStore('presentation', () => {
     }
   }
 
-  return { status, subtitle, lastBeat, lastMode, busy, error,
+  return { status, subtitle, lastBeat, lastMode, lastPersona, busy, error,
            applyEvent, fetchStatus, start, startScenario, next, pushSpeech, stop,
            setRehearsing, fetchScenario }
 })

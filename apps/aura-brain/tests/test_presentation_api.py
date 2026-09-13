@@ -54,7 +54,7 @@ def client(monkeypatch):
     presentation_api.init(robot, bus)
     presentation_api._runner = None
     # Deterministic 'improvise' so tests don't call a real LLM.
-    async def fake_generate(topic, guardrails, engine):
+    async def fake_generate(topic, guardrails, engine, persona=""):
         return f"[improv: {topic}]"
     monkeypatch.setattr(presentation_api, "_generate", fake_generate)
 

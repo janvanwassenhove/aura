@@ -5,7 +5,7 @@ owner: "aura-brain / conversation"
 priority: P1
 risk: High
 created: "2026-09-05"
-units: [U22, U36b, U36e, U36h, U45, U46, U47, U49, U54, U67, U73, U80, U81, U82, U83, U84, U85, U86, U87, U88, U89, U91, U92, U96, U128, U129, U130, U131, U132, U133, U134, U135, U140, U141, U142, U143, U144, U145, U146, U148, U149, U150, U153, U154, U155, U156, U163, U203, U209, U256, U257, U258, U260, U273, U275, U287, U288, U289, U291, U292, U321, U322, U324, U329, U331, U333]
+units: [U22, U36b, U36e, U36h, U45, U46, U47, U49, U54, U67, U73, U80, U81, U82, U83, U84, U85, U86, U87, U88, U89, U91, U92, U96, U128, U129, U130, U131, U132, U133, U134, U135, U140, U141, U142, U143, U144, U145, U146, U148, U149, U150, U153, U154, U155, U156, U163, U203, U209, U256, U257, U258, U260, U273, U275, U287, U288, U289, U291, U292, U321, U322, U324, U329, U331, U333, U349]
 ---
 
 # Feature Specification: Voice and Language
@@ -163,6 +163,13 @@ none said which one applied (U273). Settings holds the default; the character
 carries its own; a person may be met in a specific one (U274). The order is
 stated on screen.
 
+U349 adds one step above all of them, scoped to a talk: a presentation beat
+may name a **persona**, and that character's voice and speed speak the beat.
+It outranks the Present panel's Voice — which is the same rule as everywhere
+else (a character's own voice wins over a mode's), applied at the grain of a
+single beat rather than a session. A beat that names no persona is unchanged:
+the Present panel's Voice still decides.
+
 ### User Story 7 — A natural voice that can still do things (Priority: P2)
 
 **Acceptance Scenarios**:
@@ -255,6 +262,16 @@ stated on screen.
   prevents clipping). Measured: streamed replies peak at 0.35, so the speaker
   received 0.28 where the other path delivers 0.76 — about 9 dB quieter, and
   with `VOICE_ENGINE=realtime` that is **every** reply (U329).
+- **FR-023**: A spoken line that changes persona halfway (spec 011 FR-108) is
+  synthesized once per voice and reaches the robot as **one** utterance —
+  concatenated in the brain, not sent as separate `speak` calls. FR-019 decides
+  loudness per utterance, so separate calls would normalise each voice on its
+  own and turn a change of character into a change of volume. Every segment
+  comes from one provider at one sample rate (PCM s16le mono @ 24 kHz), which
+  is what makes the join a byte concatenation; a second TTS provider would
+  invalidate this and must revisit
+  [ADR-012](../../../docs/adr/ADR-012-a-line-is-one-utterance-however-many-voices-it-has.md),
+  not patch around it (U349).
 - **FR-014**: GPT-Live opens with **client** delegation. Delegated work goes to
   the orchestrator's agentic loop with `announce=False`, so tools and the
   approval gate behave exactly as on the typed path; the result returns with
@@ -328,3 +345,4 @@ the same series as this backfill.
 | U329 | Streamed speech was ~9 dB quieter than spoken speech: one loudness gain per utterance on the segment path, measured against a real reply |
 | U331 | The engine row says which path it governs, warns when hands-free voice makes it unreachable, and marks the realtime voice model unused under Live |
 | U333 | Stop drops queued audio and skips the speaker tail in both session engines; Quiet keeps the wake word in charge instead of letting the room talk |
+| U349 | A presentation beat carries its own character, and one line can change character halfway: per-beat voice and speed above the mode voice, and several voices joined into one utterance so the hand-over is not also a volume step (ADR-012) |

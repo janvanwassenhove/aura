@@ -23,6 +23,7 @@ loses the reason.
 | [009](ADR-009-honest-state.md) | Never report what has not been verified | Accepted 2026-09-05 |
 | [010](ADR-010-desktop-app-is-the-delivery-unit.md) | The desktop app is the delivery unit | Accepted 2026-09-05 |
 | [011](ADR-011-gpt-live-is-a-fourth-path.md) | GPT-Live is a fourth speech path, not a model swap | Accepted 2026-09-11 — implemented as an opt-in fourth engine (U324); real-room test outstanding |
+| [012](ADR-012-a-line-is-one-utterance-however-many-voices-it-has.md) | A line is one utterance, however many voices are in it | Accepted 2026-09-13 — implemented in U349 |
 
 ## Reading order for someone new
 

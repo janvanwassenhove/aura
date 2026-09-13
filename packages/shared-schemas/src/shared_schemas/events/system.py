@@ -108,3 +108,6 @@ class PresentationBeatFired(BaseEvent):
     mode: str
     spoken: str = ""
     slide_number: int | None = None
+    # U349: which character said it — empty means the presentation's own voice.
+    # With two characters in one show, an unattributed subtitle is misleading.
+    persona: str = ""

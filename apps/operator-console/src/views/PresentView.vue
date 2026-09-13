@@ -114,6 +114,13 @@
             Turn on <em>Laptop audio</em> below to read his lines through this
             machine instead.
           </div>
+          <!-- U349: he WAS heard, in the wrong voice. A beat that quietly used
+               the fallback would otherwise be indistinguishable from one whose
+               persona resolved. -->
+          <div v-else-if="presentation.status.voice_note" class="hud-voice-note">
+            <strong>Not the voice the scenario asked for</strong> —
+            {{ presentation.status.voice_note }}.
+          </div>
           <div class="hud-body">
             <div v-if="!cameraOff" class="hud-cam">
               <img v-if="camera.frameSrc.value" :src="camera.frameSrc.value" alt="Audience camera" class="hud-cam-img">
@@ -772,6 +779,13 @@ async function saveAsideBehaviour(key: string, value: string): Promise<void> {
 .hud-mute {
   margin: 0 12px 10px; padding: 8px 12px; border-radius: 8px;
   background: var(--danger-wash, rgba(200, 60, 50, 0.12));
+  color: var(--ink-2); font-size: 12.5px; line-height: 1.45;
+}
+/* U349: a degradation, not a failure — the line was heard. Warning, not
+   danger, so it does not read as "the talk is broken". */
+.hud-voice-note {
+  margin: 0 12px 10px; padding: 8px 12px; border-radius: 8px;
+  background: var(--warn-wash, rgba(200, 150, 20, 0.12));
   color: var(--ink-2); font-size: 12.5px; line-height: 1.45;
 }
 

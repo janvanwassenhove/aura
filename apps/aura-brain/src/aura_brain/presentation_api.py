@@ -18,6 +18,7 @@ test push text too.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Any
 
@@ -26,7 +27,7 @@ from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 from orchestrator.scenario_runner import ScenarioRunner
 from shared_schemas.events.system import PresentationBeatFired
-from shared_schemas.presentation import Scenario
+from shared_schemas.presentation import Scenario, split_persona_segments
 
 logger = logging.getLogger(__name__)
 
@@ -37,8 +38,15 @@ _bus: Any = None        # AsyncEventBus
 _pipeline: Any = None    # OrchestratorPipeline — for tool-backed improvise (U208)
 _runner: ScenarioRunner | None = None
 _watcher: Any = None    # PowerPointWatcher | None
+# U349: why the last line did not sound the way the scenario asked, if it
+# didn't. Empty means every persona it named was found.
+_voice_note = ""
 
 _SESSION = "presentation"
+
+# U349: the silence between two characters in one line. Long enough to read as
+# a hand-over, short enough not to read as a pause in the talk.
+_HANDOVER_MS = 120
 
 
 def init(robot: Any, bus: Any, pipeline: Any = None) -> None:
@@ -65,7 +73,47 @@ async def feed_speech(text: str) -> None:
 # Runner wiring — the messy real-world edges the runner stays out of
 # ------------------------------------------------------------------
 
-async def _speak(text: str) -> None:
+def _character(persona: str) -> Any:
+    """The brain character behind a scenario's persona id, or None.
+
+    Looked up case-insensitively: the id is typed by hand into YAML, and
+    `[persona:Kids_Companion]` meaning nothing would be a cruel way to find out.
+    """
+    if not persona:
+        return None
+    from aura_brain.characters import CharacterStore  # noqa: PLC0415
+
+    wanted = persona.strip().lower()
+    try:
+        return next((c for c in CharacterStore().all() if c.id.lower() == wanted), None)
+    except OSError as exc:                      # unreadable store — not fatal
+        logger.warning("character store unreadable: %s", exc)
+        return None
+
+
+def _voice_for(persona: str) -> tuple[str, float, str]:
+    """(voice, speed, what went wrong) for one persona id.
+
+    An id nobody recognises still gets spoken — losing a line mid-talk over a
+    typo would be worse — but in the presentation's own voice, and the third
+    element says so. Constitution XI: the degradation is reported, never
+    dressed up as the thing that was asked for.
+    """
+    from aura_brain import voice  # noqa: PLC0415
+
+    if not persona:
+        return voice.resolve_voice(mode="presentation"), 1.0, ""
+    character = _character(persona)
+    if character is None:
+        return voice.resolve_voice(mode="presentation"), 1.0, (
+            f"persona {persona!r} is not a character here, so that line was "
+            f"spoken in the presentation voice")
+    return (voice.resolve_voice(mode="presentation",
+                                character_voice=character.voice_id),
+            character.voice_speed or 1.0, "")
+
+
+async def _speak(text: str, persona: str = "") -> None:
     """Say a beat OUT LOUD.
 
     U269: this called `_robot.speak(text)` with no audio, and the robot's
@@ -79,7 +127,15 @@ async def _speak(text: str) -> None:
     Failures RAISE, so the runner records them and the console can say what
     went wrong. The show still goes on — that guard is U265's and it stays —
     but a silent robot must never again look like a successful beat.
+
+    U349: `persona` is the character the beat belongs to, and the line itself
+    may hand over to others with `[persona:x]`. Each stretch is synthesized in
+    its own voice and speed, and the pieces are joined into ONE utterance
+    before they reach the robot — the robot decides loudness per utterance
+    (FR-019), so separate calls would turn a change of character into a change
+    of volume as well.
     """
+    global _voice_note
     if not text:
         return
     if _robot is None:
@@ -87,19 +143,36 @@ async def _speak(text: str) -> None:
 
     from aura_brain import voice  # noqa: PLC0415 — optional at import time
 
+    segments = split_persona_segments(text, persona)
+    if not segments:
+        return
     # U273: the Present screen has its own Voice dropdown, and this call
     # ignored it — `synthesize_b64(text)` resolves with no mode and no
     # persona, so every beat came out in the Settings default no matter what
-    # the presenter had chosen for the talk.
-    audio_b64 = await voice.synthesize_b64(text, voice.resolve_voice(mode="presentation"))
-    if audio_b64 is None:
+    # the presenter had chosen for the talk. A beat persona now outranks it,
+    # which is the same order every other speaking path already uses.
+    chosen = [_voice_for(s.persona) for s in segments]
+
+    # Synthesized together, not one after the other: a slide-triggered beat has
+    # 500 ms to start speaking (SC-002), and three sequential round-trips would
+    # spend that budget on a line the presenter meant as a flourish.
+    audio = await asyncio.gather(*(
+        voice.synthesize_b64(segment.text, voice_id, speed)
+        for segment, (voice_id, speed, _) in zip(segments, chosen)))
+
+    if any(part is None for part in audio):
         # Text-only reaches the robot as a log line. Saying so is the whole
         # point: "he is mute because there is no TTS key" and "he is mute
-        # because the robot is off" need different fixes.
+        # because the robot is off" need different fixes. A line that lost
+        # only ONE of its voices is not played either — a sentence quietly
+        # missing from the middle of a talk is the harder failure to notice.
         raise RuntimeError(
             "speech could not be synthesized (no TTS key or the provider "
             "failed), so the robot had nothing to play")
-    await _robot.speak(text, audio_b64=audio_b64)
+
+    _voice_note = " ".join(dict.fromkeys(p for _, _, p in chosen if p))
+    await _robot.speak(" ".join(s.text for s in segments),
+                       audio_b64=voice.join_pcm_b64(list(audio), _HANDOVER_MS))
 
 
 async def _gesture(name: str) -> None:
@@ -113,7 +186,7 @@ async def _gesture(name: str) -> None:
         logger.debug("presentation gesture %r failed: %s", name, exc)
 
 
-async def _generate(topic: str, guardrails: str, engine: str) -> str:
+async def _generate(topic: str, guardrails: str, engine: str, persona: str = "") -> str:
     """Improvise a spoken line about `topic`. Text only — the runner speaks it.
 
     U208: `engine: pipeline` runs the FULL agentic loop (tools included) so a
@@ -121,13 +194,21 @@ async def _generate(topic: str, guardrails: str, engine: str) -> str:
     `announce=False` keeps the pipeline from auto-speaking it (the runner speaks
     it once, so the subtitle and the robot stay in sync). Any other engine is a
     single LLM completion: faster, no tools, can't wander mid-talk.
+
+    U349: a beat's persona shapes the WORDS as well as the voice. A butler's
+    line and a kids-companion's line differ in what they say long before they
+    differ in timbre, so the character's own note is appended here. Appended,
+    never substituted (FR-004): a persona that replaces the whole instruction
+    is how the language rule got deleted in U291.
     """
     guard = guardrails or "Keep it to 1-2 sentences."
+    character = _character(persona)
+    in_character = f" {character.system_note()}" if character is not None else ""
     if engine == "pipeline" and _pipeline is not None:
         prompt = (
             "You are co-presenting live. In ONE short spoken remark, first "
             f"person, no markdown, address this — using tools if you need live "
-            f"data: {topic}. {guard}"
+            f"data: {topic}. {guard}{in_character}"
         )
         try:
             return (await _pipeline.orchestrate(prompt, _SESSION, announce=False,
@@ -141,7 +222,7 @@ async def _generate(topic: str, guardrails: str, engine: str) -> str:
     system = (
         "You are a robot co-presenter on stage. Say ONE short spoken remark "
         "about the topic — natural, out loud, first person, no preamble, no "
-        "markdown. " + guard
+        "markdown. " + guard + in_character
     )
     try:
         choice = await openai_chat(
@@ -162,7 +243,8 @@ async def _on_event(event: dict) -> None:
     mode = next((b.mode for b in _runner._scenario.beats if b.id == beat_id), "") if _runner else ""
     await _bus.publish(PresentationBeatFired(
         session_id="presentation", beat_id=beat_id, mode=mode,
-        spoken=event.get("spoken", ""), slide_number=slide))
+        spoken=event.get("spoken", ""), slide_number=slide,
+        persona=event.get("persona", "")))
 
 
 # ------------------------------------------------------------------
@@ -182,13 +264,16 @@ def _scenario_from_body(body: dict) -> tuple[Scenario, str | None]:
 
 @router.post("/scenario")
 async def load_scenario(body: dict) -> JSONResponse:
-    global _runner, _watcher
+    global _runner, _watcher, _voice_note
     try:
         scenario, _ = _scenario_from_body(body or {})
     except Exception as exc:  # noqa: BLE001 — bad YAML / failed validation
         return JSONResponse({"error": _readable(exc)}, status_code=422)
 
     await _stop_watcher()
+    # U349: the note describes the line that was last spoken. Carried into
+    # the next talk it would accuse it of the previous one's typo.
+    _voice_note = ""
     _runner = ScenarioRunner(
         scenario, speak=_speak, generate=_generate, gesture=_gesture, on_event=_on_event)
 
@@ -303,6 +388,9 @@ def _status_payload() -> dict:
     if _runner is None:
         return {"active": False}
     out: dict = {"active": True, **_runner.status()}
+    # U349: he was heard, but not as the scenario asked. Distinct from
+    # speech_error, which means he was not heard at all.
+    out["voice_note"] = _voice_note
 
     state = _watcher.state if _watcher is not None else None
     out["watching"] = _watcher is not None
@@ -352,9 +440,10 @@ async def status() -> JSONResponse:
 
 @router.delete("/scenario")
 async def clear_scenario() -> JSONResponse:
-    global _runner
+    global _runner, _voice_note
     await _stop_watcher()
     _runner = None
+    _voice_note = ""
     return JSONResponse({"active": False})
 
 

@@ -16,11 +16,11 @@ the robot participates via a scenario.
 | Beat | Trigger | Mode | The robot… |
 |---|---|---|---|
 | `intro` | slide 1 | speak | says a fixed opening line + waves |
-| `kids-java` | you say **"Java"** | chime_in | adds one remark about kids learning differently |
+| `kids-java` | you say **"Java"** | chime_in | adds one remark about kids learning differently — in the **Kids Companion** voice (U349) |
 | `thesis` | slide 4 | improvise | riffs on "software is a commodity, expertise isn't" + nods |
 | `agent-factory` | you say **"agents"** | chime_in | one confident line about the agent fleet |
 | `the-question` | slide 6 | silent | stays quiet — you own the uncomfortable question |
-| `closing` | manual | speak | delivers the closing line |
+| `closing` | manual | speak | delivers the closing line, handing one clause to Kids Companion and taking it back (U349) |
 
 `slide:N` uses PowerPoint's own 1-based numbering. `keyword:` fires when *you*
 say the word while presenting. `manual` fires when you advance the beat by hand.
@@ -33,6 +33,30 @@ It's plain YAML, validated by the `Scenario` model. Each beat needs:
 - `improvise` / `chime_in` → `topic` (+ optional `guardrails`)
 - `chime_in` → must use a `keyword:` trigger
 - optional `gesture` (e.g. `wave`, `nod`) and `engine` (`pipeline` / `realtime`)
+- optional `persona` — the character that speaks the beat (U349)
+
+### Who speaks a beat (U349)
+
+`persona: <id>` names a character from **Robot → personas** (`dry_tech_butler`,
+`kids_companion`, …). That character's own voice and speed speak the beat, and
+when the beat improvises, its character note shapes the words too. Leave it out
+and the beat uses the Present panel's Voice, exactly as before.
+
+Inside a `speak` beat's text you can hand the line over mid-sentence:
+
+```yaml
+text: "Misschien. [persona:kids_companion]Of iets veel leukers![persona] De rest typ ik wel."
+```
+
+`[persona]` (or `[/persona]`) hands it back to the beat's own persona. The
+markers are never spoken, and a malformed one is refused when you save rather
+than read out on stage. The pieces are synthesized separately and joined into
+**one** utterance, so the change of character is not also a change of volume —
+see [ADR-012](../adr/ADR-012-a-line-is-one-utterance-however-many-voices-it-has.md).
+
+A persona id that matches no character is still spoken, in the presentation
+voice, and the Present panel says which id it could not find. The scenario
+builder warns about unknown inline ids while you are still at a desk.
 
 A beat that needs a live lookup (calendar, data) must set `engine: pipeline` —
 the realtime engine has no tool access (U203).

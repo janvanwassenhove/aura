@@ -13,15 +13,21 @@ class _Rig:
         self.said: list[str] = []
         self.gestured: list[str] = []
         self.events: list[dict] = []
+        # U349: who was asked to say it, alongside what.
+        self.said_by: list[tuple[str, str]] = []
+        self.generated_for: list[str] = []
 
-    async def speak(self, text: str) -> None:
+    async def speak(self, text: str, persona: str = "") -> None:
         self.said.append(text)
+        self.said_by.append((text, persona))
 
     async def gesture(self, name: str) -> None:
         self.gestured.append(name)
 
-    async def generate(self, topic: str, guardrails: str, engine: str) -> str:
+    async def generate(self, topic: str, guardrails: str, engine: str,
+                       persona: str = "") -> str:
         # Stand-in LLM: echoes the topic so the test can see improvise ran.
+        self.generated_for.append(persona)
         return f"[about {topic}]"
 
     async def on_event(self, ev: dict) -> None:
@@ -91,7 +97,7 @@ async def test_silent_beat_says_nothing_but_advances() -> None:
 async def test_a_failing_generator_does_not_kill_the_talk() -> None:
     rig = _Rig()
 
-    async def boom(topic, guardrails, engine):
+    async def boom(topic, guardrails, engine, persona=""):
         raise RuntimeError("LLM down")
 
     r = ScenarioRunner(
@@ -126,10 +132,10 @@ async def test_a_dead_speaker_never_eats_beat_done() -> None:
     """
     from shared_schemas.presentation.models import Beat, Scenario
 
-    async def broken_speak(_text: str) -> None:
+    async def broken_speak(_text: str, _persona: str = "") -> None:
         raise RuntimeError("robot audio is down")
 
-    async def generate(_t, _g, _e) -> str:
+    async def generate(_t, _g, _e, _p="") -> str:
         return "never used"
 
     events: list[dict] = []
@@ -215,3 +221,57 @@ async def test_status_counts_the_whole_show_not_just_the_manual_beats() -> None:
     st = r.status()
     assert st["manual_pos"] == 1 and st["manual_total"] == 1   # the old numbers
     assert len(st["fired"]) == 1 and st["beats_total"] == 3    # the honest ones
+
+
+# --------------------------------------------------------------------------- #
+# U349: a beat can hand the line to another character
+# --------------------------------------------------------------------------- #
+
+async def test_a_beat_is_spoken_by_its_own_persona() -> None:
+    rig = _Rig()
+    r = rig.runner(Scenario(beats=[
+        Beat(id="a", trigger="manual", mode="speak", text="Goedendag.",
+             persona="dry_tech_butler"),
+        Beat(id="b", trigger="manual", mode="speak", text="Hoi hoi!"),
+    ]))
+    await r.next()
+    await r.next()
+    assert rig.said_by == [("Goedendag.", "dry_tech_butler"), ("Hoi hoi!", "")]
+
+
+async def test_the_generator_is_told_which_persona_it_writes_for() -> None:
+    """An improvised beat has to SOUND like the character too, not just be read
+    out in its voice — a butler's line and a kids' line differ in the words
+    long before they differ in the timbre."""
+    rig = _Rig()
+    r = rig.runner(Scenario(beats=[
+        Beat(id="i", trigger="manual", mode="improvise", topic="de toekomst",
+             persona="kids_companion"),
+    ]))
+    await r.next()
+    assert rig.generated_for == ["kids_companion"]
+    assert rig.said_by == [("[about de toekomst]", "kids_companion")]
+
+
+async def test_the_persona_rides_along_on_beat_done() -> None:
+    """The subtitle says who is talking. With two characters in one show, a
+    subtitle that does not is actively misleading."""
+    rig = _Rig()
+    r = rig.runner(Scenario(beats=[
+        Beat(id="a", trigger="slide:1", mode="speak", text="Goedendag.",
+             persona="dry_tech_butler"),
+    ]))
+    await r.on_slide(1)
+    done = [e for e in rig.events if e.get("type") == "beat_done"]
+    assert done[0]["persona"] == "dry_tech_butler"
+
+
+async def test_a_rehearsal_still_says_nothing_whoever_the_persona_is() -> None:
+    rig = _Rig()
+    r = rig.runner(Scenario(beats=[
+        Beat(id="a", trigger="manual", mode="speak", text="Goedendag.",
+             persona="dry_tech_butler"),
+    ]))
+    r.rehearsing = True
+    await r.next()
+    assert rig.said_by == []

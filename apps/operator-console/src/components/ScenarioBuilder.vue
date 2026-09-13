@@ -65,12 +65,33 @@
 
         <textarea v-if="b.mode === 'speak'" v-model="b.text" class="sb-input sb-text" rows="2"
                   placeholder="Exactly what the robot says…"></textarea>
+        <!-- U349: one line, two characters. The hint is here rather than in a
+             tooltip because nobody guesses a markup they have not been shown. -->
+        <p v-if="b.mode === 'speak'" class="sb-hint sb-marker-hint">
+          Hand the line over mid-sentence with
+          <code>[persona:kids_companion]</code>, and back with <code>[persona]</code>.
+        </p>
         <template v-if="b.mode === 'improvise' || b.mode === 'chime_in'">
           <input v-model="b.topic" class="sb-input" placeholder="Topic to talk about…" />
           <input v-model="b.guardrails" class="sb-input sb-faint" placeholder="Guardrails (optional, e.g. 'one sentence')" />
         </template>
 
+        <!-- The persona named by a marker is resolved by the brain when the
+             beat is spoken; a name that matches nothing falls back to the
+             presentation voice ON STAGE. Saying so here is the whole point. -->
+        <p v-if="unknownIn(b).length" class="sb-persona-warn">
+          No character called {{ unknownIn(b).map(p => `“${p}”`).join(', ') }} —
+          that part will come out in the presentation voice.
+        </p>
+
         <div class="sb-row" v-if="b.mode !== 'silent'">
+          <label class="sb-lbl">Voice
+            <select v-model="b.persona" class="sb-input sb-persona"
+                    title="Which character speaks this beat. Its own voice and speed win over the Present panel's Voice.">
+              <option value="">the presentation voice</option>
+              <option v-for="p in personas" :key="p.id" :value="p.id">{{ p.name }}</option>
+            </select>
+          </label>
           <label class="sb-lbl">Gesture
             <select v-model="b.gesture" class="sb-input sb-gest">
               <option :value="null">none</option>
@@ -109,6 +130,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { BRAIN_URL } from '../lib/endpoints'
+import { personaIdsIn } from '../lib/vocals'
 
 const emit = defineEmits<{ start: [scenario: object] }>()
 
@@ -116,6 +138,8 @@ interface FormBeat {
   _k: number; id: string; mode: string
   _tkind: string; _tslide: number | null; _tword: string; trigger: string
   text: string; topic: string; guardrails: string; gesture: string | null; engine: string
+  /** U349: the character that speaks this beat; '' is the presentation voice. */
+  persona: string
 }
 
 let seq = 0
@@ -140,7 +164,32 @@ const badBeats = computed(() =>
 function blankBeat(): FormBeat {
   return { _k: seq++, id: `beat-${beats.value.length + 1}`, mode: 'speak',
            _tkind: 'manual', _tslide: 1, _tword: '', trigger: 'manual',
-           text: '', topic: '', guardrails: '', gesture: null, engine: '' }
+           text: '', topic: '', guardrails: '', gesture: null, engine: '',
+           persona: '' }
+}
+
+/** U349: the characters a beat may be handed to. Loaded from the brain — the
+ *  console invents no characters of its own. */
+const personas = ref<{ id: string; name: string }[]>([])
+async function fetchPersonas(): Promise<void> {
+  try {
+    const r = await fetch(`${BRAIN_URL}/setup/characters`)
+    const data = await r.json()
+    personas.value = (data.characters ?? []).map(
+      (c: { id: string; display_name?: string }) => ({ id: c.id, name: c.display_name ?? c.id }))
+  } catch { personas.value = [] }
+}
+
+/** Inline personas in this beat's text that match no known character.
+ *
+ *  Silent while the list is empty: if the brain could not be reached, every
+ *  marker would look wrong, and a warning on every line is noise rather than
+ *  information.
+ */
+function unknownIn(b: FormBeat): string[] {
+  if (!personas.value.length || b.mode !== 'speak') return []
+  const known = new Set(personas.value.map(p => p.id.toLowerCase()))
+  return personaIdsIn(b.text).filter(p => !known.has(p.toLowerCase()))
 }
 function addBeat() { beats.value.push(blankBeat()) }
 function move(i: number, d: number) {
@@ -176,6 +225,9 @@ function toScenario(): object {
         if (b.engine) out.engine = b.engine
       }
       if (b.gesture) out.gesture = b.gesture
+      // U349: omitted rather than sent empty - an absent persona means
+      // "the presentation voice", which is not a character id.
+      if (b.persona) out.persona = b.persona
       return out
     }),
   }
@@ -204,7 +256,7 @@ function loadScenario(sc: Record<string, unknown>, name = '') {
       _tword: kind === 'keyword' ? trig.split(':').slice(1).join(':') : '',
       trigger: trig, text: String(b.text ?? ''), topic: String(b.topic ?? ''),
       guardrails: String(b.guardrails ?? ''), gesture: (b.gesture as string) ?? null,
-      engine: String(b.engine ?? ''),
+      engine: String(b.engine ?? ''), persona: String(b.persona ?? ''),
     }
   })
 }
@@ -246,7 +298,7 @@ function slug(s: string): string {
   return s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 64) || 'scenario'
 }
 
-onMounted(() => { fetchSaved(); if (!beats.value.length) addBeat() })
+onMounted(() => { fetchSaved(); fetchPersonas(); if (!beats.value.length) addBeat() })
 defineExpose({ setError: (m: string) => { error.value = m }, loadScenario })
 </script>
 
@@ -289,6 +341,12 @@ defineExpose({ setError: (m: string) => { error.value = m }, loadScenario })
 .sb-text { resize: vertical; font-family: inherit; }
 .sb-row { display: flex; gap: 1rem; }
 .sb-gest { padding: 0.2rem; }
+.sb-persona { padding: 0.2rem; max-width: 12rem; }
+.sb-hint { font-style: normal; color: var(--text-faint); font-size: 0.72rem; }
+.sb-marker-hint { margin: 0; }
+.sb-marker-hint code { font-family: var(--font-mono); font-size: 0.7rem; }
+/* U349: a warning, not an error - the beat is still perfectly startable. */
+.sb-persona-warn { margin: 0; font-size: 0.74rem; color: var(--warn, #d08700); }
 
 .sb-add { align-self: flex-start; background: transparent; border: 1px dashed var(--border-strong); border-radius: var(--radius-md); color: var(--text-muted); padding: 0.35rem 0.8rem; cursor: pointer; font-size: 0.8rem; }
 .sb-add:hover { color: var(--text); border-color: var(--accent); }

@@ -98,7 +98,8 @@ async def test_the_scenario_itself_still_speaks(monkeypatch) -> None:
             said.append(text)
             return True
 
-    async def _fake_tts(text: str, voice_id: str | None = None) -> str:
+    async def _fake_tts(text: str, voice_id: str | None = None,
+                        speed: float = 1.0) -> str:
         return "YXVkaW8="          # any non-empty base64 payload
 
     monkeypatch.setattr(voice, "synthesize_b64", _fake_tts)

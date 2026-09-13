@@ -26,8 +26,11 @@ from shared_schemas.presentation.models import Beat, Scenario
 
 logger = logging.getLogger(__name__)
 
-# generate(topic, guardrails, engine) -> spoken line
-Generator = Callable[[str, str, str], Awaitable[str]]
+# generate(topic, guardrails, engine, persona) -> spoken line
+Generator = Callable[[str, str, str, str], Awaitable[str]]
+# speak(text, persona) -> plays it. `persona` is a brain character id, or ""
+# for the presentation's own voice (U349).
+Speaker = Callable[[str, str], Awaitable[Any]]
 
 
 class ScenarioRunner:
@@ -35,7 +38,7 @@ class ScenarioRunner:
         self,
         scenario: Scenario,
         *,
-        speak: Callable[[str], Awaitable[Any]],
+        speak: Speaker,
         generate: Generator,
         gesture: Callable[[str], Awaitable[Any]] | None = None,
         on_event: Callable[[dict], Awaitable[Any]] | None = None,
@@ -150,15 +153,16 @@ class ScenarioRunner:
             pass
         elif beat.mode == "speak":
             spoken = beat.text
-            await self._say(beat.id, beat.text)
+            await self._say(beat.id, beat.text, beat.persona)
         else:  # improvise or chime_in
             try:
-                spoken = (await self._generate(beat.topic, beat.guardrails, beat.engine)) or ""
+                spoken = (await self._generate(beat.topic, beat.guardrails,
+                                               beat.engine, beat.persona)) or ""
             except Exception as exc:  # noqa: BLE001 — a dead beat must not kill the talk
                 logger.warning("beat %r generation failed: %s", beat.id, exc)
                 spoken = ""
             if spoken:
-                await self._say(beat.id, spoken)
+                await self._say(beat.id, spoken, beat.persona)
 
         if beat.gesture and self._gesture is not None and beat.mode != "silent" \
                 and not self.rehearsing:
@@ -167,9 +171,12 @@ class ScenarioRunner:
             except Exception as exc:  # noqa: BLE001
                 logger.debug("gesture %r failed: %s", beat.gesture, exc)
 
-        await self._emit({"type": "beat_done", "beat": beat.id, "spoken": spoken})
+        # U349: with two characters in one show, a subtitle that does not say
+        # who is talking is worse than no attribution at all.
+        await self._emit({"type": "beat_done", "beat": beat.id, "spoken": spoken,
+                          "persona": beat.persona})
 
-    async def _say(self, beat_id: str, text: str) -> None:
+    async def _say(self, beat_id: str, text: str, persona: str = "") -> None:
         """Speak a line — unless this is a rehearsal, when the room hears nothing.
 
         U265: NEVER let a failed speaker eat beat_done. The subtitle event is
@@ -181,7 +188,7 @@ class ScenarioRunner:
         if self.rehearsing:
             return
         try:
-            await self._speak(text)
+            await self._speak(text, persona)
             self.last_speech_error = ""
         except Exception as exc:  # noqa: BLE001 — the show must go on
             logger.warning("beat %r speech failed: %s", beat_id, exc)

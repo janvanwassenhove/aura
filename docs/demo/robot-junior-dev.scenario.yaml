@@ -15,6 +15,13 @@
 #   improvise  the robot says a fresh line about `topic` (realtime — no tools)
 #   chime_in   armed by a keyword; the robot may add one remark
 #   silent     the robot stays quiet and hands the floor back to you
+#
+# Personas (U349):
+#   persona: <id>   which character speaks the beat — its own voice and speed,
+#                   and, when the beat improvises, its own way of putting
+#                   things. Leave it out for the presentation's own voice.
+#   [persona:<id>]  inside `text`: hand the line over mid-sentence.
+#   [persona]       hand it back to the beat's own persona.
 
 title: "I Hired a Real Robot as My Junior Dev"
 pptx: "robot-junior-dev.pptx"
@@ -31,6 +38,9 @@ beats:
   - id: kids-java
     trigger: keyword:Java
     mode: chime_in
+    # U349: the beat about the kids is spoken BY the kids character — its
+    # own voice, and its own way of putting things.
+    persona: kids_companion
     topic: "dat kinderen niet minder leren, maar iets anders — van code naar producten en van typen naar sturen"
     guardrails: "Maximaal twee zinnen. Luchtig, geen belerende toon."
     once: true
@@ -60,5 +70,7 @@ beats:
   - id: closing
     trigger: manual
     mode: speak
-    text: "Dus: leren jullie kinderen nog Java? Misschien. Maar leer ze vooral wat ze willen bouwen. De rest typ ik wel."
+    # U349: one line, two voices — the robot hands the joke to the kids
+    # character and takes the last word back.
+    text: "Dus: leren jullie kinderen nog Java? Misschien. [persona:kids_companion]Of iets veel leukers![persona] Maar leer ze vooral wat ze willen bouwen. De rest typ ik wel."
     gesture: nod
