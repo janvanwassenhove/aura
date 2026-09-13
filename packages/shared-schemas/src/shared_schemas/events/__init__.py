@@ -40,6 +40,7 @@ from shared_schemas.events.system import (
     OfflineRequestQueued,
     PresentationBeatFired,
     PresentationCueReceived,
+    PresentationOverlayChanged,
     ReminderTriggered,
     TurnLatencyMeasured,
 )
@@ -88,4 +89,5 @@ __all__ = [
     "ReminderTriggered",
     "PresentationBeatFired",
     "PresentationCueReceived",
+    "PresentationOverlayChanged",
 ]

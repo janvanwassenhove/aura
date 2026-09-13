@@ -1,5 +1,11 @@
 <template>
-  <div class="ov" :class="{ presenter: mode === 'presenter' }">
+  <!-- U352: `ov--offstage` is the scenario taking the overlay off the screen.
+       It is rendered away, never closed: Electron's overlay hide DESTROYS the
+       BrowserWindow, and a re-show reloads this page, re-picks the display and
+       refetches everything — per beat that is a flicker the room can see. The
+       window stays up and simply stops drawing. -->
+  <div class="ov"
+       :class="{ presenter: mode === 'presenter', 'ov--offstage': !overlayVisible }">
     <!-- ═══ Presenter strip (top) — only when this screen is YOURS ═══ -->
     <div v-if="mode === 'presenter' && presentation.status.active" class="ov-cues">
       <div class="ov-cue-row">
@@ -114,6 +120,20 @@ function onHashChange(): void {
 
 const character = computed(() => characterStore.current)
 
+/** U352: is the overlay meant to be on the projector right now?
+ *
+ *  Both channels feed the same field. The 1.5 s status poll is what a window
+ *  opened halfway through a talk reads — an event only reaches a subscriber
+ *  that existed when it was published — and `PresentationOverlayChanged`
+ *  writes the same field the moment a beat moves it, because 1.5 s of a robot
+ *  sitting on a slide he was supposed to clear is visible from the back of a
+ *  room.
+ *
+ *  Absent means VISIBLE. A brain older than this field must not blank the
+ *  projector for every talk written before it existed.
+ */
+const overlayVisible = computed(() => presentation.status.overlay_visible !== false)
+
 // ── Speaking state ──────────────────────────────────────────────────────────
 // The avatar mouths along for roughly as long as the line takes to say
 // (~15 chars/s, the same rate the echo guard uses). robotStore's isSpeaking
@@ -193,6 +213,15 @@ onUnmounted(() => {
   background: transparent; pointer-events: none;
   font-family: 'IBM Plex Sans', system-ui, sans-serif;
 }
+
+/* U352: taken off the screen by the scenario. Faded rather than removed, so
+   the hand-over reads as him stepping aside rather than as a glitch, and so
+   the avatar and camera are not torn down and rebuilt between beats. The
+   window is already pointer-events:none, so a clear overlay cannot swallow a
+   click on the deck behind it. */
+.ov--offstage { opacity: 0; }
+.ov { transition: opacity 350ms ease; }
+@media (prefers-reduced-motion: reduce) { .ov { transition: none; } }
 
 /* ── Avatar: bottom-right, unobtrusive, breathing on a real state ── */
 .ov-avatar {

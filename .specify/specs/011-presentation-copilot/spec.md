@@ -6,7 +6,7 @@ priority: P2
 risk: Medium
 created: "2026-04-25"
 amended: "2026-09-13"
-units: [U27, U205, U206, U207, U208, U246, U263, U263b, U264, U265, U266, U267, U269, U282, U320, U334, U349, U351]
+units: [U27, U205, U206, U207, U208, U246, U263, U263b, U264, U265, U266, U267, U269, U282, U320, U334, U349, U351, U352]
 ---
 
 # Feature Specification: Presentation Copilot
@@ -232,6 +232,27 @@ settings aside as the example.
 - **FR-105**: The projector overlay is a separate, transparent, click-through
   window; it can be closed; and it reflects character, cues, subtitles and
   optionally the camera.
+- **FR-111**: A scenario decides **when** the overlay is on screen, never
+  whether it exists: `overlay: hidden` at scenario level starts the talk clear,
+  and `overlay: show` / `overlay: hide` on a beat moves it from that beat
+  onwards. A scenario that says nothing leaves it shown for the whole talk —
+  the behaviour of every scenario written before this field. The presenter
+  still switches the overlay on in the Present panel; a scenario cannot open it
+  (U352).
+- **FR-112**: Hidden means **rendered clear, not closed**. Electron's overlay
+  hide destroys the `BrowserWindow`, and a re-show reloads the page, re-picks
+  the display and refetches the scenario — per beat, a flicker the room can
+  see. The window stays and fades (350 ms; none under `prefers-reduced-motion`).
+  While clear, nothing is drawn, the presenter strip included; the Present
+  panel still carries every warning (U352).
+- **FR-113**: The state crosses **both** channels FR-106 of
+  [spec 008](../008-operator-console/spec.md) allows: `PresentationOverlayChanged`
+  on the bus, so a window already open cuts at once rather than up to 1.5 s
+  late; and `overlay_visible` in `/presentation/status`, so a window opened
+  halfway through a talk can ask — an event only reaches a subscriber that
+  existed when it was published. The event is published only on a real change.
+  An absent `overlay_visible` reads as **visible**, so a console newer than its
+  brain never blanks the projector (U352).
 - **FR-106**: Nothing in the Present panel may throw while reading a scenario.
   Losing the presenter's work is the worst outcome available to this feature.
 - **FR-107**: A beat may name a **persona** — a brain character id. That
@@ -282,3 +303,4 @@ applies to `slide:N` beats; `manual` and `keyword:` beats have no such deadline.
 | U334 | Present mode enforces what it always promised: only the scenario speaks, and no open microphone answers the room |
 | U349 | A beat can be handed to another character, and one line can change character halfway — per-beat `persona`, inline `[persona:id]` markers, and one utterance however many voices are in it |
 | U351 | The wrong-voice note reaches the projector's presenter strip too — the half of U349 that could not be verified while the overlay suite would not mount |
+| U352 | The scenario says when the overlay is on the projector — a scenario-level start state and per-beat `show`/`hide`, rendered clear rather than closed, pushed and polled |

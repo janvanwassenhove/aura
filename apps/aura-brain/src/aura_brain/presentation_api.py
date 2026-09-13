@@ -26,7 +26,10 @@ import yaml
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 from orchestrator.scenario_runner import ScenarioRunner
-from shared_schemas.events.system import PresentationBeatFired
+from shared_schemas.events.system import (
+    PresentationBeatFired,
+    PresentationOverlayChanged,
+)
 from shared_schemas.presentation import Scenario, split_persona_segments
 
 logger = logging.getLogger(__name__)
@@ -236,7 +239,18 @@ async def _generate(topic: str, guardrails: str, engine: str, persona: str = "")
 
 async def _on_event(event: dict) -> None:
     """Runner events → the bus, so the presenter view can render subtitles."""
-    if _bus is None or event.get("type") != "beat_done":
+    if _bus is None:
+        return
+    # U352: the overlay is a separate window with its own store, so a beat that
+    # moves it has to cross an explicit channel. It crosses both: this one
+    # reaches a window that is already open, and `overlay_visible` in the
+    # status reaches one opened halfway through the talk.
+    if event.get("type") == "overlay":
+        await _bus.publish(PresentationOverlayChanged(
+            session_id="presentation", visible=bool(event.get("visible", True)),
+            beat_id=event.get("beat", "")))
+        return
+    if event.get("type") != "beat_done":
         return
     slide = _runner.current_slide if _runner else None
     beat_id = event.get("beat", "")

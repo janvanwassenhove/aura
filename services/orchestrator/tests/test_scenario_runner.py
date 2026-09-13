@@ -275,3 +275,92 @@ async def test_a_rehearsal_still_says_nothing_whoever_the_persona_is() -> None:
     r.rehearsing = True
     await r.next()
     assert rig.said_by == []
+
+
+# --------------------------------------------------------------------------- #
+# U352: the scenario decides when the overlay is on the projector
+# --------------------------------------------------------------------------- #
+
+def _overlay_events(rig: _Rig) -> list[bool]:
+    return [e["visible"] for e in rig.events if e.get("type") == "overlay"]
+
+
+async def test_a_scenario_that_never_mentions_it_leaves_the_overlay_alone() -> None:
+    """The compatibility contract: every scenario written before this unit says
+    nothing, and every one of them goes on showing the overlay throughout."""
+    rig = _Rig()
+    r = rig.runner(Scenario(beats=[
+        Beat(id="a", trigger="manual", mode="speak", text="one"),
+        Beat(id="b", trigger="manual", mode="speak", text="two"),
+    ]))
+    assert r.status()["overlay_visible"] is True
+    await r.next()
+    await r.next()
+    assert r.status()["overlay_visible"] is True
+    assert _overlay_events(rig) == [], "nothing to announce, so nothing is announced"
+
+
+async def test_a_beat_can_take_the_overlay_off_the_projector() -> None:
+    rig = _Rig()
+    r = rig.runner(Scenario(beats=[
+        Beat(id="demo", trigger="slide:5", mode="silent", overlay="hide"),
+        Beat(id="back", trigger="slide:6", mode="speak", text="en ik ben terug",
+             overlay="show"),
+    ]))
+    await r.on_slide(5)
+    assert r.status()["overlay_visible"] is False
+    await r.on_slide(6)
+    assert r.status()["overlay_visible"] is True
+    assert _overlay_events(rig) == [False, True]
+
+
+async def test_a_talk_can_start_hidden_so_it_appears_only_where_asked() -> None:
+    rig = _Rig()
+    r = rig.runner(Scenario(overlay="hidden", beats=[
+        Beat(id="intro", trigger="slide:1", mode="speak", text="hallo",
+             overlay="show"),
+    ]))
+    assert r.status()["overlay_visible"] is False
+    await r.on_slide(1)
+    assert r.status()["overlay_visible"] is True
+
+
+async def test_asking_for_what_is_already_true_says_nothing() -> None:
+    """A beamer redrawing itself because a beat restated the obvious is a flicker
+    the room can see."""
+    rig = _Rig()
+    r = rig.runner(Scenario(beats=[
+        Beat(id="a", trigger="manual", mode="speak", text="one", overlay="show"),
+        Beat(id="b", trigger="manual", mode="speak", text="two", overlay="shown"),
+    ]))
+    await r.next()
+    await r.next()
+    assert _overlay_events(rig) == []
+
+
+async def test_the_overlay_moves_before_the_line_is_spoken() -> None:
+    """A beat that brings him back and speaks must not speak into a blank
+    projector and appear afterwards."""
+    rig = _Rig()
+    r = rig.runner(Scenario(overlay="hidden", beats=[
+        Beat(id="back", trigger="manual", mode="speak", text="hallo", overlay="show"),
+    ]))
+    await r.next()
+    kinds = [e["type"] for e in rig.events]
+    assert kinds.index("overlay") < kinds.index("beat_started")
+
+
+async def test_a_rehearsal_still_moves_the_overlay() -> None:
+    """U267 holds back the two outputs that reach the ROOM — voice and motion.
+    The overlay is the one output a rehearsal exists to let you watch: checking
+    that he clears the screen at the demo is the whole reason to walk the show
+    beforehand, and a rehearsal that skipped it could not rehearse this at all.
+    """
+    rig = _Rig()
+    r = rig.runner(Scenario(beats=[
+        Beat(id="demo", trigger="manual", mode="silent", overlay="hide"),
+    ]))
+    r.rehearsing = True
+    await r.next()
+    assert r.status()["overlay_visible"] is False
+    assert rig.said == []                       # ...and the room still hears nothing

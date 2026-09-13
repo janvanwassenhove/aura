@@ -46,3 +46,32 @@ describe('presentationStore — who said the line', () => {
     expect(s.subtitle).toBe('Hoi.')
   })
 })
+
+/** U352: the overlay is a separate window, so a beat that moves it crosses an
+ *  explicit channel. The store is where both channels land on one field. */
+describe('presentationStore — where the overlay belongs', () => {
+  it('takes the overlay off when a beat says so', () => {
+    const s = usePresentationStore()
+    s.applyEvent({
+      event_type: 'PresentationOverlayChanged', visible: false, beat_id: 'demo',
+    })
+    expect(s.status.overlay_visible).toBe(false)
+  })
+
+  it('brings it back on the next change', () => {
+    const s = usePresentationStore()
+    s.applyEvent({ event_type: 'PresentationOverlayChanged', visible: false })
+    s.applyEvent({ event_type: 'PresentationOverlayChanged', visible: true })
+    expect(s.status.overlay_visible).toBe(true)
+  })
+
+  it('leaves the subtitle alone — it is a different kind of event', () => {
+    const s = usePresentationStore()
+    s.applyEvent({
+      event_type: 'PresentationBeatFired', beat_id: 'a', mode: 'speak', spoken: 'Hallo.',
+    })
+    s.applyEvent({ event_type: 'PresentationOverlayChanged', visible: false })
+    expect(s.subtitle).toBe('Hallo.')
+    expect(s.lastBeat).toBe('a')
+  })
+})

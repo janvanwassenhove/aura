@@ -22,6 +22,16 @@
 #                   things. Leave it out for the presentation's own voice.
 #   [persona:<id>]  inside `text`: hand the line over mid-sentence.
 #   [persona]       hand it back to the beat's own persona.
+#
+# The projector (U352):
+#   overlay: hidden   at the TOP of the file: the whole talk starts clear, so
+#                     he appears only where a beat brings him on.
+#   overlay: hide     on a beat: take him off the projector from here.
+#   overlay: show     on a beat: bring him back.
+#                     Say nothing and the overlay stays as it was — which is
+#                     why a scenario that never mentions it shows him
+#                     throughout. It still has to be switched on in the
+#                     Present panel; the scenario only decides WHEN.
 
 title: "I Hired a Real Robot as My Junior Dev"
 pptx: "robot-junior-dev.pptx"
@@ -65,11 +75,17 @@ beats:
   - id: the-question
     trigger: slide:6
     mode: silent
+    # U352: and OFF the projector. Staying quiet while still sitting in the
+    # corner of the slide is only half of handing the moment over — a face on
+    # screen is watched whether or not it is talking.
+    overlay: hide
 
   # --- closing: verbatim, so the last word lands as written ---
   - id: closing
     trigger: manual
     mode: speak
+    # U352: he comes back for the last word.
+    overlay: show
     # U349: one line, two voices — the robot hands the joke to the kids
     # character and takes the last word back.
     text: "Dus: leren jullie kinderen nog Java? Misschien. [persona:kids_companion]Of iets veel leukers![persona] Maar leer ze vooral wat ze willen bouwen. De rest typ ik wel."

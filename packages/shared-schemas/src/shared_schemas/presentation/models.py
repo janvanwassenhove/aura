@@ -54,6 +54,33 @@ class PresentationScript(BaseModel):
 BeatMode = Literal["speak", "improvise", "chime_in", "silent"]
 
 
+# U352: when the projector overlay is on screen and when it is not.
+#
+# "hidden" describes a state and "hide" an action; a scenario-level default
+# reads naturally as the first and a beat as the second, and people reach for
+# either in both places. Refusing one of them teaches nothing, so both are
+# accepted everywhere and normalised here.
+_OVERLAY_SHOW = ("show", "shown")
+_OVERLAY_HIDE = ("hide", "hidden")
+
+
+def _overlay_word(value: str) -> bool | None:
+    """True (show), False (hide), or None for "not mentioned".
+
+    Raises ValueError on a word that is neither — an overlay that silently
+    ignored a typo would leave the robot on the projector through the one
+    moment the scenario was written to clear it.
+    """
+    word = (value or "").strip().lower()
+    if not word:
+        return None
+    if word in _OVERLAY_SHOW:
+        return True
+    if word in _OVERLAY_HIDE:
+        return False
+    raise ValueError(f"overlay must be shown or hidden, not {value!r}")
+
+
 class Beat(BaseModel):
     """One moment in the presentation the robot participates in."""
 
@@ -71,6 +98,10 @@ class Beat(BaseModel):
     # this beat (a beat that needs a tool lookup must be "pipeline" — U203).
     engine: str = ""
     once: bool = True       # chime_in: fire at most once per run
+    # U352: show or hide the projector overlay from this beat onwards. Empty
+    # means "leave it as it is" — which is why a scenario written before this
+    # existed still shows the overlay for its whole length.
+    overlay: str = ""
     # U349: which character speaks this beat — a brain character id, e.g.
     # "dry_tech_butler". Empty means the presentation's own voice (Present →
     # Persona). It sets the voice AND the way the line is written when the beat
@@ -94,6 +125,11 @@ class Beat(BaseModel):
             except ValueError:
                 return None
         return None
+
+    @property
+    def overlay_change(self) -> bool | None:
+        """True to show, False to hide, None to leave the overlay alone."""
+        return _overlay_word(self.overlay)
 
     def speech_segments(self, text: str | None = None) -> list[VoiceSegment]:
         """This beat's line, cut up by who says which part (U349).
@@ -130,6 +166,10 @@ class Beat(BaseModel):
                 f"beat {self.id!r}: persona must be an id like 'dry_tech_butler'")
         if problem := persona_marker_problem(self.text):
             raise ValueError(f"beat {self.id!r}: {problem}")
+        try:
+            _overlay_word(self.overlay)
+        except ValueError as exc:
+            raise ValueError(f"beat {self.id!r}: {exc}") from exc
         return self
 
 
@@ -138,10 +178,20 @@ class Scenario(BaseModel):
 
     title: str = ""
     pptx: str = ""          # informational: the deck this scenario accompanies
+    # U352: where the overlay starts. "hidden" makes the whole talk start clear
+    # so it appears only at the beats that ask for it; empty or "shown" is the
+    # behaviour every scenario had before this field existed.
+    overlay: str = ""
     beats: list[Beat] = Field(default_factory=list)
+
+    @property
+    def overlay_starts_visible(self) -> bool:
+        """Whether the overlay is on screen before any beat has fired."""
+        return _overlay_word(self.overlay) is not False
 
     @model_validator(mode="after")
     def _unique_ids(self) -> Scenario:
+        _overlay_word(self.overlay)
         seen: set[str] = set()
         for b in self.beats:
             if b.id in seen:

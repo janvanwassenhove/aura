@@ -27,6 +27,12 @@ export interface PresentationStatus {
    *  presentation voice. Distinct from speech_error, which means the room
    *  heard nothing at all. */
   voice_note?: string
+  /** U352: whether the scenario wants the overlay on the projector right now.
+   *  Polled here AND pushed via PresentationOverlayChanged, because an event
+   *  only reaches a subscriber that existed when it was published and the
+   *  overlay window can be opened halfway through a talk. Absent means
+   *  visible — an older brain must not blank the projector. */
+  overlay_visible?: boolean
   fired?: string[]
   armed_keywords?: string[]
   /** U263: `watching` means a watcher is running; `slides_state` says whether
@@ -56,6 +62,14 @@ export const usePresentationStore = defineStore('presentation', () => {
 
   /** Applied for every WS frame; only reacts to our beat events. */
   function applyEvent(raw: Record<string, unknown>): void {
+    // U352: a beat moved the overlay. Written onto the SAME field the status
+    // poll fills, so there is one answer to "should it be on screen" rather
+    // than two that can disagree — this one just arrives 1.5 s sooner, which
+    // on a beamer is the difference between a cut and a lag.
+    if (raw.event_type === 'PresentationOverlayChanged') {
+      status.value = { ...status.value, overlay_visible: raw.visible !== false }
+      return
+    }
     if (raw.event_type !== 'PresentationBeatFired') return
     lastBeat.value = String(raw.beat_id ?? '')
     lastMode.value = String(raw.mode ?? '')

@@ -111,3 +111,21 @@ class PresentationBeatFired(BaseEvent):
     # U349: which character said it — empty means the presentation's own voice.
     # With two characters in one show, an unattributed subtitle is misleading.
     persona: str = ""
+
+
+class PresentationOverlayChanged(BaseEvent):
+    """U352: a beat moved the projector overlay on or off the screen.
+
+    Pushed as well as polled (`overlay_visible` in /presentation/status). The
+    poll is what an overlay window opened halfway through a talk reads, since
+    an event only reaches a subscriber that existed when it was published; this
+    is what a window already open reads, because 1.5 s of a robot sitting on a
+    slide he was supposed to clear is visible from the back of a room.
+
+    Only sent on a real change — restating what is already true would make the
+    beamer redraw for nothing.
+    """
+
+    event_type: Literal["PresentationOverlayChanged"] = "PresentationOverlayChanged"
+    visible: bool = True
+    beat_id: str = ""      # which beat asked for it

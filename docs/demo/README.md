@@ -19,7 +19,7 @@ the robot participates via a scenario.
 | `kids-java` | you say **"Java"** | chime_in | adds one remark about kids learning differently — in the **Kids Companion** voice (U349) |
 | `thesis` | slide 4 | improvise | riffs on "software is a commodity, expertise isn't" + nods |
 | `agent-factory` | you say **"agents"** | chime_in | one confident line about the agent fleet |
-| `the-question` | slide 6 | silent | stays quiet — you own the uncomfortable question |
+| `the-question` | slide 6 | silent | stays quiet **and leaves the projector** — you own the uncomfortable question (U352) |
 | `closing` | manual | speak | delivers the closing line, handing one clause to Kids Companion and taking it back (U349) |
 
 `slide:N` uses PowerPoint's own 1-based numbering. `keyword:` fires when *you*
@@ -34,6 +34,7 @@ It's plain YAML, validated by the `Scenario` model. Each beat needs:
 - `chime_in` → must use a `keyword:` trigger
 - optional `gesture` (e.g. `wave`, `nod`) and `engine` (`pipeline` / `realtime`)
 - optional `persona` — the character that speaks the beat (U349)
+- optional `overlay` — `show` / `hide` the projector overlay from here (U352)
 
 ### Who speaks a beat (U349)
 
@@ -57,6 +58,44 @@ see [ADR-012](../adr/ADR-012-a-line-is-one-utterance-however-many-voices-it-has.
 A persona id that matches no character is still spoken, in the presentation
 voice, and the Present panel says which id it could not find. The scenario
 builder warns about unknown inline ids while you are still at a desk.
+
+### When he is on the projector (U352)
+
+By default the overlay stays on screen for the whole talk — which is what every
+scenario written before this did, and what still happens if you never mention
+it. A beat can move it:
+
+```yaml
+  - id: the-question
+    trigger: slide:6
+    mode: silent
+    overlay: hide        # off the projector from here
+  - id: closing
+    trigger: manual
+    mode: speak
+    overlay: show        # and back for the last word
+```
+
+To run a talk where he appears only at the moments you name, start the whole
+thing clear:
+
+```yaml
+overlay: hidden          # at the top of the file, beside `title`
+```
+
+`hide`/`hidden` and `show`/`shown` both work in both places. A word that is
+neither is refused when you save, with a sentence naming the beat.
+
+Two things worth knowing:
+
+- **The scenario decides WHEN, not WHETHER.** You still switch the overlay on
+  in the Present panel; a scenario cannot open it for you. `overlay: show` on a
+  beat does nothing if there is no overlay up.
+- **Hidden means clear, not closed.** The window stays where it is and fades
+  out, so a beat later can fade it back in instantly. Closing and re-opening it
+  would re-pick the display and reload the page — visible from the back of the
+  room. While it is clear, **nothing** is drawn, the presenter strip included;
+  the Present panel still shows every warning.
 
 A beat that needs a live lookup (calendar, data) must set `engine: pipeline` —
 the realtime engine has no tool access (U203).

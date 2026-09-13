@@ -68,6 +68,11 @@ class ScenarioRunner:
         # U269: why the last line was not heard, if it was not. Empty means
         # the last thing he tried to say actually left the speaker.
         self.last_speech_error = ""
+        # U352: whether the projector overlay is on screen. The scenario may
+        # start it hidden and any beat may move it; a scenario that says
+        # nothing leaves it shown for the whole talk, which is what every
+        # scenario written before this field did.
+        self._overlay_visible = scenario.overlay_starts_visible
 
     # -- state ---------------------------------------------------------
 
@@ -78,6 +83,10 @@ class ScenarioRunner:
     @property
     def current_slide(self) -> int | None:
         return self._current_slide
+
+    @property
+    def overlay_visible(self) -> bool:
+        return self._overlay_visible
 
     def status(self) -> dict:
         return {
@@ -94,6 +103,11 @@ class ScenarioRunner:
             "beats_total": len(self._scenario.beats),
             "rehearsing": self.rehearsing,
             "speech_error": self.last_speech_error,
+            # U352: polled as well as pushed. An event only reaches a subscriber
+            # that existed when it was published, and the overlay is a window
+            # that can be opened halfway through a talk — it has to be able to
+            # ASK what it should look like, not only be told.
+            "overlay_visible": self._overlay_visible,
             "fired": sorted(self._fired),
             "armed_keywords": [
                 b.trigger_value for b in self._scenario.beats
@@ -146,6 +160,21 @@ class ScenarioRunner:
     async def _fire(self, beat: Beat) -> None:
         self._fired.add(beat.id)
         logger.info("beat %r fired (mode=%s trigger=%s)", beat.id, beat.mode, beat.trigger)
+
+        # U352: the projector moves BEFORE the line, so a beat that brings him
+        # back and speaks does not talk into a blank screen and appear after.
+        # Announced only on a real change: a beamer redrawing itself because a
+        # beat restated the obvious is a flicker the room can see.
+        #
+        # This is NOT held back during a rehearsal. U267 holds back the two
+        # outputs that reach the room — voice and motion — and the overlay is
+        # the one output a rehearsal exists to let you watch: checking that he
+        # clears the screen at the demo is the reason to walk the show first.
+        want = beat.overlay_change
+        if want is not None and want != self._overlay_visible:
+            self._overlay_visible = want
+            await self._emit({"type": "overlay", "beat": beat.id, "visible": want})
+
         await self._emit({"type": "beat_started", "beat": beat.id, "mode": beat.mode})
 
         spoken = ""

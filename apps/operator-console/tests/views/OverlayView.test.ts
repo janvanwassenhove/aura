@@ -160,3 +160,59 @@ describe('U351 — the overlay says when it was the wrong voice', () => {
     expect(w.text()).not.toContain('nobody')
   })
 })
+
+/** U352: the scenario decides when the overlay is on the projector.
+ *
+ *  "Hidden" is rendered, not closed. Electron's overlay hide DESTROYS the
+ *  BrowserWindow and a re-show reloads the page from scratch — per beat that
+ *  is a flicker, a display re-pick and a refetch. The window stays; it just
+ *  stops drawing.
+ */
+describe('U352 — the scenario can take the overlay off the screen', () => {
+  it('draws normally when nothing in the scenario says otherwise', async () => {
+    stubFetch()
+    const w = mount(OverlayView)
+    await flushPromises()
+    await flushPromises()
+
+    expect(w.find('.ov').classes()).not.toContain('ov--offstage')
+  })
+
+  it('goes clear when a beat has taken it off', async () => {
+    stubFetch({ overlay_visible: false })
+    const w = mount(OverlayView)
+    await flushPromises()
+    await flushPromises()
+
+    expect(w.find('.ov').classes()).toContain('ov--offstage')
+  })
+
+  it('comes back when a later beat brings it back', async () => {
+    stubFetch({ overlay_visible: false })
+    const w = mount(OverlayView)
+    await flushPromises()
+    await flushPromises()
+    expect(w.find('.ov').classes()).toContain('ov--offstage')
+
+    // The push channel: a beat fired and the projector must not wait for the
+    // next poll to find out.
+    const { usePresentationStore } = await import('../../src/stores/presentationStore')
+    usePresentationStore().applyEvent({
+      event_type: 'PresentationOverlayChanged', visible: true, beat_id: 'back',
+    })
+    await w.vm.$nextTick()
+
+    expect(w.find('.ov').classes()).not.toContain('ov--offstage')
+  })
+
+  it('stays visible against a brain that has never heard of this', async () => {
+    // An older brain sends no overlay_visible at all. Absent is not hidden —
+    // that would blank the projector for every talk written before U352.
+    stubFetch({ overlay_visible: undefined })
+    const w = mount(OverlayView)
+    await flushPromises()
+    await flushPromises()
+
+    expect(w.find('.ov').classes()).not.toContain('ov--offstage')
+  })
+})

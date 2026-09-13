@@ -124,3 +124,67 @@ describe('ScenarioBuilder — inline persona markers', () => {
     expect(w.find('.sb-persona-warn').exists()).toBe(false)
   })
 })
+
+/** U352: when the overlay is on the projector, said in the scenario. */
+describe('ScenarioBuilder — the projector', () => {
+  it('leaves the overlay alone unless a beat says otherwise', async () => {
+    const w = mount(ScenarioBuilder)
+    await settled(w)
+
+    await w.find('textarea.sb-text').setValue('Hallo.')
+    await w.find('button.sb-btn--go').trigger('click')
+
+    const scenario = w.emitted('start')![0][0] as any
+    expect('overlay' in scenario).toBe(false)
+    expect('overlay' in scenario.beats[0]).toBe(false)
+  })
+
+  it('sends a beat that takes the overlay off', async () => {
+    const w = mount(ScenarioBuilder)
+    await settled(w)
+
+    await w.find('textarea.sb-text').setValue('Hallo.')
+    await w.find('select.sb-overlay').setValue('hide')
+    await w.find('button.sb-btn--go').trigger('click')
+
+    expect((w.emitted('start')![0][0] as any).beats[0].overlay).toBe('hide')
+  })
+
+  it('offers the control on a silent beat, which is the likeliest one to want it', async () => {
+    const w = mount(ScenarioBuilder)
+    await settled(w)
+
+    // A beat whose whole purpose is to clear the screen for a live demo says
+    // nothing and does nothing else — so it must not lose the control that
+    // the speaking beats get.
+    await w.find('select.sb-mode').setValue('silent')
+    await w.vm.$nextTick()
+    expect(w.find('select.sb-overlay').exists()).toBe(true)
+  })
+
+  it('can start the whole talk with the overlay off', async () => {
+    const w = mount(ScenarioBuilder)
+    await settled(w)
+
+    await w.find('textarea.sb-text').setValue('Hallo.')
+    await w.find('select.sb-scenario-overlay').setValue('hidden')
+    await w.find('button.sb-btn--go').trigger('click')
+
+    expect((w.emitted('start')![0][0] as any).overlay).toBe('hidden')
+  })
+
+  it('hydrates both when an existing scenario is loaded', async () => {
+    const w = mount(ScenarioBuilder)
+    await settled(w)
+
+    ;(w.vm as any).loadScenario({
+      title: 'T', overlay: 'hidden',
+      beats: [{ id: 'a', trigger: 'manual', mode: 'silent', overlay: 'hide' }],
+    })
+    await w.vm.$nextTick()
+
+    expect((w.find('select.sb-scenario-overlay').element as HTMLSelectElement).value)
+      .toBe('hidden')
+    expect((w.find('select.sb-overlay').element as HTMLSelectElement).value).toBe('hide')
+  })
+})

@@ -24,6 +24,17 @@
       <input v-model="pptx" class="sb-input" placeholder="robot-junior-dev.pptx" />
     </label>
 
+    <!-- U352: where the overlay starts. "Hidden" is for a talk where he should
+         appear only at the moments the scenario names; the default is what
+         every scenario did before this existed - on screen throughout. -->
+    <label class="sb-field">
+      <span>On the projector <em class="sb-hint">the overlay has to be switched on in the Present panel either way</em></span>
+      <select v-model="scenarioOverlay" class="sb-input sb-scenario-overlay">
+        <option value="">shown for the whole talk</option>
+        <option value="hidden">starts hidden - beats bring him on</option>
+      </select>
+    </label>
+
     <!-- Beats -->
     <div v-for="(b, i) in beats" :key="b._k" class="sb-beat"
          :class="{ 'sb-beat--bad': badBeats.includes(b.id.trim()) }">
@@ -84,6 +95,21 @@
           that part will come out in the presentation voice.
         </p>
 
+        <!-- U352: deliberately outside the row below, which disappears for a
+             silent beat - and a silent beat is the likeliest of all to want
+             this. A beat whose whole job is to clear the screen for a live
+             demo says nothing and gestures nothing. -->
+        <div class="sb-row">
+          <label class="sb-lbl">Projector
+            <select v-model="b.overlay" class="sb-input sb-overlay"
+                    title="Move the overlay from this beat onwards. Leave it alone and it stays as it was.">
+              <option value="">leave as it is</option>
+              <option value="show">bring him on screen</option>
+              <option value="hide">take him off the screen</option>
+            </select>
+          </label>
+        </div>
+
         <div class="sb-row" v-if="b.mode !== 'silent'">
           <label class="sb-lbl">Voice
             <select v-model="b.persona" class="sb-input sb-persona"
@@ -140,11 +166,14 @@ interface FormBeat {
   text: string; topic: string; guardrails: string; gesture: string | null; engine: string
   /** U349: the character that speaks this beat; '' is the presentation voice. */
   persona: string
+  /** U352: '' leave alone | 'show' | 'hide' the projector overlay. */
+  overlay: string
 }
 
 let seq = 0
 const title = ref('')
 const pptx = ref('')
+const scenarioOverlay = ref('')   // U352: '' shown throughout | 'hidden'
 const beats = ref<FormBeat[]>([])
 const saved = ref<{ name: string; title: string; beats: number }[]>([])
 const saveName = ref('')
@@ -165,7 +194,7 @@ function blankBeat(): FormBeat {
   return { _k: seq++, id: `beat-${beats.value.length + 1}`, mode: 'speak',
            _tkind: 'manual', _tslide: 1, _tword: '', trigger: 'manual',
            text: '', topic: '', guardrails: '', gesture: null, engine: '',
-           persona: '' }
+           persona: '', overlay: '' }
 }
 
 /** U349: the characters a beat may be handed to. Loaded from the brain — the
@@ -214,6 +243,9 @@ function toScenario(): object {
   return {
     title: title.value,
     pptx: pptx.value.trim(),
+    // U352: omitted rather than sent empty - "not mentioned" is the thing that
+    // keeps every scenario written before this showing the overlay throughout.
+    ...(scenarioOverlay.value ? { overlay: scenarioOverlay.value } : {}),
     beats: beats.value.map(b => {
       if (b.mode === 'chime_in') b._tkind = 'keyword'
       syncTrigger(b)
@@ -228,6 +260,7 @@ function toScenario(): object {
       // U349: omitted rather than sent empty - an absent persona means
       // "the presentation voice", which is not a character id.
       if (b.persona) out.persona = b.persona
+      if (b.overlay) out.overlay = b.overlay
       return out
     }),
   }
@@ -246,6 +279,7 @@ function loadScenario(sc: Record<string, unknown>, name = '') {
   if (!sc) return
   title.value = String(sc.title ?? '')
   pptx.value = String(sc.pptx ?? '')   // U263b: reloading a scenario keeps its deck
+  scenarioOverlay.value = String(sc.overlay ?? '').toLowerCase() === 'hidden' ? 'hidden' : ''
   if (name) saveName.value = name
   beats.value = ((sc.beats as Record<string, unknown>[]) ?? []).map((b) => {
     const trig = String(b.trigger ?? 'manual')
@@ -257,6 +291,7 @@ function loadScenario(sc: Record<string, unknown>, name = '') {
       trigger: trig, text: String(b.text ?? ''), topic: String(b.topic ?? ''),
       guardrails: String(b.guardrails ?? ''), gesture: (b.gesture as string) ?? null,
       engine: String(b.engine ?? ''), persona: String(b.persona ?? ''),
+      overlay: String(b.overlay ?? '').toLowerCase(),
     }
   })
 }
@@ -342,6 +377,7 @@ defineExpose({ setError: (m: string) => { error.value = m }, loadScenario })
 .sb-row { display: flex; gap: 1rem; }
 .sb-gest { padding: 0.2rem; }
 .sb-persona { padding: 0.2rem; max-width: 12rem; }
+.sb-overlay { padding: 0.2rem; max-width: 13rem; }
 .sb-hint { font-style: normal; color: var(--text-faint); font-size: 0.72rem; }
 .sb-marker-hint { margin: 0; }
 .sb-marker-hint code { font-family: var(--font-mono); font-size: 0.7rem; }

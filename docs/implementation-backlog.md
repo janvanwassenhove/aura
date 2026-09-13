@@ -3449,3 +3449,89 @@ it; the room never sees it). 253 console tests green.
 
 **Not verified on a real projector.** It is the same strip, the same class and
 the same guard as the row above it, but nothing here has been on a beamer.
+
+### U352 — he could be quiet, but he could not leave the screen
+
+Asked as *"in presentation mode, within the scenario, add option to define when
+overlay is shown or not — if not mentioned (and activated) it will be shown
+continuously"*.
+
+The last clause is the whole compatibility contract, and it shaped every
+default below: `overlay` absent means "leave it as it is", so a scenario written
+before this field behaves exactly as it did.
+
+**What was missing.** A scenario could decide what he says, when he says it, in
+whose voice (U349) and whether he moves. It could not decide whether he was on
+the projector. `the-question` in the demo has been a `silent` beat since U205 —
+the robot shuts up so the owner can own an uncomfortable question — and it was
+only ever half of handing the moment over. A face on a slide is watched whether
+or not it is talking.
+
+**Hidden is rendered, not closed.** This is the decision the unit turns on.
+Electron's `overlay:present:hide` **destroys the `BrowserWindow`**
+(`main.cjs:619`), and `show` is always a re-show: a new window, a fresh display
+pick, the page loaded again, `onMounted` refetching status and beats. That is
+fine once, when the presenter puts the overlay up. Per beat it is a flicker, a
+re-pick and a refetch, in front of a room. The overlay window also has **no
+preload at all** (`webPreferences: { sandbox: true }`), so it cannot reach
+`window.aura` to hide itself even if that were the right idea. So the window
+stays exactly where it is and stops drawing — `opacity: 0` on the root with a
+350 ms fade, none under `prefers-reduced-motion`. It is already
+`pointer-events: none`, so a clear overlay cannot swallow a click on the deck.
+
+**Both channels, on purpose.** The overlay is a separate window with its own
+store, and the rule for that (constitution; spec 008 FR-106) is an explicit
+channel. This uses both the app has:
+
+- `PresentationOverlayChanged` on the bus — for a window already open, because
+  1.5 s of a robot sitting on a slide he was supposed to clear is visible from
+  the back of a room. Published **only on a real change**: a beamer redrawing
+  itself because a beat restated the obvious is a flicker too.
+- `overlay_visible` in `/presentation/status` — for a window opened halfway
+  through a talk. *An event only reaches a subscriber that exists when it is
+  published*, and this is exactly the state that must survive a late one.
+
+Both write the same field in the store, so there is one answer to "should it be
+on screen" rather than two that can disagree; the push just arrives sooner. An
+**absent** `overlay_visible` reads as visible, so a console newer than its brain
+never blanks the projector.
+
+**Three smaller decisions worth recording:**
+
+- **The projector moves before the line.** The change is emitted at the top of
+  `_fire`, ahead of `beat_started`, so a beat that brings him back and then
+  speaks does not talk into a blank screen and appear afterwards.
+- **A rehearsal still moves it.** U267 holds back the two outputs that reach the
+  room — voice and motion. The overlay is the one output a rehearsal exists to
+  let you *watch*: checking that he clears the screen at the live demo is a
+  reason to walk the show beforehand, and a rehearsal that skipped it could not
+  rehearse this at all.
+- **The control sits outside the row that vanishes for a silent beat.** In the
+  builder the gesture/voice row is hidden for `silent`, and a silent beat is the
+  likeliest of all to want this — a beat whose entire job is to clear the screen
+  says nothing and gestures nothing.
+
+`hide`/`hidden` and `show`/`shown` are both accepted in both places. A scenario
+default reads naturally as a state and a beat as an action, people reach for
+either, and refusing one of them teaches nothing. A word that is neither is
+refused when the scenario is saved, in a sentence naming the beat — an overlay
+that silently ignored a typo would leave the robot on the projector through the
+one moment the scenario was written to clear it.
+
+**What it deliberately does not do**: open the overlay. The scenario decides
+*when*, never *whether* — the presenter still switches it on in the Present
+panel, which is where it has belonged since U266 ("the beamer, not this view, is
+the truth"). `overlay: show` on a beat does nothing if no overlay is up, and
+that is correct: a YAML file should not be able to put a window on somebody's
+beamer.
+
+**Tests**: 9 in shared-schemas for the two fields and their vocabulary, 6 in the
+runner (default silence, a beat moving it, a talk starting hidden, no event for
+a no-op, the ordering against `beat_started`, and rehearsal), 7 in the brain
+(both channels, a fresh talk starting from its own scenario, and the readable
+refusal), and 12 in the console across the overlay view, the store and the
+builder. All verified red first. The demo scenario now clears the projector for
+the hard question and brings him back for the last word, so the dry run pins it.
+
+**Not verified on a real projector.** The fade, and whether 350 ms reads as him
+stepping aside rather than as a glitch, needs a beamer and a room.

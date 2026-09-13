@@ -83,3 +83,20 @@ async def test_the_shipped_scenario_hands_beats_to_another_character() -> None:
     assert closing[1].text == "Of iets veel leukers!"
     # The markup is never part of what is said.
     assert all("[" not in s.text for s in closing)
+
+
+async def test_the_shipped_scenario_clears_the_projector_for_the_hard_question() -> None:
+    """U352: the demo is the worked example of every beat type, so it shows the
+    overlay being moved too — and on the beat where it matters most. Staying
+    silent while still sitting in the corner of the slide is only half of
+    handing the moment over: a face on screen is watched whether it talks or not.
+    """
+    sc = _load()
+    beats = {b.id: b for b in sc.beats}
+
+    assert sc.overlay_starts_visible is True          # the talk opens with him on
+    assert beats["the-question"].overlay_change is False
+    assert beats["closing"].overlay_change is True
+    # Every other beat leaves the projector alone.
+    assert [b.id for b in sc.beats if b.overlay_change is not None] == [
+        "the-question", "closing"]
