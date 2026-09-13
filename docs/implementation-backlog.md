@@ -2107,3 +2107,34 @@ sessie met een televisie erbij een probleem. FR-007 zegt dat achtergrondmedia
 geen beurt mogen opleveren; voor de pipeline doet het wekwoord dat werk, voor
 een open sessie bestaat dat vangnet nog niet.
 
+### U334 — op het podium alleen het scenario
+
+Gemeld: *"in presentatie mode mag hij enkel iets zeggen op basis van scenario,
+nu gaat hij praten los van het scenario (dit mag nooit gebeuren — eigen aan
+present mode dat we deze guardrails opleggen)."*
+
+Het bijzondere: de modus **zei dit al**. In het gedragsmodel staat bij
+presentatie letterlijk `speaks_first: "never — cues only"`. Alleen dwong niets
+het af. Alle andere spreekwegen bleven gewoon open vóór een publiek: een
+antwoord op een getypt bericht, een begroeting zodra de camera iemand herkende,
+een proactieve zin, en — het vervelendst, want daar hoeft niemand hem voor aan
+te spreken — een open Live-sessie die antwoordt op wat ze hoort.
+
+Het scenario praat langs een ándere deur: `presentation_api._speak` gaat
+rechtstreeks naar de robot met zijn eigen synthese. Daardoor kon ik de
+gespreksweg dichtzetten zonder de voorstelling te raken. Dat is ook precies wat
+de laatste test bewaakt: met de poort dicht moet een beat nog steeds klinken —
+anders heeft de beveiliging opgegeten wat ze moest beschermen.
+
+Wat er nu gebeurt in presentatiemodus: antwoorden verschijnen nog gewoon in de
+console (je ziet wat hij zou zeggen), maar er komt geen geluid uit de robot
+behalve de beats, en er wordt geen sessie met open microfoon geopend.
+
+Onderweg: ruff ving een echte fout die mijn zes tests misten. Mijn regel in de
+moduswissel riep `mode_policy` aan zonder import — een `NameError` bij élke
+moduswissel, en de `except ValueError` eromheen zou hem niet eens gevangen
+hebben. Er is nu een test die de modus wisselt zoals de koptekst dat doet, via
+de route.
+
+Brain 637 groen, orchestrator 391 groen, ruff schoon.
+

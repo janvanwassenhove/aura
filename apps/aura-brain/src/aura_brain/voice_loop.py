@@ -784,6 +784,12 @@ class VoiceLoop:
         # wake word; answering is untouched, which is what Quiet always meant.
         if self._hushed():
             return False
+        # U334: on stage only the scenario speaks, and an open session is the
+        # one that needs nobody to address him — it would answer the room.
+        from aura_brain.embodiment import scenario_only
+
+        if scenario_only():
+            return False
         engine = self._engine()
         if engine == "live":
             return await self._live_session_turn(wav, command)

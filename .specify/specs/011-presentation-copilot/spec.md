@@ -6,7 +6,7 @@ priority: P2
 risk: Medium
 created: "2026-04-25"
 amended: "2026-09-05"
-units: [U27, U205, U206, U207, U208, U246, U263, U263b, U264, U265, U266, U267, U269, U282, U320]
+units: [U27, U205, U206, U207, U208, U246, U263, U263b, U264, U265, U266, U267, U269, U282, U320, U334]
 ---
 
 # Feature Specification: Presentation Copilot
@@ -83,6 +83,14 @@ A presenter can write a YAML script file with slide numbers, speech text, and op
 - **FR-003**: `PresentationCueReceived` event MUST be emitted when a slide cue fires.
 - **FR-004**: Slide transitions MUST trigger the behavior engine with motion cues if defined.
 - **FR-005**: Presentation persona MUST be activated when a session is loaded.
+- **FR-007**: On stage he speaks **the scenario and nothing else**. Present mode
+  declared this from the start — its behaviour reads *"speaks_first: never —
+  cues only"* — and nothing enforced it, so a typed reply, a greeting when the
+  camera recognised someone, a proactive line or an open Live session could all
+  talk over a talk. The conversational path is closed while the mode is
+  `presentation`; the scenario's own voice goes straight to the robot
+  (`presentation_api._speak`) and is untouched, which a test pins so the guard
+  can never silence the show it protects (U334).
 - **FR-006**: Presentation session MUST be cleared when `DELETE /presentation/session` is called.
 
 ### Key Entities
@@ -247,3 +255,4 @@ applies to `slide:N` beats; `manual` and `keyword:` beats have no such deadline.
 | U266, U267 | Four "nothing happens" with four causes; a panel that says what will happen |
 | U246 | Three broken things behind one missing word — including `uv sync` pruning the presentation extra |
 | U320 | The panel regrouped: locks as chips, status as status, the projector block given the weight it earns, a run button that names its own action, an empty state with the two doors, and help you can put away |
+| U334 | Present mode enforces what it always promised: only the scenario speaks, and no open microphone answers the room |

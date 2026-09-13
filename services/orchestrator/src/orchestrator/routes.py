@@ -406,6 +406,10 @@ async def set_mode(body: dict) -> JSONResponse:
         # the header switch means both — the boundary AND the voice/behaviour.
         if _persona_mgr is not None:
             _persona_mgr.switch(mode)
+        # U334: and the policy, which is what the speaking paths ask.
+        from orchestrator import mode_policy
+
+        mode_policy.set_active(mode)
     except ValueError as exc:
         return JSONResponse({"error": str(exc)}, status_code=422)
     return JSONResponse({"mode": _router.mode})

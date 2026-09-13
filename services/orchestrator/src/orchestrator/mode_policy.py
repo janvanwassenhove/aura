@@ -464,6 +464,31 @@ def set_quiet(on: bool) -> bool:
     return data["quiet"]
 
 
+# U334: which mode is live right now. The router and the persona manager each
+# keep their own copy for their own purposes; this is the one anything may ask,
+# because "may he speak at all" is a policy question and this is the policy
+# module. In memory on purpose: the mode is where the owner is standing, not a
+# setting — a restart starts in the default, as it always has.
+_active_mode: str = "work"
+
+
+def active() -> str:
+    return _active_mode
+
+
+def set_active(mode: str) -> str:
+    """Record the mode the header just switched to."""
+    global _active_mode
+    if mode in UI_MODES:
+        _active_mode = mode
+    return _active_mode
+
+
+def presenting() -> bool:
+    """On stage: he says the scenario and nothing else (U334)."""
+    return _active_mode == "presentation"
+
+
 def speaks_first() -> bool:
     """May he open his mouth unprompted right now?"""
     return not quiet()

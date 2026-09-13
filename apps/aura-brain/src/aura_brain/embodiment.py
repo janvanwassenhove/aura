@@ -61,6 +61,25 @@ def gesture_for(text: str) -> str:
     return _TONE_GESTURE[tone_for(text)]
 
 
+def scenario_only() -> bool:
+    """U334: is he on stage, where only the scenario may speak?
+
+    Present mode has always *declared* this — its behaviour reads
+    "speaks_first: never — cues only" — and nothing enforced it, so a greeting,
+    a typed reply or an open Live session could talk over a talk. The scenario
+    speaks through `presentation_api._speak`, which goes straight to the robot,
+    so closing this path leaves the show untouched.
+
+    Never raises: if the policy cannot be read, he keeps his voice.
+    """
+    try:
+        from orchestrator import mode_policy  # noqa: PLC0415
+
+        return bool(mode_policy.presenting())
+    except Exception:  # noqa: BLE001
+        return False
+
+
 def embodiment_plan(text: str, persona_config: Any | None) -> tuple[bool, str | None, float]:
     """(speak, motion_id | None, amplitude) for a reply under the active persona.
 
@@ -71,6 +90,9 @@ def embodiment_plan(text: str, persona_config: Any | None) -> tuple[bool, str | 
       no gesture at all.
     - No persona config (robot-only setups, tests) → speak with default nod.
     """
+    if scenario_only():
+        # U334: on stage, everything that is not a beat stays in the console.
+        return False, None, 0.0
     if persona_config is None:
         return True, gesture_for(text), 0.5
     speak = getattr(persona_config, "voice_style", "") != "silent"
