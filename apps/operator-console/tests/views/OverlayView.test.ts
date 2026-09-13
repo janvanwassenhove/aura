@@ -112,3 +112,51 @@ describe('U269 — the overlay knows the show it is drawn over', () => {
     expect(w.text()).not.toContain('Slide 7')
   })
 })
+
+/** U351: U349 gave the Present panel a strip for "he was heard, but not in the
+ *  voice the scenario asked for". The overlay carries `speech_error` for
+ *  exactly the same reason — it is where the presenter is looking — but the
+ *  note never got here, because this suite could not mount at the time (U350).
+ */
+describe('U351 — the overlay says when it was the wrong voice', () => {
+  it('reports a persona that could not be found', async () => {
+    stubFetch({ voice_note: "persona 'dry_tech_buttler' is not a character here" })
+    const w = mount(OverlayView)
+    await flushPromises()
+    await flushPromises()
+
+    expect(w.text()).toContain('dry_tech_buttler')
+  })
+
+  it('does not claim the wrong voice when every persona resolved', async () => {
+    stubFetch({ voice_note: '' })
+    const w = mount(OverlayView)
+    await flushPromises()
+    await flushPromises()
+
+    expect(w.findAll('.ov-warning')).toHaveLength(0)
+  })
+
+  it('keeps it apart from not being heard at all', async () => {
+    // Two different problems needing two different reactions mid-sentence:
+    // "turn on laptop audio" versus "that was the wrong character".
+    stubFetch({ speech_error: 'no robot is connected',
+                voice_note: "persona 'nobody' is not a character here" })
+    const w = mount(OverlayView)
+    await flushPromises()
+    await flushPromises()
+
+    expect(w.text()).toContain('could not be heard')
+    expect(w.text()).toContain('nobody')
+  })
+
+  it('never shows it to the room', async () => {
+    stubFetch({ voice_note: "persona 'nobody' is not a character here" })
+    window.location.hash = '#overlay?mode=audience'
+    const w = mount(OverlayView)
+    await flushPromises()
+    await flushPromises()
+
+    expect(w.text()).not.toContain('nobody')
+  })
+})

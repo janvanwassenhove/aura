@@ -19,6 +19,15 @@
       <div v-if="presentation.status.speech_error" class="ov-warning">
         He could not be heard: {{ presentation.status.speech_error }}
       </div>
+      <!-- U351: he WAS heard, in the wrong voice. U349 put this on the Present
+           panel and not here, because this suite could not mount then (U350) —
+           and a strip that carries "he was not heard" for the presenter is
+           exactly where "that was the wrong character" belongs too. Stacked
+           rather than chained: the two are different problems, and a dead
+           speaker does not make a mis-named persona untrue. -->
+      <div v-if="presentation.status.voice_note" class="ov-warning">
+        Not the voice the scenario asked for: {{ presentation.status.voice_note }}
+      </div>
     </div>
 
     <!-- ═══ U269: what he is actually looking at ═══

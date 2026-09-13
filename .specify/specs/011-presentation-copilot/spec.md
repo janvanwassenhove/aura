@@ -6,7 +6,7 @@ priority: P2
 risk: Medium
 created: "2026-04-25"
 amended: "2026-09-13"
-units: [U27, U205, U206, U207, U208, U246, U263, U263b, U264, U265, U266, U267, U269, U282, U320, U334, U349]
+units: [U27, U205, U206, U207, U208, U246, U263, U263b, U264, U265, U266, U267, U269, U282, U320, U334, U349, U351]
 ---
 
 # Feature Specification: Presentation Copilot
@@ -254,7 +254,10 @@ settings aside as the example.
 - **FR-110**: A persona id that matches no character still gets spoken, in the
   presentation voice, and the presentation status carries a `voice_note` saying
   which id could not be found. Distinct from `speech_error`, which means the
-  room heard nothing at all (constitution XI).
+  room heard nothing at all (constitution XI). It appears on **both** presenter
+  surfaces — the Present panel and the overlay's presenter strip — and on
+  neither audience layer, stacked beside `speech_error` rather than replacing
+  it: a dead speaker does not make a mis-named persona untrue (U351).
 
 ## Superseded
 
@@ -278,3 +281,4 @@ applies to `slide:N` beats; `manual` and `keyword:` beats have no such deadline.
 | U320 | The panel regrouped: locks as chips, status as status, the projector block given the weight it earns, a run button that names its own action, an empty state with the two doors, and help you can put away |
 | U334 | Present mode enforces what it always promised: only the scenario speaks, and no open microphone answers the room |
 | U349 | A beat can be handed to another character, and one line can change character halfway — per-beat `persona`, inline `[persona:id]` markers, and one utterance however many voices are in it |
+| U351 | The wrong-voice note reaches the projector's presenter strip too — the half of U349 that could not be verified while the overlay suite would not mount |

@@ -3283,8 +3283,8 @@ The one place this unit *should* have gone and did not is the projector
 overlay's presenter strip, which already carries `speech_error` for exactly the
 reason `voice_note` exists. `OverlayView.test.ts` is one of the 57 below: it
 fails before it mounts, so a change there could not have been verified, and an
-unverifiable line in a file about honest reporting is the wrong trade. It goes
-in once that suite runs again.
+unverifiable line in a file about honest reporting is the wrong trade.
+**Finished in U351**, once U350 made that suite run again.
 
 **Not verified on the real robot.** Everything here is covered by fakes and by
 the FakeRobot path; the one thing tests cannot show is whether 120 ms of silence
@@ -3410,3 +3410,42 @@ The other 57 are the rest of the evidence.
   once during a full run and absent from the next one. It does not change the
   exit code and predates this change, but it is a fetch still in flight when a
   test file ends, which is a real thing somewhere in the suite.
+
+### U351 — the projector strip was still the one place it did not say so
+
+Asked as *"finish this"* — the piece U349 wrote down as outstanding rather than
+shipping.
+
+U349 added `voice_note`: he was heard, but not in the voice the scenario asked
+for, because a beat named a persona that is not a character here. It reached the
+Present panel and stopped there. The projector overlay has carried
+`speech_error` on its presenter strip since U269, for the identical reason
+recorded in that unit's own comment — *"so it says it here too, where the
+presenter is looking"* — and during a talk the presenter is usually looking at
+the strip, not at the console.
+
+It was left out for a reason and the reason is now gone. `OverlayView.test.ts`
+was one of the 57 console tests that failed before mounting (U350), so a change
+there could not have been verified — and an unverifiable line in a feature whose
+entire subject is honest reporting is the wrong trade. U350 fixed the test
+environment; the suite runs; this is four lines of template and four tests.
+
+Two small decisions worth recording:
+
+- **Stacked, not chained.** The Present panel shows one banner at a time and
+  ranks it (rehearsal → not heard → wrong voice), because it is a single slot.
+  The overlay strip already stacks `deck_warnings` and `speech_error` as rows,
+  so the note joins them as a row. A dead speaker does not make a mis-named
+  persona untrue, and a presenter fixing the audio should still learn that the
+  butler was spelled wrong.
+- **Presenter only.** The block sits inside the strip's existing
+  `mode === 'presenter'` guard, so it can never reach the audience layer. A room
+  must not read the machinery of the talk it is watching — there is a test for
+  that, as there is for the rest of the strip.
+
+**Tests**: 4, verified red first (the note renders; it stays absent when every
+persona resolved; it stands beside "could not be heard" rather than instead of
+it; the room never sees it). 253 console tests green.
+
+**Not verified on a real projector.** It is the same strip, the same class and
+the same guard as the row above it, but nothing here has been on a beamer.
