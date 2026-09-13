@@ -2000,3 +2000,32 @@ tekening:**
    robot die net wegviel). Het script weigert die foto te maken zolang de
    console nog een verbonden robot tekent.
 
+### U331 — "het is niet duidelijk wanneer hij overschakelt op GPT-Live"
+
+Met de juiste waarneming erbij: *"lijkt dat hij bij begroeting standaard
+modellen gebruikt"*. Dat klopt, en het is geen storing maar een grens die
+nergens stond.
+
+De engine-keuze stuurt **één** pad aan: een gesproken beurt die de robot zélf
+hoort — na het wekwoord, of in het vervolgvenster meteen na zijn antwoord. De
+spraaklus is de enige code die de instelling leest. Alles daarbuiten negeert
+haar:
+
+* getypte berichten gaan door de gewone denkketen;
+* de **Talk-knop** in de app neemt op met de laptopmicrofoon en post naar
+  `/voice/turn`, en dat eindpunt draait altijd de pipeline;
+* de begroeting bij herkenning, proactieve zinnen en herinneringen hebben
+  alleen tekst — Live is spraak-naar-spraak en heeft een audiostroom nodig.
+
+En met *hands-free voice* uit wordt de instelling überhaupt nooit bereikt. Dat
+was precies de toestand: Live gekozen, wekwoord uit, en dus een gewone
+begroeting — wat redelijkerwijs leest als een kapotte instelling.
+
+De rij zegt dat nu zelf: welk pad ze stuurt, en een waarschuwing zodra ze niets
+kan doen. En zolang Live gekozen is, meldt de rij *Voice model* dat hij niet
+gebruikt wordt — GPT-Live brengt zijn eigen model mee.
+
+Vijf consoletests, twee eerst rood. Eén ervan slaagde aanvankelijk om de
+verkeerde reden: hij zocht "hands-free" ergens op de pagina, en dat woord staat
+ook in de stemsectie. Nu gepind op het element zelf. Console 203 groen.
+

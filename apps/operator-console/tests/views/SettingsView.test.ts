@@ -132,3 +132,72 @@ describe('GPT-Live as a conversation engine', () => {
     w.unmount()
   })
 })
+
+/** U331: the Conversation engine setting governs ONE path — a spoken turn the
+ *  robot hears itself, after the wake word or inside the follow-up window.
+ *  Typed messages, the Talk button and greetings always use the conversation
+ *  model. The row said none of that, so choosing "live" and then hearing an
+ *  ordinary greeting read as a broken setting rather than as a boundary. And
+ *  with hands-free voice off it cannot fire at all — which is exactly the
+ *  state the owner was in while wondering why nothing changed. */
+describe('the conversation engine says where it applies', () => {
+  const withPrefs = (prefs: Record<string, unknown>) => {
+    vi.stubGlobal('fetch', (url: string) => {
+      const u = String(url)
+      if (u.includes('/setup/prefs')) return OK(prefs)
+      if (u.includes('/capabilities')) return OK({ capabilities: [], allowed_apps: [] })
+      if (u.includes('/config/llm/models')) return OK({ models: [] })
+      if (u.includes('/config/llm')) return OK({ provider: 'openai', model: 'gpt-4o-mini' })
+      return OK({})
+    })
+  }
+
+  it('names the one path it governs', async () => {
+    withPrefs({ voice_mode: 'wake_word', voice_engine: 'live' })
+    const w = mount(SettingsView)
+    await flushPromises()
+    await flushPromises()
+    const scope = w.find('.engine-scope')
+    expect(scope.exists(), 'the row must say which path it governs').toBe(true)
+    expect(scope.text()).toMatch(/wake word/i)
+    expect(scope.text()).toMatch(/typed|Talk button|greeting/i)
+    w.unmount()
+  })
+
+  it('warns that it can do nothing while hands-free voice is off', async () => {
+    withPrefs({ voice_mode: 'off', voice_engine: 'live' })
+    const w = mount(SettingsView)
+    await flushPromises()
+    await flushPromises()
+    expect(w.text()).toMatch(/does nothing right now|cannot hear/i)
+    expect(w.find('.engine-warn').exists()).toBe(true)
+    w.unmount()
+  })
+
+  it('stays quiet when he can actually hear you', async () => {
+    withPrefs({ voice_mode: 'wake_word', voice_engine: 'live' })
+    const w = mount(SettingsView)
+    await flushPromises()
+    await flushPromises()
+    expect(w.find('.engine-warn').exists()).toBe(false)
+    w.unmount()
+  })
+
+  it('says the realtime voice model is unused while Live is chosen', async () => {
+    withPrefs({ voice_mode: 'wake_word', voice_engine: 'live' })
+    const w = mount(SettingsView)
+    await flushPromises()
+    await flushPromises()
+    expect(w.text()).toMatch(/GPT-Live brings its own|not used while/i)
+    w.unmount()
+  })
+
+  it('does not say that when the engine is realtime', async () => {
+    withPrefs({ voice_mode: 'wake_word', voice_engine: 'realtime' })
+    const w = mount(SettingsView)
+    await flushPromises()
+    await flushPromises()
+    expect(w.text()).not.toMatch(/GPT-Live brings its own/i)
+    w.unmount()
+  })
+})

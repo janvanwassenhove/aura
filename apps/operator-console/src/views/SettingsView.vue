@@ -49,6 +49,9 @@
             <div class="row-text">
               <div class="row-title">{{ role.label }}</div>
               <div class="row-sub">{{ role.sub }}</div>
+              <div v-if="role.field === 'realtime_model' && prefs.voiceEngine === 'live'" class="role-warn">
+                GPT-Live brings its own voice model, so this one is not used while Live is the engine.
+              </div>
             </div>
             <select v-model="roles[role.field]" class="d2-field row-field" :aria-label="role.label" @change="saveModelRoles">
               <option value="">{{ role.field === 'realtime_model' ? '— automatic —' : '— use the model above —' }}</option>
@@ -61,6 +64,11 @@
           <div class="row-text">
             <div class="row-title">Conversation engine</div>
             <div class="row-sub">{{ engineHint }}</div>
+            <!-- U331: the setting governs ONE path. Saying so here is the
+                 difference between "it does nothing" and "it does not apply
+                 to what you just tried". -->
+            <div class="engine-scope">Only for spoken turns he hears himself — after the wake word, or in the follow-up window right after he answers. Typed messages, the Talk button and greetings always use the conversation model above.</div>
+            <div v-if="engineWarning" class="engine-warn">{{ engineWarning }}</div>
           </div>
           <select :value="prefs.voiceEngine" class="d2-field row-field" aria-label="Conversation engine" @change="saveEngine">
             <option value="pipeline">pipeline</option>
@@ -547,6 +555,18 @@ const ENGINE_HINT: Record<string, string> = {
 }
 const engineHint = computed(() => ENGINE_HINT[prefs.voiceEngine] ?? ENGINE_HINT.pipeline)
 
+// U331: when the chosen engine cannot act, say so where it is chosen. The
+// owner had Live selected with hands-free voice off, heard an ordinary
+// greeting, and reasonably concluded the setting was broken — it was simply
+// never reached, and nothing on this page admitted that.
+const engineWarning = computed(() => {
+  if (prefs.voiceEngine === 'pipeline') return ''
+  if (prefs.voiceMode !== 'wake_word') {
+    return 'Hands-free voice is off, so this does nothing right now — he only answers the Talk button, and that always uses the conversation model.'
+  }
+  return ''
+})
+
 async function testLive(): Promise<void> {
   testingRealtime.value = true
   realtimeResult.value = ''
@@ -761,6 +781,11 @@ watch(() => themeStore.theme, () => { /* persisted by the store's own watcher */
 .row-val { font-size: 12.5px; font-weight: 600; color: var(--ink-3); flex-shrink: 0; }
 .row-val.ok { color: var(--ok); }
 .row-val.warn { color: var(--warn); }
+.engine-scope { font-size: 12px; color: var(--ink-3); margin-top: 4px; max-width: 62ch; }
+.engine-warn, .role-warn {
+  font-size: 12px; margin-top: 6px; max-width: 62ch;
+  color: var(--warn, #8a5a10); font-weight: 600;
+}
 .sec-note { margin: 0; padding: 8px 16px 12px; font-size: 12.5px; color: var(--ink-2); }
 .sec-error { margin: 0; padding: 8px 16px 12px; font-size: 12.5px; color: var(--danger); }
 

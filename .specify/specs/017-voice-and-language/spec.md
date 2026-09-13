@@ -5,7 +5,7 @@ owner: "aura-brain / conversation"
 priority: P1
 risk: High
 created: "2026-09-05"
-units: [U22, U36b, U36e, U36h, U45, U46, U47, U49, U54, U67, U73, U80, U81, U82, U83, U84, U85, U86, U87, U88, U89, U91, U92, U96, U128, U129, U130, U131, U132, U133, U134, U135, U140, U141, U142, U143, U144, U145, U146, U148, U149, U150, U153, U154, U155, U156, U163, U203, U209, U256, U257, U258, U260, U273, U275, U287, U288, U289, U291, U292, U321, U322, U324, U329]
+units: [U22, U36b, U36e, U36h, U45, U46, U47, U49, U54, U67, U73, U80, U81, U82, U83, U84, U85, U86, U87, U88, U89, U91, U92, U96, U128, U129, U130, U131, U132, U133, U134, U135, U140, U141, U142, U143, U144, U145, U146, U148, U149, U150, U153, U154, U155, U156, U163, U203, U209, U256, U257, U258, U260, U273, U275, U287, U288, U289, U291, U292, U321, U322, U324, U329, U331]
 ---
 
 # Feature Specification: Voice and Language
@@ -225,6 +225,14 @@ stated on screen.
   pruning trap. A contract test pins every SDK resource the four speech paths
   and the orchestrator call, so a future major bump cannot remove one quietly
   (U322).
+- **FR-020**: The Conversation engine setting says **where it applies** and
+  **when it cannot**. It governs one path — a spoken turn the robot hears
+  itself, after the wake word or inside the follow-up window; typed messages,
+  the console's Talk button (which posts to `/voice/turn` and always runs the
+  pipeline) and greetings use the conversation model whatever it says. With
+  hands-free voice off it cannot be reached at all, and the row says so rather
+  than looking effective. While Live is chosen, the realtime voice-model row
+  says it is unused, because GPT-Live brings its own (U331, constitution XI).
 - **FR-019**: Every speech path leaves the speaker at the same loudness. The
   whole-utterance path peak-normalises quiet TTS to 0.95 before the app volume;
   the streamed path gets there with **one gain per utterance**, decided on its
@@ -304,3 +312,4 @@ the same series as this backfill.
 | U322 | OpenAI SDK 2.33 → 3.13 (a major bump), declared by aura-brain itself, with a contract test for every resource AURA uses |
 | U324 | GPT-Live as an opt-in fourth engine (`live_session.py`): delegation to the orchestrator, silence gate, mic mute, idle close, meter, probe, measured voices; the dispatch finally follows the per-character engine (U203) |
 | U329 | Streamed speech was ~9 dB quieter than spoken speech: one loudness gain per utterance on the segment path, measured against a real reply |
+| U331 | The engine row says which path it governs, warns when hands-free voice makes it unreachable, and marks the realtime voice model unused under Live |
