@@ -357,6 +357,29 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     _robot = RobotClient()
     robot_api.init(_robot)
 
+    # U336: on another network he gets another address, and the brain read the
+    # old one once at startup. Rather than reporting "offline" until somebody
+    # presses Scan my network, watch the address and follow him. Same three
+    # steps the manual button takes, so there is one way an address is adopted.
+    from aura_brain import robot_finder
+
+    if robot_finder.autofind_enabled():
+        def _adopt_robot_address(url: str) -> None:
+            os.environ["ROBOT_RUNTIME_URL"] = url
+            _robot._base_url = url          # live: no restart to follow him
+            try:
+                from aura_brain.setup_api import _write_env
+
+                _write_env({"ROBOT_RUNTIME_URL": url})
+            except Exception as exc:  # noqa: BLE001 — following matters more
+                logging.getLogger(__name__).debug(
+                    "could not persist the robot address: %s", exc)
+
+        ctx._robot_watch = asyncio.create_task(robot_finder.watch_address(
+            lambda: _robot._base_url, _adopt_robot_address,
+            interval_s=float(os.environ.get("ROBOT_AUTOFIND_S", "30") or 30),
+        ))
+
     # U206: co-presenter — the runner speaks/gestures through the robot and
     # publishes beat subtitles onto the bus for the console's presenter view.
     from aura_brain import presentation_api

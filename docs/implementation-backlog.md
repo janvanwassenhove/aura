@@ -2184,3 +2184,36 @@ zeggen nu expliciet in welke modus ze zich afspelen.
 Tien nieuwe tests eerst rood. Brain 648 groen, orchestrator 391 groen, ruff
 schoon.
 
+### U336 — hij verhuist van netwerk, en AURA zoekt hem zelf terug
+
+Gevraagd bij het vooruitkijken naar een conferentie: *"kunnen we alles niet
+comfortabeler maken vanuit aura?"*
+
+Wat het ongemakkelijk maakte: de brain leest het robotadres **één keer**, bij
+het opstarten, en kijkt daarna nooit meer. Ga je met laptop en robot naar een
+ander netwerk — een telefoonhotspot, een kantoor — dan geeft DHCP hem een ander
+adres terwijl de brain het oude blijft bellen. Alles meldt dan "offline":
+correct, en nutteloos, tot iemand het Robot-paneel opent, *Scan my network*
+indrukt en met de hand het nieuwe adres kiest. Die sweep bestaat sinds U200;
+alleen riep niemand hem ooit uit zichzelf aan.
+
+Nu wordt het adres bewaakt. Antwoordt het niet meer, dan zoekt hij in de
+goedkoopste volgorde: het adres dat we hebben (één verzoek, en meestal het
+antwoord), dan `reachy-mini.local`, en pas dan elke host op ons eigen /24 —
+dezelfde grens die U200 trok, nooit breder dan het subnet van de eigenaar.
+
+Alleen iets dat **als robot antwoordt** wordt overgenomen: `/health` met een
+robotlichaam erin. Een open poort 8001 is geen bewijs; een printer die
+verbindingen accepteert zou anders "de robot" worden en elke volgende aanroep
+op een nieuwe manier laten mislukken. Overnemen gebeurt één keer per verhuizing
+en langs exact dezelfde drie stappen als de handmatige knop, zodat er één weg
+is waarop een adres verandert. Uit te zetten met `ROBOT_AUTOFIND=false`.
+
+Tien tests eerst rood, waaronder: het bestaande adres kost één verzoek en geen
+scan, iets anders op die poort wordt niet overgenomen, en een stukgelopen
+netwerk doodt de bewaking niet.
+
+**Wat dit uitdrukkelijk niet kan**, en geen enkele app kan: hem op een wifi
+zetten waar hij nog niet op zit. Kan hij het netwerk niet bereiken, dan kan
+niets hier hem bereiken. Dat blijft een eenmalige klus aan de robot zelf.
+

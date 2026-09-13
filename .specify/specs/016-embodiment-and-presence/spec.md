@@ -5,7 +5,7 @@ owner: "robot-runtime"
 priority: P1
 risk: Medium
 created: "2026-09-05"
-units: [U16, U36a, U36d, U36g, U37, U51, U99, U100, U101, U102, U111, U116, U126, U127, U137, U138, U139, U147, U157, U158, U161, U162, U164, U165, U175, U196, U212, U219, U237, U238, U252b, U252d, U253, U268, U270, U286, U325, U326, U328]
+units: [U16, U36a, U36d, U36g, U37, U51, U99, U100, U101, U102, U111, U116, U126, U127, U137, U138, U139, U147, U157, U158, U161, U162, U164, U165, U175, U196, U212, U219, U237, U238, U252b, U252d, U253, U268, U270, U286, U325, U326, U328, U336]
 ---
 
 # Feature Specification: Embodiment and Presence
@@ -230,6 +230,14 @@ while he is speaking, so that a conversation looks like a conversation.
   as one choice, and every window showing the robot honours the same selection.
 - **FR-006**: Gesture selection from reply text is heuristic and synchronous —
   no model call on the speech path.
+- **FR-013**: The brain follows the robot's address. It is watched, not read
+  once: when it stops answering, the brain tries the address it has, then
+  `reachy-mini.local`, then every host on its own /24 — the bound U200 set —
+  and adopts the first that answers **like a robot** (`/health` with a robot
+  body; an open port is not proof). Adoption takes the same three steps as the
+  manual button, once per move. `ROBOT_AUTOFIND=false` turns it off. It cannot
+  put him on a network he is not on: that stays a one-time job at the robot
+  (U336).
 - **FR-007**: Every new brain→runtime call tolerates a 404 from an older Pi and
   reports the degradation.
 - **FR-008**: Pointing the head comes in two kinds, and they are not
@@ -287,6 +295,7 @@ while he is speaking, so that a conversation looks like a conversation.
 | U252d, U268, U286 | Per-character move; the one-letter SVG bug that froze all ten faces; the overlay following the character choice |
 | U175, U212, U219, U196 | Camera: silent MJPEG stall, single-frame blips, shared frame decode, and a live view against an older robot |
 | U270 | Battery, in the three states it can actually be in |
+| U336 | The brain follows the robot to a new network instead of reporting offline until somebody scans by hand |
 | U328 | Antenna reactions: an antenna-led vocabulary, head-and-antennae in one command, and one tone classification feeding both |
 | U326 | Conversational body language both ways: acknowledging while someone speaks, moving with what he says, and a reply gesture that no longer delays the reply |
 | U325 | `gaze`: looking at someone without taking follow-me away; the face position the recogniser already had; a sweep whose cadence follows the room |
