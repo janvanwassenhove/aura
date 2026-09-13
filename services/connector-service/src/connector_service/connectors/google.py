@@ -92,7 +92,7 @@ class GoogleConnector(M365Connector):
             return result.get("items", [])
 
         try:
-            items = await asyncio.get_event_loop().run_in_executor(None, _fetch)
+            items = await asyncio.get_running_loop().run_in_executor(None, _fetch)
         except Exception as exc:
             raise ConnectorUnavailableError(f"Google Calendar API error: {exc}") from exc
 
@@ -134,7 +134,7 @@ class GoogleConnector(M365Connector):
             return full
 
         try:
-            raw_messages = await asyncio.get_event_loop().run_in_executor(None, _fetch)
+            raw_messages = await asyncio.get_running_loop().run_in_executor(None, _fetch)
         except Exception as exc:
             raise ConnectorUnavailableError(f"Gmail API error: {exc}") from exc
 
@@ -171,7 +171,7 @@ class GoogleConnector(M365Connector):
             svc.users().messages().send(userId="me", body={"raw": raw}).execute()
 
         try:
-            await asyncio.get_event_loop().run_in_executor(None, _send)
+            await asyncio.get_running_loop().run_in_executor(None, _send)
         except Exception as exc:
             raise ConnectorUnavailableError(f"Gmail send error: {exc}") from exc
 

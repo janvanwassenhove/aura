@@ -281,7 +281,7 @@ async def microsoft_auth_poll(body: dict) -> JSONResponse:
     flow_obj = _ms_flow()
     try:
         # Run blocking MSAL poll in a thread pool to avoid blocking the event loop
-        token_data = await asyncio.get_event_loop().run_in_executor(
+        token_data = await asyncio.get_running_loop().run_in_executor(
             None,
             flow_obj.complete_device_code_flow,  # type: ignore[union-attr]
             pending["flow"],
@@ -346,7 +346,7 @@ async def google_auth_poll(body: dict) -> JSONResponse:
 
     flow_obj = _google_flow()
     try:
-        await asyncio.get_event_loop().run_in_executor(
+        await asyncio.get_running_loop().run_in_executor(
             None,
             flow_obj.poll_for_token,  # type: ignore[union-attr]
             pending["device_code"],
@@ -415,7 +415,7 @@ async def github_auth_poll(body: dict) -> JSONResponse:
 
     flow_obj = _github_flow()
     try:
-        await asyncio.get_event_loop().run_in_executor(
+        await asyncio.get_running_loop().run_in_executor(
             None,
             flow_obj.poll_for_token,  # type: ignore[union-attr]
             pending["device_code"],

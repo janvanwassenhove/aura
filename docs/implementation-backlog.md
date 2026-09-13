@@ -2029,3 +2029,41 @@ Vijf consoletests, twee eerst rood. Eén ervan slaagde aanvankelijk om de
 verkeerde reden: hij zocht "hands-free" ergens op de pagina, en dat woord staat
 ook in de stemsectie. Nu gepind op het element zelf. Console 203 groen.
 
+### U332 — op een tweede laptop startte AURA niet op
+
+Gemeld met het log erbij, en dat log wees precies aan waar:
+
+```
+future: asyncio.Future[bool] = field(default_factory=asyncio.get_event_loop().create_future)
+RuntimeError: There is no current event loop in thread 'MainThread'.
+```
+
+Die regel staat in de **klasse-body** van een dataclass, dus hij draait bij het
+importeren — in een draad zonder lus. Tot en met Python 3.13 maakte
+`get_event_loop()` er dan stilletjes zelf een en waarschuwde alleen (die
+DeprecationWarning stond al maanden onderaan élke testrun van dit project). Op
+**3.14 is het een harde fout**. En `uv` mag elke interpreter kiezen die
+`requires-python = ">=3.11"` toelaat, dus op die verse machine werd het 3.14 en
+stierf de brain vóór zijn eerste regel werk — met een stacktrace over een
+dataclass-veld, wat niets zegt over wat de eigenaar probeerde te doen.
+
+Opgelost door de future te maken wanneer de goedkeuring wordt aangevraagd, in
+de lus die hem ook zal afwachten. En de drie zusjes meteen mee: elke
+`get_event_loop()` in eigen code is nu `get_running_loop()` — dat is de enige
+die niet de verkeerde lus kán teruggeven (connector-service, identity-service,
+robot-runtime).
+
+Twee tests: een scan die élke `asyncio.get_event_loop()` in de broncode afkeurt
+(rood gezien op vier bestanden), en een die de module in een verse interpreter
+importeert. Daarnaast op de échte interpreter nagemeten: met de oude code geeft
+Python 3.14.0 exact de fout uit het log; met de fix importeert hij schoon.
+
+Suites: orchestrator 391, robot-runtime 135, connector-service 89,
+identity-service 6, aura-brain 632.
+
+**Nog een beslissing die van jou is.** De crash is weg, maar 3.14 wordt nergens
+getest — CI draait 3.11. Zolang `requires-python` alles vanaf 3.11 toelaat,
+installeert een verse machine op wat uv toevallig kiest. Twee opties: het
+bereik dichtzetten (`<3.14`) zodat installaties op een geteste versie landen,
+of 3.14 aan CI toevoegen en het echt ondersteunen. Niet stil beslist.
+

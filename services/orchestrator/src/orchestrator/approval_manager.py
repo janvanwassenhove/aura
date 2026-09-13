@@ -30,6 +30,21 @@ class ApprovalDeniedError(PermissionError):
     """Raised when the user explicitly denies the approval request."""
 
 
+def _new_future() -> "asyncio.Future[bool]":
+    """A future owned by the loop that will actually await it (U332).
+
+    This used to be the deprecated get_event_loop lookup, evaluated in the
+    CLASS BODY — at import, with no loop running. Python 3.13 and earlier
+    created one and warned; 3.14 raises, and the brain died before it started.
+    Made per instance, inside the request, it belongs to the right loop by
+    construction.
+    """
+    try:
+        return asyncio.get_running_loop().create_future()
+    except RuntimeError:        # constructed outside a loop (tests, tooling)
+        return asyncio.Future()
+
+
 @dataclass
 class _PendingApproval:
     approval_id: str
@@ -37,7 +52,7 @@ class _PendingApproval:
     arguments: dict
     session_id: str
     requested_at: datetime = field(default_factory=lambda: datetime.now(UTC))
-    future: asyncio.Future[bool] = field(default_factory=asyncio.get_event_loop().create_future)
+    future: asyncio.Future[bool] = field(default_factory=_new_future)
 
 
 class ApprovalManager:
@@ -89,7 +104,7 @@ class ApprovalManager:
             logger.info("Auto-approved (remembered): %s", tool_name)
             return True
         approval_id = str(uuid.uuid4())
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         pending = _PendingApproval(
             approval_id=approval_id,
             tool_name=tool_name,

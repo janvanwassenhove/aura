@@ -5,7 +5,7 @@ owner: "platform"
 priority: P1
 risk: Low
 created: "2026-04-25"
-units: [U1, U2, U3, U4, U5, U7, U8, U9, U10, U11, U12, U31]
+units: [U1, U2, U3, U4, U5, U7, U8, U9, U10, U11, U12, U31, U332]
 amended: "2026-09-05"
 ---
 
@@ -76,6 +76,16 @@ Every service, package, and app directory contains a `README.md` describing its 
 ## Requirements
 
 ### Functional Requirements
+
+- **FR-IMPORT**: No module may reach for the event loop at import time.
+  `asyncio.get_event_loop()` is deprecated everywhere and **raises** on Python
+  3.14, so a dataclass field that called it in its class body killed the brain
+  before its first line of work — on a second laptop where `uv`, free to pick
+  any interpreter `requires-python = ">=3.11"` allows, chose 3.14. Code that
+  needs a loop asks for the **running** one, which cannot be the wrong loop. A
+  test scans the sources and a second imports the module in a fresh
+  interpreter (U332).
+
 
 - **FR-001**: Repository MUST contain `.specify/memory/constitution.md` with all eight principles.
 - **FR-002**: Repository MUST contain `AGENTS.md` with Spec Kit command reference and project map.

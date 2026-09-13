@@ -122,7 +122,7 @@ class BudgetGuard:
 
     def start(self) -> None:
         if self._task is None:
-            self._task = asyncio.get_event_loop().create_task(self._loop())
+            self._task = asyncio.get_running_loop().create_task(self._loop())
 
     async def stop(self) -> None:
         if self._task is not None:
