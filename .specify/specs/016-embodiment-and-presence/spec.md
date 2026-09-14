@@ -5,7 +5,7 @@ owner: "robot-runtime"
 priority: P1
 risk: Medium
 created: "2026-09-05"
-units: [U16, U36a, U36d, U36g, U37, U51, U99, U100, U101, U102, U111, U116, U126, U127, U137, U138, U139, U147, U157, U158, U161, U162, U164, U165, U175, U196, U212, U219, U237, U238, U252b, U252d, U253, U268, U270, U286, U325, U326, U328, U336, U341, U341b, U357, U357b]
+units: [U16, U36a, U36d, U36g, U37, U51, U99, U100, U101, U102, U111, U116, U126, U127, U137, U138, U139, U147, U157, U158, U161, U162, U164, U165, U175, U196, U212, U219, U237, U238, U252b, U252d, U253, U268, U270, U286, U325, U326, U328, U336, U341, U341b, U357, U357b, U359]
 ---
 
 # Feature Specification: Embodiment and Presence
@@ -303,6 +303,25 @@ while he is speaking, so that a conversation looks like a conversation.
   a suppression that outlived its sleep would be a robot that wakes up and never
   looks at anyone again (U357b).
 
+- **FR-042**: A line that fails to play must not cost the robot its voice.
+  `BehaviorEngine.speak()` transitions to SPEAKING, plays, and transitions back
+  to IDLE — and `SPEAKING → SPEAKING` is not a legal transition, so a playback
+  that raised used to leave the engine stuck in SPEAKING and every later line
+  answered `500`. The state is restored in a `finally`, and
+  `SpeechPlaybackCompleted` is published there too: it means *no longer
+  playing*, not *played well*, and a start with no completion is a subtitle
+  that never clears. The failure itself still propagates — the caller must hear
+  that the line was not said (U269) — it is only the state that may not survive
+  it (U359).
+- **FR-043**: `POST /robot/speak` answers with a **reason**. An unhandled
+  exception became a bare 500, which mid-talk read as *"Server error '500
+  Internal Server Error' … For more information check: developer.mozilla.org"*.
+  The route answers 503 with the cause attached ("he could not, right now",
+  not "that request was wrong"), and the brain's `RobotClient` puts that reason
+  into the error it raises instead of httpx's status-and-a-link — keeping the
+  `HTTPStatusError` type and its response, because callers branch on
+  `status_code == 404` (U359).
+
 ## Traceability
 
 | Units | What they delivered |
@@ -311,6 +330,7 @@ while he is speaking, so that a conversation looks like a conversation.
 | U36d, U147, U157, U111 | Idle look-around, upright after wake, listening pose, conversational body language, mood via head and antennae |
 | U37, U36g, U116, U126, U127, U158, U165, U253 | Follow-me: torso yaw, watchdog, re-acquire that holds, face-visible reporting, and a tracker that was dead rather than blind |
 | U161, U162, U164 | Drag-to-aim on the live picture; explicit Follow/Manual; the mirrored-axis fix |
+| U359 | One failed line left him mute for the rest of the talk — the state now comes back whatever the audio does, and a 500 says what broke |
 | U357b | Follow-me checked on both paths that matter — boot and wake — before the fix went to the Pi |
 | U357 | Sleep stopped lifting his head on the way down — the recentre that follow-me-off owes an awake robot |
 | U99, U100, U101, U102, U237, U238 | Microphone toggle; sleep and wake; the sleep pose; sleep that stays; the 404 that read as success |

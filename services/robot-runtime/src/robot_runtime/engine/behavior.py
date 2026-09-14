@@ -195,12 +195,28 @@ class BehaviorEngine:
         if timeline:
             tasks.append(asyncio.create_task(self._run_timeline(timeline)))
 
-        await asyncio.gather(*tasks)
-
-        await self._bus.publish(
-            SpeechPlaybackCompleted(session_id=self._session_id)
-        )
-        await self.transition(BehaviorState.IDLE)
+        # U359: the state comes back whatever happens to the audio.
+        #
+        # Found one slide into a conference talk: the first line played, and
+        # every line after it came back `500 Internal Server Error`. This ran
+        # transition(SPEAKING) → play → transition(IDLE) with nothing guarded,
+        # so a playback that raised skipped the last step and left the engine
+        # in SPEAKING — and SPEAKING → SPEAKING is not a legal transition
+        # (behavior/states.py). One transient audio failure therefore turned
+        # into a robot that could not speak again for the rest of the session.
+        #
+        # The failure still propagates: the caller must hear that the line was
+        # not said (U269). What must not survive it is the state.
+        try:
+            await asyncio.gather(*tasks)
+        finally:
+            # Completed means "no longer playing", not "played well" — the
+            # console derives its speaking indicator from the pair, and a start
+            # with no completion is a subtitle that never clears.
+            await self._bus.publish(
+                SpeechPlaybackCompleted(session_id=self._session_id)
+            )
+            await self.transition(BehaviorState.IDLE)
 
     # ------------------------------------------------------------------
     # Motion helpers

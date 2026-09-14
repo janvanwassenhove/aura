@@ -44,3 +44,50 @@ async def test_connect_status_speak_motion_mode(robot_client: RobotClient) -> No
 async def test_speak_requires_text(robot_client: RobotClient) -> None:
     with pytest.raises(httpx.HTTPStatusError):  # 422 — contract: text is required
         await robot_client.speak("")
+
+
+# --------------------------------------------------------------------------- #
+# U359: what the robot said went wrong must reach the person reading the screen
+# --------------------------------------------------------------------------- #
+
+async def test_a_robot_error_carries_its_reason_not_just_a_status() -> None:
+    """Reported from a rehearsal: `Server error '500 Internal Server Error' for
+    url '.../robot/speak' For more information check: <MDN>`.
+
+    httpx's message is the status and a link to a page about HTTP. The robot
+    now answers with a reason (U359), and it was being thrown away one layer
+    above — so the presenter got a lecture on status codes instead of "the
+    audio device went away".
+    """
+    import httpx
+    from aura_brain.robot_client import RobotClient
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(503, json={"error": "the robot could not play that line",
+                                         "reason": "RuntimeError: audio device went away"})
+
+    client = RobotClient(client=httpx.AsyncClient(
+        transport=httpx.MockTransport(handler), base_url="http://robot"))
+    with pytest.raises(httpx.HTTPStatusError) as exc:
+        await client.speak("Ta. Ta. Ta.", audio_b64="AAAA")
+
+    assert "audio device went away" in str(exc.value)
+    # Still an HTTPStatusError with its response attached: set_asleep() and
+    # friends branch on `exc.response.status_code == 404`.
+    assert exc.value.response.status_code == 503
+
+
+async def test_an_error_with_no_body_still_raises_normally() -> None:
+    """An older robot, or a proxy, answers with nothing useful. That must stay
+    an ordinary failure rather than becoming a crash in the error path."""
+    import httpx
+    from aura_brain.robot_client import RobotClient
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(404, text="<html>nope</html>")
+
+    client = RobotClient(client=httpx.AsyncClient(
+        transport=httpx.MockTransport(handler), base_url="http://robot"))
+    with pytest.raises(httpx.HTTPStatusError) as exc:
+        await client.speak("hello")
+    assert exc.value.response.status_code == 404

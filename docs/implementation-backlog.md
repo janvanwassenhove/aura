@@ -3908,3 +3908,64 @@ worth writing down because the symptom looked exactly like the bug under test.
 
 **Not verified by eye**: the layout has not been looked at on screen, only
 asserted. 281 console tests green.
+
+### U359 — one failed line, and he never spoke again
+
+Found mid-rehearsal, one slide into the Devoxx talk. The first line played. The
+next one, and every one after it, came back:
+
+> He was not heard — Server error '500 Internal Server Error' for url
+> 'http://172.20.10.8:8001/robot/speak' For more information check:
+> https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/500
+
+Two failures in one sentence, and the second is the one that hid the first.
+
+**Why he went mute.** `BehaviorEngine.speak()` read:
+
+```python
+await self.transition(BehaviorState.SPEAKING)
+...
+await asyncio.gather(*tasks)          # the audio
+await self._bus.publish(SpeechPlaybackCompleted(...))
+await self.transition(BehaviorState.IDLE)
+```
+
+Nothing guarded. A playback that raises skips the last line and leaves the
+engine in SPEAKING — and `SPEAKING → SPEAKING` is **not** in the transition
+table (`behavior/states.py`: SPEAKING may go to RESPONDING or IDLE, nothing
+else). So the next line raised `TransitionBlockedError` before it reached the
+speaker, and so did every line after it. One transient audio failure, and the
+robot cannot speak again for the rest of the session — on stage, permanently,
+with the talk still running.
+
+The state now comes back in a `finally`. The failure still propagates, because
+the caller must hear that the line was not said (U269); it is only the state
+that may not survive it. `SpeechPlaybackCompleted` moved into the `finally`
+too — it means *no longer playing*, not *played well*, and the console derives
+its speaking indicator from the pair, so a start with no completion is a
+subtitle that never clears and an avatar that mouths for ever.
+
+**Why nobody could tell.** The route had no error handling at all, so any
+exception became a bare 500 — and a bare 500 sends the owner to a page about
+HTTP status codes in the middle of a talk. The robot knew exactly what had
+failed and said none of it. It now answers **503** with the cause attached
+(503 because this is "he could not, right now", not "that request was wrong"),
+and `RobotClient` puts that reason into the error it raises rather than
+httpx's status-and-a-link. Type and response are preserved — `set_asleep()`
+and friends branch on `exc.response.status_code == 404`, and a message change
+must not quietly break the skew handling U238 exists for.
+
+**Tests**: three on the engine (the state returns after a failure; he really
+does speak again afterwards; the room is never left thinking he is still
+talking), one on the route (a failure answers with the reason, not a 500), and
+two on the client (the reason reaches the message; a body-less error still
+raises normally, because an older robot or a proxy answers with HTML). All
+verified red — the client test failed with the MDN link in the assertion
+message, which is the bug quoted back.
+
+145 robot-runtime tests green, 716 brain.
+
+**Not verified on the robot**: what actually raised during that first line is
+still unknown — it happened on a phone hotspot, and the robot's own log needs
+SSH this laptop does not have. This unit makes the failure survivable and
+legible; it does not explain it. If it recurs, the 503 will now name it.

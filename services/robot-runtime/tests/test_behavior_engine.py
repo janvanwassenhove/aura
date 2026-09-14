@@ -92,3 +92,70 @@ async def test_idle_task_cancelled_on_stop(adapter: FakeRobotAdapter, bus: Async
     assert not engine._idle_task.done()
     await engine.stop()
     assert engine._idle_task.done()
+
+
+# --------------------------------------------------------------------------- #
+# U359: one failed line must not make him mute for the rest of the talk
+# --------------------------------------------------------------------------- #
+
+async def test_a_failed_line_still_leaves_him_able_to_speak_again(
+    engine: BehaviorEngine, adapter: FakeRobotAdapter
+) -> None:
+    """Found mid-rehearsal, one slide into a conference talk: the first line
+    played, and every line after it came back `500 Internal Server Error`.
+
+    `speak()` transitions to SPEAKING, plays, then transitions to IDLE — with
+    nothing in between guarded. A playback that raises skips the last step and
+    leaves the engine in SPEAKING, and SPEAKING → SPEAKING is not a legal
+    transition. So one transient audio failure turns into a robot that cannot
+    speak again for the rest of the session.
+    """
+    async def boom(text, audio_bytes=None):
+        raise RuntimeError("audio device went away")
+
+    adapter.speak = boom                       # type: ignore[method-assign]
+    with pytest.raises(RuntimeError):
+        await engine.speak("this one fails")
+
+    assert engine.current_state == BehaviorState.IDLE, \
+        "he is stuck in SPEAKING and can never speak again"
+
+
+async def test_he_actually_speaks_again_after_one_failure(
+    engine: BehaviorEngine, adapter: FakeRobotAdapter
+) -> None:
+    """The state is the mechanism; this is the thing the room notices."""
+    original = adapter.speak
+
+    async def boom(text, audio_bytes=None):
+        raise RuntimeError("audio device went away")
+
+    adapter.speak = boom                       # type: ignore[method-assign]
+    with pytest.raises(RuntimeError):
+        await engine.speak("the setup line")
+
+    adapter.speak = original                   # type: ignore[method-assign]
+    await engine.speak("the fanfare")          # must not raise
+    assert engine.current_state == BehaviorState.IDLE
+
+
+async def test_the_room_is_never_left_thinking_he_is_still_talking(
+    engine: BehaviorEngine, adapter: FakeRobotAdapter, bus: AsyncEventBus
+) -> None:
+    """The console derives "he is speaking" from the playback events. A start
+    with no matching completion is a subtitle that never clears and an avatar
+    that mouths for ever."""
+    from shared_schemas.events.behavior import SpeechPlaybackCompleted
+
+    seen: list = []
+    bus.subscribe(SpeechPlaybackCompleted, lambda e: seen.append(e))
+
+    async def boom(text, audio_bytes=None):
+        raise RuntimeError("audio device went away")
+
+    adapter.speak = boom                       # type: ignore[method-assign]
+    with pytest.raises(RuntimeError):
+        await engine.speak("this one fails")
+    await asyncio.sleep(0.05)
+
+    assert seen, "playback started and never finished, as far as anyone watching knows"

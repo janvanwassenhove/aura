@@ -106,7 +106,19 @@ async def speak(body: dict) -> JSONResponse:
             audio_bytes = base64.b64decode(audio_b64)
         except Exception:
             return JSONResponse({"error": "audio_b64 is not valid base64"}, status_code=422)
-    await engine.speak(text, audio_bytes)
+    # U359: an unhandled exception here became a bare 500, and a bare 500 sent
+    # the owner to a page about HTTP status codes in the middle of a talk:
+    # "Server error '500 Internal Server Error' … For more information check:
+    # developer.mozilla.org". The robot knows what failed. 503, because this is
+    # "he could not, right now" rather than "that request was wrong" — and the
+    # reason travels with it so the console can say something useful.
+    try:
+        await engine.speak(text, audio_bytes)
+    except Exception as exc:  # noqa: BLE001 — every cause is worth reporting
+        return JSONResponse(
+            {"error": "the robot could not play that line",
+             "reason": f"{type(exc).__name__}: {exc}"},
+            status_code=503)
     return JSONResponse({"ok": True, "audio": audio_bytes is not None})
 
 

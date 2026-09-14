@@ -136,3 +136,34 @@ async def test_audio_stream_yields_pcm_chunks() -> None:
         assert len(body) == 10 * 1600 * 2
     finally:
         await _teardown(bus)
+
+
+# --------------------------------------------------------------------------- #
+# U359: a failed line says what went wrong, not just "500"
+# --------------------------------------------------------------------------- #
+
+async def test_a_failed_speak_answers_with_a_reason(monkeypatch) -> None:
+    """Reported from a rehearsal as: `Server error '500 Internal Server Error'
+    for url '.../robot/speak' For more information check: <a link to MDN>`.
+
+    An unhandled exception becomes a bare 500, and a bare 500 sends the owner
+    to a page about HTTP. The robot knows what failed; it should say so.
+    """
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+    from robot_runtime import routes
+
+    class _Engine:
+        async def speak(self, text, audio_bytes=None):
+            raise RuntimeError("audio device went away")
+
+    monkeypatch.setattr(routes, "engine", _Engine())
+    app = FastAPI()
+    app.include_router(routes.router)
+
+    with TestClient(app, raise_server_exceptions=False) as client:
+        resp = client.post("/robot/speak", json={"text": "Ta. Ta. Ta."})
+
+    assert resp.status_code != 500, "a bare 500 is not an answer"
+    body = resp.json()
+    assert "audio device went away" in str(body), body

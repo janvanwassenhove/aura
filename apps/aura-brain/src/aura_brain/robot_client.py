@@ -64,6 +64,24 @@ class RobotClient:
             async with httpx.AsyncClient(timeout=self._timeout) as client:
                 resp = await client.request(method, f"{self._base_url}{path}",
                                             json=json, headers=headers)
+        # U359: httpx's message is the status and a link to MDN. Mid-talk that
+        # read as "Server error '500 Internal Server Error' … For more
+        # information check: developer.mozilla.org", while the robot's own
+        # answer said exactly what had failed. Keep the type and the response —
+        # callers branch on `exc.response.status_code == 404` (set_asleep) —
+        # and put the reason where a person will actually read it.
+        if resp.is_error:
+            said = ""
+            try:
+                body = resp.json()
+                if isinstance(body, dict):
+                    said = str(body.get("reason") or body.get("error") or "")
+            except ValueError:
+                said = ""          # html, empty, or an older robot: no detail
+            if said:
+                raise httpx.HTTPStatusError(
+                    f"the robot answered {resp.status_code}: {said}",
+                    request=resp.request, response=resp)
         resp.raise_for_status()
         return resp
 
