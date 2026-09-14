@@ -27,6 +27,18 @@ say the word while presenting. `manual` fires when you advance the beat by hand.
 
 ## Editing the scenario
 
+**The full format is [`scenario-format.md`](scenario-format.md)** - every field,
+every trigger, and the rules that bite. Hand that file to whoever (or whatever)
+generates a scenario. Check one before you need it:
+
+```bash
+python scripts/check_scenario.py my-talk.scenario.yaml
+```
+
+It prints what the talk will do, or refuses with the sentence the Present panel
+would show.
+
+
 It's plain YAML, validated by the `Scenario` model. Each beat needs:
 
 - `speak` → `text` (spoken verbatim)

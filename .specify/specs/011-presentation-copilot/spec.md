@@ -6,7 +6,7 @@ priority: P2
 risk: Medium
 created: "2026-04-25"
 amended: "2026-09-13"
-units: [U27, U205, U206, U207, U208, U246, U263, U263b, U264, U265, U266, U267, U269, U282, U320, U334, U349, U351, U352, U360]
+units: [U27, U205, U206, U207, U208, U246, U263, U263b, U264, U265, U266, U267, U269, U282, U320, U334, U349, U351, U352, U360, U361]
 ---
 
 # Feature Specification: Presentation Copilot
@@ -300,6 +300,16 @@ settings aside as the example.
   undoing a file's whole reason for existing is the same defect wearing a
   different hat (U360).
 
+- **FR-116**: A scenario can be checked **before** the talk, from a desk:
+  `python scripts/check_scenario.py <file>` runs the same validation the Present
+  panel runs and prints what the talk will actually do — how many times he
+  speaks, which presses are yours, which keywords are armed, which slides he
+  appears on, and every beat that changes voice or waits. Exit 0 or 1, so it
+  fits a pre-flight script or CI. The format itself is documented in
+  [`docs/demo/scenario-format.md`](../../../docs/demo/scenario-format.md), which is
+  written to be handed to whoever — or whatever — generates a scenario, and says
+  plainly that an unknown field is refused rather than ignored (U361).
+
 ## Superseded
 
 FR-002's `slide_index`/`speech_cue` script format is retained as the storage
@@ -321,6 +331,7 @@ applies to `slide:N` beats; `manual` and `keyword:` beats have no such deadline.
 | U246 | Three broken things behind one missing word — including `uv sync` pruning the presentation extra |
 | U320 | The panel regrouped: locks as chips, status as status, the projector block given the weight it earns, a run button that names its own action, an empty state with the two doors, and help you can put away |
 | U334 | Present mode enforces what it always promised: only the scenario speaks, and no open microphone answers the room |
+| U361 | The scenario format written down, and a pre-flight check that says what the talk will do rather than only that the file parses |
 | U360 | `voice`, `speed` and `pause` on a beat — and an unknown field refused, after two of them sat in a shipped scenario doing nothing through a rehearsal |
 | U349 | A beat can be handed to another character, and one line can change character halfway — per-beat `persona`, inline `[persona:id]` markers, and one utterance however many voices are in it |
 | U351 | The wrong-voice note reaches the projector's presenter strip too — the half of U349 that could not be verified while the overlay suite would not mount |

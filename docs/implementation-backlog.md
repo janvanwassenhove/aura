@@ -4041,3 +4041,60 @@ TTS; a named voice beats the persona; a persona still decides when no voice is
 named; a speed alone works), and 1 in the console round-trip. All verified red.
 
 178 shared-schemas, 406 orchestrator, 720 brain, 282 console.
+
+### U361 — the format, written down, and a way to check a file before the room
+
+Asked for alongside U359 and U360: *"also provide me fixed scenario with
+instructions i can give to claude cowork to fix it in the future"*.
+
+**The scenario did not need fixing.** After U360 the file validated exactly as
+generated, with both of the fields that had been evaporating:
+
+```
+OK - I Hired a Real Robot as My Junior Dev
+  beats           23
+  he speaks       5 time(s)
+  you press       3 time(s): sound-check, the-disclaimer, last-word
+  armed keywords  Java
+  slide cues      8, 9, 29, 41, 48, 57, 58, 59, 62, 67, 68, 79, 84, 86, 91, 104, 107
+  overlay starts  shown
+  ! the-setup: waits 7.0s before speaking
+  ! the-fanfare: voice onyx at 0.85x
+```
+
+The app was the thing that was wrong. What was actually missing is the other
+half of the request: somewhere to point a generator at, and a way to find out a
+file is wrong at a desk rather than on a stage.
+
+**`docs/demo/scenario-format.md`** is the whole format — every field with its
+type and default, the trigger forms, what each mode requires, inline persona
+markers, and a section of the things that bite. It says outright that the model
+is the authority and the document is a bug if they disagree, and it ends with
+five rules for an assistant regenerating a scenario. The first is *never invent
+a field*: since U360 that is a refused load, and before U360 it was worse —
+silence.
+
+**`scripts/check_scenario.py`** runs the same validation the Present panel runs
+and then says what the talk will *do*: how many times he speaks, which presses
+are the presenter's, which keywords are armed, which slides carry cues, where
+the overlay starts, and every beat that changes voice or waits before speaking.
+A checker that only answers "valid" leaves you no wiser than before opening it.
+Exit 0 or 1, so it fits a pre-flight script.
+
+Refusals quote the beat: a misspelt `voise: onyx` comes back as
+`0.voise: Extra inputs are not permitted`, which is the U360 failure caught
+where it is still free.
+
+**Found while testing it**: the script crashed under `subprocess` with output
+that was fine in a terminal. An em dash in a `print`, a captured stdout on
+Windows, cp1252 — and a passing check became a `UnicodeEncodeError`. The output
+is ASCII now, and the reason is written at the top of the file so nobody
+prettifies it back. It is the same family as the heredoc trap CLAUDE.md already
+records: this repository runs on Windows, and anything that writes bytes has to
+mean it.
+
+**Tests**: 7 — the shipped scenario passes, the report actually contains the
+five things it promises, a misspelt field is refused by name, a broken beat
+names the beat, YAML that is not YAML says so, a missing file is a sentence and
+not a traceback, and the flags for voice and pause appear. 91 tests in
+`scripts/`, which CI runs wholesale.
