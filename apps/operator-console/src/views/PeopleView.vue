@@ -134,8 +134,8 @@
         </div>
 
         <div class="person-actions">
-          <button class="d2-ghost-btn" title="Take four photos so he recognises this person"
-                  :disabled="teaching" @click="doTeachFace">{{ teaching ? 'Watching…' : 'Teach face' }}</button>
+          <button class="d2-ghost-btn" title="Show his camera, then take four photos"
+                  :disabled="teaching" @click="teachOpen = !teachOpen">{{ teaching ? 'Watching…' : 'Teach face' }}</button>
           <button class="d2-ghost-btn" title="Add something he should remember" @click="addingFact = !addingFact">+ Add a fact</button>
           <template v-if="isOwner">
             <button class="d2-ghost-btn" title="See this person's knowledge as a graph" @click="openGraph">Open graph</button>
@@ -151,7 +151,30 @@
                     @click="confirmForget">Forget this person</button>
           </template>
         </div>
-        <p v-if="teachMsg" class="teach-msg">{{ teachMsg }}</p>
+        <!-- U358: asked for as "show camera view while it's detecting, so i
+             know it's teaching the right face". During is too late: the four
+             photos are taken in about a second and a half, less than it takes
+             a first frame to arrive. So the picture comes FIRST - look, then
+             press - which is the shape the setup wizard already uses.
+             The camera lives in a child component so this v-if is its on/off
+             switch; mounted in the view it would poll the robot over WiFi for
+             as long as anyone had a person open. -->
+        <div v-if="teachOpen" class="teach-box" data-test="teach-box">
+          <CameraPreview class="teach-cam" :alt="`What he sees while learning ${detail.person.display_name}`" />
+          <div class="teach-side">
+            <p class="teach-lead">
+              Four photos, turned into a maths fingerprint. Check it is
+              {{ detail.person.display_name }} in the picture before you take them.
+            </p>
+            <div class="teach-actions">
+              <button class="d2-ghost-btn" data-test="teach-go" :disabled="teaching"
+                      @click="doTeachFace">{{ teaching ? 'Watching…' : 'Take four photos' }}</button>
+              <button class="d2-ghost-btn" :disabled="teaching" @click="teachOpen = false">Close</button>
+            </div>
+            <p v-if="teachMsg" class="teach-msg">{{ teachMsg }}</p>
+          </div>
+        </div>
+        <p v-else-if="teachMsg" class="teach-msg">{{ teachMsg }}</p>
 
         <div v-if="addingFact" class="add-fact">
           <input v-model="factKey" class="d2-field fact-key" placeholder="key (e.g. coffee)" aria-label="Fact key">
@@ -356,6 +379,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import KnowledgeGraph from '../components/canvas/KnowledgeGraph.vue'
+import CameraPreview from '../components/CameraPreview.vue'
 import PhotoLightbox from '../components/PhotoLightbox.vue'
 import WikiText from '../components/WikiText.vue'
 import { BRAIN_URL } from '../lib/endpoints'
@@ -592,6 +616,7 @@ async function confirmForget(): Promise<void> {
 
 // ── Face: teach + snapshots ────────────────────────────────────────────────
 const teaching = ref(false)
+const teachOpen = ref(false)   // U358: the camera runs only while this is true
 const teachMsg = ref('')
 async function doTeachFace(): Promise<void> {
   if (!detail.value) return
@@ -600,6 +625,9 @@ async function doTeachFace(): Promise<void> {
   teachMsg.value = await knowledge.teachFace(detail.value.person.person_id)
   teaching.value = false
   fetchEnrolled()
+  // U358: the panel stays open. The message is about the face that was just
+  // in shot, and closing the picture as it appears would take away the one
+  // thing that says whether it was the right person.
 }
 const snapshots = ref<{ snapshot_id: string; seen_at: number; confidence: number; image: string }[]>([])
 async function loadSnapshots(personId: string): Promise<void> {
@@ -994,4 +1022,17 @@ function openGraph(): void { nav.go('graph') }
 /* Narrow windows cannot hold list + profile + graph — the graph moves to its
    own full view (Expand). */
 @media (max-width: 1200px) { [data-graph-aside] { display: none !important; } }
+
+/* U358: picture first, then the button. */
+.teach-box {
+  display: grid; grid-template-columns: minmax(0, 200px) 1fr; gap: 14px;
+  align-items: start; margin-top: 10px; padding: 12px;
+  border: 1px solid var(--line); border-radius: 12px;
+  background: var(--surface-2, rgba(127, 127, 127, 0.05));
+}
+.teach-cam { width: 100%; }
+.teach-side { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.teach-lead { margin: 0; font-size: 12.5px; color: var(--ink-2); line-height: 1.45; }
+.teach-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+@media (max-width: 640px) { .teach-box { grid-template-columns: 1fr; } }
 </style>

@@ -5,7 +5,7 @@ owner: "aura-brain / knowledge"
 priority: P1
 risk: High
 created: "2026-09-05"
-units: [U18, U19a, U19b, U19c, U19d, U19e, U20, U29, U93, U94, U97, U103, U104, U105, U106, U109, U136, U160, U180, U181, U189, U190, U204, U213, U214, U218, U243, U244, U245, U271, U272, U274, U276, U277, U278, U279, U280, U281, U290, U293, U294, U36f, U342, U348]
+units: [U18, U19a, U19b, U19c, U19d, U19e, U20, U29, U93, U94, U97, U103, U104, U105, U106, U109, U136, U160, U180, U181, U189, U190, U204, U213, U214, U218, U243, U244, U245, U271, U272, U274, U276, U277, U278, U279, U280, U281, U290, U293, U294, U36f, U342, U348, U358]
 amended: "2026-09-05"
 ---
 
@@ -202,6 +202,18 @@ while he was, in fact, remembering.
   [017-voice-and-language](../017-voice-and-language/spec.md) (U274).
 - Skills scoped to a person — see
   [019-skills-and-automation](../019-skills-and-automation/spec.md).
+
+- **FR-118**: Teaching a face shows the robot's live view **before** the photos
+  are taken, not during. Enrollment grabs four frames in about 1.5 s — less than
+  a first frame takes to arrive — so a picture that appears while it captures
+  would arrive after the decision it was meant to inform. Pressing *Teach face*
+  opens the camera; a second, deliberate press takes the photos; the picture
+  stays up with the result, because the result is about the face that was just
+  in shot. The setup wizard has shown this since it existed; the Robot panel
+  fired blind. The camera lives in a component (`CameraPreview.vue`) so a `v-if`
+  is its on/off switch — `useCameraFeed` polls from mount to unmount, and called
+  in a long-lived view it would fetch frames over WiFi for as long as anyone had
+  a person open (U358).
 
 ## Traceability
 

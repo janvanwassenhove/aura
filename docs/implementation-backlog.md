@@ -3860,3 +3860,51 @@ pose path untested for everyone.
 
 141 robot-runtime tests green, 403 orchestrator, ruff clean. Deployed to the Pi
 after this.
+
+### U358 — teaching a face with your eyes shut
+
+Asked for as *"for the teach your face, show camera view while it's detecting,
+so i know it's teaching the right face"*.
+
+**Taken literally it would not have worked**, and finding that out first changed
+the shape of the fix. Enrollment grabs four frames in about **1.5 seconds**
+(`for i in range(4)` over ~1.5 s, U18), and the frame loop needs roughly 250 ms
+to put its first picture on screen. A camera that appears *while it detects*
+would show you the tail of something already decided — and, for a one-shot
+button, arrive as the result did.
+
+So the picture comes **first**. *Teach face* now opens the robot's live view
+with the person's name beside it — *"Check it is Jan in the picture before you
+take them"* — and a second, deliberate press takes the photos. The result lands
+with the camera still up, because the message is about the face that was just
+in shot and closing the picture as the answer arrives takes away the only thing
+that can confirm it.
+
+**The setup wizard has done exactly this since it existed** — a `face-cam` next
+to *Teach him your face*. The Robot panel, which is where the Memory tab sends
+you when it says *"teach him this face"*, fired blind. Two flows for one job,
+and only one of them let you look.
+
+**Where the camera lives is the design decision.** `useCameraFeed` starts its
+frame loop on mount and stops it on unmount, so the call site decides how long
+the robot is polled. Called in `PeopleView` it would fetch frames over WiFi for
+as long as anybody had a person open — against the grain of U219, which exists
+to halve exactly this traffic. It is a component now (`CameraPreview.vue`), so
+a `v-if` is the on/off switch, and there is a test that unmounting really does
+stop the polling rather than merely hiding the picture.
+
+**Tests**: 6 on the view (camera off until asked; it appears on the first press;
+the person is named in it; the photos are only taken on the second press; the
+picture survives the result; Close puts it away) and 4 on the component. Five of
+the six were verified red against the old view — the sixth, "the camera stays
+off until it is asked for", passes on the old code too, which is right: it is a
+guard against a future regression, not a description of the bug.
+
+**Found while writing them**: the component tests leaked. Every mounted preview
+polls until unmounted, and `@vue/test-utils` does not unmount between cases, so
+a leaked instance counted its frames into the next test and the stop-polling
+assertion failed for the wrong reason. `enableAutoUnmount(afterEach)` fixes it —
+worth writing down because the symptom looked exactly like the bug under test.
+
+**Not verified by eye**: the layout has not been looked at on screen, only
+asserted. 281 console tests green.
