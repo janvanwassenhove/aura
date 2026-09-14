@@ -18,6 +18,7 @@ Each beat runs by its mode:
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from collections.abc import Awaitable, Callable
 from typing import Any
@@ -28,9 +29,13 @@ logger = logging.getLogger(__name__)
 
 # generate(topic, guardrails, engine, persona) -> spoken line
 Generator = Callable[[str, str, str, str], Awaitable[str]]
-# speak(text, persona) -> plays it. `persona` is a brain character id, or ""
-# for the presentation's own voice (U349).
-Speaker = Callable[[str, str], Awaitable[Any]]
+# speak(text, beat) -> plays it. U360: the whole beat travels, because what a
+# line should SOUND like is spread over several of its fields now - `persona`
+# (U349), and a raw `voice`/`speed` for a line that wants a different sound
+# without a character behind it. Passing them one by one meant a scenario could
+# carry a field the speaker had no way to receive, which is exactly how
+# `voice: onyx` sat in a shipped scenario doing nothing.
+Speaker = Callable[[str, Beat], Awaitable[Any]]
 
 
 class ScenarioRunner:
@@ -182,7 +187,7 @@ class ScenarioRunner:
             pass
         elif beat.mode == "speak":
             spoken = beat.text
-            await self._say(beat.id, beat.text, beat.persona)
+            await self._say(beat, beat.text)
         else:  # improvise or chime_in
             try:
                 spoken = (await self._generate(beat.topic, beat.guardrails,
@@ -191,7 +196,7 @@ class ScenarioRunner:
                 logger.warning("beat %r generation failed: %s", beat.id, exc)
                 spoken = ""
             if spoken:
-                await self._say(beat.id, spoken, beat.persona)
+                await self._say(beat, spoken)
 
         if beat.gesture and self._gesture is not None and beat.mode != "silent" \
                 and not self.rehearsing:
@@ -205,7 +210,7 @@ class ScenarioRunner:
         await self._emit({"type": "beat_done", "beat": beat.id, "spoken": spoken,
                           "persona": beat.persona})
 
-    async def _say(self, beat_id: str, text: str, persona: str = "") -> None:
+    async def _say(self, beat: Beat, text: str) -> None:
         """Speak a line — unless this is a rehearsal, when the room hears nothing.
 
         U265: NEVER let a failed speaker eat beat_done. The subtitle event is
@@ -215,12 +220,18 @@ class ScenarioRunner:
         PresentationBeatFired ever went out.
         """
         if self.rehearsing:
+            # U360: and it does not sit through the pauses either. Walking the
+            # show mute is for reading the lines, not for waiting out a video.
             return
+        # U360: `pause` lines a line up with something on SCREEN - a crawl, an
+        # animation - rather than with the slide change that fired the beat.
+        if beat.pause > 0:
+            await asyncio.sleep(beat.pause)
         try:
-            await self._speak(text, persona)
+            await self._speak(text, beat)
             self.last_speech_error = ""
         except Exception as exc:  # noqa: BLE001 — the show must go on
-            logger.warning("beat %r speech failed: %s", beat_id, exc)
+            logger.warning("beat %r speech failed: %s", beat.id, exc)
             # U269: going on is right; going on SILENTLY is not. The console
             # said "all beats done" while the room heard nothing, and nothing
             # anywhere said why. The reason now rides along in the status.

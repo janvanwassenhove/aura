@@ -6,7 +6,7 @@ priority: P2
 risk: Medium
 created: "2026-04-25"
 amended: "2026-09-13"
-units: [U27, U205, U206, U207, U208, U246, U263, U263b, U264, U265, U266, U267, U269, U282, U320, U334, U349, U351, U352]
+units: [U27, U205, U206, U207, U208, U246, U263, U263b, U264, U265, U266, U267, U269, U282, U320, U334, U349, U351, U352, U360]
 ---
 
 # Feature Specification: Presentation Copilot
@@ -280,6 +280,26 @@ settings aside as the example.
   neither audience layer, stacked beside `speech_error` rather than replacing
   it: a dead speaker does not make a mis-named persona untrue (U351).
 
+- **FR-114**: A beat may name a **`voice`** and a **`speed`** outright, and a
+  **`pause`** to wait before speaking. `voice`/`speed` are the narrow form of
+  FR-107's `persona` — a line that wants a different sound without a character
+  behind it — and they win where both are given, including over inline
+  `[persona:x]` segments: a line cannot be both "all in onyx" and "this bit in
+  somebody else's voice". `pause` lines a line up with something on **screen**
+  (a video, a crawl) rather than with the slide change that fired the beat, and
+  a rehearsal does not sit through it. The voice is validated against the
+  shipped TTS list and the speed against what the provider accepts, both naming
+  the beat (U360).
+- **FR-115**: An **unknown field on a beat or scenario is refused**. Pydantic
+  ignores extra keys by default, so a generated scenario carried `voice:` and
+  `speed:` through an entire rehearsal doing nothing — the two-voice gag they
+  were written for came out in one voice, and no screen anywhere said why. A
+  misspelt field now stops the load and names itself, which is the only moment
+  it is still cheap. The scenario builder also carries these three fields
+  through a load-and-save even though it shows no control for them: silently
+  undoing a file's whole reason for existing is the same defect wearing a
+  different hat (U360).
+
 ## Superseded
 
 FR-002's `slide_index`/`speech_cue` script format is retained as the storage
@@ -301,6 +321,7 @@ applies to `slide:N` beats; `manual` and `keyword:` beats have no such deadline.
 | U246 | Three broken things behind one missing word — including `uv sync` pruning the presentation extra |
 | U320 | The panel regrouped: locks as chips, status as status, the projector block given the weight it earns, a run button that names its own action, an empty state with the two doors, and help you can put away |
 | U334 | Present mode enforces what it always promised: only the scenario speaks, and no open microphone answers the room |
+| U360 | `voice`, `speed` and `pause` on a beat — and an unknown field refused, after two of them sat in a shipped scenario doing nothing through a rehearsal |
 | U349 | A beat can be handed to another character, and one line can change character halfway — per-beat `persona`, inline `[persona:id]` markers, and one utterance however many voices are in it |
 | U351 | The wrong-voice note reaches the projector's presenter strip too — the half of U349 that could not be verified while the overlay suite would not mount |
 | U352 | The scenario says when the overlay is on the projector — a scenario-level start state and per-beat `show`/`hide`, rendered clear rather than closed, pushed and polled |

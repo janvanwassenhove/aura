@@ -331,3 +331,77 @@ beats:
 
     _load(c)                                   # a different talk starts
     assert c.get("/presentation/status").json()["voice_note"] == ""
+
+
+# --------------------------------------------------------------------------- #
+# U360: a beat may name a voice and a speed outright
+# --------------------------------------------------------------------------- #
+
+RAW_VOICE_YAML = """
+title: Fanfare
+beats:
+  - id: setup
+    trigger: manual
+    mode: speak
+    text: "Oh, I know this one."
+  - id: fanfare
+    trigger: manual
+    mode: speak
+    text: "Ta. Ta. Ta. Taa-ta-taaa."
+    voice: onyx
+    speed: 0.85
+"""
+
+
+def test_a_beat_can_ask_for_a_voice_and_a_speed_outright(rig) -> None:
+    """A generated scenario wrote exactly this for a gag that turns on a second
+    voice. Both fields were dropped by the model, so the joke came out in the
+    ordinary voice and nothing said why."""
+    c, _, _, calls = rig
+    _load(c, RAW_VOICE_YAML)
+    c.post("/presentation/next")                 # setup — the talk's own voice
+    c.post("/presentation/next")                 # fanfare — the gag
+
+    assert calls[0] == ("Oh, I know this one.", "alloy", 1.0)
+    assert calls[1] == ("Ta. Ta. Ta. Taa-ta-taaa.", "onyx", 0.85)
+
+
+def test_a_named_voice_beats_the_persona(rig) -> None:
+    """Both can be set. `voice` is the narrower instruction, so it wins — and a
+    beat that says a voice outright is unambiguous about what it wants."""
+    c, _, _, calls = rig
+    _load(c, """
+title: Both
+beats:
+  - id: b
+    trigger: manual
+    mode: speak
+    persona: dry_tech_butler
+    voice: onyx
+    text: "Ta."
+""")
+    c.post("/presentation/next")
+    assert calls[0][1] == "onyx"
+
+
+def test_a_persona_still_decides_when_no_voice_is_named(rig) -> None:
+    """U349 must not regress: the character's own voice and speed still apply."""
+    c, _, _, calls = rig
+    _load(c)
+    c.post("/presentation/next")
+    assert calls[0] == ("Goedendag.", "ash", 0.95)
+
+
+def test_a_named_speed_applies_without_a_voice(rig) -> None:
+    c, _, _, calls = rig
+    _load(c, """
+title: Slow
+beats:
+  - id: b
+    trigger: manual
+    mode: speak
+    speed: 0.5
+    text: "Slowly."
+""")
+    c.post("/presentation/next")
+    assert calls[0] == ("Slowly.", "alloy", 0.5)

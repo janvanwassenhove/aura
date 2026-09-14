@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from shared_schemas.presentation.vocals import (
     PERSONA_ID,
@@ -22,6 +22,7 @@ from shared_schemas.presentation.vocals import (
     persona_marker_problem,
     split_persona_segments,
 )
+from shared_schemas.voice.voices import SPEED_MAX, SPEED_MIN, TTS_VOICES
 
 
 class SlideScript(BaseModel):
@@ -84,6 +85,12 @@ def _overlay_word(value: str) -> bool | None:
 class Beat(BaseModel):
     """One moment in the presentation the robot participates in."""
 
+    # U360: a field that does not exist is a mistake, not a comment. A shipped
+    # scenario carried `voice:` and `speed:` through a whole rehearsal doing
+    # nothing at all, because pydantic ignores unknown keys by default and the
+    # gag they were written for simply came out in the ordinary voice.
+    model_config = ConfigDict(extra="forbid")
+
     id: str = Field(..., min_length=1)
     # "manual" (advance by hand) | "slide:N" (a slide became active) |
     # "keyword:foo bar" (the presenter said this).
@@ -102,6 +109,15 @@ class Beat(BaseModel):
     # means "leave it as it is" — which is why a scenario written before this
     # existed still shows the overlay for its whole length.
     overlay: str = ""
+    # U360: a raw voice and speed for this beat, for when a line wants a
+    # different sound without a whole character behind it — a gag in a second
+    # voice, say. `persona` (U349) is the richer form and wins where both are
+    # given; these are what a generated scenario reaches for.
+    voice: str = ""         # a TTS voice name, e.g. "onyx"
+    speed: float = 0.0      # 0 = leave it alone; else 0.25-4.0
+    # Wait this long before speaking — for lining a line up with something on
+    # screen (a video, an animation) rather than with the slide change.
+    pause: float = 0.0      # seconds
     # U349: which character speaks this beat — a brain character id, e.g.
     # "dry_tech_butler". Empty means the presentation's own voice (Present →
     # Persona). It sets the voice AND the way the line is written when the beat
@@ -170,11 +186,24 @@ class Beat(BaseModel):
             _overlay_word(self.overlay)
         except ValueError as exc:
             raise ValueError(f"beat {self.id!r}: {exc}") from exc
+        # U360: a voice nobody has is a silent fallback to the default one,
+        # which is exactly how a two-voice joke becomes a one-voice joke.
+        if self.voice and self.voice.strip().lower() not in TTS_VOICES:
+            raise ValueError(
+                f"beat {self.id!r}: {self.voice!r} is not a voice - "
+                f"choose one of {', '.join(TTS_VOICES)}")
+        if self.speed and not SPEED_MIN <= self.speed <= SPEED_MAX:
+            raise ValueError(
+                f"beat {self.id!r}: speed must be between {SPEED_MIN} and {SPEED_MAX}")
+        if self.pause < 0:
+            raise ValueError(f"beat {self.id!r}: pause cannot be negative")
         return self
 
 
 class Scenario(BaseModel):
     """A full co-presenter scenario — the beats for one talk."""
+
+    model_config = ConfigDict(extra="forbid")   # U360, same reason as Beat
 
     title: str = ""
     pptx: str = ""          # informational: the deck this scenario accompanies

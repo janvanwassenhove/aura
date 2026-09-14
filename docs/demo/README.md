@@ -35,6 +35,13 @@ It's plain YAML, validated by the `Scenario` model. Each beat needs:
 - optional `gesture` (e.g. `wave`, `nod`) and `engine` (`pipeline` / `realtime`)
 - optional `persona` — the character that speaks the beat (U349)
 - optional `overlay` — `show` / `hide` the projector overlay from here (U352)
+- optional `voice` + `speed` — a TTS voice and rate for this beat alone (U360)
+- optional `pause` — seconds to wait before speaking (U360)
+
+**Anything else is refused.** A field the model does not know stops the load and
+names itself. That is deliberate: `voice:` and `speed:` once sat in a shipped
+scenario through a whole rehearsal doing nothing, because unknown keys used to
+be ignored, and the two-voice gag they were written for came out in one voice.
 
 ### Who speaks a beat (U349)
 

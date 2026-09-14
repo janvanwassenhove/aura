@@ -3969,3 +3969,75 @@ message, which is the bug quoted back.
 still unknown — it happened on a phone hotspot, and the robot's own log needs
 SSH this laptop does not have. This unit makes the failure survivable and
 legible; it does not explain it. If it recurs, the 503 will now name it.
+
+### U360 — the scenario said `voice: onyx`, and nothing was listening
+
+Found mid-rehearsal, alongside U359. A generated conference scenario had a gag
+built on a second voice:
+
+```yaml
+  - id: the-fanfare
+    mode: speak
+    text: "Ta. Ta. Ta. Taa-ta-taaa. Taa-ta-taa."
+    voice: onyx
+    speed: 0.85
+```
+
+The file's own comment explains why: *"A DIFFERENT VOICE (onyx, at 0.85×) —
+this is not the robot, it is the robot doing an orchestra, and the switch is
+what separates the two jokes."* The switch never happened. `voice`, `speed` and
+`pause` are not fields on `Beat`, **pydantic ignores unknown keys by default**,
+so the scenario validated cleanly and all three evaporated. The gag came out in
+the ordinary voice, the 7-second wait that lines the setup line up with a video
+crawl did not happen, and no screen anywhere said a word.
+
+Measured before changing anything, because "it must be the voice resolution"
+was the tempting answer:
+
+```
+voice -> <DROPPED>   speed -> <DROPPED>   pause -> <DROPPED>
+no error was raised: the beat validated fine
+```
+
+**So: the fields exist now, and unknown fields are refused.** The second half
+matters more than the first. `extra="forbid"` on `Beat` and `Scenario` turns a
+misspelt key into a load failure that names itself, at the one moment it is
+still cheap — at a desk, with the file open. Everything this repository keeps
+learning about honest state says the same thing: a setting that is quietly
+ignored is worse than one that is rejected.
+
+`voice` and `speed` are the narrow form of U349's `persona` — a line that wants
+a different sound without a whole character behind it — so they win where both
+are given, **including over inline `[persona:x]` segments**. A line cannot be
+both "all in onyx" and "this bit in somebody else's voice"; the beat said onyx.
+
+`pause` waits before speaking, for lining a line up with something on *screen*
+rather than with the slide change that fired the beat. A rehearsal skips it:
+U267's rehearsal is for reading the lines, not for waiting out a video.
+
+**The list of voices moved down.** Validating `voice: onix` needs the voice
+names where the schema can see them, and they lived only in `aura_brain.voice`.
+They are in `shared_schemas.voice.voices` now and the brain re-exports the same
+name, because a second copy of a list like that drifts the first time one of
+them is edited.
+
+**One knock-on worth the extra ten minutes.** The scenario builder has no
+control for these three fields, and it rebuilds every beat from its form on
+save — so loading a generated scenario and pressing Save would have stripped
+exactly what the file was written for. It carries them through untouched now,
+with a test. Silently undoing a file's whole reason for existing is the same
+defect wearing a different hat.
+
+The runner also stopped passing fields one at a time: it hands the speaker the
+**whole beat**. That is what made this possible to fix at all — `voice` could
+not have reached TTS through a `speak(text, persona)` signature however well
+the model carried it.
+
+**Tests**: 8 in shared-schemas (the three fields, their defaults, a voice
+refused by name, a speed outside what the provider takes, a negative pause, and
+unknown keys on both models), 3 in the runner (the beat reaches the speaker; a
+pause is waited; a rehearsal is not), 4 in the brain (voice and speed reach
+TTS; a named voice beats the persona; a persona still decides when no voice is
+named; a speed alone works), and 1 in the console round-trip. All verified red.
+
+178 shared-schemas, 406 orchestrator, 720 brain, 282 console.

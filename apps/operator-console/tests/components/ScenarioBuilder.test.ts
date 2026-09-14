@@ -188,3 +188,26 @@ describe('ScenarioBuilder — the projector', () => {
     expect((w.find('select.sb-overlay').element as HTMLSelectElement).value).toBe('hide')
   })
 })
+
+/** U360: the builder has no control for voice/speed/pause, and a generated
+ *  scenario is full of them. Loading one here and saving it again must not
+ *  quietly undo the thing the file was written for. */
+describe('ScenarioBuilder — fields it does not show', () => {
+  it('gives back what it was given', async () => {
+    const w = mount(ScenarioBuilder)
+    await settled(w)
+
+    ;(w.vm as any).loadScenario({
+      title: 'Fanfare',
+      beats: [{ id: 'fanfare', trigger: 'manual', mode: 'speak',
+                text: 'Ta. Ta. Ta.', voice: 'onyx', speed: 0.85, pause: 7 }],
+    })
+    await w.vm.$nextTick()
+    await w.find('button.sb-btn--go').trigger('click')
+
+    const beat = (w.emitted('start')![0][0] as any).beats[0]
+    expect(beat.voice).toBe('onyx')
+    expect(beat.speed).toBe(0.85)
+    expect(beat.pause).toBe(7)
+  })
+})

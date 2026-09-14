@@ -19,8 +19,10 @@ _tts: Any = None  # cached provider
 
 # U65: available TTS voices (gpt-4o-mini-tts). The default is set globally
 # via TTS_VOICE (Settings) and can differ per persona via TTS_VOICE_<MODE>.
-TTS_VOICES = ("alloy", "ash", "ballad", "coral", "echo", "fable",
-              "onyx", "nova", "sage", "shimmer", "verse")
+#
+# U360: the list moved to shared-schemas so a scenario can be validated against
+# it. Re-exported here because every caller in this app already knows this name.
+from shared_schemas.voice.voices import TTS_VOICES  # noqa: E402
 
 _tts_cache: dict[str, object] = {}
 

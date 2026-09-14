@@ -15,11 +15,14 @@ class _Rig:
         self.events: list[dict] = []
         # U349: who was asked to say it, alongside what.
         self.said_by: list[tuple[str, str]] = []
+        # U360: the whole beat, so voice/speed/pause can be checked.
+        self.said_with_beat: list[tuple[str, object]] = []
         self.generated_for: list[str] = []
 
-    async def speak(self, text: str, persona: str = "") -> None:
+    async def speak(self, text: str, beat=None) -> None:
         self.said.append(text)
-        self.said_by.append((text, persona))
+        self.said_by.append((text, getattr(beat, "persona", "")))
+        self.said_with_beat.append((text, beat))
 
     async def gesture(self, name: str) -> None:
         self.gestured.append(name)
@@ -132,7 +135,7 @@ async def test_a_dead_speaker_never_eats_beat_done() -> None:
     """
     from shared_schemas.presentation.models import Beat, Scenario
 
-    async def broken_speak(_text: str, _persona: str = "") -> None:
+    async def broken_speak(_text: str, _beat=None) -> None:
         raise RuntimeError("robot audio is down")
 
     async def generate(_t, _g, _e, _p="") -> str:
@@ -364,3 +367,74 @@ async def test_a_rehearsal_still_moves_the_overlay() -> None:
     await r.next()
     assert r.status()["overlay_visible"] is False
     assert rig.said == []                       # ...and the room still hears nothing
+
+
+# --------------------------------------------------------------------------- #
+# U360: the beat itself reaches the speaker, so voice/speed/pause can be used
+# --------------------------------------------------------------------------- #
+
+async def test_the_speaker_is_handed_the_whole_beat() -> None:
+    """`voice` and `speed` were written in a shipped scenario and went nowhere.
+    The runner passed only text and persona, so there was no way for them to
+    reach TTS even once the model carried them."""
+    rig = _Rig()
+    r = rig.runner(Scenario(beats=[
+        Beat(id="fanfare", trigger="manual", mode="speak",
+             text="Ta. Ta. Ta.", voice="onyx", speed=0.85),
+    ]))
+    await r.next()
+
+    said, beat = rig.said_with_beat[0]
+    assert said == "Ta. Ta. Ta."
+    assert beat.voice == "onyx" and beat.speed == 0.85
+
+
+async def test_a_beat_can_wait_before_it_speaks(monkeypatch) -> None:
+    """`pause` lines a line up with something on screen — a video, a crawl —
+    rather than with the slide change that fired it.
+
+    The wait is asserted on the CALL, not on a clock: a wall-clock assertion
+    for a fraction of a second is a test that fails on a loaded machine and
+    teaches nothing when it does.
+    """
+    import asyncio as _asyncio
+
+    slept: list[float] = []
+    real_sleep = _asyncio.sleep
+
+    async def record(seconds, *a, **kw):
+        slept.append(seconds)
+        return await real_sleep(0)
+
+    monkeypatch.setattr("orchestrator.scenario_runner.asyncio.sleep", record)
+
+    rig = _Rig()
+    r = rig.runner(Scenario(beats=[
+        Beat(id="setup", trigger="manual", mode="speak", text="now", pause=7.0),
+    ]))
+    await r.next()
+
+    assert slept == [7.0]
+    assert rig.said == ["now"]
+
+
+async def test_a_rehearsal_does_not_sit_through_the_pauses(monkeypatch) -> None:
+    """Walking the show with the robot mute should not take as long as the show
+    — U267's rehearsal is for reading the lines, not for waiting out a video."""
+    rig = _Rig()
+    r = rig.runner(Scenario(beats=[
+        Beat(id="setup", trigger="manual", mode="speak", text="now", pause=30.0),
+    ]))
+    r.rehearsing = True
+    import asyncio as _asyncio
+
+    slept: list[float] = []
+    real_sleep = _asyncio.sleep
+
+    async def record(seconds, *a, **kw):
+        slept.append(seconds)
+        return await real_sleep(0)
+
+    monkeypatch.setattr("orchestrator.scenario_runner.asyncio.sleep", record)
+    await r.next()
+    assert slept == [], "a rehearsal sat through a 30-second pause"

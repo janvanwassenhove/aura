@@ -116,7 +116,7 @@ def _voice_for(persona: str) -> tuple[str, float, str]:
             character.voice_speed or 1.0, "")
 
 
-async def _speak(text: str, persona: str = "") -> None:
+async def _speak(text: str, beat: Any = None) -> None:
     """Say a beat OUT LOUD.
 
     U269: this called `_robot.speak(text)` with no audio, and the robot's
@@ -137,6 +137,11 @@ async def _speak(text: str, persona: str = "") -> None:
     before they reach the robot — the robot decides loudness per utterance
     (FR-019), so separate calls would turn a change of character into a change
     of volume as well.
+
+    U360: the whole beat arrives now, because a line may also name a `voice`
+    and `speed` outright — the narrower instruction, so it wins over the
+    persona's. That is what a generated scenario reaches for when it wants one
+    gag in a second voice rather than a character behind the whole beat.
     """
     global _voice_note
     if not text:
@@ -146,6 +151,9 @@ async def _speak(text: str, persona: str = "") -> None:
 
     from aura_brain import voice  # noqa: PLC0415 — optional at import time
 
+    persona = getattr(beat, "persona", "") or ""
+    named_voice = (getattr(beat, "voice", "") or "").strip().lower()
+    named_speed = float(getattr(beat, "speed", 0.0) or 0.0)
     segments = split_persona_segments(text, persona)
     if not segments:
         return
@@ -155,6 +163,11 @@ async def _speak(text: str, persona: str = "") -> None:
     # the presenter had chosen for the talk. A beat persona now outranks it,
     # which is the same order every other speaking path already uses.
     chosen = [_voice_for(s.persona) for s in segments]
+    # U360: a voice named on the beat overrides every segment's — including the
+    # inline `[persona:x]` ones, because a line cannot both be "all in onyx"
+    # and "this bit in somebody else's voice"; the beat said onyx, so onyx.
+    if named_voice or named_speed:
+        chosen = [(named_voice or v, named_speed or sp, why) for v, sp, why in chosen]
 
     # Synthesized together, not one after the other: a slide-triggered beat has
     # 500 ms to start speaking (SC-002), and three sequential round-trips would

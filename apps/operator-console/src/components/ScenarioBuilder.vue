@@ -168,6 +168,8 @@ interface FormBeat {
   persona: string
   /** U352: '' leave alone | 'show' | 'hide' the projector overlay. */
   overlay: string
+  /** U360: no control for these - carried so a round-trip cannot drop them. */
+  voice: string; speed: number; pause: number
 }
 
 let seq = 0
@@ -194,7 +196,7 @@ function blankBeat(): FormBeat {
   return { _k: seq++, id: `beat-${beats.value.length + 1}`, mode: 'speak',
            _tkind: 'manual', _tslide: 1, _tword: '', trigger: 'manual',
            text: '', topic: '', guardrails: '', gesture: null, engine: '',
-           persona: '', overlay: '' }
+           persona: '', overlay: '', voice: '', speed: 0, pause: 0 }
 }
 
 /** U349: the characters a beat may be handed to. Loaded from the brain — the
@@ -261,6 +263,11 @@ function toScenario(): object {
       // "the presentation voice", which is not a character id.
       if (b.persona) out.persona = b.persona
       if (b.overlay) out.overlay = b.overlay
+      // U360: the builder has no control for these, but a scenario loaded
+      // here and saved again must come out carrying what it came in with.
+      if (b.voice) out.voice = b.voice
+      if (b.speed) out.speed = b.speed
+      if (b.pause) out.pause = b.pause
       return out
     }),
   }
@@ -292,6 +299,7 @@ function loadScenario(sc: Record<string, unknown>, name = '') {
       guardrails: String(b.guardrails ?? ''), gesture: (b.gesture as string) ?? null,
       engine: String(b.engine ?? ''), persona: String(b.persona ?? ''),
       overlay: String(b.overlay ?? '').toLowerCase(),
+      voice: String(b.voice ?? ''), speed: Number(b.speed ?? 0), pause: Number(b.pause ?? 0),
     }
   })
 }
