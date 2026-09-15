@@ -269,3 +269,80 @@ describe('U320 — the Present panel reads like one thing, not a list of six', (
     expect(w.findAll('.seg-btn.on')).toHaveLength(1)
   })
 })
+
+/** U362: reported as "when i import a yaml, second time i import it does not
+ *  seem to load? (first time after startup app it worked)".
+ *
+ *  A file input only fires `change` when its VALUE changes. Pick the same file
+ *  twice and the second pick is not a change, so nothing fires and nothing
+ *  happens — no request, no error, no scenario. SettingsView already clears
+ *  the input after reading it; Present never did.
+ */
+describe('U362 — importing the same YAML twice', () => {
+  function fakeFile(text: string) {
+    return { name: 'talk.yaml', text: async () => text } as unknown as File
+  }
+
+  /** jsdom reports a file input's value as '' and refuses to be set, so
+   *  asserting `el.value === ''` passes with or without the fix — it did, the
+   *  first time these were written. Watch the WRITE instead. */
+  function watchClear(el: HTMLInputElement, file: File): string[] {
+    const writes: string[] = []
+    Object.defineProperty(el, 'files', { value: [file], configurable: true })
+    Object.defineProperty(el, 'value', {
+      get: () => '', set: (v: string) => { writes.push(v) }, configurable: true,
+    })
+    return writes
+  }
+
+  async function importInto(w: ReturnType<typeof mount>, el: HTMLInputElement) {
+    await (w.vm as unknown as { importYaml: (e: Event) => Promise<void> })
+      .importYaml({ target: el } as unknown as Event)
+    await flushPromises()
+  }
+
+  it('clears the file input, so the same file can be picked again', async () => {
+    stubFetch()
+    const w = mount(PresentView)
+    await flushPromises()
+
+    const input = w.find('input[type="file"]')
+    expect(input.exists()).toBe(true)
+    const el = input.element as HTMLInputElement
+    const writes = watchClear(el, fakeFile('title: T\nbeats: []\n'))
+
+    await importInto(w, el)
+
+    expect(writes).toContain('')
+  })
+
+  it('posts the scenario it was given', async () => {
+    const posts = stubFetch()
+    const w = mount(PresentView)
+    await flushPromises()
+
+    const el = w.find('input[type="file"]').element as HTMLInputElement
+    watchClear(el, fakeFile('title: Second\nbeats: []\n'))
+
+    await importInto(w, el)
+
+    const loaded = posts.filter(p => p.url.includes('/presentation/scenario'))
+    expect(loaded.length).toBe(1)
+    expect(JSON.stringify(loaded[0].body)).toContain('Second')
+  })
+
+  it('still clears the input when the import fails', async () => {
+    // Otherwise a rejected file could never be re-picked after fixing it —
+    // which is the one time you WILL pick the same name twice.
+    stubFetch({ loaded: null })
+    const w = mount(PresentView)
+    await flushPromises()
+
+    const el = w.find('input[type="file"]').element as HTMLInputElement
+    const writes = watchClear(el, fakeFile('nonsense: ['))
+
+    await importInto(w, el)
+
+    expect(writes).toContain('')
+  })
+})

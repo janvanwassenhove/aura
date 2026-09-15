@@ -756,7 +756,8 @@ const importInput = ref<HTMLInputElement | null>(null)
 const importResult = ref('')
 function pickImport(): void { importInput.value?.click() }
 async function doImport(e: Event): Promise<void> {
-  const file = (e.target as HTMLInputElement).files?.[0]
+  const input = e.target as HTMLInputElement
+  const file = input.files?.[0]
   if (!file || !detail.value) return
   try {
     const json = JSON.parse(await file.text())
@@ -764,7 +765,13 @@ async function doImport(e: Event): Promise<void> {
     importResult.value = res
       ? `Mined ${res.conversations} conversations — added ${res.added_count} fact${res.added_count === 1 ? '' : 's'}.`
       : (knowledge.error ?? 'Import failed.')
-  } catch { importResult.value = 'That file is not valid JSON.' }
+  } catch { importResult.value = 'That file is not valid JSON.' } finally {
+    // U362: a file input only fires `change` when its VALUE changes, so
+    // re-picking the file you just picked does nothing at all. In the
+    // `finally` because the one time you are certain to pick the same name
+    // again is straight after a rejected file, having just fixed it.
+    input.value = ''
+  }
 }
 async function doExport(): Promise<void> {
   const data = await knowledge.exportBrain()

@@ -4098,3 +4098,42 @@ five things it promises, a misspelt field is refused by name, a broken beat
 names the beat, YAML that is not YAML says so, a missing file is a sentence and
 not a traceback, and the flags for voice and pause appear. 91 tests in
 `scripts/`, which CI runs wholesale.
+
+### U362 — the same file, picked twice, did nothing
+
+Reported during Devoxx prep: *"when i import a yaml, second time i import it
+does not seem to load? (first time after startup app it worked)"*.
+
+A file input fires `change` only when its **value** changes. Pick the same file
+again and that is not a change, so nothing fires: no request, no error, no
+scenario, and a panel still saying *No scenario yet*. "First time after startup
+it worked" is the exact signature — the first pick always changes the value,
+because it starts empty.
+
+`SettingsView` already cleared its input in a `finally`. `PresentView` never
+did, and neither did `PeopleView`'s chat import — **three file inputs, one of
+them right**, and the one that was right got there by being written last.
+
+Both are fixed the same way, and the `finally` matters as much as the clearing:
+the one time you are certain to pick the same file name again is straight after
+a rejected file, having just fixed it.
+
+**The test was wrong before the code was right.** The first version asserted
+`el.value === ''` after the import — and passed, with and without the fix,
+because jsdom reports a file input's value as `''` and refuses to be set. A
+test that passes against the bug is worse than no test: it is a claim of
+coverage. The tests now install a property setter and assert on the **write**,
+which is the thing the fix actually does. That mistake is why the second
+instance in `PeopleView` got found at all — going back to check the first test
+meant reading the others.
+
+**Also found**: the People test tripped an unhandled rejection that vitest flags
+as "might cause false positive tests". Not a product bug — the fetch stub
+answered `{}` to the view's own re-fetch of the person, which replaced `detail`
+mid-render and threw inside the template. Having just been caught by one false
+pass, taking the warning at face value was not optional. The stub answers that
+call properly now.
+
+**Tests**: 3 on Present (the input is cleared; the scenario is posted; it is
+cleared after a failure too) and 2 on People. All verified red — genuinely, the
+second time. 287 console tests green.

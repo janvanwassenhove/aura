@@ -612,11 +612,23 @@ async function pauseRobot(): Promise<void> {
 const yamlInput = ref<HTMLInputElement | null>(null)
 function pickYaml(): void { yamlInput.value?.click() }
 async function importYaml(e: Event): Promise<void> {
-  const file = (e.target as HTMLInputElement).files?.[0]
+  const input = e.target as HTMLInputElement
+  const file = input.files?.[0]
   if (!file) return
-  const text = await file.text()
-  const ok = await presentation.start(text)
-  if (ok) await modeStore.setMode('present')
+  try {
+    const text = await file.text()
+    const ok = await presentation.start(text)
+    if (ok) await modeStore.setMode('present')
+  } finally {
+    // U362: a file input only fires `change` when its VALUE changes. Pick the
+    // same file again and that is not a change, so nothing fires — no request,
+    // no error, no scenario. Reported as "second time i import it does not seem
+    // to load? (first time after startup app it worked)".
+    //
+    // In the `finally` on purpose: the one time you are certain to re-pick the
+    // same name is straight after a rejected file, having just fixed it.
+    input.value = ''
+  }
 }
 
 // ── Elapsed clock while live ───────────────────────────────────────────────

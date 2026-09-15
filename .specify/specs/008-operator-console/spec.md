@@ -6,7 +6,7 @@ priority: P1
 risk: Medium
 created: "2026-04-25"
 amended: "2026-09-13"
-units: [U28, U30, U36c, U38, U53, U63, U68, U72, U76, U77, U78, U79, U95, U98, U112, U113, U114, U115, U117, U119, U120, U122, U123, U124, U125, U187, U188, U216, U217, U222, U223, U252, U252c, U252e, U253b, U262, U319, U350, U356]
+units: [U28, U30, U36c, U38, U53, U63, U68, U72, U76, U77, U78, U79, U95, U98, U112, U113, U114, U115, U117, U119, U120, U122, U123, U124, U125, U187, U188, U216, U217, U222, U223, U252, U252c, U252e, U253b, U262, U319, U350, U356, U362]
 ---
 
 # Feature Specification: Operator Console
@@ -277,6 +277,15 @@ able to choose directly"*, and the same for the robot on the Talk screen.
   swallow. It now dims, refuses the cursor, and stops responding to hover; and
   where the gate is not guessable from the control itself, the panel says what
   would lift it (U356).
+
+- **FR-109**: Every `<input type="file">` clears its value after the handler
+  runs, in a `finally`. A file input only fires `change` when its value
+  changes, so picking the same file twice is not a change and the handler never
+  runs — no request, no error, nothing on screen. Reported as *"second time i
+  import it does not seem to load? (first time after startup app it worked)"*.
+  The `finally` matters as much as the clearing: the one time you are certain
+  to pick the same name again is straight after a rejected file, having just
+  fixed it (U362).
 
 ## Traceability
 
