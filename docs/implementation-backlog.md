@@ -4137,3 +4137,56 @@ call properly now.
 **Tests**: 3 on Present (the input is cleared; the scenario is posted; it is
 cleared after a failure too) and 2 on People. All verified red — genuinely, the
 second time. 287 console tests green.
+
+### U363 — twenty megabytes of log, and not one beat in it
+
+Found while diagnosing U362's neighbour: a beat that fired but did not speak.
+The question was the simplest one there is — *did that beat fire?* — and the
+runner answers it, at INFO, on purpose:
+
+```python
+logger.info("beat %r fired (mode=%s trigger=%s)", beat.id, beat.mode, beat.trigger)
+```
+
+`brain.log` was 20 MB. It contained `grep -c beat` → **0**.
+
+**Nothing configured logging.** `uvicorn.run()` installs its own loggers and
+leaves the root at WARNING, so every `logger.info` in `aura_brain`, the
+orchestrator and the runner was discarded on the way out. Every careful log line
+this repository has written over 360 units — the beats, "robot is now asleep",
+the degradation notices — went nowhere. What survived was uvicorn's access log,
+which is why the file is enormous and says nothing.
+
+On a stage that file is the only record there is.
+
+`configure_logging()` runs before uvicorn: INFO by default, `LOG_LEVEL` to
+override, and a nonsense value is never fatal — this is the process the whole
+app waits on, and a typo in an env var must not stop it starting. The noisy HTTP
+libraries are pinned at WARNING, because the camera is polled several times a
+second and `httpx` at INFO would bury the very thing this unit is for.
+
+**The first version broke six unrelated tests, and the fix is the interesting
+part.** `basicConfig(force=True)` is the obvious way to be idempotent. It also
+**closes every existing root handler** — in a test run, pytest's own capture.
+The handler is now added once, identified by an attribute, and nothing else is
+ever removed or closed. uvicorn adds handlers too; closing those would have been
+worse than the bug.
+
+A second thing the same mistake caused: the test asserting the beat line comes
+out could not see it through `caplog`, because `force=True` had removed
+caplog's handler while the line printed perfectly. It reads the stream now,
+which is also what `brain.log` actually is — so the assertion is on the real
+artefact rather than on a test fixture.
+
+**Tests**: 6 — the app's loggers are heard, the beat line genuinely comes out,
+the noisy libraries stay quiet, the level can be turned down, a nonsense level
+is not fatal, and configuring twice does not double every line.
+
+**Reported and not fixed here**: six brain tests fail in this working copy —
+`test_proactive.py` (5) and `test_speech_dispatch.py` (1). They are **not** from
+this unit: with every line of it removed the suite still reports 714 passed and
+those same 6 failed, and with it, 720 passed and the same 6. They passed a few
+hours earlier, so something in the environment moved rather than the code —
+these tests read the real `./personas` and the real environment rather than a
+throwaway one, which is the shape of the problem even if the trigger is not yet
+named. Left for its own unit rather than folded into this one.

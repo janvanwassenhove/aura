@@ -5,7 +5,7 @@ owner: "apps/desktop + CI"
 priority: P1
 risk: High
 created: "2026-09-05"
-units: [U32, U33, U44, U55, U56, U151, U152, U166, U168, U168b, U168c, U168d, U168e, U169, U169b, U170, U171, U172, U173, U174, U176, U177, U178, U192, U193, U197, U201, U211, U228, U229, U230, U231, U232, U233, U234, U235, U236, U283, U284, U285, U285b, U297, U179, U184, U185, U186, U210, U317, U318, U327, U330, U337, U338, U343, U344, U353, U354, U355]
+units: [U32, U33, U44, U55, U56, U151, U152, U166, U168, U168b, U168c, U168d, U168e, U169, U169b, U170, U171, U172, U173, U174, U176, U177, U178, U192, U193, U197, U201, U211, U228, U229, U230, U231, U232, U233, U234, U235, U236, U283, U284, U285, U285b, U297, U179, U184, U185, U186, U210, U317, U318, U327, U330, U337, U338, U343, U344, U353, U354, U355, U363]
 amended: "2026-09-13"
 ---
 
@@ -288,6 +288,18 @@ and installers for Windows, macOS (arm64 and x64) and Linux.
   [021-robot-deployment](../021-robot-deployment/spec.md). The laptop
   self-updates; the Pi does not, and that asymmetry is constitution X.
 
+- **FR-019**: The brain configures logging before uvicorn starts, so its own
+  lines actually reach `brain.log`. Nothing did: `uvicorn.run()` sets up its own
+  loggers and leaves the root at WARNING, so every `logger.info` in the brain,
+  the orchestrator and the scenario runner was discarded — including
+  `"beat %r fired"`. Found while diagnosing a beat that did not speak during a
+  rehearsal, with 20 MB of log holding nothing but HTTP access lines. `LOG_LEVEL`
+  overrides the default INFO and a nonsense value is never fatal — this is the
+  process the whole app waits on. The noisy HTTP libraries are pinned at WARNING,
+  because the brain polls the robot's camera several times a second and INFO
+  there would bury the log it is meant to make readable. The handler is added
+  once and **no other handler is ever removed** (U363).
+
 ## Traceability
 
 | Units | What they delivered |
@@ -298,6 +310,7 @@ and installers for Windows, macOS (arm64 and x64) and Linux.
 | U170, U171, U174, U176, U235 | About dialog; a real app icon; icons that were never committed; `updater.cjs` unpackaged; a missing module in the installer |
 | U355 | Why the same ASR rule admits another unsigned app: prevalence and age, which a release-per-push project can never reach — so signing is the only door |
 | U354 | The MSI installs on the managed laptop — and Defender's ASR rule then refuses to run the app itself, which is a different gate and needs signing or an IT exclusion |
+| U363 | The log recorded no beats — nothing configured logging at all, so every INFO line the app wrote was thrown away |
 | U353 | An MSI beside the .exe, per-machine, because a managed laptop refuses to execute the installer at all — and an update that follows the way this copy was installed |
 | U172, U173, U177, U178, U192, U197, U201, U224 | Semantic versioning from commit markers; in-app prompts; the data-loss bug; the silent check; the panic stop; verified on the real robot; the update that never came back; verifying the installer |
 | U151, U152, U229, U234, U297 | Honest title-bar status; status polled rather than awaited; the app showing another project; resolving ports; the README screenshots regenerated from the demo stack |

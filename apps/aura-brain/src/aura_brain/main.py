@@ -1193,9 +1193,54 @@ def create_app() -> FastAPI:
 app = create_app()
 
 
+#: Libraries that say something on every HTTP call. The brain polls the robot's
+#: camera several times a second, so INFO on these buries the log it is meant to
+#: make readable.
+_NOISY = ("httpx", "httpcore", "urllib3", "openai", "PIL", "asyncio")
+
+
+def configure_logging() -> None:
+    """U363: make the app's own log lines actually come out.
+
+    Nothing configured logging at all. `uvicorn.run()` sets up its own loggers
+    and leaves the root at WARNING, so every `logger.info` in the brain, the
+    orchestrator and the runner was discarded on the way out — including
+
+        logger.info("beat %r fired (mode=%s trigger=%s)", ...)
+
+    Found while diagnosing a beat that did not speak during a rehearsal: the
+    question was "did that beat fire?", and `brain.log` held 20 MB of uvicorn
+    access lines and not one beat. On a stage that file is the only record
+    there is.
+
+    A bad `LOG_LEVEL` is never fatal — this is the process the whole app waits
+    on, and a typo in an env var must not stop it starting.
+    """
+    wanted = os.environ.get("LOG_LEVEL", "INFO").strip().upper()
+    level = getattr(logging, wanted, None)
+    if not isinstance(level, int):
+        level = logging.INFO
+    root = logging.getLogger()
+    # Add OUR handler once, and never touch anybody else's. `basicConfig(
+    # force=True)` was the obvious way to be idempotent and it is wrong here:
+    # it CLOSES every existing root handler, which in a test run is pytest's
+    # own capture — six unrelated tests started failing the moment it ran.
+    # uvicorn adds handlers too, and closing those would be worse.
+    if not any(getattr(h, "_aura", False) for h in root.handlers):
+        handler = logging.StreamHandler()
+        handler.setFormatter(logging.Formatter(
+            "%(asctime)s %(levelname)-7s %(name)s: %(message)s", datefmt="%H:%M:%S"))
+        handler._aura = True        # type: ignore[attr-defined]
+        root.addHandler(handler)
+    root.setLevel(level)
+    for name in _NOISY:
+        logging.getLogger(name).setLevel(max(level, logging.WARNING))
+
+
 def run() -> None:
     import uvicorn
 
+    configure_logging()
     uvicorn.run(
         "aura_brain.main:app",
         # U215: loopback by default — the brain has NO auth on any endpoint, and
