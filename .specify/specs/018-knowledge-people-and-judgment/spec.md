@@ -5,7 +5,7 @@ owner: "aura-brain / knowledge"
 priority: P1
 risk: High
 created: "2026-09-05"
-units: [U18, U19a, U19b, U19c, U19d, U19e, U20, U29, U93, U94, U97, U103, U104, U105, U106, U109, U136, U160, U180, U181, U189, U190, U204, U213, U214, U218, U243, U244, U245, U271, U272, U274, U276, U277, U278, U279, U280, U281, U290, U293, U294, U36f, U342, U348, U358]
+units: [U18, U19a, U19b, U19c, U19d, U19e, U20, U29, U93, U94, U97, U103, U104, U105, U106, U109, U136, U160, U180, U181, U189, U190, U204, U213, U214, U218, U243, U244, U245, U271, U272, U274, U276, U277, U278, U279, U280, U281, U290, U293, U294, U36f, U342, U348, U358, U364]
 amended: "2026-09-05"
 ---
 
@@ -122,7 +122,12 @@ while he was, in fact, remembering.
 
 1. **Given** a person with `role=minor`, **When** they talk, **Then** passive
    learning does **not** happen; it requires the owner to opt in deliberately
-   (ADR-008 §10).
+   (ADR-008 §10). That includes the distilled long-term memory: without
+   `observed_learning` consent a minor's conversations are not distilled, and a
+   `memory` fact already on their profile does not reach the prompt. The owner
+   editing it by hand still works, because that is explicit (U364 — until then
+   memory was distilled for a child like anybody else and handed to the model as
+   an explicit fact).
 2. **Given** a guest, **When** they talk, **Then** only their name is retained.
 3. **Given** the owner is not present, **When** anything sensitive is
    requested, **Then** the unlock tier gates it (U19c, U20), and the badge
@@ -229,6 +234,7 @@ while he was, in fact, remembering.
 | U342 | The brain as one sealed, importable file — faces and skills included, merged rather than replaced |
 | U348 | The graph follows what he learns instead of caching the picture until you click somebody else |
 | U109, U276, U278 | Long-term memory per person — written, shown, and correctable |
+| U364 | A minor's conversations are not distilled into memory, and a memory already there stays out of the prompt, unless the owner opted in |
 | U272, U279, U280 | Memory in the graph: split into lines with keywords, its own styling and legend, and edges to the people it mentions |
 | U281, U293, U294 | Creating a profile without duplicating one; knowing the household before the conversation; looking somebody up on his own |
 | U290 | The console reading a `Response` as JSON, and telling the owner nothing was being remembered while it was |

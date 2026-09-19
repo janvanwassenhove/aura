@@ -230,3 +230,42 @@ async def test_system_note_includes_facts_and_signals(
     assert "Dutch" in note
     assert "morning_focus" in note
     assert "80%" in note
+
+
+# ---------------------------------------------------------------------------
+# U364: a minor's distilled memory is inference, not an explicit fact
+# ---------------------------------------------------------------------------
+
+
+async def test_minor_memory_is_not_injected_without_consent(
+    store: InMemoryKnowledgeStore, judgment: JudgmentLayer
+) -> None:
+    """The memory fact is written by a model from conversations. For a minor
+    that is exactly the passive learning ADR-008 section 10 forbids, so it must
+    not reach the prompt, while the explicit facts beside it still do."""
+    await store.upsert_person(Person(person_id="kid", display_name="Sam", role=PersonRole.MINOR))
+    await store.add_fact(ProfileFact(person_id="kid", key="age", value="8"))
+    await store.add_fact(ProfileFact(person_id="kid", key="memory", value="- Is in Scandinavia"))
+
+    ctx = await judgment.build_context("kid")
+    assert ctx is not None
+    assert [f.key for f in ctx.facts] == ["age"]
+    note = ctx.to_system_note()
+    assert "Memory from past conversations" not in note
+    assert "Scandinavia" not in note
+
+
+async def test_minor_memory_is_injected_with_owner_consent(
+    store: InMemoryKnowledgeStore, judgment: JudgmentLayer
+) -> None:
+    """Consent is the deliberate opt-in the spec allows: then it may be used."""
+    from shared_schemas.knowledge.models import ConsentRecord
+
+    await store.upsert_person(Person(person_id="kid", display_name="Sam", role=PersonRole.MINOR))
+    await store.set_consent(
+        ConsentRecord(person_id="kid", granted_by="owner", scope="observed_learning"))
+    await store.add_fact(ProfileFact(person_id="kid", key="memory", value="- Likes chess"))
+
+    ctx = await judgment.build_context("kid")
+    assert ctx is not None
+    assert "Likes chess" in ctx.to_system_note()

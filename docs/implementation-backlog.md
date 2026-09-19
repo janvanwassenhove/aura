@@ -4190,3 +4190,55 @@ hours earlier, so something in the environment moved rather than the code —
 these tests read the real `./personas` and the real environment rather than a
 throwaway one, which is the shape of the problem even if the trigger is not yet
 named. Left for its own unit rather than folded into this one.
+
+### U364 — a child's memory, handed to the model as a fact
+
+Found while checking the published blog series against the code: two posts and
+both Devoxx talks say a minor's assistant knows what it was *told* and nothing
+it *inferred*. The spec says the same (018, US4.1), and so does ADR-008 §10.
+The code did not.
+
+**What was actually wrong.** The rule was enforced in two places, and both of
+them only guarded observed *signals*: `record_signal` refuses a minor without
+consent, and the judgment layer drops a minor's signals. But since U109 the
+learning that actually runs is not a signal. It is `PersonMemory`: a model's
+summary of the conversation, stored as a `ProfileFact` with key `memory`.
+`PersonMemory.record` never looked at the person's role, so a child's
+conversations were distilled like anybody else's, and the judgment layer, which
+passes a minor "explicit facts only", passed that memory along with them,
+because a memory is a fact by type. Inference, labelled as explicit.
+`look_up_person` (U294) goes through the same layer, so it leaked the same way.
+
+**What changed.**
+
+- `PersonMemory` asks, before buffering a turn and again before distilling,
+  whether this person may be learned about: anyone who is not a minor, or a
+  minor the owner opted in with the existing `observed_learning` consent. It
+  checks twice so that a role changed between the two cannot slip through. It
+  fails closed: if the store cannot say who this is, nothing is learned. A
+  child's words are not even held in the buffer.
+- The judgment layer leaves a minor's `memory` fact out of the prompt unless
+  that consent exists. This is what covers a memory distilled **before** this
+  unit, which is still on the profile, visible and deletable in the console,
+  and now no longer sent anywhere. It is filtered before the fact cap, so it
+  cannot crowd out a real fact either.
+- The owner writing a minor's memory by hand is not gated, because that is
+  explicit. With no consent it is still not injected, and the owner can add the
+  same thing as an ordinary fact instead.
+
+The demo profile is deliberately left alone: `ensure_minor_learning_consent`
+also refuses the demo persona, and reusing it would have changed what a talk's
+demo profile learns in the same commit as a privacy fix. That is a separate
+question.
+
+**Tests**: 6 new. Three describe the bug and were verified red against the old
+code: a minor is not remembered and the model is never called; a role changed
+to minor before the flush is not distilled; the judgment layer drops a minor's
+memory without consent. Three are guards that pass either way and must keep
+passing: a minor with consent is remembered, the judgment layer keeps that
+memory, and the owner's own edit still works. `test_passive_learning_stops_on_stage` built
+`PersonMemory(store=None)`, which only worked while `record()` never looked at
+the store; it now gets an empty store, with the reason written beside it.
+shared-schemas 180, orchestrator 406, brain 729 (1 skipped), all run with the
+keys unset. In a fresh clone the six failures U363 reported do not reproduce,
+which supports its reading that they came from that working copy's environment.

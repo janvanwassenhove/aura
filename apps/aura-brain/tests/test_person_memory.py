@@ -77,3 +77,52 @@ async def test_unknown_person_no_crash(store) -> None:
     pm = PersonMemory(store, _chat_returning("x"), every=1)
     await pm.record("ghost", "hi", "hello")  # no such person → best-effort no-op
     assert await pm.get_memory("ghost") == ""
+
+
+# -- U364: no passive learning about a minor ---------------------------------
+
+
+async def test_minor_is_not_remembered_without_consent(store) -> None:
+    """ADR-008 section 10: a child's conversations are not distilled into a
+    memory unless the owner opted in. Nothing is sent to the model either."""
+    calls = []
+
+    async def _chat(messages, model=None):
+        calls.append(messages)
+        return {"content": "- Is in Scandinavia"}
+
+    await store.upsert_person(Person(person_id="kid", display_name="Sam", role=PersonRole.MINOR))
+    pm = PersonMemory(store, _chat, every=1)
+    await pm.record("kid", "I like loud music", "Noted!")
+    assert calls == []
+    assert await pm.get_memory("kid") == ""
+    assert await pm.flush("kid") is None
+
+
+async def test_minor_is_remembered_with_owner_consent(store) -> None:
+    from shared_schemas.knowledge import ConsentRecord
+
+    await store.upsert_person(Person(person_id="kid", display_name="Sam", role=PersonRole.MINOR))
+    await store.set_consent(
+        ConsentRecord(person_id="kid", granted_by="owner", scope="observed_learning"))
+    pm = PersonMemory(store, _chat_returning("- Likes chess"), every=1)
+    await pm.record("kid", "I like chess", "Great!")
+    assert await pm.get_memory("kid") == "- Likes chess"
+
+
+async def test_role_changed_to_minor_before_flush_is_not_distilled(store) -> None:
+    """The gate holds at distillation too, not only when a turn is buffered."""
+    await store.upsert_person(Person(person_id="sam", display_name="Sam", role=PersonRole.FAMILY))
+    pm = PersonMemory(store, _chat_returning("- remembered"), every=10)
+    await pm.record("sam", "note this", "ok")
+    await store.upsert_person(Person(person_id="sam", display_name="Sam", role=PersonRole.MINOR))
+    assert await pm.flush("sam") is None
+    assert await pm.get_memory("sam") == ""
+
+
+async def test_owner_can_still_write_a_minors_memory_explicitly(store) -> None:
+    """Only passive learning is gated; the owner editing it by hand is explicit."""
+    await store.upsert_person(Person(person_id="kid", display_name="Sam", role=PersonRole.MINOR))
+    pm = PersonMemory(store, _chat_returning("x"), every=1)
+    await pm.set_memory("kid", "- Plays hockey")
+    assert await pm.get_memory("kid") == "- Plays hockey"

@@ -6,8 +6,10 @@ Persists nothing of its own.
 
 Data-minimization rules (ADR-008 §6):
   - guest:  display_name only — enough for a polite greeting, nothing more.
-  - minor:  explicit facts only; observed signals are NEVER included (ADR-008 §10:
-            minors get no passive/observed learning by default).
+  - minor:  explicit facts only; observed signals are NEVER included, and neither
+            is the distilled conversation memory unless the owner granted
+            observed_learning consent (ADR-008 §10: minors get no passive
+            learning by default; U364).
   - family/owner: top-N explicit facts + signals above a confidence threshold.
 
 The injected note is intentionally brief — the LLM gets a compact paragraph, not
@@ -28,6 +30,8 @@ from shared_schemas.knowledge.store import KnowledgeStore
 
 _DEFAULT_MAX_FACTS = 8
 _DEFAULT_SIGNAL_THRESHOLD = 0.55  # include signals with confidence >= this
+_MEMORY_KEY = "memory"  # the distilled long-term memory (aura_brain.person_memory)
+_OBSERVED_LEARNING = "observed_learning"  # the consent scope that opts a minor in
 
 
 class PersonContext(BaseModel):
@@ -102,11 +106,21 @@ class JudgmentLayer:
             return PersonContext(person=person)
 
         # All other roles: load explicit facts, capped.
-        facts = (await self._store.get_facts(person_id))[: self._max_facts]
+        facts = await self._store.get_facts(person_id)
 
         # Minors: explicit facts only (ADR-008 §10 — no observed/passive learning).
         if person.role == PersonRole.MINOR:
-            return PersonContext(person=person, facts=facts)
+            # U364: the `memory` fact is stored as a fact but written by a
+            # model from conversations — inference, not something anybody
+            # told it. Without the owner's opt-in it stays out of the prompt,
+            # including a memory distilled before PersonMemory learned to
+            # refuse. Filtered before the cap, so it cannot crowd out a real
+            # fact either.
+            if not await self._store.has_consent(person_id, _OBSERVED_LEARNING):
+                facts = [f for f in facts if f.key != _MEMORY_KEY]
+            return PersonContext(person=person, facts=facts[: self._max_facts])
+
+        facts = facts[: self._max_facts]
 
         # Owner / Family: explicit facts + high-confidence observed signals.
         all_signals = await self._store.get_signals(person_id)

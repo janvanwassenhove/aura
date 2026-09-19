@@ -141,7 +141,12 @@ async def test_passive_learning_stops_on_stage(monkeypatch) -> None:
     async def _never_called(*a, **k):
         raise AssertionError("distilling should not happen in this test")
 
-    mem = PersonMemory(store=None, chat_fn=_never_called)
+    # U364: record() now asks the store whether this person may be learned
+    # about (a minor may not), so it needs a store; store=None only worked
+    # while record() never looked. An unknown person is still learned about.
+    from shared_schemas.knowledge import InMemoryKnowledgeStore
+
+    mem = PersonMemory(store=InMemoryKnowledgeStore(), chat_fn=_never_called)
     await mem.record("someone", "hello there", "hi back")
     assert not mem._buffers.get("someone"), "an audience was being remembered"
 

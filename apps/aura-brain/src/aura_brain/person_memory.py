@@ -25,6 +25,10 @@ logger = logging.getLogger(__name__)
 
 _LINK_RE = re.compile(r"\[\[([^\]]+)\]\]")
 
+# U364: the consent scope that lets the owner opt a minor in to being learned
+# about (ADR-008 §10). Same scope the store checks for observed signals.
+_OBSERVED_LEARNING = "observed_learning"
+
 MEMORY_KEY = "memory"
 _MAX_MEMORY_CHARS = 1400
 
@@ -128,10 +132,39 @@ class PersonMemory:
                 return
         except Exception as exc:  # noqa: BLE001
             logger.debug("memory policy unreadable: %s", exc)
+        # U364: a minor is not learned about unless the owner opted in. Checked
+        # here so a child's words are not even held in the buffer, and again at
+        # distillation in case the role changed in between.
+        if not await self._may_learn(person_id):
+            return
         buf = self._buffers.setdefault(person_id, [])
         buf.append((user, assistant))
         if len(buf) >= self._every:
             await self.flush(person_id)
+
+    async def _may_learn(self, person_id: str) -> bool:
+        """U364: may conversations with this person be distilled into memory?
+
+        The distilled memory is stored as a fact and reaches the prompt like
+        one, but it is inference — a model's summary of what was said. For a
+        minor that is exactly the passive learning ADR-008 §10 forbids unless
+        the owner consents, and the spec (018, US4.1) says so. It went unchecked
+        from U109 on, so a child's profile grew a memory and the judgment
+        layer passed it to the model as an explicit fact.
+
+        Fails closed: if the store cannot say who this is, nothing is learned.
+        An unknown person is left to _distill, which already ignores them.
+        """
+        from shared_schemas.knowledge import PersonRole  # noqa: PLC0415
+
+        try:
+            person = await self._store.get_person(person_id)
+            if person is None or person.role != PersonRole.MINOR:
+                return True
+            return await self._store.has_consent(person_id, _OBSERVED_LEARNING)
+        except Exception as exc:  # noqa: BLE001 - never raise into the turn
+            logger.debug("could not check learning consent for %s: %s", person_id, exc)
+            return False
 
     async def flush(self, person_id: str) -> dict | None:
         """Distil the buffered exchanges into the person's memory now."""
@@ -293,6 +326,8 @@ class PersonMemory:
     async def _distill(self, person_id: str, exchanges: list[tuple[str, str]]) -> dict | None:
         person = await self._store.get_person(person_id)
         if person is None:
+            return None
+        if not await self._may_learn(person_id):
             return None
         current = await self.get_memory(person_id)
         convo = "\n".join(f"- They said: {u}\n  You replied: {a}" for u, a in exchanges)
