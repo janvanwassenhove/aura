@@ -5,7 +5,7 @@ owner: "orchestrator"
 priority: P1
 risk: High
 created: "2026-04-25"
-units: [U23, U25]
+units: [U23, U25, U373]
 amended: "2026-09-05"
 ---
 
@@ -100,6 +100,15 @@ The context builder assembles a complete LLM prompt from: system prompt (persona
 ## Requirements
 
 ### Functional Requirements
+
+- **FR-PROMPT-01**: The prompt templates in `shared-prompts` — the system
+  prompt every persona speaks from, the approval request the owner reads, the
+  daily context block — are tested on their rendered text: the persona and
+  context arrive, the guardrail lines ("never reveal bearer tokens…", "always
+  request approval…") are present, nothing is HTML-escaped on its way into a
+  prompt, and the suite runs in the gate. The package had carried an empty
+  `tests/` directory since April (U373, audit T11).
+
 
 - **FR-001**: `Orchestrator` MUST expose `POST /orchestrate` accepting a turn and returning a response.
 - **FR-002**: `IntentRouter` MUST map intents to tools using a configurable intent-to-tool mapping.

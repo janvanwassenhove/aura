@@ -119,6 +119,9 @@ jobs:
 
       - name: Run shared-personas tests
         run: uv run --package shared-personas --extra dev pytest packages/shared-personas/tests -v
+      # U373 (audit T11): a tests/ directory that held only __init__.py since April.
+      - name: Run shared-prompts tests
+        run: uv run --package shared-prompts --extra dev pytest packages/shared-prompts/tests -v
 
       - name: Run robot-runtime tests
         run: uv run --package robot-runtime --extra dev pytest services/robot-runtime/tests -v

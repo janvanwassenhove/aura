@@ -4634,3 +4634,29 @@ was **cancelled** with no job started. The release workflow's concurrency
 group keeps at most one *pending* run; U372 arrived while U370 was still
 queued behind U369b, and the queue kept the newer one. Not every commit gets
 its own installer under load — true before this audit, and unchanged by it.
+
+### U373 — a test directory that had held only `__init__.py` since April
+
+Sixth fix from the testing audit
+([`docs/audit-testing-2026-09.md`](audit-testing-2026-09.md), T11), found by
+U368's tree walk on its first run.
+
+`packages/shared-prompts` renders the system prompt every persona speaks from
+(`orchestrator/persona_manager.py` calls it), the approval request the owner
+reads before a tool runs, and the daily context block. It had a `tests/`
+directory, a `dev` extra with pytest in it, and no test — since the scaffold
+in April. The gate could not even run it: pytest exits 5 on an empty
+directory, so the walk that finds unlisted suites had to be taught to skip it.
+
+Six tests now, on rendered text rather than on the template engine: the
+persona and context arrive in the system prompt; the two guardrail lines are
+in every one of them (a persona without "never reveal bearer tokens" is a
+persona that may read one back to the room); an owner-typed `<` or `&` reaches
+the model as typed rather than as `&lt;`, because prompts are not web pages;
+the approval request names the tool, the requester and the reply it asks for;
+the context summary carries its count as a number; and blank lines stay
+trimmed so the model is not reading past doubled newlines.
+
+The suite is listed in `checks.yml`, and `scripts/test_release_gate.py`'s
+walk — which requires a real test file before it insists on a suite — now
+insists on this one.

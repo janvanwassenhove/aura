@@ -89,11 +89,11 @@ def test_the_release_builds_only_behind_the_same_gate() -> None:
 def _packages_with_tests() -> list[str]:
     """Packages that have at least one test to run.
 
-    A `tests/` directory alone is not enough: `shared-prompts` has had one since
-    April with only an `__init__.py` in it, and pytest on an empty directory
-    exits 5, which would fail the gate for a suite that does not exist. That
-    empty directory is its own finding (audit T11); this walk is about suites
-    the gate could run and does not.
+    A `tests/` directory alone is not enough: `shared-prompts` had one from
+    April to U373 with only an `__init__.py` in it, and pytest on an empty
+    directory exits 5, which would fail the gate for a suite that does not
+    exist. This walk is about suites the gate could run and does not — an
+    empty directory is a finding for the audit, not for the gate.
     """
     out = []
     for root in ("packages", "services", "apps"):
