@@ -5,7 +5,7 @@ owner: "build"
 priority: P1
 risk: Low
 created: "2026-09-05"
-units: [U299, U300, U301, U302, U303, U304, U305, U306, U307, U308, U309, U310, U311, U312, U313, U314, U315, U316, U347, U369, U369b, U372, U375b]
+units: [U299, U300, U301, U302, U303, U304, U305, U306, U307, U308, U309, U310, U311, U312, U313, U314, U315, U316, U347, U369, U369b, U372, U375b, U375c, U376]
 ---
 
 # Feature Specification: Spec Coverage — traceability that a machine checks
@@ -140,6 +140,10 @@ spec-first rule and the per-unit obligations, and points at the constitution.
   (U369, audit T2). Only **tracked** test files vouch, and a test's fixture
   data must use ids no real unit will ever have (the `U8xx` range): a test
   that mentions a real id as sample input has named it (U369b).
+- **FR-TRACE-03**: **Both traceability checks read the whole history in CI.**
+  They walk `git log`; on a shallow clone that log is the tip commit alone, so
+  a unit followed by any non-unit commit was never judged. The checks job
+  checks out with `fetch-depth: 0` (U376, audit T13).
 - **FR-GATE-01**: **The gate runs locally from the file CI reads.**
   `scripts/gate.py` parses `.github/workflows/checks.yml` and executes its
   `run:` steps in the runner's order, honouring `working-directory` and `env`,
@@ -204,6 +208,8 @@ spec-first rule and the per-unit obligations, and points at the constitution.
 | U369b | A test file's own fixture data must not name real units — the check's first tests vouched for five units they knew nothing about |
 | U372 | The gate runs on the laptop from checks.yml itself — "verified locally" and "CI is green" mean the same thing |
 | U375b | The desktop's `test-*.cjs` checks count as tests — the check had gone red on the unit that added one |
+| U375c | The SyntaxError and the pre-written ledger number, corrected with the guards run and acted on |
+| U376 | The traceability checks see the whole history in CI, not the tip commit of a shallow clone |
 | U300 | Batched and ranged commit subjects counted as the several units they are — the debt went from 292 to its true 321 |
 | U301 | Spec 016 — embodiment and presence (36 units) |
 | U302 | Spec 017 — voice and language (60 units) |

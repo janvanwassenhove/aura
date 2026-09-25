@@ -4755,3 +4755,21 @@ the run and said "the same 122"; and a `\n` inside a heredoc became a real
 newline inside a string literal, so the test file shipped with a
 `SyntaxError` — the trap CLAUDE.md names, met again. Both fixed in U375c, with
 the guards run *and acted on* before the push.)
+
+### U376 — the traceability checks only ever judged the tip commit in CI
+
+Found by the pass's own last two commits. U375c failed *Spec coverage* on the
+runner; the docs commit on top of it, with identical code, passed. Locally,
+`spec_drift.py` reported the truth — U375c was claimed by no spec (a real
+omission, fixed here) — but that answer depends on `git log`, and the checks
+job used the default **shallow clone**: a log of one commit. So on the runner
+both `spec_drift.py` and `spec_tests.py` judged the tip commit alone, and a
+unit followed by any non-unit commit was never checked at all. U299's
+guarantee has been weaker in CI than on a laptop since the day it was written.
+
+`fetch-depth: 0` on the checks job's checkout. Recorded as audit T13 and
+closed in the same unit. Also worth keeping: a unit can only be judged by
+`spec_drift.py` *after* it is committed, so the pre-commit run cannot see the
+commit it is guarding — the claim has to be in the same commit, and the CI run
+is the one that actually checks it. That is one more reason the runner must
+see the whole history.

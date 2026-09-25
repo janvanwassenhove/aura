@@ -22,6 +22,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # U376 (audit T13): spec_drift.py and spec_tests.py read `git log`.
+          # On the default shallow clone that log is ONE commit, so both checks
+          # only ever judged the tip: a unit followed by a docs commit slipped
+          # through green. Found because U375c failed here and the commit on
+          # top of it passed with the same code.
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
