@@ -4516,3 +4516,43 @@ Two things worth keeping from this:
 * **The debt number is the product.** 122 is what the audit measured, 122 is
   what the check reports again after this fix, and any drop from here on has a
   test behind it or is a bug in the check.
+
+### U370 — half the console had never been mounted
+
+Third fix from the testing audit
+([`docs/audit-testing-2026-09.md`](audit-testing-2026-09.md), T4).
+
+Five of the ten views had never been imported by any test — `TalkView`, the
+screen the owner looks at most, among them — along with seven stores
+(`modeStore`, which owns the Quiet switch that U256, U332 and U366 were all
+about) and nine components (the setup wizard, the approval panel, both
+canvases). This project has no `vue-tsc`; esbuild strips types unchecked. So
+"never mounted" means "never compiled", and the compile error is delivered to
+whoever opens that panel next. U365 had just shown the shape of it: a missing
+import in `App.vue`, green everywhere, blank in front of the owner.
+
+Three sweeps, and none of them keeps a list:
+
+* **Every view.** The ids are read from `navStore.ts`'s `View` union — the
+  same union `App.vue` switches on — and each is shown inside the mounted
+  shell with a route-aware fetch stub and no `[Vue warn]` allowed. Add
+  `'diary'` to the type without mounting it and this fails, by name.
+* **Every component.** The directory under `src/components` is the list; each
+  file is mounted with its required props from a small table. Two entries were
+  missing on the first run (`PhotoLightbox` needs `src`, `PickerMenu` needs
+  `open` and `items`) and the message said so.
+* **Every store.** Every `use*Store` under `src/stores` is constructed —
+  the cheapest compile step there is — and `modeStore`'s Quiet switch is
+  exercised both ways: it writes through `/orchestrator/policy/quiet`, and
+  when the brain refuses it snaps back rather than leaving the chip on HUSHED
+  over a robot that is not.
+
+All ten views mounted clean on the first run. That is worth saying plainly:
+this unit found no broken screen. What it removes is the way the *next* broken
+screen would have shipped. Console suite: 341 green, 47 of them new.
+
+One thing observed while this landed, and not explained: the first Release
+run through the new gate (U368) reached *Publish release* with the same token
+permissions as every green run before it and was refused with HTTP 403; the
+very next run (U369) published v2.0.177 through the identical workflow. Noted
+here so a second occurrence is a pattern and not a surprise.

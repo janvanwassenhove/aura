@@ -6,7 +6,7 @@ priority: P1
 risk: Medium
 created: "2026-04-25"
 amended: "2026-09-13"
-units: [U28, U30, U36c, U38, U53, U63, U68, U72, U76, U77, U78, U79, U95, U98, U112, U113, U114, U115, U117, U119, U120, U122, U123, U124, U125, U187, U188, U216, U217, U222, U223, U252, U252c, U252e, U253b, U262, U319, U350, U356, U362]
+units: [U28, U30, U36c, U38, U53, U63, U68, U72, U76, U77, U78, U79, U95, U98, U112, U113, U114, U115, U117, U119, U120, U122, U123, U124, U125, U187, U188, U216, U217, U222, U223, U252, U252c, U252e, U253b, U262, U319, U350, U356, U362, U370]
 ---
 
 # Feature Specification: Operator Console
@@ -103,6 +103,16 @@ A developer can type text in the console and submit it as a conversation turn, r
 ## Requirements
 
 ### Functional Requirements
+
+- **FR-MOUNT-01**: **Everything the console can show is mounted by a test.**
+  There is no `vue-tsc`; a mount is the only compile step this app has. Three
+  sweeps read their subject from the code rather than keeping a list: every
+  id in `navStore`'s `View` union is shown inside the mounted shell, every
+  `.vue` under `src/components` is mounted with its required props, and every
+  `use*Store` under `src/stores` is constructed. A view, component or store
+  added without a test therefore fails the gate with its own name in the
+  message (U370, audit T4).
+
 
 - **FR-001**: Console MUST connect to the backend via WebSocket on startup.
 - **FR-002**: Robot state panel MUST display: mode, behavior state, speaking indicator, motion log (last 10).
