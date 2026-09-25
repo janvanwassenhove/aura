@@ -74,7 +74,7 @@ them — and it is writing, to be paid down spec by spec.
 | T8 `shared-config` has its first tests, secrets proven not to print | |
 | T11 `shared-prompts` has its first tests, and the gate runs them | |
 
-Suites in the gate went from ten to twelve; tests from 1,828 to 1,931. The
+Suites in the gate went from ten to twelve; tests from 1,828 to 1,896, counted the same way as the headline (a grep for test functions — vitest itself reports 345 for the console, because three of the new files generate their cases in loops). The
 number to watch is the one `spec_tests.py` prints on every push: **122** on
 the day of the audit, **117** at the end of the pass — not because five tests
 were written, but because the check had ignored the desktop's `test-*.cjs`

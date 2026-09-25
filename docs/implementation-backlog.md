@@ -4723,7 +4723,7 @@ move publishing to a `workflow_run` on CI success so the file that publishes
 is never the file that changed. Not decided here.
 
 Where the audit's numbers stand at the end of the pass: suites in the gate 10
-→ 12, tests 1,828 → 1,931, and `spec_tests.py` prints **117** (see U375b for
+→ 12, tests 1,828 → 1,896 by the audit's own count (vitest reports 345 for the console alone; the grep sees a loop-generated case once), and `spec_tests.py` prints **117** (see U375b for
 why 122 was an undercount) — the debt is the debt, and the gate now refuses to
 let it grow.
 
