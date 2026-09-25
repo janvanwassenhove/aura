@@ -69,7 +69,12 @@ jobs:
         run: |
           pip install uv
           uv sync --all-packages
-          uv run --all-packages pytest scripts/ -q
+          # `python -m pytest`, not `pytest`: an earlier step in THIS job does
+          # `pip install pytest`, so a bare `uv run pytest` picks up that
+          # system binary and runs on the runner's interpreter — with none of
+          # the workspace it just installed. That is how the first attempt at
+          # this fix stayed red (U367).
+          uv run --all-packages --with pytest python -m pytest scripts/ -q --continue-on-collection-errors
 
   test:
     runs-on: ubuntu-latest

@@ -4389,7 +4389,27 @@ like the script is broken rather than the job that runs it.
 
 The step installs the workspace now (`uv sync --all-packages`), which is what
 the scripts actually import and what every other job in this repository already
-does. And `scripts/test_scripts_are_runnable.py` stays behind it: it reads the
+does — and runs it as `python -m pytest`, not `pytest`.
+
+**That second half cost a second red build**, and the lesson is the older one
+in this repository's own trap list. The first attempt ran `uv run
+--all-packages pytest`, which looked right and stayed red: an earlier step in
+the *same job* does `pip install pytest`, so `uv run` found that binary on
+PATH and ran it on the runner's interpreter — with none of the workspace it had
+just installed. The giveaway was in the traceback all along
+(`/opt/hostedtoolcache/...` instead of `.venv/...`).
+
+It was verified locally before pushing, and the verification was worthless:
+this machine's `.venv` already had everything, so the command could not fail
+here for the reason it failed there. The honest check is a clean room, and it
+is cheap — `uv run --isolated --no-project --with pytest python -m pytest
+scripts/test_scripts_are_runnable.py` reproduces a bare environment, where the
+guard correctly reports `{'check_scenario.py': {'yaml'}, 'readme_shots.py':
+{'PIL'}}`.
+
+The run also passes `--continue-on-collection-errors`, because without it two
+modules failing to import abort collection and the guard never gets to speak —
+the readable explanation was there and pytest stopped before printing it. And `scripts/test_scripts_are_runnable.py` stays behind it: it reads the
 top-level imports of every script and reports, by name, any module this
 environment cannot provide, with the file to fix. Deliberately `ast`-based
 rather than importing each script — importing runs module-level code, and the
