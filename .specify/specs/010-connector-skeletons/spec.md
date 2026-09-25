@@ -6,7 +6,7 @@ priority: P2
 risk: Medium
 created: "2026-04-25"
 amended: "2026-09-05"
-units: [U39, U48, U52, U69, U254, U254b, U255, U295, U298]
+units: [U39, U48, U52, U69, U254, U254b, U255, U295, U298, U374]
 ---
 
 # Feature Specification: Connector Skeletons (Work IQ MCP + Mock)
@@ -97,6 +97,16 @@ No auth token, client secret, or personal M365 content appears in any log output
 ## Requirements
 
 ### Functional Requirements
+
+- **FR-CFG-01**: The settings every connector reads (`shared-config`) are
+  tested: the enabled-connector list is parsed from the environment, trimmed,
+  and never contains an empty entry; the keyring backend is chosen by the
+  environment and an unknown value is refused rather than guessed; secrets
+  (`KEYRING_PASSPHRASE`, `AZURE_CLIENT_SECRET`) are `SecretStr` and do not
+  appear in `repr`, `str` or `model_dump`; unknown environment keys are
+  ignored; and a developer's `.env.local` cannot leak into the suite. The
+  suite runs in the gate (U374, audit T8).
+
 
 - **FR-001**: `M365Connector` ABC MUST define: `list_calendar_events_today()`, `get_unread_mail()`, `post_teams_message()`, `send_mail()`, `list_tasks()`, `create_task()`.
 - **FR-002**: `MockM365Connector` MUST implement all `M365Connector` methods with realistic fake responses.

@@ -4660,3 +4660,26 @@ trimmed so the model is not reading past doubled newlines.
 The suite is listed in `checks.yml`, and `scripts/test_release_gate.py`'s
 walk — which requires a real test file before it insists on a suite — now
 insists on this one.
+
+### U374 — the settings every connector reads, tested for the first time
+
+Seventh fix from the testing audit
+([`docs/audit-testing-2026-09.md`](audit-testing-2026-09.md), T8).
+
+`packages/shared-config` is 233 lines that every connector and the identity
+service read at start-up — which connectors are on, which keyring backend
+holds the tokens, where the calendar link is — and it had no tests and no
+`tests/` directory. What goes wrong in a settings module is quiet: a secret
+that prints in a traceback, a connector list that keeps an empty entry, a
+developer's `.env.local` deciding what a test measures. Quiet is the kind this
+audit is about.
+
+Twelve tests. The ones worth naming: the keyring passphrase and the Azure
+client secret are `SecretStr` and do not appear in `repr`, `str` or
+`model_dump` — a settings object ends up in logs, and the secret in it must
+not; an unknown keyring backend is refused rather than guessed; `"m365,,"`
+from a hand-edited env enables one connector, not three; and every settings
+object in the suite is built with `_env_file=None`, because the `.env.local`
+on the machine running the tests must not be what they measure.
+
+Listed in `checks.yml`; the gate's tree walk now insists on it.
