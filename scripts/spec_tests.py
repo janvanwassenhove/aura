@@ -15,7 +15,7 @@ behind it is a fix the next refactor removes without noticing.
 This closes the loop the same way `spec_drift.py` did:
 
 * A unit is **named by a test** when its id (`U339`, `U242b`) appears anywhere
-  in a `test_*.py` or `*.test.ts` file. That is this repository's convention —
+  in a `test_*.py`, `*.test.ts` or desktop `test-*.cjs` file. That is this repository's convention —
   every test says in its docstring which fix it guards — so a mention is the
   link, and its absence means no test knows the fix exists.
 * `.specify/coverage.json` holds a second baseline, `tests_baseline`: units up
@@ -43,7 +43,10 @@ from spec_drift import claimed_units, split_at  # noqa: E402
 _UNIT_TOKEN = re.compile(r"\bU\d{1,3}[a-z]?\b")
 _SPEC_GLOB = ".specify/specs/*/spec.md"
 _COVERAGE = ".specify/coverage.json"
-_TEST_GLOBS = ("*test_*.py", "*.test.ts")
+# The desktop shell's checks are plain-node scripts named test-*.cjs, run by
+# the gate like any other suite (U375b): a test file is whatever the gate
+# runs, not whatever pytest or vitest happen to collect.
+_TEST_GLOBS = ("*test_*.py", "*.test.ts", "*test-*.cjs")
 
 
 def _root() -> Path:

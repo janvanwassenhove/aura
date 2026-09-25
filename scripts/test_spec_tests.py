@@ -37,6 +37,17 @@ def test_a_unit_named_anywhere_in_a_test_file_counts(tmp_path) -> None:
     assert units_named_by([py, ts]) == {"U839", "U841"}
 
 
+def test_a_desktop_check_is_a_test_file_too(tmp_path) -> None:
+    """U375b: the shell's checks are plain-node `test-*.cjs` scripts, run by
+    the gate. The first version of this check did not count them, so U375 —
+    guarded by one — was reported as a unit no test names, and the gate went
+    red on the commit that added the guard."""
+    cjs = _write(tmp_path, "test-brain-env.cjs", "// U875: pins the env
+")
+    assert units_named_by([cjs]) == {"U875"}
+    assert "*test-*.cjs" in spec_tests._TEST_GLOBS
+
+
 def test_a_suffix_is_its_own_unit() -> None:
     p = Path.cwd()  # unused path; content only
     assert units_named_by([]) == set()

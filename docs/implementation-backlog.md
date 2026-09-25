@@ -4725,3 +4725,18 @@ is never the file that changed. Not decided here.
 Where the audit's numbers stand at the end of the pass: suites in the gate 10
 → 12, tests 1,828 → 1,931, and `spec_tests.py` still prints **122** — the
 debt is the debt, and the gate now refuses to let it grow.
+
+### U375b — the check did not count the desktop's own tests
+
+U375 added `apps/desktop/test-brain-env.cjs`, named itself in it, and the
+pre-commit run of `spec_tests.py` printed *1 claimed unit(s) that no test
+names* — U375. The commit went through because the exit code was printed and
+not acted on, which is the third time this session that pattern has cost a
+red build, and it is now the reason `gate.py` exists.
+
+The check's globs were `test_*.py` and `*.test.ts`: what pytest and vitest
+collect. The desktop shell's checks are plain-node `test-*.cjs` scripts, run
+by the gate like any other suite, and the check did not know them. A test
+file is whatever the gate runs. `*test-*.cjs` is in the globs now, with a test
+that a `.cjs` file names a unit; the real run reports the same **122** it did
+before, and U375 is named by the check it added.
