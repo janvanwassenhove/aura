@@ -66,7 +66,7 @@ them — and it is writing, to be paid down spec by spec.
 | Landed | Still open |
 |---|---|
 | T1 one gate — `checks.yml`, CI and Release both call it; a second list is refused by test | T3 — 182 retro-specified scenarios trace to nothing (writing) |
-| T2 spec → test — `spec_tests.py` in the gate; 122 units of debt behind a baseline that only shrinks | T9 — no general flake detection |
+| T2 spec → test — `spec_tests.py` in the gate; 117 units of debt behind a baseline that only shrinks | T9 — no general flake detection |
 | T4 every view, component and store is mounted or constructed, from the code's own lists | T12 — a commit that edits `release.yml` does not publish its own release (observed twice) |
 | T5 `gate.py` runs the gate here from the file CI reads | |
 | T6 the robot being behind the laptop is a line in the Connection card | |
@@ -76,8 +76,11 @@ them — and it is writing, to be paid down spec by spec.
 
 Suites in the gate went from ten to twelve; tests from 1,828 to 1,931. The
 number to watch is the one `spec_tests.py` prints on every push: **122** on
-the day of the audit. It goes down when a test is written and names its unit;
-it cannot go up without the gate going red.
+the day of the audit, **117** at the end of the pass — not because five tests
+were written, but because the check had ignored the desktop's `test-*.cjs`
+suite, which guards U224, U229, U234, U239 and U344 (U375b). It goes down when
+a test is written and names its unit; it cannot go up without the gate going
+red.
 
 ## Method
 

@@ -4723,8 +4723,9 @@ move publishing to a `workflow_run` on CI success so the file that publishes
 is never the file that changed. Not decided here.
 
 Where the audit's numbers stand at the end of the pass: suites in the gate 10
-→ 12, tests 1,828 → 1,931, and `spec_tests.py` still prints **122** — the
-debt is the debt, and the gate now refuses to let it grow.
+→ 12, tests 1,828 → 1,931, and `spec_tests.py` prints **117** (see U375b for
+why 122 was an undercount) — the debt is the debt, and the gate now refuses to
+let it grow.
 
 ### U375b — the check did not count the desktop's own tests
 
@@ -4738,5 +4739,19 @@ The check's globs were `test_*.py` and `*.test.ts`: what pytest and vitest
 collect. The desktop shell's checks are plain-node `test-*.cjs` scripts, run
 by the gate like any other suite, and the check did not know them. A test
 file is whatever the gate runs. `*test-*.cjs` is in the globs now, with a test
-that a `.cjs` file names a unit; the real run reports the same **122** it did
-before, and U375 is named by the check it added.
+that a `.cjs` file names a unit, and U375 is named by the check it added.
+
+**The number moved, and it should have.** The real run reports **117**, not
+122: five units — U224 (`test-updater-verify.cjs`), U229 and U234
+(`test-console-origin.cjs`), U239 (`test-bootstrap-extras.cjs`), U344
+(`test-brain-launch.cjs`) — had been guarded by desktop checks all along, and
+the check was not looking at the suite that guards them. The audit's 122
+undercounted the *coverage*, not the debt; this is the check catching its own
+blind spot, which is the correct direction for the number to move.
+
+(Two things went wrong landing this and are on record because the pattern is
+the point of the whole audit: the ledger text of U375b was written *before*
+the run and said "the same 122"; and a `\n` inside a heredoc became a real
+newline inside a string literal, so the test file shipped with a
+`SyntaxError` — the trap CLAUDE.md names, met again. Both fixed in U375c, with
+the guards run *and acted on* before the push.)
