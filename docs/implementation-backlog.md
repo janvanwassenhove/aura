@@ -4362,3 +4362,40 @@ each verified against the old code:
 * And a structural one: anything that holds a microphone open must consult
   `hush`. A new session type added next year fails in the suite rather than in
   the owner's living room.
+
+### U367 — CI had been red for six units, and the installers kept shipping
+
+Asked, in two words: *"build failed?"* It had — on every push since U361, six
+units earlier. Nothing said so, because the Release workflow is green and
+independent: builds kept appearing in the usual place while the checks beside
+them failed.
+
+The cause is a leftover of my own U337. That unit replaced a hand-kept list of
+*tests* in the "Repository checks" step with `pytest scripts/ -q`, on the
+grounds that a test CI does not run is a comment with a docstring — and left a
+hand-kept list of *dependencies* on the line directly above it:
+
+```yaml
+pip install pillow pyyaml
+pytest scripts/ -q
+```
+
+The same mistake, one level down. U361 added `scripts/check_scenario.py`, which
+imports `shared_schemas` and therefore pydantic. The list could not know, and
+the failure did not read like a missing package: seven tests failed on
+assertions like `assert 'voice onyx' in ''`, with the real
+`ModuleNotFoundError` buried inside a subprocess's captured stdout. It looks
+like the script is broken rather than the job that runs it.
+
+The step installs the workspace now (`uv sync --all-packages`), which is what
+the scripts actually import and what every other job in this repository already
+does. And `scripts/test_scripts_are_runnable.py` stays behind it: it reads the
+top-level imports of every script and reports, by name, any module this
+environment cannot provide, with the file to fix. Deliberately `ast`-based
+rather than importing each script — importing runs module-level code, and the
+point is to say what is missing *without* depending on being able to run it.
+
+**Worth a decision, not taken here:** Release does not depend on CI. That is
+defensible — a red documentation check should probably not stop a build — but
+it is also why nobody noticed for six units. Coupling them, or having the
+release summary say what CI thought of the same commit, is the owner's call.

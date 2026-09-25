@@ -57,10 +57,19 @@ jobs:
       # U337: every check in scripts/ runs, rather than a hand-kept list of
       # them. Two had already fallen outside it — a test CI does not run is a
       # comment with a docstring.
+      #
+      # U367: and it installs the workspace rather than a hand-kept list of
+      # DEPENDENCIES, which is the same mistake one level down and cost six
+      # units of red builds. `pip install pillow pyyaml` could not know that
+      # U361 would add a script importing shared_schemas (and so pydantic);
+      # the failure then read as seven broken tests instead of one missing
+      # package. scripts/test_scripts_are_runnable.py says which module is
+      # missing, by name, if this ever drifts again.
       - name: Repository checks
         run: |
-          pip install pillow pyyaml
-          pytest scripts/ -q
+          pip install uv
+          uv sync --all-packages
+          uv run --all-packages pytest scripts/ -q
 
   test:
     runs-on: ubuntu-latest
