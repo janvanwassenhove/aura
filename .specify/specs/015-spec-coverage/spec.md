@@ -5,7 +5,7 @@ owner: "build"
 priority: P1
 risk: Low
 created: "2026-09-05"
-units: [U299, U300, U301, U302, U303, U304, U305, U306, U307, U308, U309, U310, U311, U312, U313, U314, U315, U316, U347, U369, U369b, U372, U375b, U375c, U376]
+units: [U299, U300, U301, U302, U303, U304, U305, U306, U307, U308, U309, U310, U311, U312, U313, U314, U315, U316, U347, U369, U369b, U372, U375b, U375c, U376, U376b, U376c]
 ---
 
 # Feature Specification: Spec Coverage — traceability that a machine checks
@@ -210,6 +210,7 @@ spec-first rule and the per-unit obligations, and points at the constitution.
 | U375b | The desktop's `test-*.cjs` checks count as tests — the check had gone red on the unit that added one |
 | U375c | The SyntaxError and the pre-written ledger number, corrected with the guards run and acted on |
 | U376 | The traceability checks see the whole history in CI, not the tip commit of a shallow clone |
+| U376b, U376c | A unit can only be judged after it is committed: claim and name it in the same commit, verify after committing, push only then |
 | U300 | Batched and ranged commit subjects counted as the several units they are — the debt went from 292 to its true 321 |
 | U301 | Spec 016 — embodiment and presence (36 units) |
 | U302 | Spec 017 — voice and language (60 units) |

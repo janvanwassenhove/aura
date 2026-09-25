@@ -138,7 +138,12 @@ def test_the_checks_job_sees_the_whole_git_history() -> None:
     clone that log is ONE commit, so on the runner both checks judged the tip
     alone and a unit followed by a docs commit was never checked at all.
     Found because U375c failed Spec coverage and the commit on top of it, with
-    identical code, passed."""
+    identical code, passed.
+
+    U376b and U376c are the two follow-ups it took to land this cleanly: a
+    unit is only judged by spec_drift/spec_tests AFTER it is committed, so the
+    claim and the naming test must be in the commit itself, and the check run
+    that counts is the one after `git commit`, before `git push`."""
     gate = _load("checks.yml")
     privacy = gate["jobs"]["privacy"]
     checkout = next(s for s in privacy["steps"] if str(s.get("uses", "")).startswith("actions/checkout"))
