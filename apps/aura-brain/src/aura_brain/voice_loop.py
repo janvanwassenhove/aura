@@ -754,16 +754,14 @@ class VoiceLoop:
     @staticmethod
     def _hushed() -> bool:
         """U256's Quiet switch, read live. Never raises — a policy that cannot
-        be read must not quietly take an engine away."""
-        import importlib
+        be read must not quietly take an engine away.
 
-        try:
-            policy = importlib.import_module("orchestrator.mode_policy")
-            quiet = getattr(policy, "quiet", None)
-            return bool(quiet()) if callable(quiet) else False
-        except Exception as exc:  # noqa: BLE001
-            logger.debug("quiet policy unreadable: %s", exc)
-            return False
+        U366: the same question the open sessions ask every tick, from the same
+        module. Two copies of "may he speak" is how one of them gets fixed.
+        """
+        from aura_brain import hush
+
+        return hush.silence_reason() == hush.QUIET
 
     async def _speech_turn(self, wav: bytes, command: str = "") -> bool:
         """Route a confirmed turn to the engine that owns it. False → pipeline.
@@ -1049,7 +1047,11 @@ class VoiceLoop:
                 self._active_session = None
             if _t is not None:
                 _t.mark("playback_complete")
-            if sess.turns == 0 and sess.closed_reason != "stopped by owner":
+            # U366: `stopped` covers Stop, Quiet and Present alike. Matching
+            # the sentence "stopped by owner" meant a session ended by Quiet
+            # looked like a failure — and the pipeline would then answer the
+            # very question the owner had just silenced.
+            if sess.turns == 0 and not sess.stopped:
                 raise RuntimeError("live session produced no spoken reply")
             logger.info("live session done: %d replies, %d delegations (%s), ~$%.4f open time",
                         sess.turns, sess.delegations, sess.closed_reason,

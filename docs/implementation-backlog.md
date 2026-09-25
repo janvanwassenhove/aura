@@ -4302,3 +4302,63 @@ the sealed export does not contain `b"Jan"`. Three letters turn up in random
 base64 often enough to fail a run for no reason, and it did. The property being
 tested is "the plaintext is not readable in the file", so it now asserts that
 with a string long enough to mean it. Re-run three times to confirm.
+
+### U366 — Quiet changed the header and nothing else
+
+Reported again, after U333 (translated): *"quiet mode and stop still seem not
+to work (although activated he keeps going)"*, with the instruction: *"make
+sure we don't have this regression any more"*.
+
+It was not a regression of U333. It was the same rule, written in one place and
+needed in three — which is the more durable kind of bug, because every
+individual fix looks complete.
+
+**Where the gates were.** U256 gave the owner the Quiet switch. U332 made it
+real at the *start* of a turn: while Quiet is on, a turn is never handed to a
+session that listens without a wake word. U334 did the same for Present mode.
+Both gates sit where a turn is decided — and an open Live session is not a
+turn. It holds the microphone for up to `LIVE_SESSION_MAX_S`, **ten minutes**
+by default, and answers whatever is loudest in the room. The supervising loop
+ticks about once a second and asked, every single tick, whether the owner had
+pressed Stop. It never asked whether he was still allowed to speak.
+
+So switching Quiet on mid-conversation changed the chip in the header and
+nothing else, for up to ten minutes. Exactly what was reported, twice.
+
+**The nastier half, which explains "Stop does not work" as well.** A Live
+session that produced no reply is treated as a failure, and the pipeline
+answers instead — correct when the model falls over, and precisely wrong when
+the session ended *because* silence was asked for. The test for "was this
+deliberate?" was a string comparison against `"stopped by owner"`, true only as
+long as Stop was the only deliberate way to end a session. So a session ended
+by Quiet looked like a failure, and the pipeline then said out loud the answer
+to the question the owner had just silenced. It now asks the session
+(`sess.stopped`) instead of matching a sentence.
+
+**What changed.** The question has one home, `aura_brain/hush.py`, and both
+session loops ask it on the tick they already use for Stop. Stop, Quiet and
+Present now mean the same thing — *now*, not when this conversation happens to
+end — and each says which of the three it was instead of borrowing the owner's
+name for it. The entry gate asks the same module, so there is one rule rather
+than two that drift.
+
+It keeps the older rule pointing the other way on purpose: **an unreadable
+policy never silences him.** A robot that goes mute because a JSON file would
+not parse is a fault nobody can diagnose from the outside; a robot that keeps
+talking is the state everyone already understands.
+
+**Made hard to lose again**, which is what was actually asked for. Seven tests,
+each verified against the old code:
+
+* Quiet switched on mid-conversation ends it, and within about a second rather
+  than eventually — driving the **real** policy module the console's switch
+  writes through, so a future change that keeps the gate but breaks the chain
+  still fails.
+* Present mode ends an open conversation.
+* The realtime engine falls silent too: a switch that works on one engine and
+  not the other is worse than neither, because it teaches the owner to trust it.
+* A session ended by Quiet is not handed to the pipeline to be answered aloud.
+* An unreadable policy never ends a conversation.
+* And a structural one: anything that holds a microphone open must consult
+  `hush`. A new session type added next year fails in the suite rather than in
+  the owner's living room.

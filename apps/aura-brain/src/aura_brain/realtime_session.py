@@ -32,6 +32,7 @@ from typing import Any
 
 import numpy as np
 
+from aura_brain import hush
 from aura_brain.realtime_voice import (
     METER,
     ConnFactory,
@@ -149,6 +150,7 @@ class RealtimeSession:
         self._first_segment_played = False
         # U184: panic stop — set from outside to end this session NOW.
         self._stopping = False
+        self._stop_reason = "stopped by owner"
         # U332: what Stop has to empty — buffered segments kept playing after
         # the button, because cutting the current audio does not unqueue them.
         self._play_q: asyncio.Queue | None = None
@@ -275,7 +277,16 @@ class RealtimeSession:
                 tick = min(1.0, max(0.05, self._idle_s / 4))
                 while True:
                     if self._stopping:          # U184: owner pressed Stop
-                        self.closed_reason = "stopped by owner"
+                        self.closed_reason = self._stop_reason
+                        return
+                    # U366: and the same question on the same tick — Quiet and
+                    # Present must mean "now" here too, or the promise depends
+                    # on which engine the owner happens to be running.
+                    reason = hush.silence_reason()
+                    if reason is not None:
+                        logger.info("realtime session ending: %s", reason)
+                        self.request_stop(reason)
+                        self.closed_reason = reason
                         return
                     done, _ = await asyncio.wait(
                         {mic, events}, timeout=tick,
@@ -314,13 +325,17 @@ class RealtimeSession:
                 logger.info("realtime session closed (%s): %d turns, ~$%.4f total",
                             self.closed_reason, self.turns, self._meter.spent_usd())
 
-    def request_stop(self) -> None:
+    def request_stop(self, reason: str = "stopped by owner") -> None:
         """U184: end this conversation at the next tick (<=1s). Used by the
         panic stop when ambient noise has the session talking to itself.
 
         U332: and drop the audio already on its way, so Stop is silent rather
-        than eventually silent."""
+        than eventually silent.
+
+        U366: Quiet and Present end a conversation through this same door, and
+        say so instead of borrowing the owner's name for it."""
         self._stopping = True
+        self._stop_reason = reason
         self._playing_until = 0.0
         q = self._play_q
         if q is not None:

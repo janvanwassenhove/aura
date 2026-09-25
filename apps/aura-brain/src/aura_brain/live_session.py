@@ -47,6 +47,7 @@ from typing import Any
 
 import numpy as np
 
+from aura_brain import hush
 from aura_brain.realtime_session import _resample_16k_to_24k
 
 logger = logging.getLogger(__name__)
@@ -197,6 +198,7 @@ class LiveSession:
         self._muted = False
         self._last_activity = time.monotonic()
         self._stopping = False
+        self._stop_reason = "stopped by owner"
         # U332: the queue Stop has to empty. Cutting the current audio is not
         # enough — what is already buffered keeps being posted, so he talks on
         # after the button.
@@ -352,7 +354,17 @@ class LiveSession:
         tick = min(1.0, max(0.05, self._idle_s / 4))
         while True:
             if self._stopping:
-                self.closed_reason = "stopped by owner"
+                self.closed_reason = self._stop_reason
+                return
+            # U366: Stop was asked here every tick and "may he still speak" was
+            # not, so switching Quiet on mid-conversation changed the header
+            # and left the microphone open for up to ten minutes. Same tick,
+            # same promise: now, not when this conversation happens to end.
+            reason = hush.silence_reason()
+            if reason is not None:
+                logger.info("live session ending: %s", reason)
+                self.request_stop(reason)
+                self.closed_reason = reason
                 return
             done, _ = await asyncio.wait({mic, events}, timeout=tick,
                                          return_when=asyncio.FIRST_COMPLETED)
@@ -388,14 +400,30 @@ class LiveSession:
         except Exception as exc:  # noqa: BLE001 — closing is best-effort
             logger.debug("live session close: %s", exc)
 
-    def request_stop(self) -> None:
+    @property
+    def stopped(self) -> bool:
+        """Did this session end because it was told to — Stop, Quiet, Present?
+
+        U366: the caller used to compare `closed_reason` against the literal
+        "stopped by owner", which was true exactly as long as Stop was the only
+        way to end a session on purpose. It is not, and a missed match here
+        sends the pipeline off to answer a question the owner had just silenced.
+        """
+        return self._stopping
+
+    def request_stop(self, reason: str = "stopped by owner") -> None:
         """U184: the panic stop ends this conversation at the next tick.
 
         U332: and it silences what is already on its way. The queue holds the
         segments the model has sent but the robot has not played; without
         emptying it, Stop cut one segment and the next arrived a moment later.
+
+        U366: the reason travels with it. Quiet and Present end a conversation
+        through this same door, and "stopped by owner" would be a small lie in
+        the log for both of them.
         """
         self._stopping = True
+        self._stop_reason = reason
         self._playing_until = 0.0
         q = self._play_q
         if q is not None:

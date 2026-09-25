@@ -82,7 +82,9 @@ async def test_it_says_what_it_holds_without_saying_who(tmp_path) -> None:
     assert header["contents"]["people"] == 2
     assert header["contents"]["facts"] == 2
     assert header["contents"]["faces"] == 2
-    assert "Jan" not in json.dumps(header)
+    # U365: same reason as above — the sealed blob is base64, and three
+    # letters turn up in it by chance often enough to fail a run.
+    assert "Jan Testperson" not in json.dumps(header)
 
 
 async def test_everything_he_learned_arrives_on_the_other_machine(tmp_path) -> None:

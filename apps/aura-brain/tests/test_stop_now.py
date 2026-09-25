@@ -79,6 +79,33 @@ class _Robot:
         return {"ok": True}
 
 
+class _RtConn:
+    """The realtime client's shape, reduced to what a session touches."""
+
+    def __init__(self, events) -> None:
+        self._events = list(events)
+        self.session = types.SimpleNamespace(update=self._noop)
+        self.conversation = types.SimpleNamespace(
+            item=types.SimpleNamespace(create=self._noop))
+        self.response = types.SimpleNamespace(create=self._noop, cancel=self._noop)
+        self.input_audio_buffer = types.SimpleNamespace(append=self._noop)
+
+    async def _noop(self, *a, **k): ...
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *a):
+        return False
+
+    async def __aiter__(self):
+        for e in self._events:
+            await asyncio.sleep(0.01)
+            yield e
+        while True:                      # an open session with nothing to say
+            await asyncio.sleep(0.02)
+
+
 class _Bus:
     async def publish(self, event) -> None: ...
 
@@ -232,3 +259,170 @@ def test_the_realtime_session_also_drops_what_is_waiting() -> None:
     assert q.empty()
     assert sess._playing_until == 0.0
     assert sess._stopping is True
+
+
+# ── U366: and it has to keep being true while he is already talking ────────
+#
+# Reported again, after U332: "quiet mode and stop still seem not to work
+# (although activated he keeps going)" (translated), with the instruction to
+# make sure the regression cannot come back.
+#
+# U332 put the Quiet gate at the START of a turn, which is where a turn is
+# decided — and that is exactly why it looked like it did nothing. An open Live
+# session is not a turn: it holds the microphone for up to LIVE_SESSION_MAX_S
+# (ten minutes by default), and the supervising loop that ticks every second
+# asked whether the owner had pressed Stop but never whether he was still
+# allowed to speak. So switching Quiet on mid-conversation changed the header
+# and nothing else, for up to ten minutes.
+#
+# These tests drive the REAL policy — the same module the console's Quiet
+# switch writes through — so a future change that keeps the gate but loses the
+# chain still fails.
+
+
+@pytest.fixture()
+def policy(tmp_path, monkeypatch):
+    """The actual policy the console writes, on a throwaway path."""
+    monkeypatch.setenv("MODE_POLICY_PATH", str(tmp_path / "mode-policy.json"))
+    from orchestrator import mode_policy
+
+    mode_policy.set_quiet(False)
+    mode_policy.set_active("work")
+    return mode_policy
+
+
+async def _open_session(robot=None):
+    robot = robot or _Robot()
+    conn = _Conn([{"type": "session.output_audio.delta", "delta": _voiced(400)}
+                  for _ in range(8)])
+    sess = LiveSession(robot=robot, bus=_Bus(), conn_factory=lambda: conn,
+                       meter=LiveMeter())
+    task = asyncio.ensure_future(sess.run())
+    await asyncio.sleep(0.25)            # he is mid-sentence
+    return sess, task, robot
+
+
+async def test_quiet_switched_on_mid_conversation_ends_it(policy) -> None:
+    """The reported case: he is talking, Quiet goes on, and he keeps going."""
+    sess, task, robot = await _open_session()
+    spoken = len(robot.segments)
+
+    policy.set_quiet(True)
+
+    await asyncio.wait_for(task, timeout=5)
+    assert "quiet" in sess.closed_reason.lower(), sess.closed_reason
+    assert len(robot.segments) <= spoken + 1, "he kept playing what was queued"
+
+
+async def test_present_mode_ends_an_open_conversation(policy) -> None:
+    """U334 closed the door an open session walks through: on stage only the
+    scenario speaks, and a session that is already running was never asked."""
+    sess, task, _ = await _open_session()
+
+    policy.set_active("presentation")
+    assert policy.presenting(), "the test did not actually put him on stage"
+
+    await asyncio.wait_for(task, timeout=5)
+    assert "present" in sess.closed_reason.lower(), sess.closed_reason
+
+
+async def test_a_policy_that_cannot_be_read_never_ends_a_conversation(monkeypatch) -> None:
+    """The mirror of U332's rule: a policy we cannot read must not take his
+    voice away. Silence is the failure mode nobody can diagnose."""
+    from aura_brain import hush
+
+    monkeypatch.setattr(hush, "_ask", lambda: (_ for _ in ()).throw(RuntimeError("no policy")))
+    sess, task, _ = await _open_session()
+
+    await asyncio.sleep(0.6)
+    assert not task.done(), "an unreadable policy silenced him"
+    sess.request_stop()
+    await asyncio.wait_for(task, timeout=5)
+
+
+async def test_quiet_is_checked_within_a_tick_not_at_the_end(policy) -> None:
+    """Within about a second — the same promise Stop makes. Ten minutes later
+    is not a different speed, it is a different feature."""
+    sess, task, _ = await _open_session()
+
+    policy.set_quiet(True)
+    started = time.monotonic()
+    await asyncio.wait_for(task, timeout=5)
+
+    assert time.monotonic() - started < 2.5, "he took too long to fall silent"
+
+
+async def test_the_realtime_session_falls_silent_too(policy) -> None:
+    """Whichever engine is running, the switch means the same thing. Quiet that
+    works on one engine and not the other is worse than neither, because it
+    teaches the owner to trust it."""
+    from aura_brain.realtime_session import RealtimeSession
+
+    robot = _Robot()
+    conn = _RtConn([types.SimpleNamespace(type="response.output_audio.delta",
+                                          delta=_voiced(400)) for _ in range(8)])
+    sess = RealtimeSession(robot=robot, bus=_Bus(), conn_factory=lambda m: conn)
+    task = asyncio.ensure_future(sess.run())
+    await asyncio.sleep(0.25)
+
+    policy.set_quiet(True)
+
+    await asyncio.wait_for(task, timeout=5)
+    assert "quiet" in sess.closed_reason.lower(), sess.closed_reason
+
+
+async def test_a_session_ended_by_quiet_does_not_hand_the_turn_to_the_pipeline(monkeypatch) -> None:
+    """The mechanism behind "he keeps going anyway", and the nastier half.
+
+    A Live session that produced no reply is treated as a failure, and the
+    pipeline answers instead — which is right when the model fell over, and
+    exactly wrong when the session ended BECAUSE the owner asked for silence.
+    The test drives the real decision: a session that says it was stopped must
+    be accepted as handled, not retried out loud.
+    """
+    monkeypatch.setenv("VOICE_ENGINE", "live")
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+    loop = _loop()
+
+    class _StoppedSession:
+        turns = 0
+        delegations = 0
+        stopped = True
+        closed_reason = "quiet switched on"
+
+        def __init__(self, **kw) -> None: ...
+        async def run(self, **kw) -> None: ...
+        def request_stop(self, reason: str = "") -> None: ...
+
+    from aura_brain import live_session as _ls
+
+    monkeypatch.setattr(_ls, "LiveSession", _StoppedSession)
+    async def _instructions(*a, **k) -> str:
+        return "be brief"
+
+    monkeypatch.setattr(loop, "_instructions", _instructions)
+
+    assert await loop._live_session_turn(b"", "hallo") is True, \
+        "the pipeline was about to answer a question the owner had silenced"
+
+
+def test_every_open_listening_session_asks_whether_it_may_still_speak() -> None:
+    """The regression guard the owner asked for, in the shape that fits.
+
+    This defect was not a wrong line; it was a rule implemented in one place
+    and needed in three. U256 wrote the switch, U332 taught the turn gate about
+    it, U334 did the same for Present — and the sessions, which are the only
+    things that hold a microphone open for ten minutes, were never told.
+
+    So the rule lives in `hush` now, and this is what notices when something
+    that listens forgets to ask. A new session type added next year fails here
+    rather than in the owner's living room.
+    """
+    from pathlib import Path
+
+    src = Path(__file__).resolve().parents[1] / "src" / "aura_brain"
+    for name in ("live_session.py", "realtime_session.py"):
+        text = (src / name).read_text(encoding="utf-8")
+        assert "hush.silence_reason()" in text, (
+            f"{name} holds the microphone open and never asks whether he may "
+            f"still speak — see aura_brain/hush.py")

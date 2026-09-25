@@ -5,7 +5,7 @@ owner: "aura-brain / conversation"
 priority: P1
 risk: High
 created: "2026-09-05"
-units: [U22, U36b, U36e, U36h, U45, U46, U47, U49, U54, U67, U73, U80, U81, U82, U83, U84, U85, U86, U87, U88, U89, U91, U92, U96, U128, U129, U130, U131, U132, U133, U134, U135, U140, U141, U142, U143, U144, U145, U146, U148, U149, U150, U153, U154, U155, U156, U163, U203, U209, U256, U257, U258, U260, U273, U275, U287, U288, U289, U291, U292, U321, U322, U324, U329, U331, U333, U349]
+units: [U22, U36b, U36e, U36h, U45, U46, U47, U49, U54, U67, U73, U80, U81, U82, U83, U84, U85, U86, U87, U88, U89, U91, U92, U96, U128, U129, U130, U131, U132, U133, U134, U135, U140, U141, U142, U143, U144, U145, U146, U148, U149, U150, U153, U154, U155, U156, U163, U203, U209, U256, U257, U258, U260, U273, U275, U287, U288, U289, U291, U292, U321, U322, U324, U329, U331, U333, U349, U366]
 ---
 
 # Feature Specification: Voice and Language
@@ -246,6 +246,18 @@ the Present panel's Voice still decides.
   first" — because an open session makes whatever is loudest the one asking.
   Answering is untouched: the wake word gates every turn, which is what Quiet
   always meant (U333, U256).
+- **FR-022b**: **And it keeps being true while he is already talking.** Quiet
+  and Present end an OPEN session too, on the same one-second tick that
+  notices Stop — a session holds the microphone for up to ten minutes, so a
+  gate that only guards the start of a turn changes the header and nothing
+  else. All three reasons end a conversation through one door and say which
+  one they were; a session that ended deliberately is never retried through
+  the pipeline, which would answer out loud the very question that was just
+  silenced. The rule lives in one module (`aura_brain/hush.py`) because it was
+  written in one place and needed in three, and a test fails when something
+  that holds a microphone open does not ask it. A policy that cannot be read
+  still never silences him: mute-by-accident is the fault nobody can diagnose
+  (U366).
 - **FR-020**: The Conversation engine setting says **where it applies** and
   **when it cannot**. It governs one path — a spoken turn the robot hears
   itself, after the wake word or inside the follow-up window; typed messages,
@@ -345,4 +357,5 @@ the same series as this backfill.
 | U329 | Streamed speech was ~9 dB quieter than spoken speech: one loudness gain per utterance on the segment path, measured against a real reply |
 | U331 | The engine row says which path it governs, warns when hands-free voice makes it unreachable, and marks the realtime voice model unused under Live |
 | U333 | Stop drops queued audio and skips the speaker tail in both session engines; Quiet keeps the wake word in charge instead of letting the room talk |
+| U366 | Quiet and Present end a conversation that is already running, within a tick, and a silenced turn is never re-asked out loud by the pipeline |
 | U349 | A presentation beat carries its own character, and one line can change character halfway: per-beat voice and speed above the mode voice, and several voices joined into one utterance so the hand-over is not also a volume step (ADR-012) |
