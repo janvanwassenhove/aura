@@ -37,13 +37,14 @@ U366, U367. That is the number this audit exists to move.
 | T4 | **high** | **Half the console is never mounted by a test.** Views never imported by any test: `TalkView` (the main screen), `ModesView`, `GraphView`, `ActivityView`, `AboutView`. Stores: `modeStore` (the Quiet switch), `capabilitiesStore`, `mcpStore`, `navStore`, `presenterStore`, `settingsStore`, `setupStore`. Components: `SetupWizard`, `ApprovalPanel`, `MindCanvas`, `ActivityLog`, `ConfirmDialog`, `NavRail`, `WikiText`, `KnowledgeGraph`, `CapabilityRow`. Composables: `useEventBusWs`, `useModal`. With no `vue-tsc`, a mount test is the only compile step this app has. | **done (U370)** — three sweeps that read their list from the code, not from a list of their own: every view in `navStore`'s `View` union mounts inside the shell; every `.vue` under `src/components` mounts with its required props; every `use*Store` under `src/stores` constructs, plus the Quiet switch's write-through and snap-back. All ten views mounted clean on the first run — the value is that an eleventh cannot arrive unmounted. |
 | T5 | **high** | **Nothing runs the gate locally.** No `Makefile`, no root script, no single command that does what CI does. So "verified locally" means "ran the suite I remembered" — U367b was verified in a primed venv and was wrong. | **done (U372)** — `python scripts/gate.py` reads `checks.yml` and runs its steps through bash, in the runner's order, with each step's `working-directory` and `env`; `--job`, `--list`, `--keep-going`. It is the file, not a copy: a step added to the gate runs here next time. The working agreement now names it as what "verified locally" means. |
 | T6 | **medium** | **The robot being behind the laptop is invisible in the app.** `deploy_robot.py --check` compares commits and the Pi's `/health` reports its `build`, but nothing in the brain or console shows it. The Pi drifting 74 commits behind was the original U240 report; today it is one commit behind and nobody would know. Every "the fix did not work" that is really "the fix is not on the Pi" lands here. | **done (U371)** — `/robot/status` carries `build: {robot, laptop, behind}`; the Connection card says *behind this laptop — run deploy_robot.py*, *same build*, or *cannot compare*. A packaged app learns its commit from a `BUILD_COMMIT` stamp the release writes; a checkout asks git; neither → an absence, never a guess. The robot was off while this landed, so the live line was not seen — the unit tests and U240's `/health.build` are what stand behind it until the next deploy. |
-| T7 | **medium** | **The Electron main process has no unit tests**, only lint and five ad-hoc `test-*.cjs` scripts (which do run). 968 lines including the bootstrap, env pinning (U327) and the updater. The U327 class of bug — a setting silently reset by an update — lives here and is tested only by the owner noticing. | **open**: the ad-hoc scripts are the right shape; they need a `brainEnv()` test that pins every owner-state path. Not started in this pass. |
+| T7 | **medium** | **The Electron main process has no unit tests**, only lint and five ad-hoc `test-*.cjs` scripts (which do run). 968 lines including the bootstrap, env pinning (U327) and the updater. The U327 class of bug — a setting silently reset by an update — lives here and is tested only by the owner noticing. | **done (U375)** — `apps/desktop/test-brain-env.cjs` pins all eleven owner-state paths under the owner's data directory, that an explicit `.env` value wins over each default, that voice providers are forced off, and that the U371 build stamp reaches the brain. Source-level, like its siblings (main.cjs requires `electron` at load); proven red against the exact U327 regression — one path defaulting to `./data` — and in the gate. |
 | T8 | **medium** | **`shared-config` (233 lines, identity + connector config) has no tests.** Every connector reads it. | **done (U374)** — twelve tests: the enabled-connector list is parsed and trimmed and never contains an empty entry; the keyring backend is chosen by the environment and an unknown one is refused; the keyring passphrase and the Azure client secret never appear in `repr`, `str` or `model_dump`; a developer's `.env.local` cannot leak into the suite; unknown env keys are ignored. In the gate. |
 | T9 | **low** | **A flaky assertion shipped and failed in CI's absence.** `test_brain_bundle` asserted a three-letter name was absent from base64 (U342); it failed on the first unlucky nonce (U365). The suite is not run under `pytest-randomly` or repeated, so order- and seed-dependence is found by the owner. | fixed for that test (U365); **open**: no general flake detection. Not started. |
 | T11 | **low** | **`packages/shared-prompts/tests/` has existed since April and contains only `__init__.py`.** A scaffolded suite nobody ever wrote a test for; pytest on it exits 5, so it cannot even be added to the gate as-is. Found by the T1 tree walk. | **done (U373)** — six tests on rendered text (persona, guardrail lines, no HTML-escaping into a prompt, the approval wording, the context count), and the suite is in the gate. |
+| T12 | **medium** | **A commit that edits `release.yml` does not publish its own release.** Observed twice, with zero counterexamples: U368 and U371 — the only two commits in this pass that changed `release.yml` — reached *Publish release* with the normal token (`Contents: write` printed at job start) and were refused with HTTP 403 *Resource not accessible by integration*; U369, U369b and U372, which did not touch the file, published v2.0.177–179 through the identical workflow. Tag numbers were fresh each time. Not explained; recorded as a rule of thumb: the *next* commit ships. | **open**: reproduce deliberately with a comment-only edit to `release.yml`, then decide — accept, or move publishing to a `workflow_run` on CI success so the file that publishes is never the file that changed. |
 | T10 | **low** | Three tests skip by environment (`test_reachy_live.py` needs hardware, `test_laptop_tools.py` is Windows-only, `test_person_prefs.py` needs the console tree). Acceptable and honest; listed so they are known. | accepted |
 
-## What "validated on every release" will mean once T1, T2 and T5 land
+## What "validated on every release" means now (T1, T2, T5 landed)
 
 1. **One gate.** `checks.yml` is the only list of what must pass. CI runs it on
    every push; Release runs the same jobs and builds nothing until they are
@@ -56,9 +57,27 @@ U366, U367. That is the number this audit exists to move.
 3. **The gate runs on the laptop with one command**, reading the same file CI
    reads. "Verified locally" then means the same thing as "CI is green".
 
-What it will **not** mean: that the specs' prose is exhaustively covered.
+What it does **not** mean: that the specs' prose is exhaustively covered.
 T3 is the honest remainder — 182 retro-written scenarios with nothing behind
 them — and it is writing, to be paid down spec by spec.
+
+## State after the first pass (U368–U375)
+
+| Landed | Still open |
+|---|---|
+| T1 one gate — `checks.yml`, CI and Release both call it; a second list is refused by test | T3 — 182 retro-specified scenarios trace to nothing (writing) |
+| T2 spec → test — `spec_tests.py` in the gate; 122 units of debt behind a baseline that only shrinks | T9 — no general flake detection |
+| T4 every view, component and store is mounted or constructed, from the code's own lists | T12 — a commit that edits `release.yml` does not publish its own release (observed twice) |
+| T5 `gate.py` runs the gate here from the file CI reads | |
+| T6 the robot being behind the laptop is a line in the Connection card | |
+| T7 every owner-state path the shell hands the brain is pinned, red on the U327 class | |
+| T8 `shared-config` has its first tests, secrets proven not to print | |
+| T11 `shared-prompts` has its first tests, and the gate runs them | |
+
+Suites in the gate went from ten to twelve; tests from 1,828 to 1,931. The
+number to watch is the one `spec_tests.py` prints on every push: **122** on
+the day of the audit. It goes down when a test is written and names its unit;
+it cannot go up without the gate going red.
 
 ## Method
 

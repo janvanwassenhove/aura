@@ -4683,3 +4683,45 @@ object in the suite is built with `_env_file=None`, because the `.env.local`
 on the machine running the tests must not be what they measure.
 
 Listed in `checks.yml`; the gate's tree walk now insists on it.
+
+### U375 — the settings an update could reset, pinned by test
+
+Eighth fix from the testing audit
+([`docs/audit-testing-2026-09.md`](audit-testing-2026-09.md), T7), and the
+last of this pass.
+
+U177 moved the knowledge store, the faces, the memory DB and the skills out
+of the install directory, because an NSIS update replaces that directory
+wholesale. U327 found the settings U177 had left behind — the mode policy,
+the MCP servers, the connector preferences, the turn traces — still
+defaulting to `./data`, which for a packaged app *is* the install directory.
+Reported as "quiet mode is on and he still talks": an update had reset the
+file the brain reads. Both fixes live in `brainEnv()` in `main.cjs`, and
+nothing checked that the list was complete or that a later edit had not
+quietly dropped a line from it.
+
+`apps/desktop/test-brain-env.cjs` does. Eleven owner-state paths must default
+under the owner's data directory and never to a relative path; an explicit
+`.env` value must win over each default (the `||` is the contract — the
+wizard's choice beats the shell's); voice providers must be forced off in the
+shell; and the U371 build stamp must reach the brain. It is source-level, like
+the four checks beside it, because `main.cjs` requires `electron` at load and
+cannot be imported by plain node — weaker than executing `brainEnv()`, and
+exactly strong enough for the U327 class. **Proven red** against it: with
+`MODE_POLICY_PATH` reverted to `'./data/mode-policy.json'` the check fails by
+name, and passes again on restore. In the gate.
+
+**A pattern, now with two data points.** U371's release was refused at
+*Publish release* with HTTP 403 — the same refusal U368 met, on the same
+printed token permissions, with a fresh tag number each time. The two are the
+only commits in this pass that edited `release.yml`; the three that did not
+(U369, U369b, U372) published v2.0.177–179 through the identical workflow.
+Recorded as audit T12 with the rule of thumb it implies — a commit that edits
+the release workflow does not ship its own installer; the next one does — and
+the two ways to settle it: reproduce on purpose with a comment-only edit, or
+move publishing to a `workflow_run` on CI success so the file that publishes
+is never the file that changed. Not decided here.
+
+Where the audit's numbers stand at the end of the pass: suites in the gate 10
+→ 12, tests 1,828 → 1,931, and `spec_tests.py` still prints **122** — the
+debt is the debt, and the gate now refuses to let it grow.

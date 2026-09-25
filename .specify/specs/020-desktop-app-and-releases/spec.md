@@ -5,7 +5,7 @@ owner: "apps/desktop + CI"
 priority: P1
 risk: High
 created: "2026-09-05"
-units: [U32, U33, U44, U55, U56, U151, U152, U166, U168, U168b, U168c, U168d, U168e, U169, U169b, U170, U171, U172, U173, U174, U176, U177, U178, U192, U193, U197, U201, U211, U228, U229, U230, U231, U232, U233, U234, U235, U236, U283, U284, U285, U285b, U297, U179, U184, U185, U186, U210, U317, U318, U327, U330, U337, U338, U343, U344, U353, U354, U355, U363, U367, U367b, U368]
+units: [U32, U33, U44, U55, U56, U151, U152, U166, U168, U168b, U168c, U168d, U168e, U169, U169b, U170, U171, U172, U173, U174, U176, U177, U178, U192, U193, U197, U201, U211, U228, U229, U230, U231, U232, U233, U234, U235, U236, U283, U284, U285, U285b, U297, U179, U184, U185, U186, U210, U317, U318, U327, U330, U337, U338, U343, U344, U353, U354, U355, U363, U367, U367b, U368, U375]
 amended: "2026-09-13"
 ---
 
@@ -168,6 +168,15 @@ and installers for Windows, macOS (arm64 and x64) and Linux.
 
 ## Functional Requirements
 
+- **FR-ENV-01**: **Every owner-state path the shell hands the brain is
+  pinned by test.** `test-brain-env.cjs` reads `brainEnv()` and requires each
+  of the eleven paths (`AURA_ENV_FILE`, the knowledge and recognition stores,
+  the memory DB, skills, scenarios, the mode policy, MCP servers, connector
+  preferences, turn traces, the gesture model) to default under the owner's
+  data directory and never to a relative path; an explicit `.env` value must
+  win over each default; voice providers are forced off; the U371 build stamp
+  reaches the brain. The check is source-level — main.cjs requires `electron`
+  at load — and goes red on the exact U327 regression (U375, audit T7).
 - **FR-CI-00**: **There is one gate.** `.github/workflows/checks.yml` is the
   only list of what must pass; `ci.yml` runs it on every push and
   `release.yml` runs the same file and builds nothing until it is green. The
@@ -342,6 +351,7 @@ and installers for Windows, macOS (arm64 and x64) and Linux.
 | U367 | The checks job installs the workspace instead of a hand-kept dependency list, and a guard names the missing module when a new script needs one |
 | U367b | That job runs `python -m pytest` so it uses the interpreter uv built, rather than a system pytest an earlier step installed |
 | U368 | One gate: `checks.yml`, called by CI and by Release; a release cannot ship on a red tree, and a second list is refused by test |
+| U375 | The eleven owner-state paths in `brainEnv()` are pinned by a check that goes red on the U327 class |
 | U338 | SignPath Foundation wired into the release: free signing for an open-source project, guarded and order-checked |
 | U343 | The from-source launcher caught up with the app it starts: it syncs Python with the extras, rebuilds a stale console, and stops baking a port |
 | U344 | The brain launched through the interpreter instead of a shim a corporate ASR rule forbids, and a dead brain that now names its cause instead of freezing the splash |

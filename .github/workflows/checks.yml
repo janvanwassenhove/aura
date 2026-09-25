@@ -189,6 +189,11 @@ jobs:
       - name: Brain launch tests
         working-directory: apps/desktop
         run: node test-brain-launch.cjs
+      # U375 (audit T7): every owner-state path the shell hands the brain is
+      # pinned outside the install directory — the U177/U327 class of loss.
+      - name: Brain env tests
+        working-directory: apps/desktop
+        run: node test-brain-env.cjs
 
   lint:
     runs-on: ubuntu-latest
