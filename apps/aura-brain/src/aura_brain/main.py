@@ -399,9 +399,15 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # to the console — it only listens to the brain's WebSocket.
     from aura_brain.robot_events import RobotEventBridge
 
+    # U365: the address is handed over as a getter, not a snapshot. U336 can
+    # move the robot to another network mid-session; everything else reads
+    # _base_url per call, and this used to be the one thing that did not — so
+    # the picture kept streaming from the new address while the event stream
+    # announced "disconnected" from the old one, every five seconds.
     ctx._robot_bridge = RobotEventBridge(
         ctx.broadcaster,
-        os.environ.get("ROBOT_RUNTIME_URL", "http://robot-runtime:8001"),
+        lambda: getattr(_robot, "_base_url", None)
+        or os.environ.get("ROBOT_RUNTIME_URL", "http://robot-runtime:8001"),
         robot_client=_robot,
     )
     ctx._robot_bridge.start()

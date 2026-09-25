@@ -5,7 +5,7 @@ owner: "robot-runtime"
 priority: P1
 risk: Medium
 created: "2026-09-05"
-units: [U16, U36a, U36d, U36g, U37, U51, U99, U100, U101, U102, U111, U116, U126, U127, U137, U138, U139, U147, U157, U158, U161, U162, U164, U165, U175, U196, U212, U219, U237, U238, U252b, U252d, U253, U268, U270, U286, U325, U326, U328, U336, U341, U341b, U357, U357b, U359]
+units: [U16, U36a, U36d, U36g, U37, U51, U99, U100, U101, U102, U111, U116, U126, U127, U137, U138, U139, U147, U157, U158, U161, U162, U164, U165, U175, U196, U212, U219, U237, U238, U252b, U252d, U253, U268, U270, U286, U325, U326, U328, U336, U341, U341b, U357, U357b, U359, U365]
 ---
 
 # Feature Specification: Embodiment and Presence
@@ -243,6 +243,16 @@ while he is speaking, so that a conversation looks like a conversation.
   manual button, once per move. `ROBOT_AUTOFIND=false` turns it off. It cannot
   put him on a network he is not on: that stays a one-time job at the robot
   (U336).
+- **FR-013b**: Everything that talks to the robot reads that address per call,
+  the relayed event stream included. It used to derive its WebSocket URL once
+  at startup, so after a move the camera, the status poll and speech reached
+  him at the new address while the event stream announced "disconnected" from
+  the old one every five seconds — a moving picture under the word *offline*.
+  A disconnect is announced **once per transition**, never per retry, so a
+  console that asks can keep what it learned (U365).
+- **FR-013c**: The console asks how the robot is on a timer, not only on mount
+  and on socket reopen. Events stay the fast path; polling is what makes a
+  wrong or missed `RobotDisconnected` short-lived instead of permanent (U365).
 - **FR-007**: Every new brain→runtime call tolerates a 404 from an older Pi and
   reports the degradation.
 - **FR-008**: Pointing the head comes in two kinds, and they are not
@@ -342,6 +352,7 @@ while he is speaking, so that a conversation looks like a conversation.
 | U175, U212, U219, U196 | Camera: silent MJPEG stall, single-frame blips, shared frame decode, and a live view against an older robot |
 | U270 | Battery, in the three states it can actually be in |
 | U336 | The brain follows the robot to a new network instead of reporting offline until somebody scans by hand |
+| U365 | The event bridge follows him too, a disconnect stops repeating itself, and the console keeps asking |
 | U328 | Antenna reactions: an antenna-led vocabulary, head-and-antennae in one command, and one tone classification feeding both |
 | U326 | Conversational body language both ways: acknowledging while someone speaks, moving with what he says, and a reply gesture that no longer delays the reply |
 | U325 | `gaze`: looking at someone without taking follow-me away; the face position the recogniser already had; a sweep whose cadence follows the room |

@@ -33,7 +33,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue'
+import { onMounted, onUnmounted, ref, watch } from 'vue'
 import AppHeader from './components/shell/AppHeader.vue'
 import CapabilityRow from './components/shell/CapabilityRow.vue'
 import NavRail from './components/shell/NavRail.vue'
@@ -90,10 +90,16 @@ watch(() => robot.faceVisible, (visible) => {
 // reconnect, because a brain restart loses the same event again.
 watch(wsStatus, (s) => { if (s === 'open') void robot.refreshStatus() })
 
+// U365: and keep asking. One missed or wrong RobotDisconnected used to sit in
+// the header until the app was restarted, with the video still moving.
+let stopStatusWatch: (() => void) | undefined
+onUnmounted(() => stopStatusWatch?.())
+
 onMounted(async () => {
   themeStore.apply()
   connect()
   void robot.refreshStatus()
+  stopStatusWatch = robot.watchStatus()
   modeStore.fetchPolicy()
   knowledge.fetchTier()
   knowledge.fetchPeople()

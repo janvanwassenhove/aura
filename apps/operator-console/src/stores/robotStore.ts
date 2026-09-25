@@ -168,6 +168,29 @@ export const useRobotStore = defineStore('robot', () => {
     } catch { /* leave the last known state — a blip is not a disconnect */ }
   }
 
+  /** U365: keep asking, so being wrong is temporary.
+   *
+   *  U297 made the console ASK instead of only listening — twice: on mount,
+   *  and whenever the event socket reopens. Everything after that arrived as
+   *  events, so one wrong or missed `RobotDisconnected` stayed on the screen
+   *  until the app was restarted. It was reported with the camera still
+   *  streaming beside the words "robot offline", which is as plain as evidence
+   *  gets: the picture was proof he was answering.
+   *
+   *  Events stay the fast path. This is what makes a wrong answer short-lived,
+   *  and it is the rule the project already states — state that must survive a
+   *  late subscriber is polled, not awaited.
+   */
+  let statusTimer: ReturnType<typeof setInterval> | undefined
+  function watchStatus(intervalMs = 10000): () => void {
+    if (statusTimer !== undefined) clearInterval(statusTimer)   // never two
+    statusTimer = setInterval(() => { void refreshStatus() }, intervalMs)
+    return () => {
+      if (statusTimer !== undefined) clearInterval(statusTimer)
+      statusTimer = undefined
+    }
+  }
+
   /** U162: flip follow-me on the robot; reverts on failure so the UI never
    *  claims a mode the robot isn't in. Returns whether it took. */
   async function setTracking(enabled: boolean, brainUrl: string): Promise<boolean> {
@@ -201,5 +224,5 @@ export const useRobotStore = defineStore('robot', () => {
     wsGeneration.value = 0
   }
 
-  return { batteryPct, hasBattery, batteryLine, mode, behaviorState, isSpeaking, currentTranscript, uptime, connected, motionLog, lastRecognized, tracking, faceVisible, wsGeneration, noteWsOpen, statusBadgeClass, applyEvent, syncFromStatus, refreshStatus, setTracking, $reset }
+  return { batteryPct, hasBattery, batteryLine, mode, behaviorState, isSpeaking, currentTranscript, uptime, connected, motionLog, lastRecognized, tracking, faceVisible, wsGeneration, noteWsOpen, statusBadgeClass, applyEvent, syncFromStatus, refreshStatus, watchStatus, setTracking, $reset }
 })

@@ -4242,3 +4242,63 @@ the store; it now gets an empty store, with the reason written beside it.
 shared-schemas 180, orchestrator 406, brain 729 (1 skipped), all run with the
 keys unset. In a fresh clone the six failures U363 reported do not reproduce,
 which supports its reading that they came from that working copy's environment.
+
+### U365 — the video was moving and the header said he was offline
+
+Reported as (translated): *"why is it taking so long for Richie to come online?
+Also at some point we see video moving (together with Richie moving) but AURA
+still says robot offline — in the title bar, the video, …"*.
+
+Both halves are one defect, and the evidence was already on the screen: a
+moving picture is proof the robot is answering. Asked directly while the
+console said offline, the brain answered:
+
+```
+/robot/status → {"connected": true, "mode": "online", "adapter_name": "reachy"}
+```
+
+So the console was not showing the brain's truth. It was showing something else
+that had gone stale, beside a camera feed that had not.
+
+**Fault one — the bridge could not follow him.** `RobotEventBridge` derived its
+WebSocket URL once, in `__init__`, from whatever `ROBOT_RUNTIME_URL` said at
+startup. U336 taught the brain to follow the robot to a new address by
+rewriting that variable and `RobotClient._base_url` — which every HTTP call
+reads *per request*. The bridge read neither. After the move onto the phone
+hotspot earlier that day, the camera proxy, the status poll and speech all went
+to the new address while the event stream hammered the old one, forever. It now
+takes a getter instead of a string. No watcher is needed while it is connected:
+the address only changes *because* the old one stopped answering, so the socket
+is already down by the time it does.
+
+**Fault two — a retry announced a fresh disconnect every five seconds.** That
+flood is what made a wrong answer permanent rather than brief: anything the
+console learned by asking was overwritten a moment later. A disconnect is a
+transition, not a heartbeat, and is now published once on the way down.
+
+**Fault three — the console asked twice in its life.** U297 made it ask instead
+of only listening: once on mount, and again whenever the event socket reopens.
+Everything after that arrived as events, so a single wrong or missed
+`RobotDisconnected` stayed on screen until the app was restarted. It asks on a
+timer now. Events stay the fast path; the poll is what makes being wrong
+temporary — the rule this repository already states, that state which must
+survive a late subscriber is polled, not awaited.
+
+**Asked for explicitly**: *"make sure this is tested so it does not happen
+again"* (translated). The bridge had **no tests at all**, which is how it
+survived. It has five now, including the address change and the "one disconnect
+per transition" rule.
+
+And the shell had never been mounted by anything — which bit immediately:
+writing the watch into `App.vue` used `onUnmounted` without importing it, and
+the store test beside it passed cheerfully while the window was broken. There
+is no `vue-tsc` here, so that is not a build error, it is a blank screen in
+front of the owner. `AppShell.test.ts` was **verified against the break**:
+restoring the missing import turned three red tests green, and removing it
+again reproduces `ReferenceError: onUnmounted is not defined`.
+
+One thing fixed in passing, and it was mine: `test_brain_bundle` asserted that
+the sealed export does not contain `b"Jan"`. Three letters turn up in random
+base64 often enough to fail a run for no reason, and it did. The property being
+tested is "the plaintext is not readable in the file", so it now asserts that
+with a string long enough to mean it. Re-run three times to confirm.

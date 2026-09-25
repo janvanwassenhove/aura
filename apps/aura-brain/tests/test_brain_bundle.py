@@ -39,7 +39,7 @@ OMK = b"0" * 32
 
 async def _populated(tmp_path):
     store = InMemoryKnowledgeStore()
-    await store.upsert_person(Person(person_id="jan", display_name="Jan", role="owner"))
+    await store.upsert_person(Person(person_id="jan", display_name="Jan Testperson", role="owner"))
     await store.upsert_person(Person(person_id="ada", display_name="Ada", role="family"))
     await store.add_fact(ProfileFact(person_id="jan", key="project",
                                      value="Builds a [[Reachy Mini]] assistant"))
@@ -64,7 +64,10 @@ async def test_the_bundle_is_sealed_and_the_facts_are_not_in_it(tmp_path) -> Non
 
     assert b"Reachy Mini" not in blob
     assert b"tea, never coffee" not in blob
-    assert b"Jan" not in blob
+    # U365: three letters turn up in random base64 often enough to fail a
+    # run for no reason. The property is "the plaintext is not readable",
+    # so assert it with something long enough to mean that.
+    assert b"Jan Testperson" not in blob
 
 
 async def test_it_says_what_it_holds_without_saying_who(tmp_path) -> None:
