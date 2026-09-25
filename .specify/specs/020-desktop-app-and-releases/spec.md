@@ -5,7 +5,7 @@ owner: "apps/desktop + CI"
 priority: P1
 risk: High
 created: "2026-09-05"
-units: [U32, U33, U44, U55, U56, U151, U152, U166, U168, U168b, U168c, U168d, U168e, U169, U169b, U170, U171, U172, U173, U174, U176, U177, U178, U192, U193, U197, U201, U211, U228, U229, U230, U231, U232, U233, U234, U235, U236, U283, U284, U285, U285b, U297, U179, U184, U185, U186, U210, U317, U318, U327, U330, U337, U338, U343, U344, U353, U354, U355, U363, U367]
+units: [U32, U33, U44, U55, U56, U151, U152, U166, U168, U168b, U168c, U168d, U168e, U169, U169b, U170, U171, U172, U173, U174, U176, U177, U178, U192, U193, U197, U201, U211, U228, U229, U230, U231, U232, U233, U234, U235, U236, U283, U284, U285, U285b, U297, U179, U184, U185, U186, U210, U317, U318, U327, U330, U337, U338, U343, U344, U353, U354, U355, U363, U367, U367b]
 amended: "2026-09-13"
 ---
 
@@ -331,6 +331,7 @@ and installers for Windows, macOS (arm64 and x64) and Linux.
 | U330 | The published screenshots refreshed from the current app, one command to redo it, and two drawings that had stopped being true |
 | U337 | Windows code signing wired end to end (Azure Trusted Signing or a PFX), an unsigned build that admits it, and every check in scripts/ actually running in CI |
 | U367 | The checks job installs the workspace instead of a hand-kept dependency list, and a guard names the missing module when a new script needs one |
+| U367b | That job runs `python -m pytest` so it uses the interpreter uv built, rather than a system pytest an earlier step installed |
 | U338 | SignPath Foundation wired into the release: free signing for an open-source project, guarded and order-checked |
 | U343 | The from-source launcher caught up with the app it starts: it syncs Python with the extras, rebuilds a stale console, and stops baking a port |
 | U344 | The brain launched through the interpreter instead of a shim a corporate ASR rule forbids, and a dead brain that now names its cause instead of freezing the splash |
