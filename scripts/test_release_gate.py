@@ -129,3 +129,19 @@ def test_the_repository_checks_are_in_the_gate() -> None:
                    "sync_agent_docs.py --check", "pytest scripts/", "npm test",
                    "ruff check"):
         assert needle in ran, f"the gate does not run `{needle}`"
+
+
+# ── U376 (audit T13): the traceability checks need the whole history ────────
+
+def test_the_checks_job_sees_the_whole_git_history() -> None:
+    """spec_drift.py and spec_tests.py walk `git log`. On the default shallow
+    clone that log is ONE commit, so on the runner both checks judged the tip
+    alone and a unit followed by a docs commit was never checked at all.
+    Found because U375c failed Spec coverage and the commit on top of it, with
+    identical code, passed."""
+    gate = _load("checks.yml")
+    privacy = gate["jobs"]["privacy"]
+    checkout = next(s for s in privacy["steps"] if str(s.get("uses", "")).startswith("actions/checkout"))
+    assert (checkout.get("with") or {}).get("fetch-depth") == 0, (
+        "the checks job must check out with fetch-depth: 0 — the traceability "
+        "checks read git log, and a shallow clone makes them judge the tip only")

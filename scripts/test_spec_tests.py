@@ -41,7 +41,8 @@ def test_a_desktop_check_is_a_test_file_too(tmp_path) -> None:
     """U375b: the shell's checks are plain-node `test-*.cjs` scripts, run by
     the gate. The first version of this check did not count them, so U375 —
     guarded by one — was reported as a unit no test names, and the gate went
-    red on the commit that added the guard."""
+    red on the commit that added the guard. (U375c repaired this very test,
+    which had shipped with a heredoc-mangled string literal.)"""
     cjs = _write(tmp_path, "test-brain-env.cjs", "// U875: pins the env\n")
     assert units_named_by([cjs]) == {"U875"}
     assert "*test-*.cjs" in spec_tests._TEST_GLOBS
