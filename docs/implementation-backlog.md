@@ -4488,3 +4488,31 @@ It runs inside `checks.yml` (U368), so it gates both CI and Release. First
 real run: *no new untested units — but 122 claimed unit(s) up to the U367b
 baseline are named by no test.* That sentence is the audit's headline number,
 now printed on every push until it is zero.
+
+### U369b — the check's own tests vouched for units they knew nothing about
+
+Caught within the hour, by the check itself. The first version of
+`scripts/test_spec_tests.py` used real-looking ids as fixture data — a spec
+claiming `U299, U300, U301`, a test naming `U339` — and the moment that file
+was tracked, the debt reported by `spec_tests.py` fell from 122 to 117 with no
+test written. The tokenizer does exactly what it says: a unit id anywhere in a
+test file names that unit. Fixture data is anywhere.
+
+Fixtures now use the `U8xx` range, three digits (four are invisible to the
+`U\d{1,3}` token both checks share) and far above any real unit for years.
+One more slipped through the first pass: a *comment* naming the baseline unit
+as the ceiling the baseline may not exceed. Spelled in two parts now.
+
+Two things worth keeping from this:
+
+* **A pipe swallowed a red guard.** The pre-commit chain ran
+  `python scripts/spec_tests.py | head -1`, which printed *1 claimed unit(s)
+  that no test names* and then let the commit through, because `head` owns the
+  exit code. The same trap as the deploy script in U333 and the ruff slip in
+  U332 — noted then, repeated now. The one unnamed unit was U369 itself: the
+  new test file was not yet `git add`ed, and only **tracked** files vouch.
+  That behaviour is right (a stray local file must not certify anything); the
+  order of operations was not.
+* **The debt number is the product.** 122 is what the audit measured, 122 is
+  what the check reports again after this fix, and any drop from here on has a
+  test behind it or is a bug in the check.

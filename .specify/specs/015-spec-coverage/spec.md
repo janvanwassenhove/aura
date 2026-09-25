@@ -5,7 +5,7 @@ owner: "build"
 priority: P1
 risk: Low
 created: "2026-09-05"
-units: [U299, U300, U301, U302, U303, U304, U305, U306, U307, U308, U309, U310, U311, U312, U313, U314, U315, U316, U347, U369]
+units: [U299, U300, U301, U302, U303, U304, U305, U306, U307, U308, U309, U310, U311, U312, U313, U314, U315, U316, U347, U369, U369b]
 ---
 
 # Feature Specification: Spec Coverage — traceability that a machine checks
@@ -136,7 +136,9 @@ spec-first rule and the per-unit obligations, and points at the constitution.
   units, which fail the gate. The baseline may only move backwards. The
   constitution's "no code merged without traceability to a spec acceptance
   criterion" was checkable only as far as the claim; now it reaches the test
-  (U369, audit T2).
+  (U369, audit T2). Only **tracked** test files vouch, and a test's fixture
+  data must use ids no real unit will ever have (the `U8xx` range): a test
+  that mentions a real id as sample input has named it (U369b).
 
 
 - **FR-001**: Every unit is identified by its commit subject `auto(UNNN): …`.
@@ -192,6 +194,7 @@ spec-first rule and the per-unit obligations, and points at the constitution.
 |---|---|
 | U299 | `scripts/spec_drift.py`, `scripts/test_spec_drift.py`, `.specify/coverage.json`, `CLAUDE.md`, CI job, pre-commit warning |
 | U369 | The other direction: every claimed unit is named by a test, with its own baseline that may only shrink |
+| U369b | A test file's own fixture data must not name real units — the check's first tests vouched for five units they knew nothing about |
 | U300 | Batched and ranged commit subjects counted as the several units they are — the debt went from 292 to its true 321 |
 | U301 | Spec 016 — embodiment and presence (36 units) |
 | U302 | Spec 017 — voice and language (60 units) |
