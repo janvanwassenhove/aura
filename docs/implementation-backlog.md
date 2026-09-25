@@ -4455,3 +4455,36 @@ Verified the way the audit says to: both suites Release had been skipping pass
 parse, the signing-order tests (U337/U338) still hold on the restructured
 `release.yml`, and the first push through the new gate is watched to
 completion rather than assumed.
+
+### U369 — a spec was claimed, not validated
+
+Second fix from the testing audit
+([`docs/audit-testing-2026-09.md`](audit-testing-2026-09.md), T2).
+
+`spec_drift.py` (U299) closed sixty-nine units of drift by checking one
+direction: every shipped unit is claimed by a spec. It never checked the other.
+A spec could claim a unit whose behaviour no test protected, and the
+constitution's "no code merged without traceability to a spec acceptance
+criterion" was checkable exactly as far as the claim and no further.
+
+The audit measured what that left open: **122 of 394 claimed units are named
+by no test file at all.** Spec 020 (desktop) 40 of 61; spec 015 13 of 19; spec
+008 (console) 19 of 40. Recent ones include U333, U343, U344, U354 and U355.
+The twelve repeat-reports since U300 are what that looks like from the owner's
+chair — a fix with nothing standing behind it is a fix the next refactor
+removes without noticing, which is exactly how U366 happened to U332.
+
+`scripts/spec_tests.py` is the sibling: a unit is *named by a test* when its
+id appears in any `test_*.py` or `*.test.ts` — the convention every test here
+already follows — and a claimed unit no test names is reported by spec. Same
+shape as `spec_drift.py` on purpose: a second baseline, `tests_baseline`, in
+`.specify/coverage.json` marks the 122 as historical debt, reported on every
+run so the number stays in view; every unit after it must be named by a test
+or the gate fails. `scripts/test_spec_tests.py` refuses a baseline that moves
+forward, and `--list` prints the debt one unit per line so paying it is a
+checklist rather than an archaeology.
+
+It runs inside `checks.yml` (U368), so it gates both CI and Release. First
+real run: *no new untested units — but 122 claimed unit(s) up to the U367b
+baseline are named by no test.* That sentence is the audit's headline number,
+now printed on every push until it is zero.

@@ -5,7 +5,7 @@ owner: "build"
 priority: P1
 risk: Low
 created: "2026-09-05"
-units: [U299, U300, U301, U302, U303, U304, U305, U306, U307, U308, U309, U310, U311, U312, U313, U314, U315, U316, U347]
+units: [U299, U300, U301, U302, U303, U304, U305, U306, U307, U308, U309, U310, U311, U312, U313, U314, U315, U316, U347, U369]
 ---
 
 # Feature Specification: Spec Coverage — traceability that a machine checks
@@ -127,6 +127,18 @@ spec-first rule and the per-unit obligations, and points at the constitution.
 
 ## Functional Requirements
 
+- **FR-TRACE-02**: **Traceability runs both ways.** `spec_drift.py` asks
+  whether every shipped unit is claimed by a spec; `spec_tests.py` asks
+  whether every claimed unit is named by at least one test file — its id in a
+  docstring, which is this repository's convention for saying which fix a test
+  guards. A second baseline in `.specify/coverage.json` (`tests_baseline`)
+  separates the 122 units of historical debt, reported on every run, from new
+  units, which fail the gate. The baseline may only move backwards. The
+  constitution's "no code merged without traceability to a spec acceptance
+  criterion" was checkable only as far as the claim; now it reaches the test
+  (U369, audit T2).
+
+
 - **FR-001**: Every unit is identified by its commit subject `auto(UNNN): …`.
   A letter suffix (`U242b`) is a distinct unit. The early history batched
   several into one subject — `auto(U2,U3):`, `auto(U19c+U20):`,
@@ -179,6 +191,7 @@ spec-first rule and the per-unit obligations, and points at the constitution.
 | Unit | What it delivered |
 |---|---|
 | U299 | `scripts/spec_drift.py`, `scripts/test_spec_drift.py`, `.specify/coverage.json`, `CLAUDE.md`, CI job, pre-commit warning |
+| U369 | The other direction: every claimed unit is named by a test, with its own baseline that may only shrink |
 | U300 | Batched and ranged commit subjects counted as the several units they are — the debt went from 292 to its true 321 |
 | U301 | Spec 016 — embodiment and presence (36 units) |
 | U302 | Spec 017 — voice and language (60 units) |

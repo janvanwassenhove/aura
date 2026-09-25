@@ -45,6 +45,13 @@ jobs:
         run: |
           pytest scripts/test_spec_drift.py -q
           python scripts/spec_drift.py
+      # U369 (audit T2): the other direction. spec_drift asks "is every shipped
+      # unit claimed by a spec"; this asks "is every claimed unit named by a
+      # test". 122 were not on the day it was written; new ones fail here.
+      - name: Every claimed unit is named by a test
+        run: |
+          pytest scripts/test_spec_tests.py -q
+          python scripts/spec_tests.py
       # U315: five paths in AGENTS.md's Key Interfaces block pointed at files
       # that had never existed, and 24 links across the specs resolved to
       # nothing. A link that looks like a link and goes nowhere is worse than
