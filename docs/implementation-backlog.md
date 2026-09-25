@@ -4419,3 +4419,39 @@ point is to say what is missing *without* depending on being able to run it.
 defensible — a red documentation check should probably not stop a build — but
 it is also why nobody noticed for six units. Coupling them, or having the
 release summary say what CI thought of the same commit, is the owner's call.
+
+### U368 — one gate, and a release that cannot skip it
+
+The first fix from the testing audit
+([`docs/audit-testing-2026-09.md`](audit-testing-2026-09.md), T1), which was
+asked for as (translated): *"all specs should be tested and validated at all
+times on any release, automated — there is too much regression"*.
+
+The most direct cause of the seven red builds that shipped anyway (U361–U367)
+was not a missing test. It was that **CI and Release each kept their own list
+of what must pass**, and the lists had drifted: Release lacked
+`identity-service` and `test-brain-launch.cjs`, and ran none of the repository
+checks — no privacy scan before publishing, no spec drift, no doc links, none
+of `scripts/`. So CI went red and Release, consulting its own shorter list,
+stayed green and published. U337 removed one hand-kept list, U367 a second;
+this was the third, and the only one that decides whether a build reaches the
+owner.
+
+Now there is **one file**: `.github/workflows/checks.yml`, a reusable workflow
+holding every job CI had, verbatim. `ci.yml` calls it and nothing else.
+`release.yml`'s gate job calls it too, and `build` and `release` depend on
+that job. A suite is listed once, or not at all.
+
+`scripts/test_release_gate.py` keeps it that way, and does the thing a list
+cannot: it **walks the tree** for every package with a test file and every
+`apps/desktop/test-*.cjs`, and fails if the gate does not run one. On its very
+first run it found a third omission — `packages/shared-prompts/tests/`, which
+has existed since April with only an `__init__.py` in it (audit T11). The walk
+now requires a real test file, because pytest on an empty directory exits 5
+and would have failed the gate for a suite that does not exist.
+
+Verified the way the audit says to: both suites Release had been skipping pass
+(`identity-service`: 6, `test-brain-launch.cjs`: ok), all three workflows
+parse, the signing-order tests (U337/U338) still hold on the restructured
+`release.yml`, and the first push through the new gate is watched to
+completion rather than assumed.

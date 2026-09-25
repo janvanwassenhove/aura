@@ -1,6 +1,6 @@
 # U166: automated releases on every push to master.
 #
-#   push to master ─→ test gate ─┬→ build installers (Windows / macOS / Linux)
+#   push to master ─→ checks.yml gate ─┬→ build installers (Windows / macOS / Linux)
 #                                ├→ demo-stack screenshots (optional, no PII)
 #                                └→ tag + GitHub Release with notes, ledger
 #                                   highlights, screenshots and all installers
@@ -88,59 +88,15 @@ jobs:
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
           echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
 
+  # U368: the same gate CI runs, not a hand-kept copy of it. The copy this
+  # replaces lacked identity-service and test-brain-launch.cjs and ran none of
+  # the repository checks; a red CI shipped installers for seven units.
+  # `build` and `release` depend on this job, so nothing is published unless
+  # every check in checks.yml is green.
   test:
     if: "!contains(github.event.head_commit.message, '[skip release]')"
-    runs-on: ubuntu-latest
-    env:
-      LLM_PROVIDER: echo   # U168b: never depend on a real key in CI
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-      - name: Privacy scan (U167 — nothing personal ships in a release)
-        run: python scripts/privacy_scan.py --all
-      - name: Install uv
-        run: pip install uv
-      - name: Sync workspace
-        run: uv sync --all-packages
-      - name: Python suites
-        run: |
-          uv run --package shared-schemas --extra dev pytest packages/shared-schemas/tests -q
-          uv run --package shared-events --extra dev pytest packages/shared-events/tests -q
-          uv run --package shared-policies --extra dev pytest packages/shared-policies/tests -q
-          uv run --package shared-personas --extra dev pytest packages/shared-personas/tests -q
-          uv run --package robot-runtime --extra dev pytest services/robot-runtime/tests -q
-          uv run --package memory-service --extra dev pytest services/memory-service/tests -q
-          uv run --package orchestrator --extra dev pytest services/orchestrator/tests -q
-          uv run --package conversation-runtime --extra dev pytest services/conversation-runtime/tests -q
-          uv run --package connector-service --extra dev pytest services/connector-service/tests -q
-          uv run --package aura-brain --extra dev pytest apps/aura-brain/tests -q
-      - name: Console suite
-        working-directory: apps/operator-console
-        run: |
-          npm ci
-          npm test
-          npm run build
-      # U235: the shell is the one thing the release BUILDS and nothing here
-      # checked. A module left out of build.files packages cleanly and dies on
-      # the owner's first launch — which is how v2.0.58 shipped.
-      - name: Desktop shell checks
-        working-directory: apps/desktop
-        run: |
-          node test-packaging.cjs
-          node test-console-origin.cjs
-          node test-updater-verify.cjs
-          node test-bootstrap-extras.cjs
+    uses: ./.github/workflows/checks.yml
 
-  # Boot a throwaway demo stack and photograph the app. Optional: a release
-  # without screenshots beats no release, so failures here never block.
-  #
-  # U235: "never block" turned out to mean "never noticed". This job failed on
-  # every release for weeks — a `networkidle` wait against a console that holds
-  # a WebSocket open — and the releases went out screenshot-less without a word.
-  # It still cannot block a release; it now says so in the release notes, so a
-  # silent failure at least leaves a mark where somebody reads it.
   screenshots:
     if: "!contains(github.event.head_commit.message, '[skip release]')"
     runs-on: ubuntu-latest
