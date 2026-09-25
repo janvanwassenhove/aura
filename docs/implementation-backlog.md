@@ -4556,3 +4556,34 @@ run through the new gate (U368) reached *Publish release* with the same token
 permissions as every green run before it and was refused with HTTP 403; the
 very next run (U369) published v2.0.177 through the identical workflow. Noted
 here so a second occurrence is a pattern and not a surprise.
+
+### U372 — nothing ran the gate locally
+
+Fourth fix from the testing audit
+([`docs/audit-testing-2026-09.md`](audit-testing-2026-09.md), T5).
+
+There was no `Makefile`, no root script, no single command that did what CI
+does. So "verified locally" meant "ran the suite I remembered", and U367b is
+what that costs: a fix verified in a primed venv, wrong on the runner, and a
+second red build to find out.
+
+`scripts/gate.py` reads `.github/workflows/checks.yml` — the one list, since
+U368 — and runs its `run:` steps through bash in the runner's order, with each
+step's `working-directory` and `env`, stopping at the first failure as the
+runner does. `--job test` runs one job, `--list` prints what would run,
+`--keep-going` reports every failure at once. It is the file, not a copy of
+it: a step added to the gate runs here on the next invocation, and there is no
+second list to forget. Environment steps (`pip install`, `uv sync`, `npm ci`)
+run too, so a fresh clone is treated like the runner.
+
+Verified by running it: `--list` prints the thirty-one steps CI runs, and
+`--job lint` executed end to end on this machine — *gate green -- 2 step(s) in
+13s, the same steps CI runs*. One Windows lesson on the way: the first version
+printed a check mark and the console's cp1252 encoding took the whole gate
+down with a `UnicodeEncodeError`. The output is plain ASCII now and the
+streams are reconfigured to replace rather than raise, so a step that prints a
+glyph cannot fail the gate by printing it.
+
+The working agreement names it: "verified locally" means the gate ran here.
+That line is synced into `CLAUDE.md`, `AGENTS.md` and the Copilot
+instructions by `sync_agent_docs.py`, which the gate itself checks.

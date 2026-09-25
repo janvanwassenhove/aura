@@ -172,6 +172,11 @@ and CI fails on any of them. Mentioning a unit in prose does **not** claim it.
 - **`uv sync` prunes extras that are not requested.** This has silently removed
   a dependency four times (U179, U213, U246, U266). A new dependency goes in
   `pyproject.toml`, never only in the working environment.
+- **"Verified locally" means the gate ran here.** `python scripts/gate.py`
+  reads `.github/workflows/checks.yml` and runs its steps — the file CI reads,
+  not a memory of it (`--job test`, `--list`). A suite you ran because you
+  remembered it is how U367b shipped a fix that was verified in a primed venv
+  and wrong on the runner.
 - **Verify with the keys unset**: `OPENAI_API_KEY= ANTHROPIC_API_KEY= uv run
   --package <pkg> --extra dev pytest`. CI has no keys; a shell that has them
   hid a red build for six hours (U283).
