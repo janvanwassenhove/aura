@@ -5,7 +5,7 @@ owner: "robot-runtime / scripts"
 priority: P1
 risk: Medium
 created: "2026-09-05"
-units: [U17, U26, U198, U199, U200, U239, U240, U241, U242, U242b, U339, U339b, U345, U346]
+units: [U17, U26, U198, U199, U200, U239, U240, U241, U242, U242b, U339, U339b, U345, U346, U371]
 ---
 
 # Feature Specification: Getting Code onto the Robot
@@ -112,6 +112,14 @@ no.
   from an older runtime and reports the degradation instead of success.
 - **FR-005**: An unreachable robot is diagnosed, not spun on, and the fix (an
   address, a scan, a pairing key) is offered on the same screen.
+- **FR-007a**: **The app says when the robot is behind.** `/robot/status`
+  carries the robot's commit (from `/health.build`, U240, asked once per
+  runtime), the laptop's (a checkout asks git; a packaged app reads the
+  `BUILD_COMMIT` stamp the release writes into `resources/aura`), and
+  `behind`. The Connection card renders three states — behind, same build,
+  cannot compare — and the absent one is an absence, never "in step" because
+  two unknowns were equal. `deploy_robot.py --check` remains the tool; this is
+  the same comparison where the owner is looking (U371, audit T6).
 - **FR-006**: A second machine is paired with a robot that holds a shared
   secret (U220) from the app — `ROBOT_SHARED_SECRET` is settable through
   `/setup/config`, reported only as set/not set, and takes effect without a
@@ -153,5 +161,6 @@ no.
 | U26 | On-Pi budget guard — shed non-essential work when hot or saturated |
 | U339 | A 401 named as a pairing problem, and the robot's key settable from the Connection card |
 | U339b | `ROBOT_SHARED_SECRET` documented in `.env.example`, for a machine started from source |
+| U371 | The robot being behind the laptop is a line in the Connection card, not a script to remember |
 | U345 | The two places U339's distinction had not reached: the headline field, and an address probe that only asked the ungated route |
 | U346 | The pairing key read per request instead of frozen into a cached client — the one path where "no restart needed" was not true |

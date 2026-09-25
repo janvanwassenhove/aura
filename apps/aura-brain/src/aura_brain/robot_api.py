@@ -11,6 +11,7 @@ CORS single-origin and the robot URL a server-side concern.
 
 from __future__ import annotations
 
+import logging
 import os
 from typing import Any
 
@@ -22,6 +23,8 @@ from shared_schemas.robot.models import MotionCommand
 from aura_brain.robot_client import robot_auth_headers
 
 router = APIRouter(prefix="/robot", tags=["robot"])
+
+logger_build = logging.getLogger(__name__)
 
 _robot: Any = None  # RobotClient — set by init()
 
@@ -268,8 +271,9 @@ async def set_address(body: dict) -> JSONResponse:
     if _robot is not None:
         _robot._base_url = url      # live: no restart to try a new address
     # A new robot may well be a different version from the last one.
-    global _robot_has_frame_jpg
+    global _robot_has_frame_jpg, _build_cache
     _robot_has_frame_jpg = None
+    _build_cache = None            # U371: a different robot is a different build
     await shutdown_camera()
 
     reachable, detail = True, "saved"
@@ -295,12 +299,72 @@ async def set_address(body: dict) -> JSONResponse:
     return JSONResponse({"url": url, "reachable": reachable, "detail": detail})
 
 
+# ── U371 (audit T6): which build he runs, beside which build this is ────────
+#
+# The Pi is deployed separately from the laptop and has drifted behind it by
+# 74 commits once (U240) and by one on the day this was written. Nothing in the
+# app showed it; `deploy_robot.py --check` did, if somebody remembered. Every
+# "the fix did not work" that was really "the fix is not on the Pi yet" was
+# found by hand. The comparison the script makes is made here now and travels
+# with /robot/status, so the Connection card can say it.
+
+_build_cache: dict | None = None      # the robot's build — asked once per runtime
+
+
+def _git_head() -> str | None:
+    """The checkout's commit, when this brain runs from one. None otherwise."""
+    import subprocess
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[4]
+    try:
+        out = subprocess.run(["git", "rev-parse", "HEAD"], cwd=root, capture_output=True,
+                             text=True, timeout=5, check=False)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    sha = out.stdout.strip() if out.returncode == 0 else ""
+    return sha or None
+
+
+def laptop_commit() -> str | None:
+    """What this brain was built from — or None, honestly.
+
+    A checkout knows (`git rev-parse HEAD`). A packaged app has no `.git`, so
+    the release stamps `AURA_BUILD_COMMIT` (a file the desktop shell reads).
+    Neither present: None, and the comparison is an absence, never a guess.
+    """
+    return _git_head() or (os.environ.get("AURA_BUILD_COMMIT", "").strip() or None)
+
+
+async def _build_block() -> dict:
+    global _build_cache
+    if _build_cache is None:
+        try:
+            _build_cache = await _robot.build()
+        except Exception:  # noqa: BLE001 — an older runtime reports nothing
+            _build_cache = {}
+    robot = (_build_cache or {}).get("commit") or None
+    laptop = laptop_commit()
+    behind: bool | None = None
+    if robot and laptop:
+        behind = robot != laptop
+    return {"robot": robot[:7] if robot else None,
+            "laptop": laptop[:7] if laptop else None,
+            "behind": behind}
+
+
 @router.get("/status")
 async def status() -> JSONResponse:
     try:
-        return JSONResponse(await _robot.status())
+        body = await _robot.status()
     except (httpx.HTTPError, OSError) as exc:
         return _unavailable(exc)
+    try:
+        body = dict(body)
+        body["build"] = await _build_block()
+    except Exception as exc:  # noqa: BLE001 — never let the comparison break status
+        logger_build.debug("build comparison skipped: %s", exc)
+    return JSONResponse(body)
 
 
 @router.get("/camera/stream")

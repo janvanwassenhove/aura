@@ -240,6 +240,27 @@
             <div class="conn-k">Mode</div>
             <div class="conn-v">{{ robot.mode }}</div>
           </div>
+          <!-- U371: which build he runs, beside which build this is. The Pi
+               is deployed separately and has been 74 commits behind without
+               anything here saying so. Three states, three sentences; the
+               absent one is an absence, never a guess. -->
+          <div v-if="robot.build" class="conn-fact conn-fact-wide" data-test="robot-build">
+            <div class="conn-k">Build</div>
+            <div class="conn-v mono" :style="{ color: robot.build.behind ? 'var(--warn)' : 'inherit' }">
+              <template v-if="!robot.build.robot">
+                this runtime does not report its build (older than U240)
+              </template>
+              <template v-else-if="robot.build.laptop === null">
+                {{ robot.build.robot }} · cannot compare — this build carries no stamp
+              </template>
+              <template v-else-if="robot.build.behind">
+                {{ robot.build.robot }} — behind this laptop ({{ robot.build.laptop }}) · run <code>python scripts/deploy_robot.py</code>
+              </template>
+              <template v-else>
+                {{ robot.build.robot }} · same build as this laptop
+              </template>
+            </div>
+          </div>
           <div class="conn-fact">
             <div class="conn-k">Following</div>
             <div class="conn-v">{{ robot.tracking ? (robot.faceVisible ? 'a face' : 'nothing to follow') : 'off' }}</div>
@@ -921,4 +942,5 @@ onUnmounted(() => clearInterval(statusTimer))
   border: 1.5px solid var(--ok); color: var(--ink); font-size: 12px; cursor: pointer;
 }
 .conn-result { margin: 8px 0 0; font-size: 12.5px; color: var(--ink-2); }
+.conn-fact-wide { grid-column: 1 / -1; }
 </style>

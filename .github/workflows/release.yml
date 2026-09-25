@@ -224,6 +224,9 @@ jobs:
           WINDOWS_PFX_PASSWORD: ${{ secrets.WINDOWS_PFX_PASSWORD }}
         run: |
           npm ci
+          # U371: a packaged app has no .git, so it cannot know which commit it
+          # is — and then cannot say whether the robot is behind it. Stamp it.
+          git -C ../.. rev-parse HEAD > ../../BUILD_COMMIT
           npx electron-builder ${{ matrix.args }} --publish never -c.extraMetadata.version=${{ needs.version.outputs.version }}
 
       # ── U338: SignPath Foundation — free code signing for open source ──

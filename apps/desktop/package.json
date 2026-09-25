@@ -1,7 +1,7 @@
 {
   "name": "aura-desktop",
   "version": "1.0.0",
-  "description": "AURA desktop app \u2014 brain + operator console in one window",
+  "description": "AURA desktop app — brain + operator console in one window",
   "author": {
     "name": "Jan Van Wassenhove",
     "email": "janvanwassenhove@users.noreply.github.com"
@@ -76,6 +76,10 @@
           "**/*",
           "!**/.env"
         ]
+      },
+      {
+        "from": "../../BUILD_COMMIT",
+        "to": "aura/BUILD_COMMIT"
       }
     ],
     "artifactName": "AURA-${version}-${os}-${arch}.${ext}",

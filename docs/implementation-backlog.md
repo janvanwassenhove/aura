@@ -4587,3 +4587,50 @@ glyph cannot fail the gate by printing it.
 The working agreement names it: "verified locally" means the gate ran here.
 That line is synced into `CLAUDE.md`, `AGENTS.md` and the Copilot
 instructions by `sync_agent_docs.py`, which the gate itself checks.
+
+### U371 — the robot being behind the laptop was invisible in the app
+
+Fifth fix from the testing audit
+([`docs/audit-testing-2026-09.md`](audit-testing-2026-09.md), T6).
+
+The Pi is deployed separately from the laptop. It has been 74 commits behind
+once (the U240 report) and was one behind on the day of the audit, and nothing
+in the brain or the console said so. `deploy_robot.py --check` did — if you
+remembered it existed. Every "the fix did not work" that was really "the fix
+is not on the Pi yet" was diagnosed by hand; the Quiet/Stop report that became
+U366 started with exactly that check, done by hand, before the real cause was
+found.
+
+The comparison the script makes is made in the brain now and travels with
+`/robot/status` as `build: {robot, laptop, behind}`. The robot's commit comes
+from `/health.build` (U240), asked **once** per runtime rather than on every
+status poll — a commit does not change while the runtime runs, and the console
+polls every ten seconds since U365. The laptop's commit is the honest part:
+
+* a checkout asks `git rev-parse HEAD`;
+* a packaged app has no `.git`, so the release now writes `BUILD_COMMIT` into
+  the packaged tree and the desktop shell hands it to the brain as
+  `AURA_BUILD_COMMIT`;
+* neither present — an installer older than this — and `laptop` is `null`,
+  `behind` is `null`, and the card says *cannot compare*. Two unknowns that
+  happen to be equal must never read as "same build" (constitution XI).
+
+The Connection card renders three sentences: *f145485 — behind this laptop
+(8f179ce) · run `python scripts/deploy_robot.py`*, *same build as this
+laptop*, and *cannot compare — this build carries no stamp*; a runtime older
+than U240 gets *does not report its build*.
+
+**Verified as far as it could be.** Seven brain tests (including the
+once-per-runtime rule and the checkout-beats-stale-stamp rule), four console
+mount tests, the packaging and brain-launch checks on the stamped
+`package.json`, and `laptop_commit()` returning this checkout's HEAD. The
+robot itself was off while this landed — `/health` answered nothing by name
+or by address — so the live line was not seen; `/health.build` has answered
+to `deploy_robot.py --check` all day, and that is what the comparison reads.
+The first deploy after this is where it will show, and should.
+
+Also noted, because it looked like a failure and was not: U370's Release run
+was **cancelled** with no job started. The release workflow's concurrency
+group keeps at most one *pending* run; U372 arrived while U370 was still
+queued behind U369b, and the queue kept the newer one. Not every commit gets
+its own installer under load — true before this audit, and unchanged by it.

@@ -24,6 +24,10 @@ export const useRobotStore = defineStore('robot', () => {
   const currentTranscript = ref('')
   const uptime = ref(0)
   const connected = ref(false)
+  /** U371: which build the robot runs beside which build this is. `null`
+   *  fields are absences — a runtime too old to report, a packaged app with
+   *  no stamp — and are rendered as such, never as "in step". */
+  const build = ref<{ robot: string | null; laptop: string | null; behind: boolean | null } | null>(null)
   const motionLog = ref<MotionLogEntry[]>([])
   const lastRecognized = ref<RecognizedPerson | null>(null)
   // U162: follow-me lives HERE, not in a component. Two surfaces drive it (the
@@ -134,6 +138,7 @@ export const useRobotStore = defineStore('robot', () => {
   function syncFromStatus(
     s: {
       connected?: boolean; mode?: string; tracking?: boolean
+      build?: { robot: string | null; laptop: string | null; behind: boolean | null }
       face_visible?: boolean | null
       /** U270: null = nobody measured it. It is NOT 100. */
       battery_pct?: number | null
@@ -143,6 +148,7 @@ export const useRobotStore = defineStore('robot', () => {
   ): void {
     if (!s) return
     connected.value = s.connected === true
+    if (s.build) build.value = s.build
     batteryPct.value = typeof s.battery_pct === 'number' ? s.battery_pct : null
     hasBattery.value = typeof s.has_battery === 'boolean' ? s.has_battery : null
     if (s.mode) mode.value = s.mode
@@ -224,5 +230,5 @@ export const useRobotStore = defineStore('robot', () => {
     wsGeneration.value = 0
   }
 
-  return { batteryPct, hasBattery, batteryLine, mode, behaviorState, isSpeaking, currentTranscript, uptime, connected, motionLog, lastRecognized, tracking, faceVisible, wsGeneration, noteWsOpen, statusBadgeClass, applyEvent, syncFromStatus, refreshStatus, watchStatus, setTracking, $reset }
+  return { batteryPct, hasBattery, batteryLine, mode, behaviorState, isSpeaking, currentTranscript, uptime, connected, build, motionLog, lastRecognized, tracking, faceVisible, wsGeneration, noteWsOpen, statusBadgeClass, applyEvent, syncFromStatus, refreshStatus, watchStatus, setTracking, $reset }
 })

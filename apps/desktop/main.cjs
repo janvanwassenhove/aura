@@ -148,6 +148,14 @@ function brainEnv() {
   env.GESTURE_MODEL_PATH = env.GESTURE_MODEL_PATH || path.join(DATA_DIR, 'models', 'hand_landmarker.task')
   // Desktop defaults (only when the wizard/.env didn't decide already).
   env.ROBOT_RUNTIME_URL = env.ROBOT_RUNTIME_URL || 'http://reachy-mini.local:8001'
+  // U371: which commit this build is, for the robot-behind-the-laptop line in
+  // the Connection card. A dev checkout answers `git rev-parse` itself; a
+  // packaged app reads the stamp the release wrote. Absent: the brain says it
+  // cannot compare, which is the truth.
+  try {
+    const stamp = fs.readFileSync(path.join(REPO_ROOT, 'BUILD_COMMIT'), 'utf-8').trim()
+    if (stamp) env.AURA_BUILD_COMMIT = env.AURA_BUILD_COMMIT || stamp
+  } catch { /* no stamp: a dev checkout, or an older installer */ }
   env.HEARTBEAT_ENABLED = env.HEARTBEAT_ENABLED || 'true'
   // Both spellings of the console origin: the window uses the IP, a human
   // opening it in a browser will type the name.
