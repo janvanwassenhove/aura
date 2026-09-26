@@ -202,6 +202,25 @@ jobs:
         working-directory: apps/desktop
         run: node test-brain-env.cjs
 
+  # U379: the desktop rung on a real Mac. The unit tests pin the exact osascript
+  # and `open -b` commands on any OS; this runs them against macOS itself —
+  # the installed-app scan for real, and the window query, which on a runner
+  # without an Accessibility grant must come back naming the permission
+  # rather than crashing or answering "no windows".
+  desktop-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install uv
+        run: pip install uv
+      - name: Sync the orchestrator
+        run: uv sync --package orchestrator --extra dev
+      - name: Desktop rung on macOS
+        run: uv run --package orchestrator --extra dev pytest services/orchestrator/tests/test_desktop_mac.py services/orchestrator/tests/test_desktop_tools.py -v
+
   lint:
     runs-on: ubuntu-latest
     steps:

@@ -5,7 +5,7 @@ owner: "orchestrator"
 priority: P1
 risk: High
 created: "2026-09-05"
-units: [U40, U43, U50, U57, U58, U59, U60, U61, U62, U64, U65, U66, U70, U71, U74, U75, U107, U108, U110, U118, U159, U194, U195, U247, U248, U249, U250, U251, U253c, U259, U259b, U261, U296, U335, U377, U378]
+units: [U40, U43, U50, U57, U58, U59, U60, U61, U62, U64, U65, U66, U70, U71, U74, U75, U107, U108, U110, U118, U159, U194, U195, U247, U248, U249, U250, U251, U253c, U259, U259b, U261, U296, U335, U377, U378, U379]
 ---
 
 # Feature Specification: Skills, Automation and the Agentic Loop
@@ -139,6 +139,20 @@ about two questions:
   clipboard text restored. The six follow the owner's *screen control* setting
   and exist in exactly the modes `launch_app` does. The automation ladder and
   the built-in skills place the rung before `use_computer` (U378).
+- **FR-DESKTOP-02**: **The desktop rung works on a Mac too.** A second
+  backend behind the same surface, using only what every Mac has: installed
+  apps from the bundles' `Info.plist`, `open -b <bundle id>` to launch, System
+  Events via `osascript` for windows, focus and keys, and `pbcopy` on stdin
+  for text — text is never an argument and never inside a script. A Mac
+  focuses applications, so a window's handle is its bundle id and
+  `foreground() == handle` remains the check before any key. Missing
+  Accessibility permission is reported by name with where to grant it. On
+  both platforms the **final key of a shortcut comes from a fixed list** (safe
+  single characters or named keys): free text from the model would land
+  inside an AppleScript on a Mac. `send_keys` is described to the model with
+  the shortcuts of the platform it runs on (`ctrl+cmd+i` for Copilot Chat on a
+  Mac). A macOS job in the gate runs the real bundle scan and the
+  permission-honest window query on every push (U379).
 - **FR-LAUNCH-01**: **A registered app is started the way a shell would find
   it.** `launch_app` resolves the command through `shutil.which` (PATHEXT) —
   `code` on Windows is the batch shim `code.cmd`, which CreateProcess alone

@@ -43,6 +43,9 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
+import plistlib
+import re
 import subprocess
 import sys
 import time
@@ -86,6 +89,21 @@ _EXES = {
 _MODIFIERS = {"ctrl", "alt", "shift", "win", "cmd", "command", "option"}
 _MAX_KEYS = 4
 
+#: U379: the FINAL key comes from this list too. It used to be free text from
+#: the model; on Windows pyautogui ignores a name it does not know, but on a
+#: Mac the key lands inside an AppleScript, and a "key" like
+#: `a" & do shell script "…` is a shell command. Single safe characters (no
+#: quote, no backslash) or named keys — nothing else, on either platform.
+_SAFE_CHARS = set("abcdefghijklmnopqrstuvwxyz0123456789,./;[]-=`")
+_MAC_KEY_CODES = {
+    "enter": 36, "return": 36, "tab": 48, "space": 49, "backspace": 51,
+    "delete": 117, "escape": 53, "esc": 53, "home": 115, "end": 119,
+    "pageup": 116, "pagedown": 121, "left": 123, "right": 124, "down": 125,
+    "up": 126, "f1": 122, "f2": 120, "f3": 99, "f4": 118, "f5": 96, "f6": 97,
+    "f7": 98, "f8": 100, "f9": 101, "f10": 109, "f11": 103, "f12": 111,
+}
+_NAMED_KEYS = set(_MAC_KEY_CODES)
+
 
 def _sleep(seconds: float) -> None:          # a seam: tests do not wait
     time.sleep(seconds)
@@ -93,12 +111,22 @@ def _sleep(seconds: float) -> None:          # a seam: tests do not wait
 
 # ── the backend ────────────────────────────────────────────────────────────
 
+class DesktopPermissionError(RuntimeError):
+    """The OS refused: the owner has to grant something by hand. `advice` says
+    exactly what and where, so the reply is an instruction, not a mystery."""
+
+    def __init__(self, advice: str) -> None:
+        super().__init__(advice)
+        self.advice = advice
+
+
 _WINDOWS_BACKEND: Any = None
+_MAC_BACKEND: Any = None
 
 
 def _backend() -> Any:
     """The desktop of this machine, or None where there is none to drive."""
-    global _WINDOWS_BACKEND
+    global _WINDOWS_BACKEND, _MAC_BACKEND
     if sys.platform == "win32":
         if _WINDOWS_BACKEND is None:
             try:
@@ -107,7 +135,11 @@ def _backend() -> Any:
                 logger.warning("desktop control unavailable: %s", exc)
                 return None
         return _WINDOWS_BACKEND
-    return None                              # macOS: U379
+    if sys.platform == "darwin":            # U379: built into every Mac
+        if _MAC_BACKEND is None:
+            _MAC_BACKEND = _MacDesktop()
+        return _MAC_BACKEND
+    return None
 
 
 class _Win:
@@ -185,10 +217,13 @@ class _WindowsDesktop:
 
         return win32gui.GetForegroundWindow() or None
 
+    _PYAUTOGUI = {"cmd": "win", "command": "win", "option": "alt",
+                  "return": "enter", "esc": "escape"}
+
     def hotkey(self, *keys: str) -> None:
         import pyautogui
 
-        pyautogui.hotkey(*keys)
+        pyautogui.hotkey(*(self._PYAUTOGUI.get(k, k) for k in keys))
 
     def write_ascii(self, text: str) -> None:
         import pyautogui
@@ -220,6 +255,163 @@ class _WindowsDesktop:
                 cb.SetClipboardData(win32con.CF_UNICODETEXT, previous)
             finally:
                 cb.CloseClipboard()
+
+
+def _run_cmd(argv: list[str], stdin: str | None = None) -> Any:
+    """argv only — never a shell. stdin carries text, so text is never an argument."""
+    return subprocess.run(argv, input=stdin, capture_output=True, text=True,  # noqa: S603
+                          timeout=20, check=False)
+
+
+_BUNDLE_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9.\-]*$")
+
+_MAC_PERMISSION = (
+    "[desktop: macOS has not given AURA permission to control other apps. "
+    "Open System Settings → Privacy & Security → Accessibility and allow AURA "
+    "(and, under Automation, allow it to control System Events), then try "
+    "again. Until then use_computer cannot help either — it needs the same "
+    "permission.]")
+
+_MAC_MODIFIERS = {"ctrl": "control down", "alt": "option down", "option": "option down",
+                  "shift": "shift down", "cmd": "command down",
+                  "command": "command down", "win": "command down"}
+
+_WINDOWS_SCRIPT = """
+const se = Application("System Events");
+const out = [];
+for (const p of se.applicationProcesses.whose({visible: true})()) {
+  let bid = ""; try { bid = p.bundleIdentifier() || ""; } catch (e) {}
+  let titles = []; try { titles = p.windows.name(); } catch (e) {}
+  for (const t of titles) { if (t) out.push({bid: bid, app: p.name(), title: t}); }
+}
+JSON.stringify(out);
+"""
+
+_FRONT_SCRIPT = """
+const f = Application("System Events").applicationProcesses.whose({frontmost: true})();
+f.length ? (f[0].bundleIdentifier() || "") : "";
+"""
+
+
+class _MacDesktop:
+    """macOS, with nothing that is not already on every Mac (U379).
+
+    Apps come from the bundles themselves; launching is `open -b`; windows,
+    focus and keys go through System Events, which is the one part that needs
+    the owner's Accessibility permission — and says so by name when it is
+    missing. A Mac focuses applications, not windows, so a window's handle is
+    its app's bundle id: `foreground() == handle` is still the check that
+    keys never go to the wrong app.
+    """
+
+    ROOTS = ("/Applications", "/Applications/Utilities", "/System/Applications",
+             "/System/Applications/Utilities", "~/Applications")
+
+    def __init__(self, run: Any = None, roots: Any = None) -> None:
+        self._run = run or _run_cmd
+        self._roots = [os.path.expanduser(str(r)) for r in (roots or self.ROOTS)]
+
+    # -- apps ------------------------------------------------------------------
+    def start_apps(self) -> list[dict]:
+        now = time.monotonic()
+        if _APPS_CACHE.get("apps") and now - _APPS_CACHE.get("at", 0) < _APPS_TTL_S:
+            return list(_APPS_CACHE["apps"])
+        apps: list[dict] = []
+        seen: set[str] = set()
+        for root in self._roots:
+            for bundle in self._bundles(root):
+                app = self._read(bundle)
+                if app and app["AppID"] not in seen:
+                    seen.add(app["AppID"])
+                    apps.append(app)
+        _APPS_CACHE.update({"apps": apps, "at": now})
+        return list(apps)
+
+    @staticmethod
+    def _bundles(root: str) -> list[str]:
+        if not os.path.isdir(root):
+            return []
+        found = []
+        for entry in sorted(os.listdir(root)):
+            path = os.path.join(root, entry)
+            if entry.endswith(".app"):
+                found.append(path)
+            elif os.path.isdir(path):         # e.g. /Applications/Microsoft Office/
+                found += [os.path.join(path, e) for e in sorted(os.listdir(path))
+                          if e.endswith(".app")]
+        return found
+
+    @staticmethod
+    def _read(bundle: str) -> dict | None:
+        try:
+            with open(os.path.join(bundle, "Contents", "Info.plist"), "rb") as fh:
+                info = plistlib.load(fh)
+        except (OSError, ValueError, plistlib.InvalidFileException):
+            return None
+        bid = str(info.get("CFBundleIdentifier") or "")
+        if not bid:
+            return None
+        name = (info.get("CFBundleDisplayName") or info.get("CFBundleName")
+                or os.path.basename(bundle)[:-4])
+        return {"Name": str(name), "AppID": bid}
+
+    def launch(self, app_id: str) -> None:
+        self._run(["open", "-b", app_id])
+
+    # -- System Events -----------------------------------------------------------
+    def _osa(self, script: str, lang: str = "JavaScript") -> str:
+        argv = ["osascript", "-l", lang, "-e", script] if lang == "JavaScript" \
+            else ["osascript", "-e", script]
+        r = self._run(argv)
+        if r.returncode != 0:
+            err = r.stderr or ""
+            if any(m in err for m in ("-1719", "-1743", "assistive access",
+                                      "Not authorized to send Apple events")):
+                raise DesktopPermissionError(_MAC_PERMISSION)
+            raise RuntimeError(f"osascript failed: {err.strip()[:200]}")
+        return (r.stdout or "").strip()
+
+    def windows(self) -> list[_Win]:
+        raw = self._osa(_WINDOWS_SCRIPT)
+        rows = json.loads(raw) if raw else []
+        return [_Win(r.get("bid", ""), r.get("title", ""), r.get("bid", "")) for r in rows]
+
+    def focus(self, handle: str) -> bool:
+        if not isinstance(handle, str) or not _BUNDLE_ID.match(handle):
+            logger.warning("desktop: refused to focus a malformed bundle id")
+            return False
+        try:
+            self._osa(f'tell application id "{handle}" to activate', "AppleScript")
+            return True
+        except DesktopPermissionError:
+            raise
+        except Exception as exc:  # noqa: BLE001
+            logger.info("desktop: activate failed for %s: %s", handle, exc)
+            return False
+
+    def foreground(self) -> str | None:
+        return self._osa(_FRONT_SCRIPT) or None
+
+    def hotkey(self, *keys: str) -> None:
+        *mods, key = keys                     # already validated by _parse_keys
+        using = (" using {" + ", ".join(_MAC_MODIFIERS[m] for m in mods) + "}") if mods else ""
+        action = (f"key code {_MAC_KEY_CODES[key]}" if key in _MAC_KEY_CODES
+                  else f'keystroke "{key}"')
+        self._osa(f'tell application "System Events" to {action}{using}', "AppleScript")
+
+    def paste_text(self, text: str) -> None:
+        """Through the clipboard on stdin: the text is never an argument and
+        never inside a script, so there is nothing to escape and nothing to
+        inject. The owner's clipboard text is put back afterwards."""
+        previous = self._run(["pbpaste"]).stdout
+        self._run(["pbcopy"], stdin=text)
+        self._osa('tell application "System Events" to keystroke "v" using {command down}',
+                  "AppleScript")
+        _sleep(0.3)
+        self._run(["pbcopy"], stdin=previous or "")
+
+    def write_ascii(self, text: str) -> None:
+        self.paste_text(text)                 # same path: nothing is ever embedded
 
 
 def _exe_of(handle: int) -> str:
@@ -295,13 +487,15 @@ def _windows_for(query: str, b: Any) -> list[Any]:
     q = _norm(query)
     exes = set(_EXES.get(q, set()))
     display = {q}
+    ids: set[str] = set()
     for app in (match_apps(query) or [])[:1]:
         display.add(app["Name"].lower())
         exes |= _EXES.get(app["Name"].lower(), set())
+        ids.add(app["AppID"].lower())
     hits = []
     for w in b.windows():
         title = (w.title or "").lower()
-        if (exes and _exe_base(w.exe) in exes) or any(
+        if (exes and _exe_base(w.exe) in exes) or (w.exe or "").lower() in ids or any(
                 title == d or title.endswith(f" - {d}") for d in display):
             hits.append(w)
     return hits
@@ -322,6 +516,8 @@ def _parse_keys(keys: str) -> list[str] | None:
     *mods, last = parts
     if any(m not in _MODIFIERS for m in mods):
         return None
+    if not (last in _NAMED_KEYS or (len(last) == 1 and last in _SAFE_CHARS)):
+        return None
     return parts
 
 
@@ -336,10 +532,26 @@ _NO_DESKTOP = ("[desktop: there is no desktop to drive on this machine (not "
 
 # ── the tools ──────────────────────────────────────────────────────────────
 
+def _guarded(fn):
+    """A permission refusal becomes the instruction that fixes it; any other
+    fault becomes a marked failure — never a traceback in the owner's chat."""
+    def wrapper(*args: Any) -> str:
+        try:
+            return fn(*args)
+        except DesktopPermissionError as exc:
+            return _unavailable(exc.advice)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("desktop: %s failed: %s", fn.__name__, exc)
+            return _unavailable(f"[desktop: {fn.__name__.lstrip('_')} failed — {exc}]")
+    wrapper.__name__ = fn.__name__
+    return wrapper
+
+
 async def find_app(query: str) -> str:
     return await asyncio.to_thread(_find_app, query)
 
 
+@_guarded
 def _find_app(query: str) -> str:
     if _backend() is None:
         return _unavailable(_NO_DESKTOP)
@@ -355,6 +567,7 @@ async def list_windows() -> str:
     return await asyncio.to_thread(_list_windows)
 
 
+@_guarded
 def _list_windows() -> str:
     b = _backend()
     if b is None:
@@ -367,6 +580,7 @@ async def focus_window(app: str) -> str:
     return await asyncio.to_thread(_focus_window, app)
 
 
+@_guarded
 def _focus_window(app: str) -> str:
     b = _backend()
     if b is None:
@@ -385,6 +599,7 @@ async def open_app(name: str) -> str:
     return await asyncio.to_thread(_open_app, name)
 
 
+@_guarded
 def _open_app(name: str) -> str:
     b = _backend()
     if b is None:
@@ -424,6 +639,7 @@ async def send_keys(app: str, keys: str) -> str:
     return await asyncio.to_thread(_send_keys, app, keys)
 
 
+@_guarded
 def _send_keys(app: str, keys: str) -> str:
     b = _backend()
     if b is None:
@@ -449,6 +665,7 @@ async def type_into(app: str, text: str) -> str:
     return await asyncio.to_thread(_type_into, app, text)
 
 
+@_guarded
 def _type_into(app: str, text: str) -> str:
     b = _backend()
     if b is None:

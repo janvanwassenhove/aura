@@ -4937,3 +4937,62 @@ That also corrects what U377's entry said.
 
 33 tests (31 on any OS, 2 more on Windows with the components); orchestrator
 447 green, brain 748.
+
+### U379 — the same desktop rung on a Mac
+
+Asked while U378 was being built (translated): *"then make sure the same is
+possible on Mac."* U378 had put every platform call behind one backend
+surface for exactly this; this is the second backend, and it needs nothing
+that is not already on every Mac:
+
+| | Windows (U378) | macOS (U379) |
+|---|---|---|
+| installed apps | `Get-StartApps` | every `*.app` under `/Applications` & co, named by its `Info.plist` |
+| launch | `explorer shell:AppsFolder\<AppID>` | `open -b <bundle id>` |
+| windows, focus, foreground | pywin32 | System Events via `osascript` |
+| keys | pyautogui | System Events `keystroke` / `key code` |
+| text | pyautogui, or the clipboard for é/ë/ü | `pbcopy` on stdin, then Cmd+V — always |
+
+A Mac focuses applications rather than windows, so a window's handle is its
+app's bundle id — and `foreground() == handle` is still the check made
+immediately before any key or character goes out. Text never becomes an
+argument and never sits inside a script: it goes to `pbcopy` on stdin, so
+there is nothing to escape and nothing to inject. The owner's clipboard text
+is put back afterwards.
+
+**The one thing the owner must do by hand on a Mac** is grant Accessibility
+(and Automation for System Events). When it is missing, every tool answers
+with the instruction — *System Settings → Privacy & Security → Accessibility:
+allow AURA* — as a U247-marked failure, rather than a traceback or an empty
+list that reads like "no windows open".
+
+**A hole found while designing this, closed on both platforms.** `send_keys`
+validated the modifiers but let the final key be free text from the model. On
+Windows pyautogui silently ignores a key name it does not know; on a Mac that
+string is written into an AppleScript — and a "key" like
+`a" & do shell script "…` is a shell command. The final key now comes from a
+fixed list on both platforms: one safe character (no quote, no backslash) or
+a named key. A test sends exactly that injection and asserts it never reaches
+`osascript`; another refuses a malformed bundle id before it is put into a
+script.
+
+**The model is told the shortcuts of the machine it is on.** The same action
+has a different chord per platform — Copilot Chat is Ctrl+Alt+I on Windows
+and Ctrl+Cmd+I on a Mac — and an example for the wrong platform is worse than
+none, because it gets pressed. `send_keys`' description is built per platform,
+the ladder note names both, and the VS Code skill gives the Mac variant.
+
+**Verified, and what was not.** 23 tests pin the exact commands against a
+fake runner — `open -b com.microsoft.VSCode`, `keystroke "i" using {control
+down, command down}`, `key code 53` for Escape, the clipboard round-trip, the
+permission message — and run on any OS. What cannot be done from a Windows
+laptop is drive a real Mac, so the gate gains a **macOS job**: it runs the
+real bundle scan and the real window query on `macos-latest` on every push,
+where a runner without an Accessibility grant must answer by naming the
+permission. The live Windows run was repeated after these cross-platform
+changes and still opened, focused, typed into and closed Rekenmachine; it
+also showed two windows for one app this time (the `ApplicationFrameHost`
+frame and the inner `CalculatorApp.exe`) — the frame was chosen, and had the
+inner one been, the focus check would have refused rather than typed.
+
+Orchestrator 468 green.

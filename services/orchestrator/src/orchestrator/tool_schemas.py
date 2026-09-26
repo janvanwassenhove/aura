@@ -424,7 +424,8 @@ LADDER_NOTE = (
     "why). Escalate one step at a time; never start at the GUI. "
     "An app that is not in launch_app's list is NOT a dead end: open_app opens "
     "any installed app, and send_keys reaches what an app has a shortcut for "
-    "(Copilot Chat in VS Code is ctrl+alt+i). Only when no shortcut exists "
+    "(Copilot Chat in VS Code: ctrl+alt+i on Windows, ctrl+cmd+i on a Mac). "
+    "Only when no shortcut exists "
     "is it a job for use_computer. "
     "MUSIC: you CAN open Spotify (launch_app 'spotify') and press play "
     "(media_control) — never claim you can't open apps. When asked to play "
@@ -480,13 +481,37 @@ def _launch_app_spec() -> dict:
     return spec
 
 
+def _send_keys_spec() -> dict:
+    """send_keys, with the shortcuts of the platform this brain runs on (U379).
+
+    The model does not know which OS the owner uses, and the same action has a
+    different chord on each: Copilot Chat is Ctrl+Alt+I on Windows and
+    Ctrl+Cmd+I on a Mac. Examples for the wrong platform are worse than none —
+    they are pressed.
+    """
+    import sys
+
+    spec = copy.deepcopy(TOOL_SCHEMAS["send_keys"])
+    if sys.platform == "darwin":
+        spec["function"]["description"] = (
+            "Press a keyboard shortcut inside a named app on the owner's Mac: it "
+            "is brought to the front first, and nothing is pressed unless it "
+            "really is in front. Use cmd where Windows uses ctrl. Examples: VS "
+            "Code Copilot Chat 'ctrl+cmd+i'; PowerPoint new slide 'shift+cmd+n', "
+            "start show 'shift+cmd+enter'; Claude desktop new chat 'cmd+n'. Asks "
+            "the owner for approval.")
+    return spec
+
+
 def build_tool_specs(allowed_tools: frozenset[str]) -> list[dict]:
     """Return OpenAI function schemas for the allowed tools that have one.
 
     Order is stable (sorted) for deterministic prompts/tests.
     """
     specs = [
-        _launch_app_spec() if name == "launch_app" else TOOL_SCHEMAS[name]
+        _launch_app_spec() if name == "launch_app"
+        else _send_keys_spec() if name == "send_keys"
+        else TOOL_SCHEMAS[name]
         for name in sorted(allowed_tools) if name in TOOL_SCHEMAS
     ]
     # U255: tools from MCP servers the owner added and switched on. They have

@@ -83,6 +83,7 @@ Finding a repo the owner names but does not locate:
 GitHub Copilot lives inside the VS Code UI. Its shortcuts reach it
 directly; use_computer is only for reading the answer back:
 - Copilot Chat: send_keys('vscode', 'ctrl+alt+i') opens the chat panel
+  (on a Mac: 'ctrl+cmd+i'; there, use cmd wherever Windows uses ctrl)
   (inline suggestion: 'ctrl+i'), then type_into('vscode', <the question>)
   and send_keys('vscode', 'enter'). No screenshot is needed for any of it.
 - Type the request into the chat box, then read the answer back from the
