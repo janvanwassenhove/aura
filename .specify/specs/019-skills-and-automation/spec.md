@@ -5,7 +5,7 @@ owner: "orchestrator"
 priority: P1
 risk: High
 created: "2026-09-05"
-units: [U40, U43, U50, U57, U58, U59, U60, U61, U62, U64, U65, U66, U70, U71, U74, U75, U107, U108, U110, U118, U159, U194, U195, U247, U248, U249, U250, U251, U253c, U259, U259b, U261, U296, U335]
+units: [U40, U43, U50, U57, U58, U59, U60, U61, U62, U64, U65, U66, U70, U71, U74, U75, U107, U108, U110, U118, U159, U194, U195, U247, U248, U249, U250, U251, U253c, U259, U259b, U261, U296, U335, U377]
 ---
 
 # Feature Specification: Skills, Automation and the Agentic Loop
@@ -124,6 +124,18 @@ about two questions:
    ([017](../017-voice-and-language/spec.md), U256).
 
 ## Functional Requirements
+
+- **FR-LAUNCH-01**: **A registered app is started the way a shell would find
+  it.** `launch_app` resolves the command through `shutil.which` (PATHEXT) —
+  `code` on Windows is the batch shim `code.cmd`, which CreateProcess alone
+  never finds — and an absolute path is used as written. A launch that does not
+  start (not installed, refused by the OS, exits at once) is a U247-marked
+  failure, logged, and its reply names a move the model can make: a dedicated
+  tool where one exists (`open_in_vscode` for VS Code), or `use_computer`,
+  whose call *is* the request — the owner gets an approval card. The built-in
+  skills' escalation order says the same, so the model calls the gated tool
+  rather than asking for approval in a sentence and stopping (U377).
+
 
 - **FR-MODE-BEHAVIOUR**: A mode's behaviour row is enforced, not described.
   `speaks_first` decides whether an unprompted line may be voiced at all —

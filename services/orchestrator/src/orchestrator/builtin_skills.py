@@ -45,7 +45,11 @@ _ESCALATION = (
     "1. A dedicated tool if one exists (open_in_vscode, media_control).\n"
     "2. launch_app for opening a registered app.\n"
     "3. use_computer ONLY for what genuinely needs clicking inside a UI. It "
-    "takes screenshots of the owner's screen, needs approval, and is slow.\n"
+    "takes screenshots of the owner's screen and is slow. Calling it IS how "
+    "you ask: the owner gets an approval card. Do not write 'I need your "
+    "approval' and stop — call it, and let the card ask (U377).\n"
+    "If a step fails, go to the next one yourself; the tool's reply names "
+    "what else can reach the same thing.\n"
     "Never type passwords, card details, or accept terms/cookies with "
     "use_computer — stop and hand back to the owner instead."
 )
@@ -62,7 +66,9 @@ BUILTIN_SKILLS: tuple[Skill, ...] = (
 Opening code:
 - To SHOW a file or folder, use open_in_vscode (path, optional line). It is
   instant and changes nothing — always prefer it over clicking.
-- To open VS Code with no target, launch_app('vscode').
+- To open VS Code with no target, launch_app('vscode'). If that fails,
+  open_in_vscode on the folder you are working in (or the owner's home
+  folder) reaches the same window without clicking.
 
 Finding a repo the owner names but does not locate:
 - Use run_powershell to search their code roots, e.g.

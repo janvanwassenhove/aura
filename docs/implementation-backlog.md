@@ -4773,3 +4773,71 @@ closed in the same unit. Also worth keeping: a unit can only be judged by
 commit it is guarding — the claim has to be in the same commit, and the CI run
 is the one that actually checks it. That is one more reason the runner must
 see the whole history.
+
+### U377 — "can you start VS Code": auto-approved, and dead in two milliseconds
+
+Reported with a screenshot (translated): *"why does this not work? It is in
+the skills too — but even without that he should go looking for a solution,
+or ask for permission somewhere."* The header said `tools 2ms`; he answered
+that he could not start VS Code "via my app link" and would need "your
+approval for a next step" — with no card and no step named.
+
+The brain log for that minute:
+
+```
+14:17:07 orchestrator.approval_manager :: Auto-approved (remembered): launch_app
+```
+
+So approval was never the obstacle. `launch_app` ran and failed before
+starting anything, and wrote nothing to the log while doing it.
+
+**The cause was one line, and its fix was already in the same file.**
+`_open_in_vscode` resolves the CLI with `shutil.which("code")`, commented
+*"resolves code.cmd on Windows"*. `_launch_app` passed the bare word `code` to
+`create_subprocess_exec`. On Windows `code` is a batch shim, `code.cmd`, and
+CreateProcess appends `.exe` and nothing else — PATHEXT is a shell
+convention, not a process one. Measured on the owner's machine before
+touching anything:
+
+```
+exec('code', '--version')         -> FileNotFoundError: [WinError 2]
+exec(which('code'), '--version')  -> started
+```
+
+Of the seven registered apps exactly two were broken — `vscode` and `code`,
+the two whose command is a shim. The other five start with a real `.exe`
+(`notepad`, `explorer.exe`, `cmd`) and never noticed.
+
+**Why he then asked instead of acting.** The tool's reply was *"command not
+found — check its path in Capabilities"*: a chore for the owner, not a move
+for him. The skill's escalation order said `use_computer` "needs approval",
+and nothing anywhere said that *calling* it is how approval is asked — the
+gate shows the owner a card. So he followed the skill to the letter, reached
+step 3, and asked in a sentence. And because the failure carried no U247
+marker, the skill's usage evidence counted it as a success: the `2×` on the
+owner's skill card is two failures.
+
+What changed:
+
+* `launch_app` resolves the command through `shutil.which`; an absolute path
+  is used as written.
+* Every way it can fail to start — not installed, refused by the OS (U344's
+  Defender class), exiting at once — is a U247-marked failure, logged at
+  WARNING, whose reply names a next move: `open_in_vscode` where a dedicated
+  tool exists, otherwise `use_computer`, "calling it shows the owner an
+  approval card, so call it rather than asking in words first".
+* The built-in skills' shared escalation text says the same, and the VS Code
+  skill gains a way round a failed launch. Built-in skills are seeded only
+  when absent, so the owner's own copy is untouched — and does not need
+  touching: the `launch_app('vscode')` it recommends works now.
+
+Ten tests, seven verified red on the logic (an eighth — an absolute path is
+not second-guessed — is a guard that was green before and must stay green),
+including one that runs the real `code --version` through the real path on a
+Windows machine with VS Code, which is the report reproduced as a test.
+Orchestrator suite: 416 green.
+
+Noted in passing, not fixed here: `_open_in_vscode` passes a model-supplied
+path as an argument to `code.cmd`, and arguments to a batch file are parsed
+by `cmd.exe` — a path containing `&` is the classic injection shape. Flagged
+as its own task.

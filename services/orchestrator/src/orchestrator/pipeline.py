@@ -6,6 +6,7 @@ import asyncio
 import json
 import logging
 import os
+import shutil
 import time
 
 import httpx
@@ -234,6 +235,43 @@ def _allowed_apps() -> dict[str, str]:
     return apps
 
 
+#: U377: apps that also have a tool of their own, which reaches them without
+#: clicking. Named in a failed launch so the model has a move to make.
+_DEDICATED_TOOL = {
+    "vscode": "open_in_vscode (a folder or file path) opens VS Code without clicking",
+    "code": "open_in_vscode (a folder or file path) opens VS Code without clicking",
+}
+
+
+def _resolve_command(word: str) -> str | None:
+    """Find the executable the way a shell would, or None.
+
+    U377: CreateProcess appends `.exe` and nothing else — PATHEXT is a shell
+    convention. So a registered command that is a batch shim (`code` is
+    `code.cmd`) was "not found" by `create_subprocess_exec` while being right
+    there on PATH. `shutil.which` applies PATHEXT; `_open_in_vscode` has used it
+    since it was written. An absolute path is the owner's own choice and is
+    returned as written, found or not — the launch will say so if it is wrong.
+    """
+    if os.path.isabs(word):
+        return word
+    return shutil.which(word)
+
+
+def _launch_next_step(key: str) -> str:
+    """What he can do next — a move for HIM, not a chore for the owner.
+
+    U377: the old reply was "check its path in Capabilities", and the skill's
+    escalation order said use_computer "needs approval". Nothing said that
+    calling it IS how approval is asked, so he wrote "I need your approval for a
+    next step" in a sentence — no card, and no statement of the step.
+    """
+    dedicated = _DEDICATED_TOOL.get(key)
+    first = f"{dedicated}; or " if dedicated else ""
+    return (f"Other ways to reach it: {first}use_computer — calling it shows the owner "
+            "an approval card, so call it rather than asking in words first.")
+
+
 async def _launch_app(name: str) -> str:
     """Launch a pre-registered desktop app (U40). Approval-gated upstream."""
     if os.environ.get("APP_LAUNCH_ENABLED", "true").lower() != "true":
@@ -250,6 +288,17 @@ async def _launch_app(name: str) -> str:
     import shlex
 
     argv = shlex.split(cmd, posix=not _is_windows())
+    exe = _resolve_command(argv[0]) if argv else None
+    if exe is None:
+        # U247: marked, so the skill evidence counts this as the failure it is
+        # rather than one more successful use.
+        logger.warning("launch_app: %r is registered as %r, which is not on this machine",
+                       key, argv[0] if argv else cmd)
+        return mark_unavailable(
+            f"app:{key}",
+            f"[launch_app: {name!r} is registered as {(argv[0] if argv else cmd)!r}, and nothing "
+            f"by that name is installed on this machine. {_launch_next_step(key)}]")
+    argv[0] = exe
     try:
         proc = await asyncio.create_subprocess_exec(
             *argv,
@@ -259,12 +308,20 @@ async def _launch_app(name: str) -> str:
         # Don't wait for GUI apps to exit; just confirm it started.
         await asyncio.sleep(0.3)
         if proc.returncode not in (None, 0):
-            return f"[launch_app: {name} exited with code {proc.returncode}]"
+            logger.warning("launch_app: %r exited at once with %s", key, proc.returncode)
+            return mark_unavailable(
+                f"app:{key}",
+                f"[launch_app: {name} exited at once with code {proc.returncode}. "
+                f"{_launch_next_step(key)}]")
+        logger.info("launch_app: started %r", key)
         return f"Launched {name}."
-    except FileNotFoundError:
-        return f"[launch_app: command for {name!r} not found — check its path in Capabilities]"
-    except Exception as exc:  # noqa: BLE001
-        return f"[launch_app: error — {exc}]"
+    except OSError as exc:
+        # FileNotFoundError, and PermissionError from a managed laptop that
+        # refuses the launcher (U344's Defender ASR) — both are "not started".
+        logger.warning("launch_app: %r could not be started: %s", key, exc)
+        return mark_unavailable(
+            f"app:{key}",
+            f"[launch_app: {name} could not be started — {exc}. {_launch_next_step(key)}]")
 
 
 async def _open_in_vscode(path: str, line: int | None = None) -> str:
