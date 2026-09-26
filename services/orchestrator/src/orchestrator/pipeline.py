@@ -23,6 +23,7 @@ from shared_schemas.events.system import TurnLatencyMeasured
 from shared_schemas.robot.models import RobotMode
 from shared_schemas.tool_outcome import mark_unavailable, unavailable_capabilities
 
+from orchestrator import desktop as _desktop
 from orchestrator import laptop_tools
 from orchestrator.approval_manager import ApprovalDeniedError, ApprovalManager, ApprovalTimeout
 from orchestrator.context_builder import ContextBuilder
@@ -1129,6 +1130,9 @@ class OrchestratorPipeline:
                 )
             elif tool_name == "launch_app":
                 result_text = await _launch_app(arguments.get("name", ""))
+            elif tool_name in _desktop.DESKTOP_TOOLS:
+                # U378: the desktop rung — any app, its windows, its keys.
+                result_text = await _desktop.DESKTOP_TOOLS[tool_name](arguments)
             elif tool_name == "media_control":
                 result_text = await _media_control(arguments.get("action", ""))
             else:

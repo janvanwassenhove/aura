@@ -13,6 +13,9 @@ APPROVAL_REQUIRED: frozenset[str] = frozenset(
         "create_task",
         "delete_task",
         "launch_app",  # starting an app on the laptop always asks the owner
+        "open_app",  # U378: opening ANY installed app asks, like launch_app
+        "send_keys",  # U378: a shortcut can send, delete or submit
+        "type_into",  # U378: typing into an app acts on the owner's behalf
         "use_computer",  # screenshot + mouse/keyboard control always asks the owner
         "open_browser_url",  # navigating the owner's browser always asks
         "run_powershell",  # arbitrary shell — always asks, per command
@@ -47,6 +50,12 @@ MODE_TOOL_MAP: dict[str, frozenset[str]] = {
             "list_browser_tabs",
             "open_browser_url",
             "launch_app",
+            "find_app",
+            "open_app",
+            "list_windows",
+            "focus_window",
+            "send_keys",
+            "type_into",
             "list_calendar_events_today",
             "create_calendar_event",
             "delete_calendar_event",
@@ -85,6 +94,12 @@ MODE_TOOL_MAP: dict[str, frozenset[str]] = {
             "list_speakers",
             "media_control",
             "launch_app",
+            "find_app",
+            "open_app",
+            "list_windows",
+            "focus_window",
+            "send_keys",
+            "type_into",
             "use_computer",
             "list_browser_tabs",
             "open_browser_url",

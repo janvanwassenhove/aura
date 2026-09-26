@@ -5,7 +5,7 @@ owner: "orchestrator"
 priority: P1
 risk: High
 created: "2026-09-05"
-units: [U40, U43, U50, U57, U58, U59, U60, U61, U62, U64, U65, U66, U70, U71, U74, U75, U107, U108, U110, U118, U159, U194, U195, U247, U248, U249, U250, U251, U253c, U259, U259b, U261, U296, U335, U377]
+units: [U40, U43, U50, U57, U58, U59, U60, U61, U62, U64, U65, U66, U70, U71, U74, U75, U107, U108, U110, U118, U159, U194, U195, U247, U248, U249, U250, U251, U253c, U259, U259b, U261, U296, U335, U377, U378]
 ---
 
 # Feature Specification: Skills, Automation and the Agentic Loop
@@ -125,6 +125,20 @@ about two questions:
 
 ## Functional Requirements
 
+- **FR-DESKTOP-01**: **There is a desktop rung between the CLI and the
+  screen.** Six tools reach any installed app, its windows and its keyboard
+  shortcuts without a screenshot: `find_app` and `list_windows` (read-only),
+  `focus_window` (brings an open app forward), and `open_app`, `send_keys`,
+  `type_into` (approval-gated, like `launch_app`). `open_app` opens any app the
+  Start list knows — no allow-list — and focuses an already-open one instead of
+  starting a second. Apps are matched by name and then by their
+  language-independent AppID, because the Start list is localized
+  ('Rekenmachine' on a Dutch Windows). **Nothing is pressed or typed unless the
+  intended window is verifiably in the foreground at that moment**; key
+  combinations are validated, and non-ASCII text is pasted with the owner's
+  clipboard text restored. The six follow the owner's *screen control* setting
+  and exist in exactly the modes `launch_app` does. The automation ladder and
+  the built-in skills place the rung before `use_computer` (U378).
 - **FR-LAUNCH-01**: **A registered app is started the way a shell would find
   it.** `launch_app` resolves the command through `shutil.which` (PATHEXT) —
   `code` on Windows is the batch shim `code.cmd`, which CreateProcess alone

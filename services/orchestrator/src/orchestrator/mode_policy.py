@@ -86,6 +86,9 @@ TOOL_GROUPS: list[tuple[str, str, str, frozenset[str]]] = [
     })),
     ("screen control", "Screen control", "drive the desktop like a user", frozenset({
         "use_computer", "launch_app", "open_browser_url", "list_browser_tabs",
+        # U378: the desktop rung follows the same owner setting.
+        "find_app", "open_app", "list_windows", "focus_window",
+        "send_keys", "type_into",
     })),
     ("slides", "Slides", "advance and react to a presentation", frozenset({
         "speak", "execute_motion", "load_presentation", "advance_slide",

@@ -43,8 +43,11 @@ _MARKER_NAME = ".builtin-seeded.json"
 _ESCALATION = (
     "Escalation order — never skip a step:\n"
     "1. A dedicated tool if one exists (open_in_vscode, media_control).\n"
-    "2. launch_app for opening a registered app.\n"
-    "3. use_computer ONLY for what genuinely needs clicking inside a UI. It "
+    "2. launch_app for a registered app; open_app for ANY installed app.\n"
+    "3. focus_window + send_keys / type_into for what the app has a "
+    "keyboard shortcut for — deterministic, and it never types into the "
+    "wrong window (U378).\n"
+    "4. use_computer ONLY for what genuinely needs clicking inside a UI. It "
     "takes screenshots of the owner's screen and is slow. Calling it IS how "
     "you ask: the owner gets an approval card. Do not write 'I need your "
     "approval' and stop — call it, and let the card ask (U377).\n"
@@ -77,8 +80,11 @@ Finding a repo the owner names but does not locate:
 - Report what you found and let the owner pick before opening anything.
 - Cloning is a write: state the URL and target folder and get approval first.
 
-GitHub Copilot lives inside the VS Code UI, so it needs use_computer:
-- Copilot Chat: Ctrl+Alt+I opens the chat panel. Inline suggestion: Ctrl+I.
+GitHub Copilot lives inside the VS Code UI. Its shortcuts reach it
+directly; use_computer is only for reading the answer back:
+- Copilot Chat: send_keys('vscode', 'ctrl+alt+i') opens the chat panel
+  (inline suggestion: 'ctrl+i'), then type_into('vscode', <the question>)
+  and send_keys('vscode', 'enter'). No screenshot is needed for any of it.
 - Type the request into the chat box, then read the answer back from the
   screenshot. Do NOT accept a suggested edit on the owner's behalf unless they
   asked for that specific change — describe what Copilot proposes and let them

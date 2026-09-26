@@ -4827,9 +4827,12 @@ What changed:
   tool exists, otherwise `use_computer`, "calling it shows the owner an
   approval card, so call it rather than asking in words first".
 * The built-in skills' shared escalation text says the same, and the VS Code
-  skill gains a way round a failed launch. Built-in skills are seeded only
-  when absent, so the owner's own copy is untouched — and does not need
-  touching: the `launch_app('vscode')` it recommends works now.
+  skill gains a way round a failed launch. *(Corrected in U378: this entry
+  first said the owner's copy stays untouched because built-ins are "seeded
+  only when absent". Wrong — since U253c the seeder replaces a stored
+  built-in whose fingerprint still matches what AURA last wrote, and leaves
+  an edited one alone. The owner's copy was checked and is unedited, so it
+  receives the new text on the next start.)*
 
 Ten tests, seven verified red on the logic (an eighth — an absolute path is
 not second-guessed — is a guard that was green before and must stay green),
@@ -4841,3 +4844,96 @@ Noted in passing, not fixed here: `_open_in_vscode` passes a model-supplied
 path as an argument to `code.cmd`, and arguments to a batch file are parsed
 by `cmd.exe` — a path containing `&` is the classic injection shape. Flagged
 as its own task.
+
+### U378 — he finds his own way on the desktop: any app, its window, its keys
+
+Asked after U377 (translated): *"but he must also be able to go looking by
+himself (screen recognition?) to take action, like opening a window or
+starting Copilot chat — for all kinds of apps, also Claude desktop or
+PowerPoint."* And, while this was being built: *"then make sure the same is
+possible on Mac"* — which shaped it from the start (see the end).
+
+**What existed.** `launch_app` for seven allow-listed names, and
+`use_computer`, which screenshots the screen and has gpt-4o guess pixel
+coordinates for pyautogui to click. The automation ladder went cli → fs →
+browser → gui with nothing in between, so anything beyond the seven names went
+straight to the slowest and least reliable rung there is. The backend for it
+was installed and the capability switched on — measured, not assumed: the
+packaged app's venv has pyautogui and pywin32, the repo's dev venv has
+neither.
+
+**What was measured before designing anything.** Windows knows **191**
+installed apps by name — PowerPoint, Claude, VS Code, ChatGPT, Word, Excel,
+Outlook, Teams — each launchable as `shell:AppsFolder\<AppID>` with no
+allow-list and no screenshot; and the app's own Python can enumerate every
+open window. None of the owner's examples needs a pixel: PowerPoint and Claude
+are found by name and opened, a window has a handle that can be brought
+forward, and Copilot Chat is Ctrl+Alt+I in a focused VS Code.
+
+**The rung.** `orchestrator/desktop.py`, six tools:
+
+| Tool | | |
+|---|---|---|
+| `find_app` | read-only | which installed apps match a name |
+| `list_windows` | read-only | which apps have a window open |
+| `focus_window` | benign | bring an open app's window to the front |
+| `open_app` | approval | open any installed app, or focus it if already open |
+| `send_keys` | approval | press a shortcut in a named app |
+| `type_into` | approval | type text into a named app |
+
+The property that must never break, and has four tests of its own: **nothing
+is pressed or typed unless the intended window is verifiably in the
+foreground at that moment** — not "focus was requested", but `foreground() ==
+handle` after the request. A notification that steals focus between the two
+cancels the keystrokes. Ctrl+Enter in the wrong window sends a mail in
+Outlook. Key combinations are validated (modifiers joined by `+` and one key,
+at most four parts); text a keyboard cannot type (é, ë, ü) is pasted, with the
+owner's clipboard text put back afterwards.
+
+They sit in the owner's *screen control* group, so the Modes editor governs
+them; they exist in exactly the modes `launch_app` does (work, home); the
+three that act are in `APPROVAL_REQUIRED`. The ladder note gains the rung
+before `use_computer` and says outright that an app missing from
+`launch_app`'s list is not a dead end. The built-in VS Code skill now starts
+Copilot Chat with `send_keys('vscode', 'ctrl+alt+i')`, types the question with
+`type_into`, and keeps `use_computer` for reading the answer back.
+
+**Found by running it on the owner's machine, not by the tests.** The first
+live run asked for `calculator` and got *not installed*: the owner's Windows
+is Dutch, and the Start list says *Rekenmachine*. Office keeps its English
+names, which is why PowerPoint matched and this did not. The fix is not a
+translation table — apps are matched on their name first and then on their
+**AppID**, which does not translate (`Microsoft.WindowsCalculator_…`). The
+window then turned out to belong to `ApplicationFrameHost.exe`, as every
+packaged app's does, so the exe says nothing and the localized title is what
+finds it. The second live run, on the owner's machine with the installed
+app's own Python, closing only the window it had opened:
+
+```
+match 'calculator' -> ['Rekenmachine']
+open_app   -> Opened Rekenmachine — its window is in front.
+window: ['Rekenmachine'] | exe: ['ApplicationFrameHost.exe'] | in front: True
+type_into  -> Typed 6 characters into calculator.
+send_keys  -> Pressed escape in calculator.
+again open -> calculator was already open — brought it to the front.
+closed the window it opened: True
+```
+
+Read-only against the real Start list: 191 apps in 1.2 s; `ppt` →
+PowerPoint, `vscode` → Visual Studio Code, `photoshop` → not installed; the
+open Claude and Chrome windows found.
+
+**Shaped for the Mac from the start.** Everything platform-specific sits
+behind one backend surface — `start_apps`, `windows`, `launch`, `focus`,
+`foreground`, `hotkey`, `write_ascii`, `paste_text` — and the tests talk to
+that surface, not to Windows. macOS is the next unit, as a second backend.
+
+**The owner gets the new skill text without doing anything.** Built-in
+skills carry a fingerprint of what AURA last wrote; on start, a stored copy
+that still matches is replaced with the new built-in and an edited one is left
+alone (U253c). The owner's `desktop-vscode.md` was checked against its marker:
+unedited, so the Copilot-by-shortcut instructions arrive on the next start.
+That also corrects what U377's entry said.
+
+33 tests (31 on any OS, 2 more on Windows with the components); orchestrator
+447 green, brain 748.

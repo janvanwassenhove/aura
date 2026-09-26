@@ -131,6 +131,64 @@ TOOL_SCHEMAS: dict[str, dict] = {
             "due_at": {"type": "string", "description": "ISO-8601 due datetime."},
         }, "required": ["text", "due_at"]},
     ),
+    # U378: the desktop rung — any installed app, its windows, its shortcuts.
+    "find_app": _fn(
+        "find_app",
+        "Find installed apps on the owner's laptop by name (e.g. 'powerpoint', "
+        "'claude', 'teams'). Read-only: opens nothing. Use it when unsure what an "
+        "app is called or whether it is installed.",
+        {"type": "object", "properties": {
+            "name": {"type": "string", "description": "What the owner calls the app."},
+        }, "required": ["name"], "additionalProperties": False},
+    ),
+    "open_app": _fn(
+        "open_app",
+        "Open ANY installed app on the owner's laptop by name — PowerPoint, "
+        "Claude, Word, Teams, VS Code — no allow-list needed. If it is already "
+        "open, its window is brought to the front instead of starting a second "
+        "one. Asks the owner for approval.",
+        {"type": "object", "properties": {
+            "name": {"type": "string", "description": "The app's name as the owner says it."},
+        }, "required": ["name"], "additionalProperties": False},
+    ),
+    "list_windows": _fn(
+        "list_windows",
+        "List the windows open on the owner's laptop right now (app and title). "
+        "Read-only.",
+        {"type": "object", "properties": {}, "additionalProperties": False},
+    ),
+    "focus_window": _fn(
+        "focus_window",
+        "Bring an app that is already open to the front, e.g. before sending it "
+        "a shortcut. Changes nothing inside the app.",
+        {"type": "object", "properties": {
+            "app": {"type": "string", "description": "The app's name, e.g. 'vscode'."},
+        }, "required": ["app"], "additionalProperties": False},
+    ),
+    "send_keys": _fn(
+        "send_keys",
+        "Press a keyboard shortcut inside a named app: it is brought to the "
+        "front first, and nothing is pressed unless it really is in front. "
+        "Examples: VS Code Copilot Chat 'ctrl+alt+i'; PowerPoint new slide "
+        "'ctrl+m', start show 'f5'; Claude desktop new chat 'ctrl+n'. Asks the "
+        "owner for approval.",
+        {"type": "object", "properties": {
+            "app": {"type": "string", "description": "The app to press it in."},
+            "keys": {"type": "string",
+                     "description": "Modifiers joined by + and one key, e.g. 'ctrl+alt+i'."},
+        }, "required": ["app", "keys"], "additionalProperties": False},
+    ),
+    "type_into": _fn(
+        "type_into",
+        "Type text into a named app at its current cursor — e.g. a question "
+        "into Copilot Chat after opening it with send_keys. The app is brought "
+        "to the front first and nothing is typed unless it is. Asks the owner "
+        "for approval.",
+        {"type": "object", "properties": {
+            "app": {"type": "string"},
+            "text": {"type": "string", "description": "Exactly what to type."},
+        }, "required": ["app", "text"], "additionalProperties": False},
+    ),
     "launch_app": _fn(
         "launch_app",
         "Launch an allow-listed desktop app on the owner's laptop by its "
@@ -346,15 +404,28 @@ TOOL_LAYERS: dict[str, str] = {
     "list_browser_tabs": "browser",
     "open_browser_url": "browser",
     "use_computer": "gui",
+    "find_app": "desktop",
+    "open_app": "desktop",
+    "list_windows": "desktop",
+    "focus_window": "desktop",
+    "send_keys": "desktop",
+    "type_into": "desktop",
 }
 
 LADDER_NOTE = (
     "AUTOMATION LADDER — always pick the MOST RELIABLE layer that can do the "
     "job: 1) api (connectors like calendar/mail/music), 2) cli (run_dev_task, "
     "run_powershell, git_prepare, launch_app), 3) fs (read_file/write_file), "
-    "4) browser (list_browser_tabs/open_browser_url), 5) gui (use_computer — "
+    "4) desktop (find_app, open_app, list_windows, focus_window, send_keys, "
+    "type_into — ANY installed app by name, its windows and its keyboard "
+    "shortcuts; deterministic, no screenshots), 5) browser "
+    "(list_browser_tabs/open_browser_url), 6) gui (use_computer — "
     "the emergency exit, ONLY when no lower layer can possibly do it, and say "
     "why). Escalate one step at a time; never start at the GUI. "
+    "An app that is not in launch_app's list is NOT a dead end: open_app opens "
+    "any installed app, and send_keys reaches what an app has a shortcut for "
+    "(Copilot Chat in VS Code is ctrl+alt+i). Only when no shortcut exists "
+    "is it a job for use_computer. "
     "MUSIC: you CAN open Spotify (launch_app 'spotify') and press play "
     "(media_control) — never claim you can't open apps. When asked to play "
     "music, ACT (launch + play) instead of asking which exact track; then "
