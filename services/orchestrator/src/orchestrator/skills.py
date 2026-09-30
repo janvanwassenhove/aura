@@ -153,7 +153,9 @@ class SkillStore:
         training_note = (
             "SELF-TRAINING: when the owner corrects your approach or shows you "
             "their way of working, propose saving it with the save_skill tool "
-            "(the owner approves every write)."
+            "(the owner approves every write). The same goes for a route you "
+            "worked out yourself when no skill covered the request: offer to "
+            "keep the steps that worked, once."
         )
         if not skills:
             return training_note

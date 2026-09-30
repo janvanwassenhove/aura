@@ -252,7 +252,11 @@ TOOL_SCHEMAS: dict[str, dict] = {
     "save_skill": _fn(
         "save_skill",
         "SELF-TRAINING: save or update a skill — a procedure the owner taught "
-        "you (from feedback, corrections, or a demonstrated way of working). "
+        "you (from feedback, corrections, or a demonstrated way of working), "
+        "OR a route you worked out yourself: when no skill covered a request "
+        "and you found a way by looking (find_app, open_app, send_keys, the "
+        "browser or the screen), offer it once at the end of that turn — the "
+        "steps that actually worked, not the ones you tried first. "
         "Sensitive — the owner approves every skill write and sees exactly "
         "what you want to store. Scope to a person when it's THEIR way of "
         "working (digital twin); add triggers so it activates at the right time.",

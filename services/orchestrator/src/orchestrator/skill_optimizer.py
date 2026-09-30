@@ -287,6 +287,18 @@ async def propose_new_skill(
         "These attempts also ran into something that was not available: "
         + ", ".join(unavailable) + ". Take that into account.\n"
     ) if unavailable else ""
+    # U382: the tools that ran in attempts that hit no wall were recorded all
+    # along and never shown here, so the draft guessed at a route the log
+    # already held. An attempt that ran into something unavailable does not
+    # count as having worked.
+    worked = sorted({
+        tool for e in getattr(store, "unmatched", lambda: [])()
+        if not (e.get("unavailable") or [])
+        for tool in (e.get("tools") or [])})
+    if worked:
+        failures += (
+            "In attempts that hit no wall, these tools ran — this is what "
+            "worked; build the procedure on them: " + ", ".join(worked) + ".\n")
     prompt = _NEW_SKILL_PROMPT.format(
         examples="\n".join(f"  - {e[:160]}" for e in examples[:12]),
         failures=failures, existing=existing, tools=tools or "(not listed)",

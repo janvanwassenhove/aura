@@ -103,3 +103,27 @@ Spotify app on your laptop and press play via the media keys.
 - Settings → **Robot** re-tests connectivity or rescans the network.
 - The robot's health is watched by a self-maintenance loop that reconnects
   automatically.
+
+## 8. Teaching him a new way of working
+
+A **skill** is a short procedure he follows whenever a request matches it —
+"to ask ChatGPT for an image: open ChatGPT, type the request, press Enter,
+tell me when the image is there". There are three ways to give him one, and
+every one ends in an approval card: nothing is saved until you accept it.
+
+- **Let him find it, then keep it.** Ask for the thing. He looks first —
+  is the app installed, is it open, is it open in your browser — and tries
+  the routes he has. When nothing covered the request and he found a way, he
+  offers to keep the steps that worked. Accept the card, and next time he
+  goes straight there.
+- **Teach it in Talk.** Type the lesson in the message box and press **🎓**:
+  "when I say ask ChatGPT, open the ChatGPT app with open_app, type my request
+  with type_into and press Enter; if it isn't installed, use chatgpt.com in
+  Chrome". Best right after a turn that went wrong — he reflects on it.
+- **Write it yourself.** **Skills** → **+ New skill**: a name, a few trigger
+  words ("chatgpt", "afbeelding"), and the steps.
+
+A skill you edit stays yours: AURA never replaces your text. The only thing
+it puts back is a small set of honesty rules the built-in skills ship with —
+for example *never say something cannot be done before trying it* — appended
+at the end if an edit removed them.

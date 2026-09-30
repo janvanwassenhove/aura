@@ -106,3 +106,30 @@ mediatoetsen.
 - Instellingen → **Robot** test de verbinding opnieuw of scant het netwerk.
 - Een zelfonderhoudslus bewaakt de robotverbinding en herstelt die
   automatisch.
+
+## 8. Hem iets aanleren
+
+Een **skill** is een korte werkwijze die hij volgt zodra een vraag erop past —
+"om ChatGPT een afbeelding te laten maken: open ChatGPT, typ de vraag, druk op
+Enter, zeg me wanneer de afbeelding er staat". Je kunt hem er op drie manieren
+een geven, en elke manier eindigt in een goedkeuringskaart: er wordt niets
+bewaard tot jij het aanvaardt.
+
+- **Laat hem zoeken, en bewaar wat werkte.** Vraag het gewoon. Hij kijkt eerst
+  — is de app geïnstalleerd, staat ze open, staat ze open in je browser — en
+  probeert de wegen die hij heeft. Dekte geen enkele skill de vraag en vond hij
+  toch een manier, dan stelt hij voor om de stappen die werkten te bewaren.
+  Aanvaard de kaart, en de volgende keer gaat hij er meteen naartoe.
+- **Leer het in Talk.** Typ de les in het berichtvak en druk op **🎓**:
+  "als ik zeg vraag het aan ChatGPT, open de ChatGPT-app met open_app, typ mijn
+  vraag met type_into en druk op Enter; is ze niet geïnstalleerd, gebruik dan
+  chatgpt.com in Chrome". Het best meteen na een beurt die misliep — dan denkt
+  hij daarover na.
+- **Schrijf het zelf.** **Skills** → **+ New skill**: een naam, een paar
+  triggerwoorden ("chatgpt", "afbeelding") en de stappen.
+
+Een skill die je aanpast blijft van jou: AURA vervangt je tekst nooit. Het
+enige wat het terugzet, is een klein aantal eerlijkheidsregels waarmee de
+ingebouwde skills geleverd worden — bijvoorbeeld *zeg nooit dat iets niet kan
+voor je het geprobeerd hebt* — achteraan toegevoegd als een aanpassing ze had
+weggehaald.

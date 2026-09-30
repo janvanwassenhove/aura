@@ -5,7 +5,7 @@ owner: "orchestrator"
 priority: P1
 risk: High
 created: "2026-09-05"
-units: [U40, U43, U50, U57, U58, U59, U60, U61, U62, U64, U65, U66, U70, U71, U74, U75, U107, U108, U110, U118, U159, U194, U195, U247, U248, U249, U250, U251, U253c, U259, U259b, U261, U296, U335, U377, U378, U379, U380, U381]
+units: [U40, U43, U50, U57, U58, U59, U60, U61, U62, U64, U65, U66, U70, U71, U74, U75, U107, U108, U110, U118, U159, U194, U195, U247, U248, U249, U250, U251, U253c, U259, U259b, U261, U296, U335, U377, U378, U379, U380, U381, U382]
 ---
 
 # Feature Specification: Skills, Automation and the Agentic Loop
@@ -140,6 +140,15 @@ about two questions:
   or the website (`open_browser_url`), asks through `type_into` +
   `send_keys('enter')`, and says where an image is rather than claiming to
   have seen it (U381).
+- **FR-LEARN-01**: **What he works out himself, he offers to keep.** When no
+  skill covered a request and he found a route by looking (desktop tools, the
+  browser or the screen), `save_skill` and the skills prompt tell him to offer
+  the steps that actually worked, once, at the end of that turn — through the
+  same approval card as every skill write. The U250 draft for a request no
+  skill covered is shown the tools that ran in attempts that hit no wall
+  (an attempt that ran into something unavailable does not count as having
+  worked). The user guide and its Dutch twin describe the three ways to teach
+  him: accept his offer, 🎓 in Talk, or write it in Skills (U382).
 - **FR-SKILL-INV-01**: **A built-in skill's guardrails survive every
   rewrite** ([ADR-013](../../../docs/adr/ADR-013-built-in-guardrails-survive-every-rewrite.md)).
   Built-ins declare invariants — sentences embedded in their body, today

@@ -5092,3 +5092,35 @@ a copy of the owner's skills directory: the reported sentence binds
 
 Tests verified red against the old pipeline and skill (8 of 30). Orchestrator
 506 green.
+
+### U382 — what he works out himself, he offers to keep
+
+The goal behind U381, in the owner's words (translated): *"he should go
+looking for ways to do it"* — and the question right after (translated):
+*"how can the user best teach him this?"*
+
+U381 made him look. But a route found by looking — `find_app`, `open_app`,
+`type_into`, Enter — lived for exactly one turn, because every learning path
+AURA had started from somebody else:
+
+- `save_skill` described itself as saving "a procedure the owner taught you",
+  and the skills prompt said to propose one "when the owner corrects your
+  approach or shows you their way of working". A route he found himself was
+  neither, so he never offered it. Both now say: when no skill covered the
+  request and you found a way, offer the steps that actually worked — once,
+  at the end of that turn. The approval card is unchanged; nothing is saved
+  without the owner.
+- The U250 draft for a request no skill covered was written from the owner's
+  requests alone. `_unmatched.jsonl` had recorded which tools ran in each
+  attempt all along; the drafting model never saw them, and guessed at a route
+  the log already held. It is now shown the tools from attempts that hit no
+  wall. An attempt that ran into something unavailable does not count.
+
+The answer to the owner's question went into the product rather than only
+into the chat: section 8 of the user guide and of its Dutch twin, *Teaching
+him a new way of working* — accept his offer after he found it, 🎓 in Talk
+right after a turn that went wrong, or write it in Skills — and that an edited
+skill stays the owner's except for the honesty rules of ADR-013.
+
+Tests verified red (4 of 6). Orchestrator 512 green; brain skill proposals
+green.
