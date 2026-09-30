@@ -168,28 +168,38 @@ Choosing speakers / output device:
         description="Open the Claude or ChatGPT desktop app and ask it something",
         triggers=["claude", "chatgpt", "chat gpt", "vraag het aan",
                   "ask claude", "ask chatgpt"],
-        body=f"""Using another AI assistant that is installed on the desktop.
+        body=f"""Using another AI assistant — Claude or ChatGPT — on the owner's behalf.
 
-When this is useful: the owner explicitly wants a second opinion, or wants the
-answer to land in that app's own history. For anything you can answer yourself,
-just answer — do not bounce the question sideways.
+When this is useful: the owner asks for that assistant by name, or wants
+something only it does (ChatGPT makes images; an answer lands in its own
+history). For anything you can answer yourself, just answer — do not bounce the
+question sideways.
 
 {NEVER_UNTRIED_REFUSAL}
 
-1. Call launch_app('claude') or launch_app('chatgpt'). ALWAYS call it — you
-   cannot know what is registered without asking, and the tool names the
-   registered apps when it refuses. Do not tell the owner an app is
-   unavailable unless a real launch_app result said so; a refusal you invented
-   describes a boundary that may not exist, and it hides the one call that
-   would have proved it either way.
-   If the tool DOES refuse, repeat its reason and point at Capabilities —
-   never route around the allow-list with run_powershell. That list is the
-   reason AURA cannot start arbitrary programs.
-2. Wait for the window, then use_computer: click the message box, type the
-   owner's question verbatim, press Enter.
-3. Wait for the reply to finish streaming before reading it — a screenshot
-   taken mid-answer gives you half a sentence. Then read it back.
-4. Never paste anything from the owner's knowledge base, credentials, or
+1. Find out what is here before deciding anything. find_app('chatgpt') (or
+   'claude') says whether the desktop app is installed; list_windows whether it
+   is already open; list_browser_tabs whether it is open in the browser
+   (chatgpt.com, claude.ai) — an open tab usually means the owner is logged in.
+2. Open it by the first route that exists:
+   - installed: launch_app('chatgpt') / launch_app('claude') if it is
+     registered, otherwise open_app with the name find_app returned;
+   - not installed: open_browser_url('https://chatgpt.com') or
+     open_browser_url('https://claude.ai') — the browser the owner is logged
+     in to.
+   Never route around a refusal with run_powershell.
+3. Ask it: type_into(app, the owner's request verbatim), then
+   send_keys(app, 'enter'). In a browser tab, or when type_into cannot reach
+   the message box, use_computer: click the message box, type, press Enter.
+4. Wait for the reply to finish — a screenshot mid-answer gives you half a
+   sentence, and an image can take a minute. Then read the answer back. An
+   image stays in that window: tell the owner where to look, and do not claim
+   you saw or saved it unless a tool showed it to you.
+5. Only when a tool result shows a real wall — not installed and no website,
+   a login page, a paywall — ask the owner ONE concrete question that would
+   unblock it: "Are you logged in to ChatGPT in Chrome? Then I'll try again."
+   Never answer with "I can't" and a menu of alternatives.
+6. Never paste anything from the owner's knowledge base, credentials, or
    private files into another assistant unless the owner asked for exactly
    that, naming what to share. Their data does not leave the house by default.
 

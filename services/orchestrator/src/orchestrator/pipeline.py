@@ -25,6 +25,7 @@ from shared_schemas.tool_outcome import mark_unavailable, unavailable_capabiliti
 
 from orchestrator import desktop as _desktop
 from orchestrator import laptop_tools
+from orchestrator import untried as _untried
 from orchestrator.approval_manager import ApprovalDeniedError, ApprovalManager, ApprovalTimeout
 from orchestrator.context_builder import ContextBuilder
 from orchestrator.dev_agent import DevAgentTool
@@ -814,6 +815,7 @@ class OrchestratorPipeline:
         self._stop_flags.discard(session_id)
         reply: str | None = None
         nudged = False   # U248: the promise pushback fires at most once
+        refusal_nudged = False   # U381: so does the untried-refusal one
 
         for round_no in range(1, max_rounds + 1):
             # Owner steering: guidance sent while the loop runs lands here.
@@ -865,6 +867,20 @@ class OrchestratorPipeline:
                     logger.info("promised without acting; asking it to act or say so")
                     messages.append({"role": "assistant", "content": reply})
                     messages.append({"role": "system", "content": PROMISE_NUDGE})
+                    continue
+                # U381: "Die mogelijkheid heb ik niet" — with the skill for
+                # exactly this request loaded and every tool it needed offered,
+                # and nothing tried. A skill's rule against that is a request;
+                # this is the check. Once, like the promise pushback.
+                bound = list((trace or {}).get("skills") or [])
+                if (not refusal_nudged and bound and tool_specs
+                        and not trace_tools(trace)
+                        and _untried.looks_like_a_refusal(reply)):
+                    refusal_nudged = True
+                    logger.info("refused untried with skill(s) %s bound; asking it to "
+                                "investigate first", ", ".join(bound))
+                    messages.append({"role": "assistant", "content": reply})
+                    messages.append({"role": "system", "content": _untried.nudge(bound)})
                     continue
                 await self._bus.publish(AgentRoundCompleted(
                     session_id=session_id, round_no=round_no, tool_names=[], done=True))

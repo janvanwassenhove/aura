@@ -5052,3 +5052,43 @@ its Dutch rewrite word for word and gains exactly the two guardrails;
 owner's own skills are untouched.
 
 Orchestrator 476 green.
+
+### U381 — "I can't" is an answer only after he tried
+
+The same report as U380 (translated): *"can you ask chatgpt to generate an
+image about richie mini with a canoe on the river"* → *"I don't have that
+possibility, but I can help with something else!"* — and the goal the owner
+stated right after (translated): *"he should go looking for ways to do it —
+check whether ChatGPT is installed, or ask whether there is an account (logged
+in to Chrome?)."*
+
+U380 made the rule against an untried refusal impossible to optimize away. But
+a sentence in a skill is a request to the model, and the failing turn had the
+skill bound, every tool it needed offered, and called none. So this unit adds
+the two things a rule alone cannot:
+
+**A check in the turn loop** (`orchestrator/untried.py`), built exactly like
+U248's promise check: a reply that says it cannot be done, in a turn where no
+tool ran, while a skill for this request is loaded and tools were offered, is
+pushed back **once** — naming the skill, telling him to investigate with
+`find_app`, `list_windows` and `list_browser_tabs`, and making ONE concrete
+question ("are you logged in to ChatGPT in Chrome?") or `request_capability`
+the fallback instead of a menu of alternatives. It does not fire without a
+bound skill (then "I can't" may be true, and nagging would teach him to
+promise instead), nor after a real tool result said no.
+
+**A skill that investigates.** `desktop-ai-assistants` now looks first
+(installed? already open? open in a browser tab, so probably logged in?), then
+takes the first route that exists — the app via `launch_app`/`open_app`, or
+the website via `open_browser_url` — asks through `type_into` +
+`send_keys('enter')` instead of mouse clicks, waits for an image to finish, and
+says where it is rather than claiming to have seen it. "Point at Capabilities"
+is gone: that was how the optimizer's rewrite ended the turn.
+
+The owner's rewritten copy keeps its Dutch text (ADR-013) and gains the
+guardrail from U380; the code check is what reaches it regardless. Verified on
+a copy of the owner's skills directory: the reported sentence binds
+`desktop-ai-assistants`, so the check applies.
+
+Tests verified red against the old pipeline and skill (8 of 30). Orchestrator
+506 green.

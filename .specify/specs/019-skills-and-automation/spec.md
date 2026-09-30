@@ -5,7 +5,7 @@ owner: "orchestrator"
 priority: P1
 risk: High
 created: "2026-09-05"
-units: [U40, U43, U50, U57, U58, U59, U60, U61, U62, U64, U65, U66, U70, U71, U74, U75, U107, U108, U110, U118, U159, U194, U195, U247, U248, U249, U250, U251, U253c, U259, U259b, U261, U296, U335, U377, U378, U379, U380]
+units: [U40, U43, U50, U57, U58, U59, U60, U61, U62, U64, U65, U66, U70, U71, U74, U75, U107, U108, U110, U118, U159, U194, U195, U247, U248, U249, U250, U251, U253c, U259, U259b, U261, U296, U335, U377, U378, U379, U380, U381]
 ---
 
 # Feature Specification: Skills, Automation and the Agentic Loop
@@ -84,6 +84,9 @@ about two questions:
 2. **Given** something he genuinely cannot do, **When** he says so, **Then**
    the refusal is real rather than invented, and no skill hands him a
    ready-made excuse (U253c).
+   A refusal in a turn where no tool ran, while a skill for that request is
+   loaded and tools were offered, is pushed back once with the instruction to
+   investigate first (U381 — see FR-REFUSE-01).
 3. **Given** a capability he needs but does not have, **When** he needs it,
    **Then** he can **ask to be unblocked** — `request_capability` is always
    available, and granting it takes effect immediately rather than after a
@@ -125,6 +128,18 @@ about two questions:
 
 ## Functional Requirements
 
+- **FR-REFUSE-01**: **"I can't" is an answer only after he tried.** When a
+  reply says the request cannot be done (Dutch or English), no tool ran this
+  turn, at least one skill was bound to the request and tools were offered, the
+  pipeline pushes back once: it names the skill and tells him to investigate
+  (`find_app`, `list_windows`, `list_browser_tabs`), follow the skill, and — if
+  a real tool result shows a wall — ask the owner ONE concrete question or call
+  `request_capability`. At most once per turn; a refusal after a real tool
+  result, or with no skill bound, stands. The `desktop-ai-assistants` built-in
+  investigates first, then opens the installed app (`launch_app`/`open_app`)
+  or the website (`open_browser_url`), asks through `type_into` +
+  `send_keys('enter')`, and says where an image is rather than claiming to
+  have seen it (U381).
 - **FR-SKILL-INV-01**: **A built-in skill's guardrails survive every
   rewrite** ([ADR-013](../../../docs/adr/ADR-013-built-in-guardrails-survive-every-rewrite.md)).
   Built-ins declare invariants — sentences embedded in their body, today
