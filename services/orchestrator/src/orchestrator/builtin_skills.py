@@ -38,6 +38,19 @@ logger = logging.getLogger(__name__)
 # owner deliberately removed on the very next boot.
 _MARKER_NAME = ".builtin-seeded.json"
 
+# U380: sentences a rewrite may reword AROUND but may not remove. The U107
+# optimizer once translated the AI-assistant skill and dropped the one rule it
+# existed for ("never tell the owner an app is unavailable before trying"); the
+# owner approved the diff, and the next request was refused untried. Each is
+# embedded in the built-in body below by construction, restored by the
+# optimizer if a proposal drops it, and put back into an edited copy on start.
+CARD_IS_THE_REQUEST = "Calling it IS how you ask: the owner gets an approval card."
+NEVER_UNTRIED_REFUSAL = (
+    "Never tell the owner something cannot be done before you have tried it: "
+    "an app, an account or a capability is unavailable only when a real tool "
+    "result said so.")
+_KEPT_HEADING = "Always true (ships with AURA, kept through every rewrite):"
+
 # Shared preamble: screen control is slow, sensitive and approval-gated, so
 # every skill must exhaust the cheap deterministic tools before reaching for it.
 _ESCALATION = (
@@ -161,6 +174,8 @@ When this is useful: the owner explicitly wants a second opinion, or wants the
 answer to land in that app's own history. For anything you can answer yourself,
 just answer — do not bounce the question sideways.
 
+{NEVER_UNTRIED_REFUSAL}
+
 1. Call launch_app('claude') or launch_app('chatgpt'). ALWAYS call it — you
    cannot know what is registered without asking, and the tool names the
    registered apps when it refuses. Do not tell the owner an app is
@@ -181,6 +196,37 @@ just answer — do not bounce the question sideways.
 {_ESCALATION}""",
     ),
 )
+
+
+def _invariants_for(skill: Skill) -> tuple[str, ...]:
+    found = []
+    if CARD_IS_THE_REQUEST in skill.body:
+        found.append(CARD_IS_THE_REQUEST)
+    if NEVER_UNTRIED_REFUSAL in skill.body:
+        found.append(NEVER_UNTRIED_REFUSAL)
+    return tuple(found)
+
+
+#: Built-in name → the sentences its copies must keep (U380).
+INVARIANTS: dict[str, tuple[str, ...]] = {
+    s.name: _invariants_for(s) for s in BUILTIN_SKILLS if _invariants_for(s)
+}
+
+
+def restore_invariants(name: str, body: str) -> tuple[str, list[str]]:
+    """Put back any invariant a rewrite dropped. Returns (body, restored).
+
+    Appends — never rewrites — so the owner's approved text stays exactly as it
+    was, and is idempotent: a sentence that is present is not added again.
+    """
+    missing = [s for s in INVARIANTS.get(name, ()) if s not in (body or "")]
+    if not missing:
+        return body, []
+    base = (body or "").rstrip()
+    block = "\n".join(f"- {s}" for s in missing)
+    if _KEPT_HEADING in base:
+        return f"{base}\n{block}", missing
+    return f"{base}\n\n{_KEPT_HEADING}\n{block}", missing
 
 
 def _marker_path(store: SkillStore) -> Path:
@@ -257,7 +303,17 @@ def _update_untouched_builtins(
         known = {seen_fps[stored.name]} if stored.name in seen_fps else set()
         known |= _PRIOR_BUILTIN_FINGERPRINTS.get(stored.name, set())
         if current not in known:
-            continue                       # the owner edited it — hands off
+            # The owner's (or an approved optimization's) rewrite — hands off,
+            # EXCEPT for the guardrails that ship with AURA (U380).
+            body, restored = restore_invariants(stored.name, stored.body)
+            if restored:
+                try:
+                    store.save(replace(stored, body=body))
+                    logger.info("built-in skill %s: put back %d guardrail(s) a rewrite "
+                                "had removed", stored.name, len(restored))
+                except OSError as exc:
+                    logger.warning("built-in skill %s not repaired: %s", stored.name, exc)
+            continue
         try:
             # Keep the owner's own switches; only the procedure is ours.
             replacement = replace(

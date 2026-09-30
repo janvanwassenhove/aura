@@ -204,11 +204,22 @@ async def propose_optimization(
         return {"error": "the model did not return a usable rewrite"}
 
     proposed = str(data["body"]).strip()
+    # U380: a built-in's guardrails survive any rewrite. The loop once dropped
+    # "never refuse untried" while tightening a skill, and the approved result
+    # refused the owner's next request without trying anything.
+    from orchestrator.builtin_skills import restore_invariants
+
+    proposed, kept = restore_invariants(skill.name, proposed)
+    rationale = str(data.get("rationale", "")).strip()
+    if kept:
+        rationale = (f"{rationale} " if rationale else "") + (
+            f"Kept {len(kept)} guardrail(s) the rewrite had dropped — rules that "
+            "ship with a built-in skill cannot be optimized away.")
     changed = bool(data.get("changed", True)) and proposed != (skill.body or "").strip()
     return {
         "name": skill.name,
         "changed": changed,
-        "rationale": str(data.get("rationale", "")).strip(),
+        "rationale": rationale,
         "current_body": skill.body,
         "proposed_body": proposed,
         "based_on": len(obs),

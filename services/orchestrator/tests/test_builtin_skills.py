@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 
-from orchestrator.builtin_skills import BUILTIN_SKILLS, seed_builtin_skills
+from orchestrator.builtin_skills import BUILTIN_SKILLS, CARD_IS_THE_REQUEST, NEVER_UNTRIED_REFUSAL, seed_builtin_skills
 from orchestrator.skills import Skill, SkillStore
 
 
@@ -37,7 +37,12 @@ def test_an_owner_edit_is_never_overwritten(tmp_path) -> None:
                      body="Only ever play jazz."))
     seed_builtin_skills(store)
 
-    assert store.get("desktop-spotify").body == "Only ever play jazz."
+    # U380 (ADR-013): their text is never overwritten or rewritten — but the
+    # guardrails that ship with a built-in are appended if an edit removed
+    # them. Nothing of theirs goes; only our rules come back.
+    body = store.get("desktop-spotify").body
+    assert body.startswith("Only ever play jazz.")
+    assert CARD_IS_THE_REQUEST in body
 
 
 def test_a_deleted_builtin_stays_deleted(tmp_path) -> None:
@@ -133,7 +138,13 @@ def test_an_owner_edited_builtin_is_still_never_corrected(tmp_path) -> None:
     mine = replace(_ai_skill(), body="Ask Claude the way I like it.")
     store.save(mine)
     seed_builtin_skills(store)
-    assert _stored(store).body == "Ask Claude the way I like it."
+    # U380 (ADR-013): still never CORRECTED to our text — their procedure
+    # stays, word for word — but the rule against refusing untried is not a
+    # preference to edit away; it comes back, appended.
+    body = _stored(store).body
+    assert body.startswith("Ask Claude the way I like it.")
+    assert NEVER_UNTRIED_REFUSAL in body
+    assert "launch_app('claude')" not in body, "their procedure must not be replaced by ours"
 
 
 def test_correcting_keeps_the_owners_switches(tmp_path, monkeypatch) -> None:

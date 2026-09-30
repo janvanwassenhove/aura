@@ -5,7 +5,7 @@ owner: "orchestrator"
 priority: P1
 risk: High
 created: "2026-09-05"
-units: [U40, U43, U50, U57, U58, U59, U60, U61, U62, U64, U65, U66, U70, U71, U74, U75, U107, U108, U110, U118, U159, U194, U195, U247, U248, U249, U250, U251, U253c, U259, U259b, U261, U296, U335, U377, U378, U379]
+units: [U40, U43, U50, U57, U58, U59, U60, U61, U62, U64, U65, U66, U70, U71, U74, U75, U107, U108, U110, U118, U159, U194, U195, U247, U248, U249, U250, U251, U253c, U259, U259b, U261, U296, U335, U377, U378, U379, U380]
 ---
 
 # Feature Specification: Skills, Automation and the Agentic Loop
@@ -125,6 +125,16 @@ about two questions:
 
 ## Functional Requirements
 
+- **FR-SKILL-INV-01**: **A built-in skill's guardrails survive every
+  rewrite** ([ADR-013](../../../docs/adr/ADR-013-built-in-guardrails-survive-every-rewrite.md)).
+  Built-ins declare invariants — sentences embedded in their body, today
+  "calling it IS how you ask: the owner gets an approval card" and "never tell
+  the owner something cannot be done before you have tried it". The
+  self-optimizing loop restores any its proposal dropped and says so in the
+  rationale; on start, an edited copy missing one gets it appended under
+  "Always true (ships with AURA, kept through every rewrite)". The owner's own
+  text is never removed or reworded, and skills that are not built-ins are
+  never touched (U380).
 - **FR-DESKTOP-01**: **There is a desktop rung between the CLI and the
   screen.** Six tools reach any installed app, its windows and its keyboard
   shortcuts without a screenshot: `find_app` and `list_windows` (read-only),

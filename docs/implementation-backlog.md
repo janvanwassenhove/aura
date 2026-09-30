@@ -4996,3 +4996,59 @@ frame and the inner `CalculatorApp.exe`) — the frame was chosen, and had the
 inner one been, the focus check would have refused rather than typed.
 
 Orchestrator 468 green.
+
+### U380 — the optimizer removed the rule, and the fix could never reach it
+
+Reported with a screenshot (translated): *"can you ask chatgpt to generate an
+image about richie mini with a canoe on the river"* → *"I don't have that
+possibility, but I can help with something else."* And, stated right after as
+the goal (translated): *"he should go looking for ways to do it — check
+whether ChatGPT is installed, or ask whether there is an account (logged in to
+Chrome?)."*
+
+This unit is the part that made the refusal possible and permanent; U381 is
+the part that makes him investigate instead. Every link below was measured.
+
+**What he did.** The brain log for that turn holds one model call and
+nothing else: no tool, no approval card. **What he had.** Replaying the
+sentence against the installed 2.0.183 code: the skill
+`desktop-ai-assistants` was bound, and `open_app`, `type_into` and
+`use_computer` were offered. He had everything and tried nothing.
+
+**Why.** The owner's copy of that skill is not any version AURA ever shipped
+— compared against all four versions in git history. It is a Dutch rewrite,
+and `.metrics/desktop-ai-assistants.optimized` was written on 2026-09-29 at
+23:12: the U107 self-optimizing loop proposed it and the proposal was
+approved. The loop's prompt says "same language as the current body"; it
+translated anyway. And it removed the one sentence the skill existed for —
+*"ALWAYS call it … Do not tell the owner an app is unavailable unless a real
+launch_app result said so"* — replacing it with *"if the requested app is not
+on the allow-list, say so and point at Capabilities"*. He followed it. The
+"usage evidence" it optimized on includes *"Hier ist auch die Riese
+ChatGPT."* and *"ChatGPT, my name is"*: the television, heard as commands.
+
+**Why it stayed broken.** An approved rewrite is stored like an owner edit,
+and the seeder rightly leaves edits alone — so every later fix to the
+built-in, U377's and U378's included, was withheld from exactly this copy.
+The marker holds fingerprints for `desktop-chrome` and `desktop-vscode` only;
+`desktop-ai-assistants` and `desktop-spotify` (optimized on 08-17) were
+beyond reach.
+
+**The decision** ([ADR-013](adr/ADR-013-built-in-guardrails-survive-every-rewrite.md)):
+built-in skills declare **invariants** — sentences a rewrite may reword
+around but not remove. Two today, both about honesty: *calling it IS how you
+ask* and *never tell the owner something cannot be done before you have
+tried it*. The optimizer restores any it dropped and says so in the rationale
+the owner approves; on start, an edited copy missing one gets it appended.
+The owner's own words are never removed or reworded. Two existing tests
+encoded "an edit is never touched" and were changed to the new contract —
+"never overwritten, never rewritten, guardrails appended" — with the ADR as
+the reason.
+
+**Verified on the owner's real data**, on a copy of the skills directory
+(the real one is repaired on the next start): `desktop-ai-assistants` keeps
+its Dutch rewrite word for word and gains exactly the two guardrails;
+`desktop-spotify` gains the approval-card one; VS Code, Chrome and the
+owner's own skills are untouched.
+
+Orchestrator 476 green.
