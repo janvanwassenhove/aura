@@ -25,6 +25,7 @@ loses the reason.
 | [011](ADR-011-gpt-live-is-a-fourth-path.md) | GPT-Live is a fourth speech path, not a model swap | Accepted 2026-09-11 — implemented as an opt-in fourth engine (U324); real-room test outstanding |
 | [012](ADR-012-a-line-is-one-utterance-however-many-voices-it-has.md) | A line is one utterance, however many voices are in it | Accepted 2026-09-13 — implemented in U349 |
 | [013](ADR-013-built-in-guardrails-survive-every-rewrite.md) | A built-in skill's guardrails survive every rewrite | Accepted 2026-09-30 — implemented in U380 |
+| [014](ADR-014-the-laptop-plays-his-voice-not-its-own.md) | The laptop plays his voice, not its own | Accepted 2026-10-02 — implemented in U364 |
 
 ## Reading order for someone new
 

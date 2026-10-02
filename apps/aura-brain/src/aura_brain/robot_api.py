@@ -27,11 +27,14 @@ router = APIRouter(prefix="/robot", tags=["robot"])
 logger_build = logging.getLogger(__name__)
 
 _robot: Any = None  # RobotClient — set by init()
+_bus: Any = None    # AsyncEventBus — set by init(); U364 needs it to route
+                    # speech to the laptop, which is an event, not a call.
 
 
-def init(robot: Any) -> None:
-    global _robot
+def init(robot: Any, bus: Any = None) -> None:
+    global _robot, _bus
     _robot = robot
+    _bus = bus
 
 
 def _diagnose(exc: Exception) -> str:
@@ -757,6 +760,14 @@ async def set_volume(body: dict) -> JSONResponse:
         return _unavailable(exc)
 
 
+async def _say(speech_out: Any, text: str, audio_b64: str | None,
+               out: list[bool]) -> None:
+    """`asyncio.gather` discards what it collects into our caller's `ok`, so the
+    result is appended rather than returned — a gesture that plays while the
+    speech failed must not report success."""
+    out.append(await speech_out.deliver(_robot, _bus, text, audio_b64))
+
+
 @router.post("/say")
 async def say(body: dict) -> JSONResponse:
     """Make the robot SAY something out loud: brain-side TTS → robot speaker.
@@ -771,19 +782,24 @@ async def say(body: dict) -> JSONResponse:
 
     audio_b64 = await voice.synthesize_b64(text)
     motion_id = (body or {}).get("motion_id")
+    # U364: the owner's choice of speaker applies here too. A gesture still
+    # plays on the robot — only the voice moves.
+    from aura_brain import speech_out  # noqa: PLC0415
+
     try:
         if motion_id:
             import asyncio
 
+            ok_speech: list[bool] = []
             await asyncio.gather(
                 _robot.execute_motion(MotionCommand(
                     motion_id=motion_id, speed=1.0, amplitude=0.6, direction=None,
                 )),
-                _robot.speak(text, audio_b64=audio_b64),
+                _say(speech_out, text, audio_b64, ok_speech),
             )
-            ok = True
+            ok = ok_speech[0] if ok_speech else False
         else:
-            ok = await _robot.speak(text, audio_b64=audio_b64)
+            ok = await speech_out.deliver(_robot, _bus, text, audio_b64)
     except (httpx.HTTPError, OSError) as exc:
         return _unavailable(exc)
     return JSONResponse({"ok": ok, "voiced": audio_b64 is not None})

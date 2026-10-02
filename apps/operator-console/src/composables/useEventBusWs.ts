@@ -4,6 +4,7 @@ import { useConversationStore } from '../stores/conversationStore'
 import { useEventStore } from '../stores/eventStore'
 import { useApprovalStore } from '../stores/approvalStore'
 import { usePresentationStore } from '../stores/presentationStore'
+import { playUtterance } from './useSpeechPlayback'
 import { ROBOT_EVENTS_WS } from '../lib/endpoints'
 
 const WS_URL = ROBOT_EVENTS_WS
@@ -27,6 +28,11 @@ export function useEventBusWs() {
     eventStore.addEvent(raw)
     approvalStore.applyEvent(raw)
     usePresentationStore().applyEvent(raw)
+    // U364: a line synthesized for THIS laptop to play. Fire-and-forget:
+    // audio is best-effort and must never hold up the event stream.
+    if (raw.event_type === 'SpeechAudioReady') {
+      void playUtterance(String(raw.utterance_id ?? ''))
+    }
   }
 
   function connect() {

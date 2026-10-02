@@ -1,0 +1,162 @@
+"""U364: where his voice comes out — the robot's speaker, or this laptop.
+
+Asked for as: "can we add option that audio can go via laptop (so default
+robot, but we can also choose to go via audio of laptop?".
+
+The console has had a "Laptop audio" switch since U209 and it reads the line
+with the BROWSER's speech synthesis. That is a Windows voice, not his: it loses
+the character's own voice and speed (U349), and it cannot do a line that
+changes persona halfway, because by the time the browser sees it the line is
+text again.
+
+The brain already synthesizes the real audio before it ever reaches the robot.
+So this is a question about where that audio is PLAYED, not about producing it
+twice. `deliver()` is the one place that decides, because there are five call
+sites that speak and a decision copied five times is a decision that will drift.
+
+The hand-over is deliberately small: the audio is held here under an id, an
+event says it is ready, the console fetches it once, and it is gone. Holding
+every line of a talk would be a leak, and serving one twice would let a
+reconnecting console replay the last thing he said into a quiet room.
+"""
+
+from __future__ import annotations
+
+import base64
+import logging
+import os
+import struct
+import uuid
+from collections import OrderedDict
+from typing import Any
+
+logger = logging.getLogger(__name__)
+
+ROBOT = "robot"
+LAPTOP = "laptop"
+
+#: PCM s16le mono @ 24 kHz — what `voice.synthesize_b64` returns, always.
+SAMPLE_RATE = 24000
+CHANNELS = 1
+BITS = 16
+
+#: How many unfetched utterances to hold. Small on purpose: this is a hand-over
+#: between two processes on one machine, not a store. A console that is closed
+#: or asleep simply misses them, which is the correct outcome.
+KEEP = 8
+
+_waiting: "OrderedDict[str, bytes]" = OrderedDict()
+
+
+def output() -> str:
+    """Where speech should be played. Read live, so the toggle applies at once.
+
+    Anything unrecognised is the robot. A typo in an env var must never be the
+    reason a room hears nothing.
+    """
+    choice = os.environ.get("AUDIO_OUTPUT", ROBOT).strip().lower()
+    return LAPTOP if choice == LAPTOP else ROBOT
+
+
+def wav_from_pcm(pcm: bytes, rate: int = SAMPLE_RATE) -> bytes:
+    """Wrap raw PCM in a WAV header.
+
+    Served as WAV so the console can hand the URL to an `<audio>` element;
+    raw PCM would mean decoding it by hand in the browser for no reason.
+    """
+    byte_rate = rate * CHANNELS * BITS // 8
+    block_align = CHANNELS * BITS // 8
+    header = b"RIFF" + struct.pack("<I", 36 + len(pcm)) + b"WAVE"
+    header += b"fmt " + struct.pack("<IHHIIHH", 16, 1, CHANNELS, rate,
+                                    byte_rate, block_align, BITS)
+    header += b"data" + struct.pack("<I", len(pcm))
+    return header + pcm
+
+
+def take(utterance_id: str) -> bytes | None:
+    """The WAV for one utterance, once. Returns None if it was already served
+    or has aged out."""
+    return _waiting.pop(utterance_id, None)
+
+
+def pending() -> int:
+    return len(_waiting)
+
+
+def forget_all() -> None:
+    _waiting.clear()
+
+
+def _hold(pcm: bytes) -> str:
+    utterance_id = uuid.uuid4().hex
+    _waiting[utterance_id] = wav_from_pcm(pcm)
+    while len(_waiting) > KEEP:
+        _waiting.popitem(last=False)      # drop the oldest unfetched line
+    return utterance_id
+
+
+async def deliver(robot: Any, bus: Any, text: str, audio_b64: str | None) -> bool:
+    """Play one line. Returns whether it was actually handed anywhere.
+
+    Never pretends: a line with no audio reports False rather than looking
+    like a successful utterance (U269's rule).
+    """
+    if output() == LAPTOP:
+        if not audio_b64:
+            return False
+        try:
+            pcm = base64.b64decode(audio_b64)
+        except Exception as exc:  # noqa: BLE001 — bad audio is not a crash
+            logger.warning("speech audio could not be decoded: %s", exc)
+            return False
+        if bus is None:
+            # The event is the whole delivery: without it nothing will ever ask
+            # for the audio, so holding it and returning True would be a
+            # successful-looking utterance that no room can hear (ADR-009).
+            logger.warning("speech cannot reach the laptop: no event bus")
+            return False
+        from shared_schemas.events.audio import SpeechAudioReady  # noqa: PLC0415
+
+        utterance_id = _hold(pcm)
+        await bus.publish(SpeechAudioReady(
+            session_id="default", utterance_id=utterance_id, text=text))
+        logger.info("speech routed to the laptop (%d bytes)", len(pcm))
+        return True
+
+    if robot is None:
+        return False
+    await robot.speak(text, audio_b64=audio_b64)
+    return True
+
+
+# ------------------------------------------------------------------
+# The hand-over: one GET, one line, gone.
+# ------------------------------------------------------------------
+
+from fastapi import APIRouter  # noqa: E402
+from fastapi.responses import JSONResponse, Response  # noqa: E402
+
+router = APIRouter(tags=["speech"])
+
+
+@router.get("/speech/{utterance_id}.wav")
+async def speech_wav(utterance_id: str) -> Response:
+    """Serve one synthesized line to the console, once.
+
+    404 once it has been taken or has aged out, which is the honest answer:
+    the console asking twice means something replayed, and a room hearing the
+    last sentence again is worse than hearing nothing.
+    """
+    wav = take(utterance_id)
+    if wav is None:
+        return JSONResponse(
+            {"error": "that line is no longer waiting to be played"},
+            status_code=404)
+    return Response(content=wav, media_type="audio/wav",
+                    headers={"Cache-Control": "no-store"})
+
+
+@router.get("/speech/output")
+async def speech_output() -> JSONResponse:
+    """Where speech is going right now, and what is waiting."""
+    return JSONResponse({"output": output(), "pending": pending()})

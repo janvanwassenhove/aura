@@ -187,8 +187,13 @@ async def _speak(text: str, beat: Any = None) -> None:
             "failed), so the robot had nothing to play")
 
     _voice_note = " ".join(dict.fromkeys(p for _, _, p in chosen if p))
-    await _robot.speak(" ".join(s.text for s in segments),
-                       audio_b64=voice.join_pcm_b64(list(audio), _HANDOVER_MS))
+    # U364: the robot's speaker, or this laptop if that is what the owner
+    # chose. The joined utterance is the same either way.
+    from aura_brain import speech_out  # noqa: PLC0415
+
+    await speech_out.deliver(
+        _robot, _bus, " ".join(s.text for s in segments),
+        voice.join_pcm_b64(list(audio), _HANDOVER_MS))
 
 
 async def _gesture(name: str) -> None:

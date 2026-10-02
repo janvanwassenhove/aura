@@ -27,6 +27,11 @@ what blocks the `.exe`.
 An MSI install needs an administrator once, and updates itself with the next
 MSI rather than silently — you will see the wizard.
 
+**Where he speaks** (Settings -> Where he speaks): his own speaker, or this
+laptop. The voice is identical either way - the same audio is synthesized once
+and only the speaker changes - so a bigger room can hear him through the laptop
+without losing his character.
+
 On first start a short **setup wizard** appears:
 
 1. **Name & language** — give your assistant a call name (e.g. "Richie"). This

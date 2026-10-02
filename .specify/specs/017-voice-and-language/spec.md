@@ -5,7 +5,7 @@ owner: "aura-brain / conversation"
 priority: P1
 risk: High
 created: "2026-09-05"
-units: [U22, U36b, U36e, U36h, U45, U46, U47, U49, U54, U67, U73, U80, U81, U82, U83, U84, U85, U86, U87, U88, U89, U91, U92, U96, U128, U129, U130, U131, U132, U133, U134, U135, U140, U141, U142, U143, U144, U145, U146, U148, U149, U150, U153, U154, U155, U156, U163, U203, U209, U256, U257, U258, U260, U273, U275, U287, U288, U289, U291, U292, U321, U322, U324, U329, U331, U333, U349, U366]
+units: [U22, U36b, U36e, U36h, U45, U46, U47, U49, U54, U67, U73, U80, U81, U82, U83, U84, U85, U86, U87, U88, U89, U91, U92, U96, U128, U129, U130, U131, U132, U133, U134, U135, U140, U141, U142, U143, U144, U145, U146, U148, U149, U150, U153, U154, U155, U156, U163, U203, U209, U256, U257, U258, U260, U273, U275, U287, U288, U289, U291, U292, U321, U322, U324, U329, U331, U333, U349, U366, U364]
 ---
 
 # Feature Specification: Voice and Language
@@ -334,6 +334,31 @@ local wake word, the circuit breaker, or the language pinning. **This spec is
 the current truth**; the ADR is superseded in those respects and is amended in
 the same series as this backfill.
 
+- **FR-024**: His voice can come out of **this laptop** instead of the robot's
+  speaker. `AUDIO_OUTPUT` is `robot` (the default, and what every install had)
+  or `laptop`; anything unrecognised is `robot`, because a typo in an env var
+  must never be the reason a room hears nothing. The brain synthesizes **once**
+  either way — `laptop` changes where that audio is played, not what it is, so
+  the character's voice and speed (FR-018, spec 011 FR-107) and a line that
+  changes persona halfway (spec 011 FR-108) all survive intact. This is the
+  difference from U209's *Laptop audio*, which hands the text to the browser's
+  `speechSynthesis` and gets a Windows voice reading it.
+- **FR-025**: The audio crosses as a **hand-over, not a stream**:
+  `SpeechAudioReady` carries an id, and the console fetches the WAV once from
+  `GET /speech/{id}.wav`. The bytes stay off the event bus; the console can hand
+  the URL to an `<audio>` element rather than decoding PCM by hand; and the line
+  is served **once**, because a console asking twice can only be replaying the
+  last sentence into a quiet room. Unfetched lines age out at a small cap — a
+  hand-over between two processes on one machine is not a store (U364). Without a bus
+  to announce on, nothing is delivered and nothing is held — the event is
+  the delivery, so its absence is a failure, not a success (ADR-009).
+- **FR-026**: Every path that makes him speak asks where: the two reply paths,
+  the presentation runner, and `/robot/say`, which is what the console's quick
+  actions use. A gesture sent with `/robot/say` still plays on the robot —
+  only the voice moves. The realtime/live path is the exception and still speaks
+  to the robot, because it streams provider audio rather than synthesizing it
+  (U364).
+
 ## Traceability
 
 | Units | What they delivered |
@@ -358,4 +383,5 @@ the same series as this backfill.
 | U331 | The engine row says which path it governs, warns when hands-free voice makes it unreachable, and marks the realtime voice model unused under Live |
 | U333 | Stop drops queued audio and skips the speaker tail in both session engines; Quiet keeps the wake word in charge instead of letting the room talk |
 | U366 | Quiet and Present end a conversation that is already running, within a tick, and a silenced turn is never re-asked out loud by the pipeline |
+| U364 | His voice out of the laptop instead of the robot — the same synthesized audio, handed over once, so the character and the mid-line switch survive |
 | U349 | A presentation beat carries its own character, and one line can change character halfway: per-beat voice and speed above the mode voice, and several voices joined into one utterance so the hand-over is not also a volume step (ADR-012) |

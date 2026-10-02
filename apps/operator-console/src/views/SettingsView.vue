@@ -356,6 +356,23 @@
           <input :value="prefs.assistantName" maxlength="24" class="d2-field row-field" aria-label="Assistant name"
                  @change="prefs.save({ assistant_name: ($event.target as HTMLInputElement).value })">
         </div>
+        <!-- U364: where his voice comes out. The brain synthesizes once either
+             way - this chooses the speaker, not the voice. -->
+        <div class="row">
+          <div class="row-text">
+            <div class="row-title">Where he speaks</div>
+            <div class="row-sub">
+              His own speaker, or this laptop. Same voice either way - the audio
+              is identical, only the speaker changes.
+            </div>
+          </div>
+          <select :value="prefs.audioOutput" class="d2-field row-field"
+                  aria-label="Where he speaks" data-test="audio-output"
+                  @change="prefs.save({ audio_output: ($event.target as HTMLSelectElement).value as 'robot' | 'laptop' })">
+            <option value="robot">the robot's speaker</option>
+            <option value="laptop">this laptop</option>
+          </select>
+        </div>
         <div class="row">
           <div class="row-text">
             <div class="row-title">Hands-free voice</div>

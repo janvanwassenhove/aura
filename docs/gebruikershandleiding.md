@@ -27,6 +27,11 @@ ondertekend is; die waarschuwing is niet wat de `.exe` tegenhoudt.
 Een MSI-installatie vraagt eenmalig een beheerder, en werkt zichzelf bij met de
 volgende MSI in plaats van stilletjes — je krijgt de wizard te zien.
 
+**Waar hij spreekt** (Instellingen -> Waar hij spreekt): zijn eigen speaker, of
+deze laptop. De stem is in beide gevallen identiek - dezelfde audio wordt een
+keer gemaakt en alleen de speaker verschilt - dus een grotere zaal kan hem via
+de laptop horen zonder dat hij zijn karakter verliest.
+
 Bij de eerste start verschijnt een korte **setup-wizard**:
 
 1. **Naam & taal** — geef je assistent een roepnaam (bv. "Richie"). Die wordt

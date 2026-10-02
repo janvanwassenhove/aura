@@ -364,7 +364,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     from aura_brain.robot_client import RobotClient
 
     _robot = RobotClient()
-    robot_api.init(_robot)
+    robot_api.init(_robot, ctx.bus)      # U364: /robot/say routes to the laptop too
 
     # U336: on another network he gets another address, and the brain read the
     # old one once at startup. Rather than reporting "offline" until somebody
@@ -445,7 +445,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # U36: EMBODIMENT — every assistant reply is spoken out loud on the robot
     # with a gesture matched to the content (greeting→wave, question→tilt,
     # excitement→gesture, default→nod). Toggle with SPEAK_REPLIES=false.
-    from aura_brain import voice
+    from aura_brain import speech_out, voice
     from aura_brain.embodiment import embodiment_plan
 
     async def _embody_reply(event: ResponseDrafted) -> None:
@@ -542,7 +542,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
                             raise asyncio.CancelledError
                         if _t is not None:
                             _t.mark("playback_first_sample")
-                        await _robot.speak(chunk, audio_b64=audio_b64)
+                        # U364: the robot's speaker or this laptop - one place
+                        # decides, because five call sites deciding separately
+                        # is a decision that drifts.
+                        await speech_out.deliver(_robot, bus, chunk, audio_b64)
 
                     await stream_speech(capped, _synth, _speak_chunk)
                 else:
@@ -551,7 +554,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
                         return  # interrupted during synthesis — stay silent
                     if _t is not None:
                         _t.mark("playback_first_sample")
-                    await _robot.speak(capped, audio_b64=audio_b64)
+                    await speech_out.deliver(_robot, bus, capped, audio_b64)   # U364
                     if _t is not None:
                         _t.mark("playback_complete")
 
@@ -1158,6 +1161,11 @@ def create_app() -> FastAPI:
 
     from aura_brain import recognition_api
     app.include_router(recognition_api.router)  # U18
+    # U364: serves one synthesized line to the console when the owner has
+    # chosen to hear him through the laptop rather than the robot's speaker.
+    from aura_brain import speech_out
+
+    app.include_router(speech_out.router)  # U364
 
     from aura_brain import robot_api
     app.include_router(robot_api.router)  # U36: console → robot proxy

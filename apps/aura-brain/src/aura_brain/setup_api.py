@@ -127,6 +127,9 @@ async def status() -> JSONResponse:
         "assistant_name": os.environ.get("ASSISTANT_NAME", "AURA"),
         "robot_url": os.environ.get("ROBOT_RUNTIME_URL", ""),
         "voice_mode": os.environ.get("VOICE_MODE", "off"),
+        # U364: where his voice comes out. "robot" is the default and
+        # always has been; "laptop" plays the same audio here instead.
+        "audio_output": os.environ.get("AUDIO_OUTPUT", "robot"),
         "llm_provider": os.environ.get("LLM_PROVIDER", "openai"),
         "openai_key_set": bool(os.environ.get("OPENAI_API_KEY")),
         # U339: enough for the console to say "paired", and nothing more.
@@ -368,6 +371,9 @@ def _prefs_snapshot() -> dict:
         "language_fallback": os.environ.get("LANGUAGE_FALLBACK", ""),
         "language_fallback_effective": _effective_fallback(),
         "voice_mode": os.environ.get("VOICE_MODE", "off"),
+        # U364: where his voice comes out. "robot" is the default and always
+        # has been; "laptop" plays the same audio here instead.
+        "audio_output": os.environ.get("AUDIO_OUTPUT", "robot"),
         "voice_engine": os.environ.get("VOICE_ENGINE", "pipeline"),  # U132
         "wake_word": os.environ.get("WAKE_WORD", os.environ.get("ASSISTANT_NAME", "AURA")),
         "tts_voice": os.environ.get("TTS_VOICE", "alloy"),
@@ -476,6 +482,17 @@ async def set_prefs(body: dict) -> JSONResponse:
                 status_code=422,
             )
         updates["ASSISTANT_LANGUAGE"] = language
+    # U364: the robot's own speaker, or this laptop's. The audio is identical
+    # either way - the brain synthesizes once and only the destination changes -
+    # so this is a routing choice, not a quality one.
+    audio_output = (body or {}).get("audio_output")
+    if audio_output is not None:
+        audio_output = str(audio_output).strip().lower()
+        if audio_output not in ("robot", "laptop"):
+            return JSONResponse(
+                {"error": "audio_output must be robot or laptop"}, status_code=422,
+            )
+        updates["AUDIO_OUTPUT"] = audio_output
     # U257: which language wins when a message is too short to tell. Only
     # consulted while `language` is auto; an explicit choice stays absolute.
     fallback = (body or {}).get("language_fallback")

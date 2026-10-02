@@ -42,6 +42,8 @@ export const usePrefsStore = defineStore('prefs', () => {
   const languageFallback = ref<string>('')
   const languageFallbackEffective = ref<string>('')
   const voiceMode = ref<VoiceMode>('off')
+  /** U364: where his voice comes out - the robot's speaker, or this laptop. */
+  const audioOutput = ref<'robot' | 'laptop'>('robot')
   const voiceEngine = ref<VoiceEngine>('pipeline')
   const wakeWord = ref('AURA')
   const ttsVoice = ref('alloy')
@@ -87,6 +89,7 @@ export const usePrefsStore = defineStore('prefs', () => {
         languageFallback.value = data.language_fallback ?? ''
         languageFallbackEffective.value = data.language_fallback_effective ?? ''
         voiceMode.value = (data.voice_mode ?? 'off') as VoiceMode
+        audioOutput.value = (data.audio_output ?? 'robot') as 'robot' | 'laptop'
         voiceEngine.value = (data.voice_engine ?? 'pipeline') as VoiceEngine
         wakeWord.value = data.wake_word
         ttsVoice.value = data.tts_voice ?? 'alloy'
@@ -99,6 +102,7 @@ export const usePrefsStore = defineStore('prefs', () => {
   async function save(fields: {
     assistant_name?: string; language?: Language; language_fallback?: string;
     voice_mode?: VoiceMode; voice_engine?: VoiceEngine; wake_word?: string; tts_voice?: string
+    audio_output?: 'robot' | 'laptop'
   }): Promise<boolean> {
     saving.value = true
     error.value = null
@@ -120,6 +124,7 @@ export const usePrefsStore = defineStore('prefs', () => {
         languageFallbackEffective.value = data.language_fallback_effective
       }
       voiceMode.value = data.voice_mode
+      if (data.audio_output) audioOutput.value = data.audio_output
       voiceEngine.value = data.voice_engine ?? voiceEngine.value
       wakeWord.value = data.wake_word
       ttsVoice.value = data.tts_voice ?? ttsVoice.value
@@ -136,7 +141,7 @@ export const usePrefsStore = defineStore('prefs', () => {
 
   return {
     assistantName, language, languageFallback, languageFallbackEffective,
-    voiceMode, voiceEngine, wakeWord, ttsVoice, voiceInUse, voiceSource, saving, error,
+    voiceMode, voiceEngine, audioOutput, wakeWord, ttsVoice, voiceInUse, voiceSource, saving, error,
     density, densityTouched, railCollapsed,
     setDensity, followPerson, resetDensityTouch, toggleRail,
     fetchPrefs, save,

@@ -201,3 +201,36 @@ describe('the conversation engine says where it applies', () => {
     w.unmount()
   })
 })
+
+/** U364: where his voice comes out, chosen in Settings. */
+describe('U364 — the speaker his voice comes out of', () => {
+  it('offers the robot and this laptop, defaulting to the robot', async () => {
+    stubFetch()
+    const w = mount(SettingsView)
+    await flushPromises()
+
+    const sel = w.find('[data-test="audio-output"]')
+    expect(sel.exists()).toBe(true)
+    const options = sel.findAll('option').map(o => o.element.value)
+    expect(options).toEqual(['robot', 'laptop'])
+    expect((sel.element as HTMLSelectElement).value).toBe('robot')
+  })
+
+  it('saves the choice', async () => {
+    stubFetch()
+    // The shared stub records URLs only; wrap it to see what was sent.
+    const inner = globalThis.fetch
+    const bodies: string[] = []
+    vi.stubGlobal('fetch', (url: unknown, init?: RequestInit) => {
+      if (init?.body) bodies.push(String(init.body))
+      return (inner as typeof fetch)(url as string, init)
+    })
+
+    const w = mount(SettingsView)
+    await flushPromises()
+    await w.find('[data-test="audio-output"]').setValue('laptop')
+    await flushPromises()
+
+    expect(bodies.some(b => b.includes('"audio_output":"laptop"'))).toBe(true)
+  })
+})

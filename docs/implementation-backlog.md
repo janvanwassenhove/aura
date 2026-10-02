@@ -5124,3 +5124,95 @@ skill stays the owner's except for the honesty rules of ADR-013.
 
 Tests verified red (4 of 6). Orchestrator 512 green; brain skill proposals
 green.
+
+### U364 — his voice, out of the laptop, still his voice
+
+Asked for as: *"can we add option that audio can go via laptop (so default
+robot, but we can also choose to go via audio of laptop?"*.
+
+Half of it existed and was the wrong half. The Present panel has had a **Laptop
+audio** switch since U209, and its own docstring is honest about what it does:
+*"It's the laptop's voice, not the robot's exact audio."* It hands the text to
+the browser's `speechSynthesis` and a Windows voice reads it. That throws away
+the character's voice and speed (U349), and a line that changes persona halfway
+cannot survive it at all — by the time the browser sees it, the line is text
+again and the markers are gone.
+
+The brain already synthesizes the real audio before it ever reaches the robot.
+So the question was never *how do we make sound on the laptop*; it was **where
+that one piece of audio gets played**. Asked, and the answer was the real voice.
+
+`AUDIO_OUTPUT` is `robot` (the default, and what every install has had) or
+`laptop`. Anything unrecognised is `robot` — a typo in an env var must never be
+the reason a room hears nothing.
+
+**One place decides.** There are five call sites that speak: two in the reply
+path, one in the presentation runner, one in `/robot/say`, one in the realtime
+loop. A routing decision copied five times is a decision that drifts, so
+`speech_out.deliver()` is the only thing that chooses, and the call sites just
+hand it the line and the audio. Four of the five go through it; the fifth is
+below.
+
+`/robot/say` was nearly missed. It is how the console's quick actions make him
+say a line on demand — the most likely thing to be reached for from a stage
+— and it called `_robot.speak` directly. It needed the bus, which
+`robot_api` did not have, so `init()` takes one now. A gesture sent with the line
+still plays on the robot: only the voice moves.
+
+**The hand-over is deliberately small.** `SpeechAudioReady` carries an **id**,
+not the bytes: the console fetches the WAV once from `GET /speech/{id}.wav`.
+Three reasons, and the third is the one that matters most:
+
+- a few hundred kilobytes per line stays off the event bus;
+- WAV rather than raw PCM, so the console hands a URL to an `<audio>` element
+  instead of decoding PCM through the Web Audio API by hand;
+- **once**. The brain 404s a line it has already served, and the console keeps
+  its own set of ids it has played. A console that asks twice is a console
+  replaying the last sentence into a quiet room, and that is worse than silence.
+
+Unfetched lines age out at a cap of eight. A console that is closed or asleep
+simply misses them, which is correct: this is a hand-over between two processes
+on one machine, not a store, and holding every line of a talk is how a long
+session becomes a leak.
+
+**And with no bus, nothing is delivered.** The first version held the audio and
+returned `True` whenever there was no bus to announce it on — a line nobody
+would ever fetch, reported as spoken. The event *is* the delivery here, so the
+absence of one is a failure to deliver, and it now says so (ADR-009:
+constructing is not connecting).
+
+**Tests**: 15 in the brain (the default is unchanged, a nonsense setting still
+speaks, the robot stays quiet when the laptop has it, the bytes offered are
+byte-for-byte his, it is a valid 24 kHz mono 16-bit WAV and not raw PCM, no
+audio and no bus are each reported as not delivered rather than pretended, a
+line is served once, old lines are evicted, the setting round-trips over HTTP, a
+destination that is not one is refused, and `/robot/say` both honours the setting
+and still reaches the robot by default) and 7 in the console (playback fetches
+and plays, one line at a time, ignores an empty id, never replays, survives a
+browser with no `Audio`, and the Settings control offers both and saves). All
+verified red — the Settings and `/robot/say` ones against a stashed working
+tree.
+
+One of those tests broke two others two files away, and the reason is worth
+keeping. `POST /setup/prefs` sets the real `os.environ`, which is how the setting
+takes effect without a restart. `monkeypatch.delenv(raising=False)` on an
+already-unset variable records nothing to undo, so `laptop` leaked out of the
+test that set it, and `/robot/say` then answered `ok: false` in a suite that had
+never heard of audio output. The fixture pops it on the way out now.
+
+**Not done here, and deliberately**: the realtime/live path (`voice_loop.py`)
+is the fifth call site and still speaks straight to the robot. It streams its own audio from the provider
+rather than going through `voice.synthesize_b64`, so routing it is a different
+job with a different shape, and bundling it in would have been a second unit
+wearing this one's name. U209's `speechSynthesis` switch is also untouched — it
+is still there, still in the Present panel, and still the only option that
+needs no robot at all.
+
+The decision and the four alternatives that were rejected are in
+[ADR-014](adr/ADR-014-the-laptop-plays-his-voice-not-its-own.md), and
+`docs/diagrams/media-paths.svg` grew the fork: panel 3 showed one destination
+for the audio and now shows two.
+
+**Not verified by ear**: nothing here has been played through a laptop speaker.
+The bytes are asserted to be identical to what the robot would have received,
+which is the part a test can hold.
