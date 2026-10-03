@@ -5865,3 +5865,81 @@ switch, still when it says nothing, follow-me overridden and given back,
 untouched when it says nothing); an API walk of a small stage scenario; the two
 example walks — each step's exact state, and the reason the early return was
 found; 3 builder tests (2 red before); 2 checker tests.
+
+### U395 — emotions: a giggle, a hmm, a yawn — the robot's own recordings
+
+Asked for, when wandering was agreed (translated): sound as levels rather than
+on and off — *"whether he may speak or make sounds (maybe provide variations,
+e.g. just a hmm or giggling — emotion sounds, besides actually conversing)"*.
+Then, before this unit landed (translated): *"make sure everything works on
+the robot too (and is tested)"*.
+
+**What exists.** Pollen publishes an emotions library for Reachy Mini — 85
+recorded movements, each with a sound made for it — and the robot's daemon
+already has it on disk and plays one by name: the movement, and the sound
+through the robot's speaker. It answers at once with a move id and lists the
+moves still running. Read on the robot, not assumed: the daemon's router, its
+`play_move` (which plays the move's sound file), and the library itself, with
+the length of every recording measured — from 2.1 s (`inquiring1`) to 19.8 s
+(`sleep1`). Only short ones are used.
+
+**The level.** `WANDER_SOUND` gains `emotions`, between `silent` and `talk`:
+
+- *emotions* — no words. Someone who speaks to him gets an emotion that fits
+  the reply (laughter first — `laughing2` — then its mood: `cheerful1`,
+  `enthusiastic2`, `oops1`, `inquiring2`, `thoughtful2`, and `understanding2`,
+  a nod and a *hmm*, for everything else). The words stay in the console.
+- *emotions* and *talk* — now and then one of his own accord: greeting someone
+  who comes into view after twenty seconds with nobody (`welcoming1`,
+  `inquiring2`, `cheerful1`), and a sigh or a yawn after five minutes with no
+  face and no voice (`indifferent1`, `tired1`). Never two within 45 seconds;
+  whoever was already there when he started has not arrived; and never while
+  turning to a voice, because a recording moves the head on its own path and
+  would undo the turn.
+
+**Who decides what.** The robot plays and chooses; the brain allows. The robot
+cannot know about Quiet, a talk on stage or the owner's level, so the brain
+tells it — and tells it again when the level or Quiet changes. Quiet gained a
+listener for this; before, nothing outside the brain could hear it change.
+Quiet stops the emotions he starts and leaves the ones he answers with — the
+line U256 drew for words. On stage, none (U334).
+
+**On the robot.** The runtime holds the motion lock from the moment the daemon
+accepts a move until it reports it finished, with follow-me paused, so no
+gesture, beat or wander step moves the head under the recording; his own voice
+stops it. `POST /robot/emotion` refuses asleep (409), a name that is not a
+plain name (422 — it becomes part of a URL on the robot) and one the library
+does not have (404). A robot too old for emotions keeps wandering and the
+note in Settings says it needs an update. ADR-016 records why the daemon plays
+them, and why they always come from the robot's speaker.
+
+**Verified on the robot**, not only in tests:
+
+- *U393/U394 first.* The robot was on v2.0.196 (U391); its release updater
+  brought it to v2.0.199 and reported it healthy. Wandering on: in 45 seconds
+  the head glanced to ±30°, the antennas moved, the torso turned 16°, and the
+  sound direction was read from the microphone array. Off: follow-me on again,
+  as the owner had it. Asleep: `active: false`, and head, torso and antennas
+  stayed where they were.
+- *U395.* With the unit's runtime copied onto the robot: `laughing2` moved the
+  head and antennas for its three seconds, follow-me came back afterwards, and
+  the daemon kept the sound file open for the whole of it — the proof that it
+  plays, since the room was too loud to measure it through the microphone.
+  Unknown name 404, `../etc` 422, asleep 409. The daemon stops a move by id.
+  With the thresholds lowered for a minute, the planner chose a yawn (`tired1`)
+  by itself and the daemon played it.
+- *Measured, and why the lock matters.* An emotion played straight through the
+  daemon with follow-me on made the daemon log *"IK error: collision
+  detected"*; played through the runtime, with the tracker paused, it did not.
+
+**Not verified:** what it sounds like in a room — the evidence is the file
+being played, not a person hearing it. And the laptop half — the brain and the
+console — is only as current as the last time AURA was restarted.
+
+**Tests**: 8 planner tests (all red before); 8 adapter tests against a fake
+daemon (all red); 4 route tests (red); 15 brain tests (20 cases) — the level, when
+spontaneous ones are allowed, Quiet, the stage, the mood mapping, answering,
+an older robot — plus the reply path through the real brain, and the
+Settings choice reaching the robot (verified red with the hook removed); 2
+console tests (red). `test_status_says_whether_he_wanders` changed with the
+status shape.

@@ -54,15 +54,25 @@ class FakeRobotAdapter(RobotAdapter):
         self._body_follow = enabled
         return enabled
 
-    async def set_wander(self, enabled: bool) -> dict:
+    async def set_wander(self, enabled: bool, emotions: bool = False) -> dict:
         """U393: recorded, not performed — the fake has no head to turn."""
         self._wander = enabled
+        self._wander_emotions = bool(emotions)
         return self.wander_state()
 
     def wander_state(self) -> dict:
-        return {"enabled": getattr(self, "_wander", False),
-                "active": getattr(self, "_wander", False),
-                "sound_direction": None}
+        on = getattr(self, "_wander", False)
+        return {"enabled": on,
+                "active": on,
+                "sound_direction": None,
+                "emotions": on and getattr(self, "_wander_emotions", False)}
+
+    async def play_emotion(self, name: str) -> dict:
+        """U395: recorded, not played — the fake has no speaker."""
+        if not hasattr(self, "emotions"):
+            self.emotions: list[str] = []
+        self.emotions.append(name)
+        return {"played": name}
 
     async def gaze(self, dyaw: float = 0.0, dpitch: float = 0.0,
                    duration: float = 0.6) -> dict:

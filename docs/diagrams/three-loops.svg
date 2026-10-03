@@ -1,5 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="1262" viewBox="0 0 1000 1262" role="img"
-     aria-label="Four loops on four clocks. Perception runs continuously against the camera: frame, downscale, embedding, match. Conversation is event-driven and passes through idle, listening, transcribing, thinking and speaking, returning to idle when it is done, with interrupted drawn as a state of its own rather than an error path. Maintenance runs every five minutes, checking whether the robot is reachable, the key is valid and the store is encrypted. Wandering runs every half second on the robot, only when the owner has asked for it: he looks around, turns to a voice and moves his antennas while the face tracker keeps whoever he is looking at; follow-me and body-follow stay the owner's, and asleep or on stage he stands still. Below, two panels show where the bugs actually live: shared hardware, where face recognition and gesture detection both want the same camera frame, output becoming input, where the speaker sits next to the microphone, and one body, where wandering, gestures, beats and speech all want the head and wandering is the one that waits.">
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="1294" viewBox="0 0 1000 1294" role="img"
+     aria-label="Four loops on four clocks. Perception runs continuously against the camera: frame, downscale, embedding, match. Conversation is event-driven and passes through idle, listening, transcribing, thinking and speaking, returning to idle when it is done, with interrupted drawn as a state of its own rather than an error path. Maintenance runs every five minutes, checking whether the robot is reachable, the key is valid and the store is encrypted. Wandering runs every half second on the robot, only when the owner has asked for it: he looks around, turns to a voice and moves his antennas while the face tracker keeps whoever he is looking at; now and then, when the owner allows it, he greets someone who arrives or sighs after a long while alone with an emotion from Pollen's library, a movement with its own sound; follow-me and body-follow stay the owner's, asleep he stands still, and on stage the scenario decides. Below, two panels show where the bugs actually live: shared hardware, where face recognition and gesture detection both want the same camera frame, output becoming input, where the speaker sits next to the microphone, and one body, where wandering, emotions, gestures, beats and speech all want the head and wandering is the one that waits.">
   <defs>
     <pattern id="g4" width="24" height="24" patternUnits="userSpaceOnUse">
       <path d="M24 0H0V24" fill="none" stroke="#c9b998" stroke-width="0.5" opacity="0.35"/>
@@ -68,28 +68,29 @@
   <text x="72" y="632" font-family="Consolas, ui-monospace, monospace" font-size="19" fill="#34302b">it reconnects by itself — and it reports that it did</text>
 
   <!-- wander (U393) -->
-  <rect x="48" y="674" width="904" height="130" fill="#efe7d6" stroke="#34302b" stroke-width="2.5"/>
+  <rect x="48" y="674" width="904" height="162" fill="#efe7d6" stroke="#34302b" stroke-width="2.5"/>
   <text x="72" y="714" font-family="Consolas, ui-monospace, monospace" font-size="24" fill="#34302b">WANDER</text>
   <text x="560" y="712" font-family="Consolas, ui-monospace, monospace" font-size="17" letter-spacing="2" fill="#c0522d">EVERY ½ SECOND · WHEN ASKED</text>
   <text x="72" y="752" font-family="Consolas, ui-monospace, monospace" font-size="19" fill="#6f6659">look around · turn to a voice · antennas — the tracker keeps the person</text>
-  <text x="72" y="784" font-family="Consolas, ui-monospace, monospace" font-size="19" fill="#34302b">follow-me stays the owner's; asleep or on stage, he stands still</text>
+  <text x="72" y="784" font-family="Consolas, ui-monospace, monospace" font-size="19" fill="#6f6659">a greeting, a sigh — an emotion from Pollen's library, when allowed</text>
+  <text x="72" y="816" font-family="Consolas, ui-monospace, monospace" font-size="19" fill="#34302b">follow-me stays the owner's · asleep, still · on stage, the scenario says</text>
 
   <!-- between the loops -->
-  <line x1="48" y1="852" x2="952" y2="852" stroke="#b8933f" stroke-width="1"/>
-  <text x="48" y="890" font-family="Consolas, ui-monospace, monospace" font-size="17" letter-spacing="2" fill="#8a7a55">THE BUGS ARE NOT IN THE LOOPS — THEY ARE BETWEEN THEM</text>
+  <line x1="48" y1="884" x2="952" y2="884" stroke="#b8933f" stroke-width="1"/>
+  <text x="48" y="922" font-family="Consolas, ui-monospace, monospace" font-size="17" letter-spacing="2" fill="#8a7a55">THE BUGS ARE NOT IN THE LOOPS — THEY ARE BETWEEN THEM</text>
 
-  <rect x="48" y="914" width="904" height="98" fill="#efe7d6" stroke="#34302b" stroke-width="2"/>
-  <text x="72" y="950" font-family="Consolas, ui-monospace, monospace" font-size="21" fill="#34302b">SHARED HARDWARE</text>
-  <text x="72" y="980" font-family="Consolas, ui-monospace, monospace" font-size="18" fill="#6f6659">face recognition and gesture detection want the same camera frame</text>
-  <text x="72" y="1004" font-family="Consolas, ui-monospace, monospace" font-size="18" fill="#c0522d">&#8594; one shared frame, with a short time-to-live</text>
+  <rect x="48" y="946" width="904" height="98" fill="#efe7d6" stroke="#34302b" stroke-width="2"/>
+  <text x="72" y="982" font-family="Consolas, ui-monospace, monospace" font-size="21" fill="#34302b">SHARED HARDWARE</text>
+  <text x="72" y="1012" font-family="Consolas, ui-monospace, monospace" font-size="18" fill="#6f6659">face recognition and gesture detection want the same camera frame</text>
+  <text x="72" y="1036" font-family="Consolas, ui-monospace, monospace" font-size="18" fill="#c0522d">&#8594; one shared frame, with a short time-to-live</text>
 
-  <rect x="48" y="1028" width="904" height="98" fill="#efe7d6" stroke="#34302b" stroke-width="2"/>
-  <text x="72" y="1064" font-family="Consolas, ui-monospace, monospace" font-size="21" fill="#34302b">OUTPUT BECOMES INPUT</text>
-  <text x="72" y="1094" font-family="Consolas, ui-monospace, monospace" font-size="18" fill="#6f6659">the speaker sits next to the microphone, joined by the air in the room</text>
-  <text x="72" y="1118" font-family="Consolas, ui-monospace, monospace" font-size="18" fill="#c0522d">&#8594; gate it where the loop closes</text>
+  <rect x="48" y="1060" width="904" height="98" fill="#efe7d6" stroke="#34302b" stroke-width="2"/>
+  <text x="72" y="1096" font-family="Consolas, ui-monospace, monospace" font-size="21" fill="#34302b">OUTPUT BECOMES INPUT</text>
+  <text x="72" y="1126" font-family="Consolas, ui-monospace, monospace" font-size="18" fill="#6f6659">the speaker sits next to the microphone, joined by the air in the room</text>
+  <text x="72" y="1150" font-family="Consolas, ui-monospace, monospace" font-size="18" fill="#c0522d">&#8594; gate it where the loop closes</text>
 
-  <rect x="48" y="1142" width="904" height="98" fill="#efe7d6" stroke="#34302b" stroke-width="2"/>
-  <text x="72" y="1178" font-family="Consolas, ui-monospace, monospace" font-size="21" fill="#34302b">ONE BODY</text>
-  <text x="72" y="1208" font-family="Consolas, ui-monospace, monospace" font-size="18" fill="#6f6659">wandering, gestures, beats and speech all want the same head</text>
-  <text x="72" y="1232" font-family="Consolas, ui-monospace, monospace" font-size="18" fill="#c0522d">&#8594; one motion lock — and wandering is the one that waits</text>
+  <rect x="48" y="1174" width="904" height="98" fill="#efe7d6" stroke="#34302b" stroke-width="2"/>
+  <text x="72" y="1210" font-family="Consolas, ui-monospace, monospace" font-size="21" fill="#34302b">ONE BODY</text>
+  <text x="72" y="1240" font-family="Consolas, ui-monospace, monospace" font-size="18" fill="#6f6659">wandering, emotions, gestures, beats and speech all want the same head</text>
+  <text x="72" y="1264" font-family="Consolas, ui-monospace, monospace" font-size="18" fill="#c0522d">&#8594; one motion lock — and wandering is the one that waits</text>
 </svg>

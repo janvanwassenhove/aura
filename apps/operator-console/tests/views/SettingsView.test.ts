@@ -252,14 +252,14 @@ describe('U393 — wandering in Settings', () => {
     return bodies
   }
 
-  it('offers silent or talk, and saves the choice', async () => {
+  it('offers silent, emotions or talk, and saves the choice', async () => {
     const bodies = wanderBrain({ wanted: true, effective: true, paused: null, note: '' })
     const w = mount(SettingsView)
     await flushPromises(); await flushPromises()
 
     const sel = w.find('[data-test="wander-sound"]')
     expect(sel.exists()).toBe(true)
-    expect(sel.findAll('option').map(o => o.element.value)).toEqual(['silent', 'talk'])
+    expect(sel.findAll('option').map(o => o.element.value)).toEqual(['silent', 'emotions', 'talk'])
     await sel.setValue('talk')
     await flushPromises()
     expect(bodies.some(b => b.includes('"wander_sound":"talk"'))).toBe(true)
@@ -278,6 +278,21 @@ describe('U393 — wandering in Settings', () => {
     const w = mount(SettingsView)
     await flushPromises(); await flushPromises()
     expect(w.find('[data-test="wander-note"]').text()).toMatch(/update/i)
+  })
+
+  // U395: the store read anything but 'talk' as 'silent' — a choice of
+  // emotions would have shown as silent after every reload.
+  it('shows emotions when that is what the brain has', async () => {
+    wanderBrain({ wanted: true, effective: true, paused: null, note: '' })
+    const plain = (globalThis.fetch as unknown as (u: string, i?: RequestInit) => Promise<Response>)
+    vi.stubGlobal('fetch', (url: string, init?: RequestInit) =>
+      String(url).includes('/setup/prefs') && !init?.body
+        ? OK({ voice_mode: 'off', wander_sound: 'emotions' })
+        : plain(url, init))
+    const w = mount(SettingsView)
+    await flushPromises(); await flushPromises()
+    const sel = w.find('[data-test="wander-sound"]').element as HTMLSelectElement
+    expect(sel.value).toBe('emotions')
   })
 })
 

@@ -16,6 +16,12 @@ radians — 0 is left, π/2 is straight ahead, π is right — and whether it is
 speech. It cannot tell front from back: both read as π/2. So a voice near π/2
 is never a reason to turn; it is either in front of him already, or behind
 him, where he cannot know.
+
+U395 adds emotion sounds, when the brain allows them: Pollen's emotions
+library, a recorded movement with its own sound. He makes one of his own
+accord only now and then — greeting someone who arrives, a sigh after a long
+while alone — and only short ones, because a fifteen-second yawn at a
+visitor is not a greeting.
 """
 
 from __future__ import annotations
@@ -30,6 +36,13 @@ HEAD_YAW_MAX = 0.70          # rad, ±40° — what the neck turns on its own
 HEAD_PITCH_MAX = 0.18        # rad — glances stay roughly level
 BODY_YAW_MAX = 1.20          # rad, ±69° — the same bound the joystick uses
 
+# U395: emotions, by name in Pollen's library (seconds measured on the robot).
+GREETINGS = ("welcoming1", "inquiring2", "cheerful1")    # 3.5, 2.6, 2.8 s
+ALONE = ("indifferent1", "tired1")                       # 2.6, 7.4 s
+GREET_AFTER_S = 20.0         # out of view this long, and coming back is arriving
+ALONE_AFTER_S = 300.0        # no face, no voice this long: a sigh
+EMOTION_GAP_S = 45.0         # never two emotions closer than this
+
 
 @dataclass(frozen=True)
 class Look:
@@ -40,7 +53,8 @@ class Look:
     head_pitch: float
     body_yaw: float | None
     antennas: tuple[float, float]
-    reason: str                  # "sound" | "look-around" | "antennas"
+    reason: str                  # "sound" | "look-around" | "antennas" | "greet" | "alone"
+    emotion: str | None = None   # U395: play this instead of moving
 
 
 def doa_to_yaw(angle: float) -> float | None:
@@ -88,6 +102,11 @@ class WanderPlanner:
         self._next_body: float | None = None
         self._next_antennas: float | None = None
         self._last_sound_turn = -1e9
+        # U395: when a face was last seen, when he last had company of any
+        # kind, and when he last made an emotion.
+        self._last_face: float | None = None
+        self._company_at: float | None = None
+        self._last_emotion = -1e9
 
     def _after(self, now: float, span: tuple[float, float]) -> float:
         return now + self._rng.uniform(*span)
@@ -96,14 +115,31 @@ class WanderPlanner:
         a = self._rng.uniform(-0.6, 0.6)
         return (round(a, 3), round(-a * self._rng.uniform(0.4, 1.0), 3))
 
+    def _emote(self, now: float, names: tuple[str, ...], reason: str) -> Look:
+        self._last_emotion = now
+        return Look(None, 0.0, None, (0.0, 0.0), reason, self._rng.choice(names))
+
     def decide(self, now: float, *, face_visible: bool,
-               doa: tuple[float, bool] | None) -> Look | None:
+               doa: tuple[float, bool] | None, emotions: bool = False) -> Look | None:
         if self._next_glance is None:
             self._next_glance = self._after(now, (1.0, 4.0))
             self._next_body = self._after(now, self._body_every)
             self._next_antennas = self._after(now, self._antennas_every)
+            # Whoever is there when he starts has not arrived; they were here.
+            self._last_face = self._company_at = now
+
+        # U395: arriving is a face after a while without one — not a face
+        # that looked away for a moment.
+        arriving = face_visible and now - self._last_face >= GREET_AFTER_S
+        if face_visible:
+            self._last_face = self._company_at = now
+        if doa is not None and doa[1]:
+            self._company_at = now
+        may_emote = emotions and now - self._last_emotion >= EMOTION_GAP_S
 
         if face_visible:
+            if arriving and may_emote:
+                return self._emote(now, GREETINGS, "greet")
             # Keep looking at them; postpone the look-around until they leave.
             self._next_glance = max(self._next_glance, self._after(now, (3.0, 6.0)))
             if now >= self._next_antennas:
@@ -121,6 +157,10 @@ class WanderPlanner:
                 self._next_glance = self._after(now, (4.0, 8.0))
                 return Look(round(head, 3), 0.05, None if body is None else round(body, 3),
                             self._antenna_pose(), "sound")
+
+        if may_emote and now - self._company_at >= ALONE_AFTER_S:
+            self._company_at = now
+            return self._emote(now, ALONE, "alone")
 
         if now >= self._next_glance:
             self._next_glance = self._after(now, self._glance_every)

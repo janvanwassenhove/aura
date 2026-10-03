@@ -444,6 +444,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         _asyncio.ensure_future(_wander.apply(_robot))
 
     capabilities_api.set_live_hook("wander", _apply_wander)
+    # U395: the robot is told again when its sound level or Quiet changes.
+    _wander.bind(_robot)
+    from orchestrator import mode_policy as _mode_policy
+
+    _mode_policy.on_quiet_change(_wander.quiet_changed)
 
     # U84: conversation state machine + character personas.
     from aura_brain.characters import CharacterStore
@@ -487,8 +492,13 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         from aura_brain import wander as _wander_now
 
         if _wander_now.silences_speech():
+            # U395: with emotions, the answer is one — a giggle, a hmm.
+            played = None
+            if text and not text.startswith("[echo]"):
+                played = await _wander_now.react(_robot, text)
             logging.getLogger(__name__).info(
-                "wandering silently: the reply is not spoken")
+                "wandering: the reply is not spoken%s",
+                f"; he answered with {played}" if played else "")
             return
         if not text or text.startswith("[echo]"):
             return

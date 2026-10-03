@@ -456,7 +456,7 @@ class _StageRobot:
     def __init__(self) -> None:
         self.told: list[tuple[str, bool]] = []
 
-    async def set_wander(self, enabled):
+    async def set_wander(self, enabled, emotions=False):
         self.told.append(("wander", enabled))
         return {"enabled": enabled, "active": enabled, "sound_direction": True}
 

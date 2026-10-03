@@ -22,4 +22,4 @@ feature: "023-wandering"
 
 ## Phase 3: Emotions (U395)
 
-- [ ] T010 [U395] The *emotions* sound level, from Pollen's library
+- [x] T010 [U395] The *emotions* sound level, from Pollen's library — verified on the robot: the move, the sound file opened by the daemon, follow-me back afterwards, refusals asleep and for unknown names

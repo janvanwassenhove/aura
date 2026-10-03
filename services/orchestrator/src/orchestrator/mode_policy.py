@@ -460,10 +460,29 @@ def quiet() -> bool:
     return bool(_load().get("quiet", False))
 
 
+# U395: who wants to know when Quiet changes. Anything acting on its own
+# accord outside this process — the robot's spontaneous emotions — has to be
+# told; reading the policy only works for code that runs here.
+_quiet_listeners: list = []
+
+
+def on_quiet_change(fn, *, remove: bool = False) -> None:
+    if remove:
+        if fn in _quiet_listeners:
+            _quiet_listeners.remove(fn)
+    elif fn not in _quiet_listeners:
+        _quiet_listeners.append(fn)
+
+
 def set_quiet(on: bool) -> bool:
     data = _load()
     data["quiet"] = bool(on)
     _save(data)
+    for fn in list(_quiet_listeners):
+        try:
+            fn(data["quiet"])
+        except Exception as exc:  # noqa: BLE001 — a listener never undoes the switch
+            logger.debug("quiet listener failed: %s", exc)
     return data["quiet"]
 
 

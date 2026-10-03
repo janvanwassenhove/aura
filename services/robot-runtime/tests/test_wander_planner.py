@@ -108,3 +108,93 @@ def test_the_same_seed_plans_the_same_wander() -> None:
     a = [_planner(3).decide(float(t), face_visible=False, doa=None) for t in range(60)]
     b = [_planner(3).decide(float(t), face_visible=False, doa=None) for t in range(60)]
     assert a == b
+
+
+# --- U395: emotion sounds -----------------------------------------------------
+# "maybe provide variations, e.g. just a hmm or giggling — emotion sounds,
+# besides actually conversing" (translated). He makes them of his own accord
+# only now and then, and never when the owner has not allowed it.
+
+def _emotions(acts) -> list[str]:
+    return [a.emotion for a in acts if a is not None and a.emotion]
+
+
+def test_without_emotions_allowed_he_never_makes_one() -> None:
+    p = _planner()
+    acts = [p.decide(float(t), face_visible=40 <= t % 100 < 60, doa=(LEFT, t % 7 == 0))
+            for t in range(0, 900)]
+    assert _emotions(acts) == []
+
+
+def test_someone_arriving_after_a_while_is_greeted() -> None:
+    from robot_runtime.wander import GREETINGS
+
+    p = _planner()
+    for t in range(0, 30):
+        p.decide(float(t), face_visible=False, doa=None, emotions=True)
+    hello = p.decide(30.0, face_visible=True, doa=None, emotions=True)
+    assert hello is not None and hello.emotion in GREETINGS
+    assert hello.reason == "greet"
+    later = [p.decide(float(t), face_visible=True, doa=None, emotions=True) for t in range(31, 120)]
+    assert _emotions(later) == [], "someone who stays is greeted once"
+
+
+def test_someone_already_there_when_he_starts_is_not_greeted() -> None:
+    p = _planner()
+    acts = [p.decide(float(t), face_visible=True, doa=None, emotions=True) for t in range(0, 60)]
+    assert _emotions(acts) == []
+
+
+def test_looking_away_for_a_moment_is_not_arriving() -> None:
+    p = _planner()
+    for t in range(0, 30):
+        p.decide(float(t), face_visible=False, doa=None, emotions=True)
+    assert p.decide(30.0, face_visible=True, doa=None, emotions=True).emotion
+    for t in range(31, 36):                       # five seconds out of view
+        p.decide(float(t), face_visible=False, doa=None, emotions=True)
+    back = p.decide(36.0, face_visible=True, doa=None, emotions=True)
+    assert back is None or back.emotion is None
+
+
+def test_emotions_are_rare() -> None:
+    """At most one per EMOTION_GAP_S, however busy the room."""
+    from robot_runtime.wander import EMOTION_GAP_S
+
+    p = _planner()
+    when = []
+    for t in range(0, 1200):
+        # someone comes and goes every 40 seconds — each would be an arrival
+        act = p.decide(float(t), face_visible=t % 40 >= 25, doa=None, emotions=True)
+        if act is not None and act.emotion:
+            when.append(t)
+    assert when, "nobody was greeted at all"
+    assert all(b - a >= EMOTION_GAP_S for a, b in zip(when, when[1:])), when
+
+
+def test_long_alone_he_sighs_now_and_then() -> None:
+    from robot_runtime.wander import ALONE, ALONE_AFTER_S
+
+    p = _planner()
+    acts = [p.decide(float(t), face_visible=False, doa=None, emotions=True)
+            for t in range(0, int(ALONE_AFTER_S * 2.5))]
+    sighs = _emotions(acts)
+    assert len(sighs) == 2 and set(sighs) <= set(ALONE)
+
+
+def test_a_voice_means_he_is_not_alone() -> None:
+    from robot_runtime.wander import ALONE_AFTER_S
+
+    p = _planner()
+    acts = [p.decide(float(t), face_visible=False, doa=(FRONT, t % 60 == 0), emotions=True)
+            for t in range(0, int(ALONE_AFTER_S * 2))]
+    assert _emotions(acts) == []
+
+
+def test_turning_to_a_voice_is_never_spoilt_by_an_emotion() -> None:
+    """A recorded emotion moves the head on its own path — it would undo the
+    turn towards whoever spoke."""
+    p = _planner()
+    for t in range(0, 400):
+        act = p.decide(float(t), face_visible=False, doa=(LEFT, t % 9 == 0), emotions=True)
+        if act is not None and act.reason == "sound":
+            assert act.emotion is None

@@ -23,3 +23,9 @@ feature: "023-wandering"
   runtime as well would compete with the daemon for it.
 - **Silent means text.** A silent wander does not discard the conversation; it
   keeps it off the speaker.
+- **Emotions are the daemon's to play** (U395,
+  [ADR-016](../../../docs/adr/ADR-016-his-emotions-are-the-robots-recordings.md)).
+  Pollen's library is already on the robot and the daemon plays a recording
+  with its sound; the runtime holds the motion lock until the daemon reports it
+  finished, and the brain tells the robot whether spontaneous ones are allowed,
+  because Quiet, the stage and the owner's level are the brain's to know.

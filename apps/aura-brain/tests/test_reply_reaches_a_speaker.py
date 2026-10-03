@@ -37,11 +37,16 @@ class _Robot:
 
     def __init__(self, *a, **k) -> None:
         self.heard: list[tuple[str, str | None]] = []
+        self.emoted: list[str] = []
         self._base_url = "http://fake-robot"
 
     async def speak(self, text, audio_b64=None):
         self.heard.append((text, audio_b64))
         return True
+
+    async def play_emotion(self, name):
+        self.emoted.append(name)
+        return {"played": name}
 
     def __getattr__(self, name):
         async def _nothing(*a, **k):
@@ -116,7 +121,7 @@ async def _reply(text: str):
         await ctx.bus.publish(ResponseDrafted(session_id="default", response_text=text))
         for _ in range(100):
             await asyncio.sleep(0.02)
-            if offered or any(r.heard for r in _ROBOTS):
+            if offered or any(r.heard or r.emoted for r in _ROBOTS):
                 break
         await asyncio.sleep(0.05)
         return offered
@@ -163,3 +168,15 @@ async def test_wandering_with_talk_he_answers_as_usual(isolated, monkeypatch) ->
     await _reply("Goedemorgen, alles klaar?")
     assert [t for r in isolated for t, _ in r.heard] == ["Goedemorgen, alles klaar?"]
 
+
+
+async def test_wandering_with_emotions_he_answers_with_one(isolated, monkeypatch) -> None:
+    """U395: the reply's mood as a sound and a movement — a giggle, a hmm —
+    instead of the words. The words stay in the console."""
+    monkeypatch.setenv("WANDER_ENABLED", "true")
+    monkeypatch.setenv("WANDER_SOUND", "emotions")
+    _ROBOTS[:] = isolated
+    offered = await _reply("Haha, goeie!")
+    assert all(r.heard == [] for r in isolated), "emotions mode makes sounds, not words"
+    assert offered == []
+    assert [e for r in isolated for e in r.emoted] == ["laughing2"]

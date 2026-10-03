@@ -387,11 +387,14 @@ async def set_wander(body: dict) -> JSONResponse:
     assert adapter is not None
     _touch()
     enabled = bool(body.get("enabled", True))
+    # U395: whether he may make emotion sounds while he wanders. Not saying is
+    # not allowing — an older brain never asks for them.
+    emotions = bool(body.get("emotions", False))
     toggler = getattr(adapter, "set_wander", None)
     if toggler is None:
         return JSONResponse({"error": "adapter cannot wander"}, status_code=501)
     try:
-        return JSONResponse(await toggler(enabled))
+        return JSONResponse(await toggler(enabled, emotions=emotions))
     except Exception as exc:  # noqa: BLE001
         return JSONResponse({"error": f"wander failed: {exc}"}, status_code=500)
 
@@ -403,6 +406,32 @@ async def get_wander() -> JSONResponse:
     if state is None:
         return JSONResponse({"error": "adapter cannot wander"}, status_code=501)
     return JSONResponse(state())
+
+
+@router.post("/robot/emotion")
+async def play_emotion(body: dict) -> JSONResponse:
+    """U395: one emotion from Pollen's library — a movement with its own sound.
+
+    Answers once it has started. 409 asleep, 422 not a name, 404 not in the
+    library, 501 an adapter without emotions.
+    """
+    assert adapter is not None
+    _touch()
+    player = getattr(adapter, "play_emotion", None)
+    if player is None:
+        return JSONResponse({"error": "adapter has no emotions"}, status_code=501)
+    name = str(body.get("name") or "")
+    try:
+        result = await player(name)
+    except ValueError as exc:
+        return JSONResponse({"error": str(exc)}, status_code=422)
+    except LookupError as exc:
+        return JSONResponse({"error": str(exc)}, status_code=404)
+    except Exception as exc:  # noqa: BLE001
+        return JSONResponse({"error": f"emotion failed: {exc}"}, status_code=500)
+    if result.get("played") is None:
+        return JSONResponse({"error": result.get("reason") or "not played"}, status_code=409)
+    return JSONResponse(result)
 
 
 @router.post("/robot/body_follow")

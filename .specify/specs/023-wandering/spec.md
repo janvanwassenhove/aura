@@ -5,7 +5,7 @@ owner: "robot-runtime / aura-brain"
 priority: P2
 risk: Medium
 created: "2026-10-03"
-units: [U393, U394]
+units: [U393, U394, U395]
 ---
 
 # Feature Specification: Wandering
@@ -72,7 +72,21 @@ cannot tell front from back.
    **Then** he turns to them and says nothing; the reply appears in the console.
 2. **Given** wandering with sound *talk*, **When** someone speaks to him,
    **Then** he answers as usual.
-3. *Emotions* — emotion sounds from Pollen's library instead of words — is U395.
+3. **Given** wandering with sound *emotions*, **When** someone speaks to him,
+   **Then** he answers with an emotion that fits the reply — a giggle for a
+   joke, an *oops* for an apology, a nod and a *hmm* otherwise — and the words
+   appear in the console (U395).
+4. **Given** wandering with sound *emotions* or *talk*, **When** someone comes
+   into view after a while with nobody there, **Then** now and then he greets
+   them with an emotion; **When** he has been alone for a long while, **Then**
+   now and then he sighs or yawns. Never two within 45 seconds, and nobody who
+   was already there when he started is greeted (U395).
+5. **Given** Quiet is on, **Then** he makes no emotion of his own accord — but
+   he still answers with one, because answering is not starting (U256).
+6. **Given** a talk is on stage, **Then** he makes no emotion at all; only the
+   scenario makes sound (U334).
+7. **Given** he is asleep, or speaking, **Then** no emotion plays; his voice
+   cuts a playing one short.
 
 ### Story 4 — a talk decides (U394)
 
@@ -107,11 +121,26 @@ cannot tell front from back.
 - **FR-005**: Gestures, beats and speech hold the motion lock first; a wander
   step waits for it and does not move while he talks.
 - **FR-006**: `WANDER_SOUND` is `silent` (default, and what anything
-  unrecognised means) or `talk`. While wandering silently, replies are not
-  spoken and no voice engine that speaks for itself is opened.
+  unrecognised means), `emotions` (FR-009) or `talk`. While wandering silently
+  or with emotions, replies are not spoken and no voice engine that speaks for
+  itself is opened.
 - **FR-008**: During a presentation the scenario decides whether he wanders
   and whether he follows the presenter, slide by slide (spec 011 FR-122); the
   brain composes it with the owner's settings and gives those back at the end.
+- **FR-009**: `WANDER_SOUND` has a third level, `emotions` (U395): sounds
+  instead of words. An emotion is a recording from Pollen's emotions library
+  (`pollen-robotics/reachy-mini-emotions-library`) — a movement with its own
+  sound — played by the daemon (`POST /api/move/play/recorded-move-dataset/…`)
+  through the robot's speaker, whichever speaker he talks on. The robot runtime
+  plays it (`POST /robot/emotion {name}`: 409 asleep, 422 not a plain name, 404
+  not in the library, 501 an adapter without them) with the motion lock held
+  and follow-me paused until the daemon says it has finished, and stops it when
+  he starts speaking. The planner chooses spontaneous ones (short ones only:
+  greeting someone who arrives, a sigh after five minutes alone, at most one per
+  45 s) when the brain allows them: wandering, sound `emotions` or `talk`, not
+  Quiet, no talk on stage. The brain tells the robot again when the sound level
+  or Quiet changes. In `emotions` mode a reply becomes an emotion picked from
+  its mood (`aura_brain.mood`), laughter first.
 - **FR-007**: `GET /robot/wander` (brain) says whether he wanders, why not when
   he should (`paused: presentation`), what he may say, and what the robot
   answered — including "the robot needs an update to wander".
@@ -120,11 +149,14 @@ cannot tell front from back.
 
 - Driving: Reachy Mini has no wheels.
 - Telling a voice in front from one behind.
-- Emotion sounds (U395) and scenario control (U394), specified when they land.
+- Emotions in a scenario: on stage only the scenario's own lines make sound.
+- Sound-only emotions, or ones synthesised on the laptop: the library's
+  recordings belong to the body — the sound comes from the robot.
 
 ## Traceability
 
 | Unit | What it delivered |
 |---|---|
+| U395 | The *emotions* sound level: spontaneous emotions while he wanders, and a reply answered with one, from Pollen's library |
 | U394 | A scenario decides wandering and follow-me during a talk |
 | U393 | Wandering: the planner, the robot's half (follow-me untouched, never asleep, motion lock first), the brain's half (whether, and what he may say), the switch and its note in Settings |

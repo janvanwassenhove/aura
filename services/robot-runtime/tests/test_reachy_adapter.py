@@ -915,10 +915,171 @@ async def test_status_says_whether_he_wanders(adapter) -> None:
     assert adapter.wander_state()["enabled"] is False
     await adapter.set_wander(True)
     assert adapter.wander_state() == {"enabled": True, "active": True,
-                                      "sound_direction": None}
+                                      "sound_direction": None, "emotions": False}
     sleep_state.set_asleep(True)
     try:
         assert adapter.wander_state()["active"] is False
     finally:
         sleep_state.set_asleep(False)
+
+
+# --------------------------------------------------------------------------- #
+# U395: emotion sounds — Pollen's emotions library, played by the daemon, which
+# plays each move's own sound with it. The adapter owns WHEN: never asleep,
+# never over his own voice, and with the motion lock held so nothing else
+# moves the head while the recording does.
+# --------------------------------------------------------------------------- #
+
+class _Daemon:
+    """The daemon's move endpoints, as far as an emotion needs them."""
+
+    def __init__(self, *, known=("welcoming1", "laughing2"), runs_for: int = 2) -> None:
+        self.known = known
+        self.runs_for = runs_for
+        self.requests: list[tuple[str, str]] = []
+        self.playing: str | None = None
+        self.stopped: list[str] = []
+
+    def handler(self, request):
+        import httpx
+
+        path = request.url.path
+        self.requests.append((request.method, path))
+        if request.method == "POST" and "/api/move/play/recorded-move-dataset/" in path:
+            name = path.rsplit("/", 1)[1]
+            if name not in self.known:
+                return httpx.Response(404, json={"detail": f"Move {name} not found"})
+            self.playing = "uuid-1"
+            return httpx.Response(200, json={"uuid": "uuid-1"})
+        if path == "/api/move/running":
+            if self.playing and self.runs_for > 0:
+                self.runs_for -= 1
+                return httpx.Response(200, json=[{"uuid": self.playing}])
+            self.playing = None
+            return httpx.Response(200, json=[])
+        if path == "/api/move/stop":
+            self.stopped.append(self.playing or "")
+            self.playing = None
+            return httpx.Response(200, json={"message": "stopped"})
+        return httpx.Response(404, json={"detail": "Not Found"})
+
+
+@pytest.fixture()
+def daemon(adapter, monkeypatch):
+    import httpx
+
+    d = _Daemon()
+    monkeypatch.setenv("EMOTION_POLL_S", "0")
+    adapter._daemon = httpx.AsyncClient(transport=httpx.MockTransport(d.handler),
+                                        base_url="http://daemon")
+    return d
+
+
+async def _played_out(adapter) -> None:
+    if adapter._emotion_task is not None:
+        await adapter._emotion_task
+
+
+async def test_an_emotion_is_played_by_the_daemon_from_pollens_library(adapter, daemon) -> None:
+    await adapter.connect()
+    result = await adapter.play_emotion("welcoming1")
+    await _played_out(adapter)
+    assert result["played"] == "welcoming1"
+    assert ("POST", "/api/move/play/recorded-move-dataset/"
+            "pollen-robotics/reachy-mini-emotions-library/welcoming1") in daemon.requests
+
+
+async def test_follow_me_pauses_for_an_emotion_and_comes_back(adapter, daemon) -> None:
+    """A recording moves the head on its own path; the face tracker would pull
+    it straight back and the emotion would look like a twitch."""
+    await adapter.connect()
+    mini = adapter._created[0]
+    await adapter.set_tracking(True)
+    mini.calls.clear()
+    await adapter.play_emotion("welcoming1")
+    await _played_out(adapter)
+    assert _tracking_weights(mini) == [0.0, 1.0]
+
+
+async def test_nothing_else_moves_him_while_an_emotion_plays(adapter, daemon) -> None:
+    await adapter.connect()
+    adapter._read_doa = _doa(0.0, True)
+    adapter._face_visible = lambda: False
+    await adapter.set_wander(True)
+    await adapter.play_emotion("welcoming1")
+    assert adapter._motion_lock.locked(), "the emotion must hold the motion lock"
+    assert await adapter._wander_step(500.0) is None
+    await _played_out(adapter)
+    assert not adapter._motion_lock.locked(), "and give it back when it is done"
+
+
+async def test_asleep_he_makes_no_emotion(adapter, daemon) -> None:
+    from robot_runtime import sleep_state
+
+    await adapter.connect()
+    sleep_state.set_asleep(True)
+    try:
+        result = await adapter.play_emotion("welcoming1")
+    finally:
+        sleep_state.set_asleep(False)
+    assert result["played"] is None and result["reason"] == "asleep"
+    assert daemon.requests == []
+
+
+async def test_only_a_plain_name_reaches_the_daemon(adapter, daemon) -> None:
+    """The name becomes part of a URL path on the robot."""
+    await adapter.connect()
+    for bad in ("../../etc", "a/b", "", "Welcoming 1", "x" * 80):
+        with pytest.raises(ValueError):
+            await adapter.play_emotion(bad)
+    assert daemon.requests == []
+    assert not adapter._motion_lock.locked()
+
+
+async def test_an_unknown_emotion_is_said_so_and_leaves_him_free(adapter, daemon) -> None:
+    await adapter.connect()
+    mini = adapter._created[0]
+    await adapter.set_tracking(True)
+    mini.calls.clear()
+    with pytest.raises(LookupError):
+        await adapter.play_emotion("sneezing9")
+    assert not adapter._motion_lock.locked()
+    assert _tracking_weights(mini) == [0.0, 1.0], "follow-me must come back after a refusal"
+
+
+async def test_his_own_voice_cuts_an_emotion_short(adapter, daemon) -> None:
+    import time as _time
+
+    await adapter.connect()
+    daemon.runs_for = 50
+    await adapter.play_emotion("laughing2")
+    adapter._appsrc_until = _time.monotonic() + 5.0    # a reply starts
+    await _played_out(adapter)
+    assert daemon.stopped == ["uuid-1"]
+    assert not adapter._motion_lock.locked()
+
+
+async def test_wandering_with_emotions_plays_what_the_planner_chose(adapter, daemon) -> None:
+    from robot_runtime.wander import Look
+
+    await adapter.connect()
+    adapter._read_doa = _doa(0.0, False)
+    adapter._face_visible = lambda: True
+    seen = {}
+
+    def decide(now, *, face_visible, doa, emotions=False):
+        seen["emotions"] = emotions
+        return Look(None, 0.0, None, (0.0, 0.0), "greet", "welcoming1") if emotions else None
+    adapter._wander_planner.decide = decide
+
+    await adapter.set_wander(True)
+    await adapter._wander_step(500.0)
+    assert seen["emotions"] is False, "emotions are off unless the brain allows them"
+
+    await adapter.set_wander(True, emotions=True)
+    assert adapter.wander_state()["emotions"] is True
+    look = await adapter._wander_step(600.0)
+    await _played_out(adapter)
+    assert seen["emotions"] is True and look.emotion == "welcoming1"
+    assert any(path.endswith("/welcoming1") for _, path in daemon.requests)
 

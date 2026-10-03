@@ -26,7 +26,7 @@ class _Robot:
         self.wander: bool | None = None
         self.follow_me: bool | None = None
 
-    async def set_wander(self, enabled):
+    async def set_wander(self, enabled, emotions=False):
         self.wander = enabled
         return {"enabled": enabled, "active": enabled, "sound_direction": True}
 

@@ -3,7 +3,7 @@
 **Status**: **Accepted — implemented in U393** (2026-10-03).
 **Date**: 2026-10-03
 **Owner**: robot-runtime / adapters, aura-brain / wander
-**Related**: [spec 023](../../.specify/specs/023-wandering/spec.md), U37, U157,
+**Related**: [spec 023](../../.specify/specs/023-wandering/spec.md), [ADR-016](ADR-016-his-emotions-are-the-robots-recordings.md), U37, U157,
 U165, U357, U393
 
 ---

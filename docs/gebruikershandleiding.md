@@ -93,9 +93,14 @@ een app starten, je browser navigeren, Computer Use, code schrijven.
 - **Rondkijken** (Wander, standaard uit, naast *Follow me*): hij kijkt rond op
   zijn plek, volgt de mensen die hij ziet, draait naar stemmen en beweegt zijn
   antennes. Kies wat hij intussen mag zeggen: *stil* (hij kijkt wie hem
-  aanspreekt aan en antwoordt alleen in de console) of *praat als je hem
-  aanspreekt*. Hij stopt als hij slaapt, en je Follow me-instelling blijft
-  precies zoals ze was. Tijdens een presentatie beslist het scenario
+  aanspreekt aan en antwoordt alleen in de console), *emoties* (geen woorden:
+  hij antwoordt met een giechel, een knik en een *hmm*, een *oeps* — en af en
+  toe begroet hij wie binnenkomt of geeuwt hij als hij een tijd alleen is) of
+  *praat als je hem aanspreekt* (woorden, en af en toe een eigen emotie). De
+  emoties zijn opnames van Pollen en komen altijd uit de luidspreker van de
+  robot, ook als hij via deze laptop praat. Met Quiet aan maakt hij er geen
+  uit zichzelf, maar antwoordt hij er nog wel mee. Hij stopt als hij slaapt, en
+  je Follow me-instelling blijft precies zoals ze was. Tijdens een presentatie beslist het scenario
   (`wander:` en `follow_me:`, zie `docs/demo/scenario-format.md`); een scenario
   dat er niets over zegt, houdt hem stil, en na het beëindigen van de
   presentatie gelden je eigen instellingen weer.

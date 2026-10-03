@@ -496,13 +496,16 @@ async def set_prefs(body: dict) -> JSONResponse:
             )
         updates["AUDIO_OUTPUT"] = audio_output
     # U393: what he may do with his voice while he wanders — `silent` (looks
-    # at whoever speaks, says nothing) or `talk`.
+    # at whoever speaks, says nothing), `emotions` (U395: sounds, not words)
+    # or `talk`.
     wander_sound = (body or {}).get("wander_sound")
     if wander_sound is not None:
         wander_sound = str(wander_sound).strip().lower()
-        if wander_sound not in ("silent", "talk"):
+        from aura_brain import wander as _wander  # noqa: PLC0415
+
+        if wander_sound not in _wander.SOUNDS:
             return JSONResponse(
-                {"error": "wander_sound must be silent or talk"}, status_code=422,
+                {"error": "wander_sound must be silent, emotions or talk"}, status_code=422,
             )
         updates["WANDER_SOUND"] = wander_sound
     # U257: which language wins when a message is too short to tell. Only
@@ -597,6 +600,12 @@ async def set_prefs(body: dict) -> JSONResponse:
         return JSONResponse({"error": "nothing to update"}, status_code=422)
     os.environ.update(updates)          # effective immediately (read live)
     persisted = _write_env(updates)     # survives restarts
+    if "WANDER_SOUND" in updates:
+        # U395: whether he may emote of his own accord is the robot's to act
+        # on — tell it now, not at the next wake-up.
+        from aura_brain import wander as _wander  # noqa: PLC0415
+
+        await _wander.reapply()
     return JSONResponse({**_prefs_snapshot(), "persisted": persisted})
 
 

@@ -30,6 +30,7 @@ import io
 import logging
 import math
 import os
+import re
 from typing import Any
 
 import numpy as np
@@ -46,6 +47,13 @@ from robot_runtime import sleep_state
 from robot_runtime.wander import WanderPlanner
 
 logger = logging.getLogger(__name__)
+
+# U395: Pollen's emotions library, on the robot's own disk (the daemon fetched
+# it once). A name is letters, digits, `_` and `-`: it becomes a URL path.
+EMOTIONS_DATASET = os.environ.get("EMOTIONS_DATASET",
+                                  "pollen-robotics/reachy-mini-emotions-library")
+_EMOTION_NAME = re.compile(r"[a-z0-9][a-z0-9_-]{0,39}")
+EMOTION_MAX_S = 25.0         # the longest in the library is 19.8 s
 
 _NEUTRAL = np.eye(4)
 
@@ -99,6 +107,10 @@ class ReachyRobotAdapter(RobotAdapter):
         self._wander_on = False
         self._wander_task: asyncio.Task | None = None
         self._wander_planner = WanderPlanner()
+        # U395: emotion sounds — allowed by the brain, played by the daemon.
+        self._wander_emotions = False
+        self._daemon: Any = None
+        self._emotion_task: asyncio.Task | None = None
         self._doa_ok: bool | None = None       # None: not read yet
         self._doa_failures = 0
         self._doa_client = None
@@ -385,20 +397,26 @@ class ReachyRobotAdapter(RobotAdapter):
     # U393: wandering — looking around where he stands
     # ------------------------------------------------------------------
 
-    async def set_wander(self, enabled: bool) -> dict:
+    async def set_wander(self, enabled: bool, emotions: bool = False) -> dict:
         """Wander on or off. Follow-me and body-follow are the owner's and are
         not touched: while wandering they are kept on, and afterwards they are
-        put back to whatever the owner has them set to."""
+        put back to whatever the owner has them set to.
+
+        U395: `emotions` — whether he may make emotion sounds of his own
+        accord while he wanders. The brain decides (the owner's sound level,
+        Quiet, a talk on stage); not saying is not allowing."""
         if self._mini is None:
             raise RuntimeError("not connected")
         self._wander_on = enabled
+        self._wander_emotions = bool(emotions)
         want = self._tracking_wanted()
         if want != self._tracking_on:
             await self._apply_tracking(want)
         body = self._body_wanted()
         if body != self._body_follow:
             await self._apply_body_follow(body)
-        logger.info("wander %s", "on" if enabled else "off")
+        logger.info("wander %s%s", "on" if enabled else "off",
+                    " with emotions" if enabled and emotions else "")
         return self.wander_state()
 
     def wander_state(self) -> dict:
@@ -408,6 +426,7 @@ class ReachyRobotAdapter(RobotAdapter):
                        and not sleep_state.is_asleep()),
             # None: not read yet — never claimed until the array has answered.
             "sound_direction": self._doa_ok,
+            "emotions": self._wander_on and self._wander_emotions,
         }
 
     async def _read_doa(self) -> tuple[float, bool] | None:
@@ -442,9 +461,16 @@ class ReachyRobotAdapter(RobotAdapter):
             return None
         face = await asyncio.to_thread(self._face_visible)
         doa = await self._read_doa()
-        look = self._wander_planner.decide(now, face_visible=bool(face), doa=doa)
+        look = self._wander_planner.decide(now, face_visible=bool(face), doa=doa,
+                                           emotions=self._wander_emotions)
         if look is None:
             return None
+        if look.emotion:
+            try:
+                await self.play_emotion(look.emotion)
+            except Exception as exc:  # noqa: BLE001 — wandering goes on without it
+                logger.info("wander: emotion %s did not play: %s", look.emotion, exc)
+            return look
         mini = self._mini
 
         def _move() -> None:
@@ -458,6 +484,93 @@ class ReachyRobotAdapter(RobotAdapter):
         async with self._motion_lock:
             await asyncio.to_thread(_move)
         return look
+
+    # ------------------------------------------------------------------
+    # U395: emotions — a recorded movement with its own sound
+    # ------------------------------------------------------------------
+
+    def _daemon_client(self):
+        """The daemon's HTTP API, where Pollen's emotions library is played.
+        It plays each move's sound with it, through the robot's speaker."""
+        if self._daemon is None:
+            import httpx
+
+            base = os.environ.get("REACHY_DAEMON_URL") or f"http://{self._host}:8000"
+            self._daemon = httpx.AsyncClient(base_url=base, timeout=5.0)
+        return self._daemon
+
+    async def play_emotion(self, name: str) -> dict:
+        """Play one emotion from the library, e.g. ``laughing2``.
+
+        Returns once the daemon has started it; the motion lock is held until
+        it has finished, so no gesture, beat or wander step moves the head
+        under the recording. Follow-me pauses for it, as it does for a
+        manual gesture. Asleep, nothing plays. His own voice cuts it short.
+
+        Raises ValueError for anything that is not a plain name — it becomes
+        part of a URL on the robot — and LookupError for one the library
+        does not have.
+        """
+        if self._mini is None:
+            raise RuntimeError("not connected")
+        if not _EMOTION_NAME.fullmatch(name or ""):
+            raise ValueError(f"not an emotion name: {name!r}")
+        if sleep_state.is_asleep():
+            return {"played": None, "reason": "asleep"}
+
+        await self._motion_lock.acquire()
+        paused = False
+        try:
+            if self._tracking_on:
+                try:
+                    await asyncio.to_thread(self._mini.start_head_tracking, 0.0)
+                    paused = True
+                except Exception:  # noqa: BLE001
+                    pass
+            r = await self._daemon_client().post(
+                f"/api/move/play/recorded-move-dataset/{EMOTIONS_DATASET}/{name}")
+            if r.status_code == 404:
+                raise LookupError(f"the robot has no emotion called {name!r}")
+            r.raise_for_status()
+            uuid = (r.json() or {}).get("uuid")
+        except BaseException:
+            await self._end_emotion(paused)
+            raise
+        self._emotion_task = asyncio.ensure_future(self._finish_emotion(name, uuid, paused))
+        return {"played": name}
+
+    async def _finish_emotion(self, name: str, uuid: str | None, paused: bool) -> None:
+        """Wait for the daemon to finish the move, then let go."""
+        import time
+
+        client = self._daemon_client()
+        poll = float(os.environ.get("EMOTION_POLL_S", "0.25"))
+        started = time.monotonic()
+        cut = False
+        try:
+            while time.monotonic() - started < EMOTION_MAX_S:
+                await asyncio.sleep(poll)
+                if not cut and time.monotonic() < self._appsrc_until:
+                    # He started speaking: his voice comes first.
+                    cut = True
+                    await client.post("/api/move/stop", json={"uuid": uuid})
+                running = (await client.get("/api/move/running")).json()
+                if not any(isinstance(m, dict) and m.get("uuid") == uuid for m in running or []):
+                    break
+        except Exception as exc:  # noqa: BLE001 — never keep the lock over a glitch
+            logger.debug("emotion %s: could not follow it to the end: %s", name, exc)
+        finally:
+            await self._end_emotion(paused)
+            logger.info("emotion %s played%s", name, " (cut short: he spoke)" if cut else "")
+
+    async def _end_emotion(self, paused: bool) -> None:
+        if paused and self._mini is not None:
+            try:
+                await asyncio.to_thread(self._mini.start_head_tracking, 1.0)
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("could not resume head tracking after an emotion: %s", exc)
+        if self._motion_lock.locked():
+            self._motion_lock.release()
 
     async def _wander_loop(self) -> None:
         import time
@@ -876,6 +989,9 @@ class ReachyRobotAdapter(RobotAdapter):
         if self._wander_task is not None:
             self._wander_task.cancel()
             self._wander_task = None
+        if self._emotion_task is not None:
+            self._emotion_task.cancel()
+            self._emotion_task = None
         if self._doa_client is not None:
             try:
                 await self._doa_client.aclose()

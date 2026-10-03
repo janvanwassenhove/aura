@@ -267,8 +267,9 @@
             <span v-if="wanderNote" class="row-val warn" data-test="wander-note">{{ wanderNote }}</span>
             <select :value="prefs.wanderSound" class="d2-field row-field" data-test="wander-sound"
                     aria-label="What he may say while he wanders"
-                    @change="prefs.save({ wander_sound: ($event.target as HTMLSelectElement).value as 'silent' | 'talk' })">
+                    @change="prefs.save({ wander_sound: ($event.target as HTMLSelectElement).value as WanderSound })">
               <option value="silent">silent — looks, says nothing</option>
+              <option value="emotions">emotions — a giggle, a hmm; no words</option>
               <option value="talk">talks when spoken to</option>
             </select>
           </template>
@@ -489,7 +490,7 @@ import { BRAIN_URL } from '../lib/endpoints'
 import { useCapabilitiesStore } from '../stores/capabilitiesStore'
 import { useConnectionsStore } from '../stores/connectionsStore'
 import { useKnowledgeStore } from '../stores/knowledgeStore'
-import { LANGUAGES, usePrefsStore, type Language } from '../stores/prefsStore'
+import { LANGUAGES, usePrefsStore, type Language, type WanderSound } from '../stores/prefsStore'
 import { useSettingsStore, type LLMProvider } from '../stores/settingsStore'
 import { useMcpStore } from '../stores/mcpStore'
 import { useThemeStore } from '../stores/themeStore'
