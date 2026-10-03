@@ -60,6 +60,30 @@ _MOOD_EMOTION = {
 }
 _LAUGH = ("haha", "hihi", "hehe", "lol", "grappig", "funny", "\U0001f602", "\U0001f923")
 
+# U398: how long each one sounds, measured from the library on the robot, so
+# the voice loop can treat his own giggle as his own voice (not as "AURA").
+EMOTION_SECONDS = {
+    "laughing2": 2.9, "cheerful1": 2.8, "enthusiastic2": 3.4, "oops1": 2.5,
+    "inquiring2": 2.6, "thoughtful2": 5.5, "understanding2": 2.6,
+    "welcoming1": 3.5, "grateful1": 2.5,
+}
+
+# U398: what the chat says he did — the words he did not say stay unsaid.
+_GLOSS = {
+    "laughing2": "laughs", "cheerful1": "whistles happily", "enthusiastic2": "cheers",
+    "oops1": "oops", "inquiring2": "tilts his head", "thoughtful2": "thinks about it",
+    "understanding2": "nods — hmm", "welcoming1": "welcomes you", "grateful1": "thanks you",
+}
+
+# U398: what a visitor said, by what it is — matched as whole words, because
+# "hi" is inside "this" and "dag" inside "vandaag".
+_GREETING = ("hallo", "hoi", "hey", "hi", "hello", "goedemorgen", "goedemiddag",
+             "goedenavond", "bonjour", "salut", "welkom")
+_THANKS = ("dank", "bedankt", "dankjewel", "dankuwel", "merci", "thanks", "thank")
+_QUESTION_WORDS = ("wie", "wat", "waar", "waarom", "hoe", "wanneer", "welke", "kan", "kun",
+                   "ben", "who", "what", "where", "why", "how", "when", "which", "can",
+                   "could", "are", "do", "does")
+
 
 def _behaviour() -> dict:
     """The active mode's behaviour row (U397). Unreadable is "not wandering"
@@ -145,6 +169,52 @@ def spontaneous_emotions() -> bool:
     return effective() and sound() in (EMOTIONS, TALK) and not _quiet()
 
 
+def emotion_for_heard(heard: str) -> str:
+    """U398: the emotion that answers what a visitor SAID — a greeting, thanks,
+    laughter, a question — without composing a reply nobody will hear."""
+    import re  # noqa: PLC0415
+
+    t = (heard or "").lower()
+    words = re.findall(r"[a-zà-ÿ']+", t)
+    if any(cue in t for cue in _LAUGH):
+        return "laughing2"
+    if any(w in _GREETING for w in words):
+        return "welcoming1"
+    if any(w in _THANKS or w.startswith("dank") for w in words):
+        return "grateful1"
+    if t.rstrip().endswith("?") or (words and words[0] in _QUESTION_WORDS):
+        return "thoughtful2"
+    from aura_brain.mood import detect_mood  # noqa: PLC0415
+
+    mood = detect_mood(heard)
+    if mood in ("excited",):
+        return "enthusiastic2"
+    if mood == "happy":
+        return "cheerful1"
+    return "understanding2"
+
+
+def emotion_seconds(name: str) -> float:
+    return EMOTION_SECONDS.get(name, 4.0)
+
+
+def describe(name: str) -> str:
+    """What the chat shows in place of an answer."""
+    return f"*{_GLOSS.get(name, 'reacts')}* ({name})"
+
+
+def answers_with_emotion() -> bool:
+    """U398: whether a heard question gets an emotion instead of an answer."""
+    return effective() and sound() == EMOTIONS and _stage() is None
+
+
+async def react_to_heard(robot, heard: str) -> str | None:
+    """Answer what a visitor said with an emotion. Never raises."""
+    if robot is None or not answers_with_emotion():
+        return None
+    return await _play(robot, emotion_for_heard(heard))
+
+
 def emotion_for(text: str) -> str:
     """The emotion that answers a reply: laughter first, then its mood."""
     t = (text or "").lower()
@@ -164,7 +234,12 @@ async def react(robot: Any, text: str) -> str | None:
     """
     if robot is None or _stage() is not None or not effective() or sound() != EMOTIONS:
         return None
-    name = emotion_for(text)
+    return await _play(robot, emotion_for(text))
+
+
+async def _play(robot, name: str) -> str | None:
+    """Play one emotion; the name when it played, None when the robot could
+    not. Never raises."""
     try:
         import httpx  # noqa: PLC0415
 

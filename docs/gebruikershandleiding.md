@@ -112,7 +112,12 @@ een app starten, je browser navigeren, Computer Use, code schrijven.
   kop), hij zoekt de mensen die je kent niet op, niets over jou of je gezin
   zit in wat hij te horen krijgt, wat je in Work zei volgt hem niet, en hij
   onthoudt niemand die hij ontmoet. Terug naar Work en alles is zoals je het
-  liet.
+  liet. Op een stand zegt een bezoeker zijn naam **en** de vraag samen ("AURA,
+  wat ben jij?") — zijn naam alleen, of de volgende zin na zijn antwoord, is
+  een menigte die praat, niet iemand die hem aanspreekt.
+- In *emoties* beantwoordt hij wat hij hoorde met een emotie en maakt hij geen
+  woorden: de chat toont wat hij deed, zoals *\*laughs\* (laughing2)*. Wat je
+  in de console typt, krijgt nog wel een geschreven antwoord.
 
 ## 5. Connecties
 

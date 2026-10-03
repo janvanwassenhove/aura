@@ -180,8 +180,14 @@ async def test_wandering_with_emotions_he_answers_with_one(isolated, monkeypatch
     """U395: the reply's mood as a sound and a movement — a giggle, a hmm —
     instead of the words. The words stay in the console."""
     _wandering("emotions")
+    from aura_brain import voice_loop as vl
+
+    sounded: list[float] = []
+    monkeypatch.setattr(vl.VoiceLoop, "note_sound", lambda self, s: sounded.append(s))
     _ROBOTS[:] = isolated
     offered = await _reply("Haha, goeie!")
     assert all(r.heard == [] for r in isolated), "emotions mode makes sounds, not words"
     assert offered == []
     assert [e for r in isolated for e in r.emoted] == ["laughing2"]
+    # U398: and the voice loop knows his giggle is his own voice.
+    assert sounded == [2.9]

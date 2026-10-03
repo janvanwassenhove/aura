@@ -357,6 +357,24 @@ class VoiceLoop:
         cd = float(os.environ.get("SELF_HEARING_COOLDOWN_S", "1.2"))
         return time.monotonic() < self._speaking_until + cd
 
+    @staticmethod
+    def _public() -> bool:
+        """U398: is the room a crowd (a Stand)? Never raises — a policy that
+        cannot be read is not a crowd."""
+        try:
+            from orchestrator import mode_policy  # noqa: PLC0415
+
+            return mode_policy.in_public()
+        except Exception:  # noqa: BLE001
+            return False
+
+    def note_sound(self, seconds: float) -> None:
+        """U398: he is making a sound that is not speech — an emotion from the
+        robot's library. To the echo guards it is his own voice: a giggle the
+        transcriber hears as "AURA" was waking him on his own laughter. It
+        opens no window; a sound is not a question put to the room."""
+        self._speaking_until = max(self._speaking_until, time.monotonic() + max(0.0, seconds))
+
     def note_spoken(self, text: str) -> None:
         self._last_reply = (text or "")[:200]
         # U148: keep a small history for the echo guard (reverb lags turns).
@@ -388,7 +406,9 @@ class VoiceLoop:
         # and FOLLOWUP_CHAIN_MAX wake-word-less turns later the wake word is
         # required again - so a phantom can talk to itself twice, not forever.
         followup_s = self._followup_s
-        if followup_s <= 0 or now < self._music_until:
+        if followup_s <= 0 or now < self._music_until or self._public():
+            # U398: at a stand the next voice after his answer is as likely
+            # someone else's — the name and the question come together there.
             self._followup_until = 0.0  # wake word required
         elif self._followup_chain < self._max_followup_chain:
             self._followup_until = self._speaking_until + followup_s
@@ -473,6 +493,8 @@ class VoiceLoop:
                     mode = "wake_word"
                     if self._manager is not None and self._manager.character is not None:
                         mode = self._manager.character.interruptibility or "wake_word"
+                    if self._public():
+                        mode = "wake_word"   # U398: a crowd is not an interruption
                     if mode == "off":
                         continue
                     barge_text = (await voice.transcribe(wav, filename="robot.wav") or "").strip()
@@ -523,6 +545,8 @@ class VoiceLoop:
                         continue  # silence — cheap skip, no STT
 
                 in_followup = in_barge or time.monotonic() < self._followup_until
+                if self._public() and not in_barge:
+                    in_followup = False   # U398: no window survives into a crowd
                 # U128: LOCAL wake gate — outside a follow-up window, detect the
                 # wake word on-device before spending a network STT call. No
                 # detector (or a follow-up window) → keep the old transcribe path.
@@ -630,6 +654,17 @@ class VoiceLoop:
                 # gibberish, do NOTHING (no generic "how can I help" reply that
                 # made phantom turns). Only start a turn once we have a real
                 # command.
+                if not command and self._public():
+                    # U398: at a stand his name alone is what the transcriber
+                    # makes of noise, of a clipping microphone and of his own
+                    # giggle — and the window it opened took whatever the
+                    # crowd said next as the question. There, the name and the
+                    # question come in one breath.
+                    self._stat["last_skipped"] = (
+                        "heard his name alone — at a stand the question has to "
+                        "come with it")
+                    logger.info("at a stand: his name alone opens nothing")
+                    continue
                 if not command:
                     # U275: SHOW that the name landed. Reported as "ik roep
                     # robot 'hey richie' met wakeword, maar krijg geen reactie":
@@ -713,7 +748,9 @@ class VoiceLoop:
                 # (or when the engine is 'pipeline') fall back to the classic
                 # transcribe→LLM→TTS handler so Richie always replies.
                 try:
-                    if not await self._speech_turn(wav, command, addressed=addressed):
+                    if await self._emotion_turn(command):
+                        pass
+                    elif not await self._speech_turn(wav, command, addressed=addressed):
                         await self._handle(command)
                 finally:
                     _TRACE.finish(self._session_id)
@@ -1155,6 +1192,41 @@ class VoiceLoop:
         logger.warning("PANIC STOP by owner: speech=%s session=%s, mic off",
                        stopped["speech"], stopped["session"])
         return {"stopped": True, **stopped, "voice_mode": "off"}
+
+    async def _emotion_turn(self, command: str) -> bool:
+        """U398: in *emotions*, a heard question gets an emotion picked from
+        what was said — a greeting, thanks, laughter, a question — and no
+        answer is composed. The answer was only ever shown in the chat, where
+        it read as him holding conversations with the room. True when this
+        turn was his."""
+        from aura_brain import wander  # noqa: PLC0415
+
+        if not wander.answers_with_emotion():
+            return False
+        from shared_schemas.events.audio import TranscriptUpdated
+        from shared_schemas.events.conversation import ResponseDrafted
+
+        await self._bus.publish(TranscriptUpdated(
+            session_id=self._session_id, transcript=command, is_final=True,
+        ))
+        logger.info("VoiceLoop heard: %r", command)
+        played = await wander.react_to_heard(self._robot, command)
+        if played:
+            # already_voiced: the robot has expressed it; nothing is to be
+            # synthesised or played again for this line. The sound is noted
+            # after it, because the reply's note_spoken measures only the text.
+            await self._bus.publish(ResponseDrafted(
+                session_id=self._session_id, response_text=wander.describe(played),
+                already_voiced=True,
+            ))
+            self.note_sound(wander.emotion_seconds(played))
+            logger.info("answered with an emotion: %s", played)
+        if self._manager is not None:
+            try:
+                self._manager.listening()
+            except Exception:  # noqa: BLE001 — bookkeeping never costs the turn
+                pass
+        return True
 
     async def _handle(self, command: str) -> None:
         from shared_schemas.events.audio import TranscriptUpdated

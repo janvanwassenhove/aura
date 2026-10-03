@@ -5,7 +5,7 @@ owner: "aura-brain / conversation"
 priority: P1
 risk: High
 created: "2026-09-05"
-units: [U22, U36b, U36e, U36h, U45, U46, U47, U49, U54, U67, U73, U80, U81, U82, U83, U84, U85, U86, U87, U88, U89, U91, U92, U96, U128, U129, U130, U131, U132, U133, U134, U135, U140, U141, U142, U143, U144, U145, U146, U148, U149, U150, U153, U154, U155, U156, U163, U203, U209, U256, U257, U258, U260, U273, U275, U287, U288, U289, U291, U292, U321, U322, U324, U329, U331, U333, U349, U366, U364, U384, U385, U392]
+units: [U22, U36b, U36e, U36h, U45, U46, U47, U49, U54, U67, U73, U80, U81, U82, U83, U84, U85, U86, U87, U88, U89, U91, U92, U96, U128, U129, U130, U131, U132, U133, U134, U135, U140, U141, U142, U143, U144, U145, U146, U148, U149, U150, U153, U154, U155, U156, U163, U203, U209, U256, U257, U258, U260, U273, U275, U287, U288, U289, U291, U292, U321, U322, U324, U329, U331, U333, U349, U366, U364, U384, U385, U392, U398]
 ---
 
 # Feature Specification: Voice and Language
@@ -390,6 +390,17 @@ the same series as this backfill.
 - **FR-032**: A paid **Live session opens only when he was addressed** — the
   wake word transcribed or detected on the device. A turn that reached him any
   other way is answered by the pipeline, once (U392).
+- **FR-033**: **At a stand his name and the question come in one breath**
+  (U398). In a public mode (`mode_policy.in_public()`) his name alone opens no
+  second window, nothing he says opens a follow-up window, and only his name
+  interrupts him whatever the character's `interruptibility`. In a crowd the
+  transcriber makes "AURA" out of noise, a clipping microphone and his own
+  sounds, and the window that followed took whatever someone said next as the
+  question — measured: one phantom turn every fifteen seconds.
+- **FR-034**: **A sound he makes is his own voice to the echo guards** (U398).
+  An emotion from the robot's library extends the self-hearing cooldown by its
+  measured length (`VoiceLoop.note_sound`); the reply's text no longer stands
+  in for a sound he made instead of saying it. A sound opens no window.
 
 ## Traceability
 
@@ -416,4 +427,5 @@ the same series as this backfill.
 | U333 | Stop drops queued audio and skips the speaker tail in both session engines; Quiet keeps the wake word in charge instead of letting the room talk |
 | U366 | Quiet and Present end a conversation that is already running, within a tick, and a silenced turn is never re-asked out loud by the pipeline |
 | U364 | His voice out of the laptop instead of the robot — the same synthesized audio, handed over once, so the character and the mid-line switch survive |
+| U398 | At a stand his name and the question come together; his own emotion sound is his own voice to the echo guards |
 | U349 | A presentation beat carries its own character, and one line can change character halfway: per-beat voice and speed above the mode voice, and several voices joined into one utterance so the hand-over is not also a volume step (ADR-012) |

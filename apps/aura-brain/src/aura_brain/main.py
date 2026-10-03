@@ -492,6 +492,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             played = None
             if text and not text.startswith("[echo]"):
                 played = await _wander_now.react(_robot, text)
+            if played and ctx._voice_loop is not None:
+                # U398: his own giggle is his own voice to the echo guards.
+                ctx._voice_loop.note_sound(_wander_now.emotion_seconds(played))
             logging.getLogger(__name__).info(
                 "wandering: the reply is not spoken%s",
                 f"; he answered with {played}" if played else "")

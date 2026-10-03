@@ -6070,3 +6070,62 @@ selects (all red). The Settings tests for wandering were replaced by one that
 says it is not there; two mode-policy tests that named three modes and four
 behaviour keys now name four and six; the persona list has six; and U294's
 "the person lookup is in every mode" is now every mode but the stand.
+
+### U398 — at a stand he answered the crowd
+
+Reported, in Stand with *emotions* (translated): *"I notice in the chat that he
+still starts a conversation"*, then *"not spoken aloud, only in the chat"*.
+
+**What the log showed.** Nothing was spoken — every turn ended *"the reply is
+not spoken; he answered with inquiring2"*. But turns arrived every fifteen
+seconds, and nobody had said his name: "Ik weet niet of dat piept.", "I
+needed to see more in the", "Det er en god speking.", "De nieuwste en
+spannendste". The voice loop's own status said `last_text: "AURA"` and
+`last_peak: 1.0` — a microphone at full scale — and after almost every turn
+the log has *"discarded self-hearing (cooldown): 'AURA'"*.
+
+**What was actually wrong** was a loop with three parts:
+
+1. The transcriber returns "AURA" for audio that is not his name. Measured:
+   right after his own sounds (caught by the cooldown, so logged), and as the
+   last transcript of a loud room. Which of noise, clipping or his own sound
+   caused each phantom is not separable from the log; all three end the same
+   way.
+2. His name alone is a wake: a nod, and a second window that accepts anything
+   (U93, U275). Whatever the room said next became the question.
+3. In *emotions* the answer is a sound — but the self-hearing cooldown was set
+   by `note_spoken` from the length of the reply's **text**, which he did not
+   say. The sound he did make was not covered, so it could be heard as "AURA"
+   and start the next round.
+
+**The change.**
+
+- *At a stand his name and the question come in one breath.* In a public mode
+  his name alone opens nothing, an answer opens no follow-up window, and only
+  his name interrupts him, whatever the character's `interruptibility`. A
+  visitor who says "AURA" and waits gets no answer — the price of not
+  answering the hall (ADR-017).
+- *His sound is his own voice.* `VoiceLoop.note_sound(seconds)` extends the
+  self-hearing cooldown by an emotion's measured length, from both the voice
+  path and the typed path; it opens no window.
+- *In emotions, no composed answer.* A heard question gets an emotion picked
+  from what was **said** — laughter, a greeting, thanks, a question, else its
+  mood — and the chat shows what he did (`*welcomes you* (welcoming1)`)
+  instead of an answer nobody heard. No LLM call per overheard sentence.
+  Typed messages in the console still get a written answer. The owner chose
+  this over keeping the text.
+
+**Not explained.** The same log interleaves two conversation turn counters
+(`turn=6` and `turn=13` sixteen seconds apart) with a single brain running.
+It did not change what was heard or answered here, and it is written down
+rather than guessed at.
+
+**Tests**: the real listening loop over a scripted room, on a clock moved by
+hand — at home his name alone still opens the window (control); at a stand it
+opens nothing, an answer opens no window, a `vad` character is not interrupted
+by the crowd, and name-plus-question is answered; the cooldown covers his
+emotion and opens nothing; in *emotions* a heard "AURA, hallo!" plays
+`welcoming1`, composes nothing and shows what he did, while *talk* still
+answers; ten heard sentences map to their emotion, with "This is nice" kept
+out of the greetings. 16 red before, the 3 controls green. The reply path's
+emotions test now also checks the voice loop was told (red without the wiring).

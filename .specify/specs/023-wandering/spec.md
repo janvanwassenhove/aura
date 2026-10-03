@@ -5,7 +5,7 @@ owner: "robot-runtime / aura-brain"
 priority: P2
 risk: Medium
 created: "2026-10-03"
-units: [U393, U394, U395, U397]
+units: [U393, U394, U395, U397, U398]
 ---
 
 # Feature Specification: Wandering
@@ -156,6 +156,12 @@ cannot tell front from back.
   Quiet, no talk on stage. The brain tells the robot again when the sound level
   or Quiet changes. In `emotions` mode a reply becomes an emotion picked from
   its mood (`aura_brain.mood`), laughter first.
+- **FR-011**: In *emotions* a heard question gets **an emotion picked from
+  what was said** — laughter, a greeting, thanks, a question, otherwise its
+  mood — and no answer is composed (U398). The chat shows what he did
+  (`*laughs* (laughing2)`), not words he did not say; nothing is synthesised.
+  A message typed in the console is still answered by the pipeline, and its
+  reply's mood picks the emotion (FR-009).
 - **FR-007**: `GET /robot/wander` (brain) says whether he wanders, why not when
   he should (`paused: presentation`), what he may say, and what the robot
   answered — including "the robot needs an update to wander".
@@ -172,6 +178,7 @@ cannot tell front from back.
 
 | Unit | What it delivered |
 |---|---|
+| U398 | In *emotions* a heard question gets an emotion picked from what was said, without composing an answer |
 | U397 | Wandering is a behaviour of each mode, set in Modes; a Stand mode wanders and talks by default |
 | U395 | The *emotions* sound level: spontaneous emotions while he wanders, and a reply answered with one, from Pollen's library |
 | U394 | A scenario decides wandering and follow-me during a talk |

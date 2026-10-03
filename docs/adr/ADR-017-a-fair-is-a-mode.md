@@ -64,6 +64,12 @@ everyone who walks up is talking to that.
   to whoever stands beside them.
 - The owner can still open up a Stand in Modes, group by group, like any mode.
   The defaults are the safe ones.
+- At a stand his name and the question come in one breath, and nothing he
+  says opens a window for the next voice (U398). The first evening in Stand
+  showed why: the transcriber made "AURA" out of noise and out of his own
+  giggle, and the window that followed took the crowd's next sentence as the
+  question. A visitor who says only "AURA" and waits gets nothing — the
+  price of not answering the hall.
 - Anything added later that reads personal context must ask
   `mode_policy.in_public()` — the pipeline, the household note and the person
   note do, and they are what both speech paths ask.
