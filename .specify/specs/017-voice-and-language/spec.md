@@ -5,7 +5,7 @@ owner: "aura-brain / conversation"
 priority: P1
 risk: High
 created: "2026-09-05"
-units: [U22, U36b, U36e, U36h, U45, U46, U47, U49, U54, U67, U73, U80, U81, U82, U83, U84, U85, U86, U87, U88, U89, U91, U92, U96, U128, U129, U130, U131, U132, U133, U134, U135, U140, U141, U142, U143, U144, U145, U146, U148, U149, U150, U153, U154, U155, U156, U163, U203, U209, U256, U257, U258, U260, U273, U275, U287, U288, U289, U291, U292, U321, U322, U324, U329, U331, U333, U349, U366, U364, U384]
+units: [U22, U36b, U36e, U36h, U45, U46, U47, U49, U54, U67, U73, U80, U81, U82, U83, U84, U85, U86, U87, U88, U89, U91, U92, U96, U128, U129, U130, U131, U132, U133, U134, U135, U140, U141, U142, U143, U144, U145, U146, U148, U149, U150, U153, U154, U155, U156, U163, U203, U209, U256, U257, U258, U260, U273, U275, U287, U288, U289, U291, U292, U321, U322, U324, U329, U331, U333, U349, U366, U364, U384, U385]
 ---
 
 # Feature Specification: Voice and Language
@@ -355,9 +355,10 @@ the same series as this backfill.
 - **FR-026**: Every path that makes him speak asks where: the two reply paths,
   the presentation runner, and `/robot/say`, which is what the console's quick
   actions use. A gesture sent with `/robot/say` still plays on the robot —
-  only the voice moves. The realtime/live path is the exception and still speaks
-  to the robot, because it streams provider audio rather than synthesizing it
-  (U364).
+  only the voice moves. The live and realtime engines ask too — each streamed
+  segment is its own hand-over (U385). Nothing in the brain calls the robot's
+  `speak`, `speak_segment` or `stop_audio` except `speech_out`, and a test reads
+  the source to keep it that way (U364, U385).
 - **FR-027**: A reply that reaches no speaker is a failure the log says out
   loud. From U364 to U384 the reply path handed `deliver()` a name that did not
   exist in its scope; every reply raised, and the handler logged it at DEBUG,
@@ -368,6 +369,16 @@ the same series as this backfill.
 - **FR-028**: The console is *told* there is a line to play. `SpeechAudioReady`
   is on the WebSocket broadcast (spec 003 FR-005); without it the brain held
   the audio and no console ever fetched it (U384).
+- **FR-029**: On the laptop, lines play in the order they were announced, each
+  after the one before has finished, and each is fetched the moment it is
+  announced. The first version stopped the current line when the next arrived;
+  a live reply is a burst of segments, so the room would have heard only the
+  last fragment — and a segment waiting its turn could age out of the brain's
+  small hold before it was fetched (U385).
+- **FR-030**: Stop means both speakers. Barge-in, the realtime cut and the
+  panic stop publish `SpeechAudioStopped` and drop unfetched lines *before*
+  asking the robot to stop, so an unreachable robot cannot leave the laptop
+  talking. Whether the robot confirmed is still reported as such (U385).
 
 ## Traceability
 

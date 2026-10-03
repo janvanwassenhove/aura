@@ -49,6 +49,7 @@ from shared_schemas.events import (
     RobotDisconnected,
     RobotModeChanged,
     SpeechAudioReady,
+    SpeechAudioStopped,
     SpeechPlaybackCompleted,
     SpeechPlaybackStarted,
     ToolCallFailed,
@@ -101,6 +102,8 @@ _ALL_EVENT_TYPES: tuple[type[BaseEvent], ...] = (
     # U384: U364's laptop audio. The console fetches the line it names; without
     # this it was held in the brain and nobody was ever told to fetch it.
     SpeechAudioReady,
+    # U385: Stop has to reach the laptop too, or it keeps talking.
+    SpeechAudioStopped,
     # U384: U352's overlay switch. The overlay also polls every 1.5 s, which is
     # why this was never missed — but the push was designed in, and without it
     # a scenario's "hide the overlay" lands up to a second and a half late.

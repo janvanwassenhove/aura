@@ -433,7 +433,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     from aura_brain.conversation_manager import ConversationManager
 
     ctx.characters = CharacterStore()
-    ctx.conversation = ConversationManager(stop_robot_audio=_robot.stop_audio)
+    from aura_brain import speech_out as _speech_out
+
+    # U385: a barge-in stops him on whichever speaker he is using. It used
+    # to stop the robot only, and the laptop talked on over the owner.
+    ctx.conversation = ConversationManager(
+        stop_robot_audio=lambda: _speech_out.stop(_robot, ctx.bus))
 
     def _active_character_note() -> str:
         c = ctx.characters.active()

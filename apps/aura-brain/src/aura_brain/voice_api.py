@@ -55,7 +55,9 @@ async def panic_stop() -> JSONResponse:
         os.environ["VOICE_MODE"] = "off"
         if _robot is not None:
             try:
-                await _robot.stop_audio()
+                from aura_brain import speech_out  # noqa: PLC0415
+
+                await speech_out.stop(_robot, _bus)  # U385: laptop too
                 result["speech"] = True
             except Exception:  # noqa: BLE001 — a panic stop never fails
                 pass

@@ -47,7 +47,7 @@ from typing import Any
 
 import numpy as np
 
-from aura_brain import hush
+from aura_brain import hush, speech_out
 from aura_brain.realtime_session import _resample_16k_to_24k
 
 logger = logging.getLogger(__name__)
@@ -475,7 +475,8 @@ class LiveSession:
                     self._trace.mark("playback_first_sample")
                 first = False
                 try:
-                    await self._robot.speak_segment(base64.b64encode(data).decode())
+                    await speech_out.deliver_segment(  # U385: the owner's speaker
+                        self._robot, self._bus, base64.b64encode(data).decode())
                 except Exception as exc:  # noqa: BLE001 — drop a segment, keep talking
                     logger.debug("live segment playback failed: %s", exc)
 

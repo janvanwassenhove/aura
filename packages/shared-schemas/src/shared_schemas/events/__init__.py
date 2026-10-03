@@ -3,6 +3,7 @@
 from shared_schemas.events.audio import (
     AudioInputStarted,
     SpeechAudioReady,
+    SpeechAudioStopped,
     TranscriptUpdated,
     UserSpeechDetected,
 )
@@ -56,6 +57,7 @@ __all__ = [
     "AudioInputStarted",
     "UserSpeechDetected",
     "SpeechAudioReady",
+    "SpeechAudioStopped",
     "TranscriptUpdated",
     # conversation
     "IntentRecognized",

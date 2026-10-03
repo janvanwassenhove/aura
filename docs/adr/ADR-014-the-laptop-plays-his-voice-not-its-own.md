@@ -99,11 +99,26 @@ at all, and that is worth keeping for a laptop-only rehearsal.
   presentation runner, and `/robot/say`, which is what the console's quick
   actions use. A gesture sent with `/robot/say` still plays on the robot: only
   the voice moves.
-- **The realtime/live path is the exception.** `voice_loop.py` streams audio
-  from the provider rather than going through `voice.synthesize_b64`, so it has
-  no single buffer to hand over and still speaks to the robot. Routing it is a
-  different job with a different shape, and bundling it in would have been a
-  second unit wearing this one's name.
+- ~~**The realtime/live path is the exception.**~~ **Withdrawn in U385.** It
+  was the exception that got noticed: with the laptop chosen, the live engine
+  went on speaking through the robot, and that is what the owner reported. A
+  setting called *Where he speaks* cannot mean "except sometimes". Each
+  streamed segment is now its own hand-over.
+
+## Amended by U385: a queue, not a cut
+
+The first console player stopped the line it was playing when the next one
+arrived, on the reasoning that two lines overlapping is two voices out of one
+speaker. True, and the wrong fix for it: a live reply is a burst of ~1.4 s
+segments, and cut-on-arrival plays only the last one. Lines now queue and play
+in announcement order, and each is fetched the moment it is announced, because
+the brain holds only eight unfetched lines and a burst queued behind a long
+sentence would otherwise age out there.
+
+Queueing makes Stop matter more, not less — there is now a queue to drop. Every
+stop (barge-in, the realtime cut, the panic stop) goes through `speech_out.stop`,
+which tells the console first and the robot second, so the call that can fail
+is the one that cannot leave the laptop talking.
 - Nothing here has been verified **by ear**. The tests assert the bytes offered
   to the laptop are identical to the bytes the robot would have received, which
   is the part a test can hold; that they come out of a speaker is not.

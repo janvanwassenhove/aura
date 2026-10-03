@@ -32,7 +32,7 @@ from typing import Any
 
 import numpy as np
 
-from aura_brain import hush
+from aura_brain import hush, speech_out
 from aura_brain.realtime_voice import (
     METER,
     ConnFactory,
@@ -396,7 +396,8 @@ class RealtimeSession:
                         self._trace.mark("tts_first_audio")
                         self._trace.mark("playback_first_sample")
                 try:
-                    await self._robot.speak_segment(base64.b64encode(data).decode())
+                    await speech_out.deliver_segment(  # U385: the owner's speaker
+                        self._robot, self._bus, base64.b64encode(data).decode())
                 except Exception as exc:  # noqa: BLE001 — drop, don't die
                     logger.debug("segment playback failed: %s", exc)
 
@@ -438,7 +439,7 @@ class RealtimeSession:
                         seg = bytearray()          # drop unplayed audio
                         self._playing_until = 0.0
                         try:
-                            await self._robot.stop_audio()
+                            await speech_out.stop(self._robot, self._bus)  # U385
                         except Exception:  # noqa: BLE001 — cut is best-effort
                             pass
                         try:

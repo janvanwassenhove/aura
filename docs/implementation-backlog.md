@@ -5389,3 +5389,63 @@ played it; nobody listened.
 speech all afternoon (*"Kolarakaltvyou."*, *"Moćete beli."*) and answered it,
 once opening a paid live session; and 5 of 58 replies in the log started twice
 in the same second.
+
+### U385 — "where he speaks" means every word, and Stop means both speakers
+
+The rest of U384's report. What the owner heard from the robot, with the laptop
+chosen, was a live session voicing its replies over `/robot/speak/segment`. U364
+left that path unrouted and wrote the exception into ADR-014; the owner never
+agreed to it, and the setting's own name says otherwise.
+
+Routing it turned up two things the exception had been hiding.
+
+**The console player cut each line off when the next one arrived.** That was a
+deliberate choice in U364 — two lines overlapping is two voices — and it was
+never exercised with more than one line, because nothing yet sent more than one.
+A live reply is a burst of ~1.4 s segments; cut-on-arrival plays the last
+fragment and nothing else. It also fetched lazily, at play time, while the brain
+holds only eight unfetched lines: a burst queued behind one long sentence would
+have aged out before anyone asked for it.
+
+**Every Stop reached the robot only.** Barge-in, the realtime cut and the panic
+stop all called `robot.stop_audio()`. With the laptop chosen — possible since
+U364 — pressing Stop left the laptop talking. That one was never reported
+because, until U384, the laptop never got anything to say.
+
+What changed:
+
+- `speech_out.deliver_segment()` for streamed audio, and `speech_out.stop()`,
+  which drops unfetched lines, publishes the new `SpeechAudioStopped`, and only
+  then asks the robot — so an unreachable robot cannot leave the laptop talking.
+  The robot's error still propagates, so the panic stop's `speech` field still
+  says whether the *robot* confirmed.
+- The live session, the realtime session and the voice loop's two speaking
+  calls go through it; so do all four stop sites and the conversation manager's
+  barge-in hook.
+- The console queues lines in announcement order — slots are reserved on
+  arrival, so fetches finishing out of order do not reorder speech — fetches
+  each one immediately, and drops the queue on Stop. A stop that lands while a
+  line is still in flight wins.
+- `SpeechAudioStopped` had to go on the broadcaster, and U384's coverage test
+  refused to let it be forgotten — which is the point of that test.
+
+**Tests**: 8 in `test_live_speech_out.py`, including one that reads the brain's
+source as an AST and fails if anything but `speech_out` calls the robot's
+`speak`, `speak_segment` or `stop_audio` — verified by putting the live
+session's direct call back, which it named by file and line. The console's 12
+playback tests replace U364's 5: 10 fail against the old player.
+
+**Verified end to end** on the throwaway stack with real synthesized audio.
+Three lines announced at once played in order, each starting the millisecond
+the one before ended (10173/12271/14011 ms), none paused, and the brain's
+`pending` was 0 within a second. Two long lines and the panic stop 2.5 s in:
+the first paused mid-sentence at 3.8 s, the second never started. The live
+engine itself was **not** run end to end — it needs the provider and a
+microphone; its three call sites are covered by the source guard and by
+`deliver_segment`'s own tests.
+
+**Still direct, deliberately**: U27's slide-cue `PresentationManager`
+(`services/orchestrator`) calls `robot.speak(text)` with no audio, so the
+robot's own TTS reads it. Nothing in the console drives it any more — scenarios
+use the U206 runner, which is routed — so routing it would mean synthesizing for
+a path no one takes.

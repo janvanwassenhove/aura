@@ -102,30 +102,72 @@ async def deliver(robot: Any, bus: Any, text: str, audio_b64: str | None) -> boo
     like a successful utterance (U269's rule).
     """
     if output() == LAPTOP:
-        if not audio_b64:
-            return False
-        try:
-            pcm = base64.b64decode(audio_b64)
-        except Exception as exc:  # noqa: BLE001 — bad audio is not a crash
-            logger.warning("speech audio could not be decoded: %s", exc)
-            return False
-        if bus is None:
-            # The event is the whole delivery: without it nothing will ever ask
-            # for the audio, so holding it and returning True would be a
-            # successful-looking utterance that no room can hear (ADR-009).
-            logger.warning("speech cannot reach the laptop: no event bus")
-            return False
-        from shared_schemas.events.audio import SpeechAudioReady  # noqa: PLC0415
-
-        utterance_id = _hold(pcm)
-        await bus.publish(SpeechAudioReady(
-            session_id="default", utterance_id=utterance_id, text=text))
-        logger.info("speech routed to the laptop (%d bytes)", len(pcm))
-        return True
-
+        return await _offer(bus, text, audio_b64)
     if robot is None:
         return False
     await robot.speak(text, audio_b64=audio_b64)
+    return True
+
+
+async def deliver_segment(robot: Any, bus: Any, audio_b64: str | None) -> bool:
+    """Play one streamed piece of a reply. Returns whether it was handed anywhere.
+
+    U385: the live and realtime engines speak in ~1.4 s segments as the
+    provider produces them, over `/robot/speak/segment`. U364 left that path
+    alone and wrote the exception down; it was what the owner heard from the
+    robot with the laptop chosen. On the laptop each segment is its own
+    hand-over, and the console plays them in the order they were offered.
+    """
+    if output() == LAPTOP:
+        return await _offer(bus, "", audio_b64)
+    if robot is None:
+        return False
+    await robot.speak_segment(audio_b64)
+    return True
+
+
+async def stop(robot: Any, bus: Any) -> None:
+    """Silence him wherever he is speaking.
+
+    U385: every Stop used to reach the robot's speaker only. The laptop is told
+    first, and unfetched lines are dropped, because the robot call is the one
+    that can fail — an offline robot must never leave the laptop talking. The
+    robot's error still propagates, so callers that report whether the robot
+    stopped keep reporting it honestly.
+    """
+    forget_all()
+    if bus is not None:
+        from shared_schemas.events.audio import SpeechAudioStopped  # noqa: PLC0415
+
+        try:
+            await bus.publish(SpeechAudioStopped(session_id="default"))
+        except Exception as exc:  # noqa: BLE001 — a stop never fails on the bus
+            logger.warning("could not tell the laptop to stop: %s", exc)
+    if robot is not None:
+        await robot.stop_audio()
+
+
+async def _offer(bus: Any, text: str, audio_b64: str | None) -> bool:
+    """Hold one piece of audio for the console and tell it so."""
+    if not audio_b64:
+        return False
+    try:
+        pcm = base64.b64decode(audio_b64)
+    except Exception as exc:  # noqa: BLE001 — bad audio is not a crash
+        logger.warning("speech audio could not be decoded: %s", exc)
+        return False
+    if bus is None:
+        # The event is the whole delivery: without it nothing will ever ask
+        # for the audio, so holding it and returning True would be a
+        # successful-looking utterance that no room can hear (ADR-009).
+        logger.warning("speech cannot reach the laptop: no event bus")
+        return False
+    from shared_schemas.events.audio import SpeechAudioReady  # noqa: PLC0415
+
+    utterance_id = _hold(pcm)
+    await bus.publish(SpeechAudioReady(
+        session_id="default", utterance_id=utterance_id, text=text))
+    logger.info("speech routed to the laptop (%d bytes)", len(pcm))
     return True
 
 

@@ -38,3 +38,16 @@ class SpeechAudioReady(BaseEvent):
     event_type: Literal["SpeechAudioReady"] = "SpeechAudioReady"
     utterance_id: str
     text: str = ""
+
+
+class SpeechAudioStopped(BaseEvent):
+    """U385: stop playing him on this laptop, now, and drop what is queued.
+
+    Every way of silencing him — barge-in, the realtime cut, the panic stop —
+    used to stop the robot's speaker and nothing else. With his voice routed to
+    the laptop (U364) that left the laptop talking after Stop was pressed.
+    Published on every stop, whichever speaker is in use: a console that is not
+    playing anything simply has nothing to stop.
+    """
+
+    event_type: Literal["SpeechAudioStopped"] = "SpeechAudioStopped"

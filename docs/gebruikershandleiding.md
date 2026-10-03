@@ -30,7 +30,8 @@ volgende MSI in plaats van stilletjes — je krijgt de wizard te zien.
 **Waar hij spreekt** (Instellingen -> Waar hij spreekt): zijn eigen speaker, of
 deze laptop. De stem is in beide gevallen identiek - dezelfde audio wordt een
 keer gemaakt en alleen de speaker verschilt - dus een grotere zaal kan hem via
-de laptop horen zonder dat hij zijn karakter verliest.
+de laptop horen zonder dat hij zijn karakter verliest. Dat geldt voor elk woord,
+ook in de live-modus, en Stop (of door hem heen praten) legt ook de laptop stil.
 
 Bij de eerste start verschijnt een korte **setup-wizard**:
 

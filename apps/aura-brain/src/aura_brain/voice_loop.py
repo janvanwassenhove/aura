@@ -29,6 +29,8 @@ import os
 import time
 from typing import Any
 
+from aura_brain import speech_out
+
 logger = logging.getLogger(__name__)
 
 # Whisper hallucinates set phrases from silence/noise. Reject these outright.
@@ -483,7 +485,7 @@ class VoiceLoop:
                     if self._manager is not None:
                         await self._manager.interrupt(self._last_reply)
                     try:
-                        await self._robot.stop_audio()
+                        await speech_out.stop(self._robot, self._bus)  # U385: both
                     except Exception:  # noqa: BLE001 — robot offline
                         pass
                     self._speaking_until = 0.0  # user interrupted → stop waiting
@@ -858,7 +860,8 @@ class VoiceLoop:
                                 _t.mark("tts_first_audio")
                                 _t.mark("playback_first_sample")
                         try:
-                            await self._robot.speak_segment(base64.b64encode(seg).decode())
+                            await speech_out.deliver_segment(  # U385: the owner's speaker
+                                self._robot, self._bus, base64.b64encode(seg).decode())
                         except Exception as exc:  # noqa: BLE001 — best-effort
                             logger.debug("segment playback failed: %s", exc)
 
@@ -892,7 +895,9 @@ class VoiceLoop:
                 if _t is not None:
                     _t.mark("tts_first_audio")
                     _t.mark("playback_first_sample")
-                await self._robot.speak(transcript, audio_b64=base64.b64encode(audio_out).decode())
+                await speech_out.deliver(  # U385: the owner's speaker
+                    self._robot, self._bus, transcript,
+                    base64.b64encode(audio_out).decode())
             if _t is not None:
                 _t.mark("playback_complete")
             self.note_spoken(transcript)
@@ -1096,7 +1101,7 @@ class VoiceLoop:
 
         stopped = {"speech": False, "session": False}
         try:
-            await self._robot.stop_audio()
+            await speech_out.stop(self._robot, self._bus)  # U385: laptop too
             stopped["speech"] = True
         except Exception as exc:  # noqa: BLE001 — never fail a panic stop
             logger.warning("panic: could not stop speech: %s", exc)
