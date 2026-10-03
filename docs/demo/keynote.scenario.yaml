@@ -1,0 +1,69 @@
+# AURA presentation scenario — EXAMPLE: a keynote (U394).
+#
+# A large hall, the robot on stage beside you. What it shows:
+#
+#   - `wander` and `follow_me` for the whole talk, at the top;
+#   - beats that change them from a slide onwards, like `overlay`;
+#   - on any slide, he is wherever the last beat AT OR BEFORE that slide put
+#     him — so going back, or jumping, puts him right without replaying history.
+#
+# Check it at a desk before the day:
+#   python scripts/check_scenario.py docs/demo/keynote.scenario.yaml
+#
+# The format: docs/demo/scenario-format.md
+
+title: "Keynote: The Junior Dev That Never Sleeps"
+pptx: "keynote.pptx"
+overlay: shown
+
+# Before your first slide: the hall is filling up. He looks around it, turns to
+# people talking near the stage, and moves his antennas — wandering, where he
+# stands. From your first word he watches you instead.
+wander: on
+follow_me: on
+
+beats:
+  # Slide 1 is your title, up while people sit down. Nothing here — the start
+  # of the talk already has him wandering.
+
+  # Slide 2: your first word. He stops looking around and watches you.
+  - id: you-start
+    trigger: slide:2
+    mode: silent
+    wander: off
+
+  - id: hello
+    trigger: slide:3
+    mode: speak
+    text: "Good morning. I'm the junior dev. He does the talking; I do the nodding."
+    gesture: nod
+
+  # A live demo on the big screen. The room should watch the demo, not a robot
+  # following you across the stage — so he stands still and leaves the screen.
+  - id: demo
+    trigger: slide:18
+    mode: silent
+    follow_me: off
+    overlay: hide
+
+  - id: demo-done
+    trigger: slide:19
+    mode: silent
+    follow_me: on
+    overlay: show
+
+  # Questions: he turns towards whoever asks — the microphone array hears the
+  # side a voice comes from. He does not speak; on stage only the scenario does.
+  - id: questions
+    trigger: slide:30
+    mode: silent
+    wander: on
+
+  # The last line. He stops looking around for it, and the talk ends with him
+  # watching you. After "End presentation" your own settings come back.
+  - id: thanks
+    trigger: slide:31
+    mode: speak
+    text: "Thank you. I'll be by the coffee — the one not drinking any."
+    wander: off
+    gesture: nod

@@ -24,6 +24,8 @@ script.
 title: "I Hired a Real Robot as My Junior Dev"   # optional
 pptx: "AURA-Devoxx-2026-conference-talk.pptx"    # optional, for the wrong-deck warning
 overlay: hidden                                   # optional: hidden | shown (default)
+wander: on                                        # optional: on | off — does he look around?
+follow_me: on                                     # optional: on | off — does he watch you?
 
 beats:
   - id: the-fanfare        # required, unique
@@ -36,6 +38,8 @@ beats:
     gesture: nod           # optional
     persona: kids_companion  # optional: a character id
     overlay: hide          # optional: show | hide, from this beat onwards
+    wander: off            # optional: on | off, from this beat onwards
+    follow_me: off         # optional: on | off, from this beat onwards
     once: true             # optional: keyword beats fire once anyway; a slide beat
                            #   replays when you return to its slide unless this says true
 ```
@@ -55,6 +59,8 @@ came out in one voice (U360).
 | `title` | string | `""` | Shown on the presenter HUD. |
 | `pptx` | string | `""` | The deck's file name. Only used to warn you that the wrong deck is on screen — he never opens it. |
 | `overlay` | `shown` \| `hidden` | `shown` | Where the projector overlay starts. `hidden` is for a talk where he should appear only at the moments you name. |
+| `wander` | `on` \| `off` | not said | Whether he looks around where he stands — follows the people he sees, turns towards voices, moves his antennas — when the talk starts. Not said: he does not wander during the talk, whatever Settings says. |
+| `follow_me` | `on` \| `off` | not said | Whether he keeps looking at the presenter when the talk starts. Not said: your own *Follow me* setting. |
 | `beats` | list | `[]` | In file order. Order matters for `manual` beats. |
 
 ### Beat
@@ -71,6 +77,8 @@ came out in one voice (U360).
 | `engine` | `""` \| `pipeline` \| `realtime` | `""` | `pipeline` runs the full agentic loop — **required** if the line needs live data (calendar, a lookup). |
 | `once` | bool | by trigger | Leave it out. A `keyword:` beat fires once however often the word is said; a `slide:` beat runs again every time you return to its slide. Write `once: true` on a slide beat only if returning must stay silent. |
 | `overlay` | `""` \| `show` \| `hide` | `""` | Move the projector overlay from this beat onwards. Empty leaves it alone. |
+| `wander` | `on` \| `off` | not said | From this beat onwards, does he look around. Not said leaves it as it was. |
+| `follow_me` | `on` \| `off` | not said | From this beat onwards, does he watch the presenter. Not said leaves it as it was. |
 | `persona` | character id | `""` | Which character speaks this beat — its voice, speed, and (when improvising) its way of putting things. |
 | `voice` | TTS voice | `""` | A voice for this beat alone. |
 | `speed` | float | `0` | `0.25`–`4.0`. `0` means leave it alone. |
@@ -135,8 +143,22 @@ line cannot be both "all in onyx" and "this bit in somebody else's voice".
   middle of a full-frame run leaves him off the screen even though that slide
   has no beat of its own. A keyword or manual beat can move it too; the next
   slide change decides again.
+- **`wander` and `follow_me` follow the slide, like the overlay.** On any
+  slide he is where the last beat at or before it put him, so going back or
+  jumping puts him right. A keyword or manual beat can move them too; the next
+  slide change decides again.
+- **During a talk the scenario decides; afterwards, your settings.** `wander:
+  on` makes him wander even if Settings has it off — the scenario is your
+  script for that talk. A scenario that says nothing about wandering keeps him
+  still on stage. *End presentation* gives your own Follow me and Wander back.
+- **Wandering never makes him speak.** On stage only the scenario speaks; while
+  wandering he turns towards voices, nothing more. He never wanders asleep.
+- **Two worked examples**: [`keynote.scenario.yaml`](keynote.scenario.yaml)
+  and [`conference-talk.scenario.yaml`](conference-talk.scenario.yaml). Both are
+  walked slide by slide in the tests, forwards and backwards, checking what the
+  robot is told at every step.
 - **The builder shows no control for `voice`, `speed` or `pause`**, but it
-  carries them through a load-and-save untouched.
+  carries them through a load-and-save untouched. `once` is carried the same way.
 - **A persona that names no character is still spoken**, in the presentation
   voice, and the Present panel says which id it could not find.
 

@@ -5,7 +5,7 @@ owner: "robot-runtime / aura-brain"
 priority: P2
 risk: Medium
 created: "2026-10-03"
-units: [U393]
+units: [U393, U394]
 ---
 
 # Feature Specification: Wandering
@@ -74,6 +74,19 @@ cannot tell front from back.
    **Then** he answers as usual.
 3. *Emotions* — emotion sounds from Pollen's library instead of words — is U395.
 
+### Story 4 — a talk decides (U394)
+
+1. **Given** a scenario with `wander: on` for the walk-in and `wander: off`
+   from the first slide, **When** the presenter starts, **Then** he looks around
+   the room until the first slide and watches the presenter after it.
+2. **Given** a beat with `follow_me: off` on the demo slide, **When** that
+   slide is reached, **Then** he stands still; **When** the presenter jumps back
+   into the demo later, **Then** he stands still again.
+3. **Given** a scenario that says nothing about wandering, **Then** he does not
+   wander during the talk, whatever Settings says.
+4. **Given** the talk ends, **Then** the owner's own Wander and Follow me apply
+   again.
+
 ## Functional Requirements
 
 - **FR-001**: Wandering is a capability, `wander` (`WANDER_ENABLED`, off by
@@ -96,6 +109,9 @@ cannot tell front from back.
 - **FR-006**: `WANDER_SOUND` is `silent` (default, and what anything
   unrecognised means) or `talk`. While wandering silently, replies are not
   spoken and no voice engine that speaks for itself is opened.
+- **FR-008**: During a presentation the scenario decides whether he wanders
+  and whether he follows the presenter, slide by slide (spec 011 FR-122); the
+  brain composes it with the owner's settings and gives those back at the end.
 - **FR-007**: `GET /robot/wander` (brain) says whether he wanders, why not when
   he should (`paused: presentation`), what he may say, and what the robot
   answered — including "the robot needs an update to wander".
@@ -110,4 +126,5 @@ cannot tell front from back.
 
 | Unit | What it delivered |
 |---|---|
+| U394 | A scenario decides wandering and follow-me during a talk |
 | U393 | Wandering: the planner, the robot's half (follow-me untouched, never asleep, motion lock first), the brain's half (whether, and what he may say), the switch and its note in Settings |

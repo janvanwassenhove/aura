@@ -434,3 +434,77 @@ def test_ending_with_nothing_loaded_is_harmless(client) -> None:
     assert r.status_code == 200
     assert r.json() == {"active": False}
 
+
+# ------------------------------------------------------------------
+# U394: "check that these are activated correctly" (translated) — the real
+# API, a scenario with wander and follow_me, slides driven one by one, and a
+# robot that records exactly what it was told.
+# ------------------------------------------------------------------
+
+STAGE_YAML = """
+title: Stage
+follow_me: on
+beats:
+  - {id: walk-in, trigger: "slide:1", mode: silent, wander: on}
+  - {id: talk, trigger: "slide:2", mode: silent, wander: off}
+  - {id: demo, trigger: "slide:5", mode: silent, follow_me: off}
+  - {id: demo-done, trigger: "slide:6", mode: silent, follow_me: on}
+"""
+
+
+class _StageRobot:
+    def __init__(self) -> None:
+        self.told: list[tuple[str, bool]] = []
+
+    async def set_wander(self, enabled):
+        self.told.append(("wander", enabled))
+        return {"enabled": enabled, "active": enabled, "sound_direction": True}
+
+    async def set_tracking(self, enabled):
+        self.told.append(("follow_me", enabled))
+        return enabled
+
+    def __getattr__(self, _name):
+        async def _nothing(*a, **k):
+            return {}
+        return _nothing
+
+
+async def test_the_scenario_moves_wander_and_follow_me_on_the_real_robot_path(monkeypatch) -> None:
+    from aura_brain import presentation_api, wander
+
+    robot = _StageRobot()
+    monkeypatch.setattr(presentation_api, "_robot", robot)
+    monkeypatch.setenv("HEAD_TRACKING", "true")
+    monkeypatch.delenv("WANDER_ENABLED", raising=False)
+    monkeypatch.setattr(presentation_api, "_stop_watcher", _noop)
+    wander.forget()
+    presentation_api._runner = None
+    presentation_api._kept = None
+
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+    app = FastAPI()
+    app.include_router(presentation_api.router)
+    c = TestClient(app)
+    assert c.post("/presentation/scenario", json={"yaml": STAGE_YAML}).status_code == 200
+
+    for slide in (1, 2, 5, 6):
+        await presentation_api._on_slide(slide)
+    c.post("/presentation/end")
+
+    wander_calls = [v for k, v in robot.told if k == "wander"]
+    follow_calls = [v for k, v in robot.told if k == "follow_me"]
+    # load (talk starts, nothing said yet: off), slide 1 on, slide 2 off, end off
+    assert wander_calls[0] is False and True in wander_calls and wander_calls[-1] is False
+    assert wander_calls.index(True) < len(wander_calls) - 1
+    # follow-me: on for the talk, off for the demo, on after it, and the
+    # owner's (on) once the talk has ended
+    assert follow_calls[:1] == [True]
+    assert False in follow_calls
+    assert follow_calls[-1] is True
+
+
+async def _noop(*_a, **_k):
+    return None
+

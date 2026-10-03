@@ -35,6 +35,26 @@
       </select>
     </label>
 
+    <!-- U394: what the talk asks of his body. Not chosen = the owner's own
+         settings, which is what every scenario before this did. -->
+    <label class="sb-field">
+      <span>While presenting <em class="sb-hint">beats below can change these from a slide onwards</em></span>
+      <span class="sb-pair">
+        <select v-model="scenarioWander" class="sb-input sb-scenario-wander"
+                title="Does he look around by himself during the talk?">
+          <option value="">wander: as in Settings (paused)</option>
+          <option value="on">wander: on</option>
+          <option value="off">wander: off</option>
+        </select>
+        <select v-model="scenarioFollow" class="sb-input sb-scenario-follow"
+                title="Does he keep looking at the presenter?">
+          <option value="">follow me: as in Settings</option>
+          <option value="on">follow me: on</option>
+          <option value="off">follow me: off</option>
+        </select>
+      </span>
+    </label>
+
     <!-- Beats -->
     <div v-for="(b, i) in beats" :key="b._k" class="sb-beat"
          :class="{ 'sb-beat--bad': badBeats.includes(b.id.trim()) }">
@@ -108,6 +128,21 @@
               <option value="hide">take him off the screen</option>
             </select>
           </label>
+          <!-- U394: from this beat onwards — like the projector. -->
+          <label class="sb-lbl">On stage
+            <select v-model="b.wander" class="sb-input sb-beat-wander"
+                    title="From this beat onwards: does he look around by himself?">
+              <option value="">wander: leave as it is</option>
+              <option value="on">wander: on</option>
+              <option value="off">wander: off</option>
+            </select>
+            <select v-model="b.follow_me" class="sb-input sb-beat-follow"
+                    title="From this beat onwards: does he keep looking at the presenter?">
+              <option value="">follow me: leave as it is</option>
+              <option value="on">follow me: on</option>
+              <option value="off">follow me: off</option>
+            </select>
+          </label>
         </div>
 
         <div class="sb-row" v-if="b.mode !== 'silent'">
@@ -170,12 +205,18 @@ interface FormBeat {
   overlay: string
   /** U360: no control for these - carried so a round-trip cannot drop them. */
   voice: string; speed: number; pause: number
+  /** U394: '' leave as it is | 'on' | 'off', from this beat onwards. */
+  wander: string; follow_me: string
+  /** U387: only when the scenario wrote it — carried, never invented. */
+  once: boolean | null
 }
 
 let seq = 0
 const title = ref('')
 const pptx = ref('')
 const scenarioOverlay = ref('')   // U352: '' shown throughout | 'hidden'
+const scenarioWander = ref('')    // U394: '' not said | 'on' | 'off'
+const scenarioFollow = ref('')    // U394: '' not said | 'on' | 'off'
 const beats = ref<FormBeat[]>([])
 const saved = ref<{ name: string; title: string; beats: number }[]>([])
 const saveName = ref('')
@@ -196,7 +237,13 @@ function blankBeat(): FormBeat {
   return { _k: seq++, id: `beat-${beats.value.length + 1}`, mode: 'speak',
            _tkind: 'manual', _tslide: 1, _tword: '', trigger: 'manual',
            text: '', topic: '', guardrails: '', gesture: null, engine: '',
-           persona: '', overlay: '', voice: '', speed: 0, pause: 0 }
+           persona: '', overlay: '', voice: '', speed: 0, pause: 0,
+           wander: '', follow_me: '', once: null }
+}
+
+/** U394: 'on' / 'off' / '' to what the brain reads — true / false / left out. */
+function onOff(v: unknown): string {
+  return v === true ? 'on' : v === false ? 'off' : ''
 }
 
 /** U349: the characters a beat may be handed to. Loaded from the brain — the
@@ -248,6 +295,9 @@ function toScenario(): object {
     // U352: omitted rather than sent empty - "not mentioned" is the thing that
     // keeps every scenario written before this showing the overlay throughout.
     ...(scenarioOverlay.value ? { overlay: scenarioOverlay.value } : {}),
+    // U394: left out when not chosen - "not said" is the owner's settings.
+    ...(scenarioWander.value ? { wander: scenarioWander.value === 'on' } : {}),
+    ...(scenarioFollow.value ? { follow_me: scenarioFollow.value === 'on' } : {}),
     beats: beats.value.map(b => {
       if (b.mode === 'chime_in') b._tkind = 'keyword'
       syncTrigger(b)
@@ -268,6 +318,9 @@ function toScenario(): object {
       if (b.voice) out.voice = b.voice
       if (b.speed) out.speed = b.speed
       if (b.pause) out.pause = b.pause
+      if (b.wander) out.wander = b.wander === 'on'
+      if (b.follow_me) out.follow_me = b.follow_me === 'on'
+      if (b.once !== null) out.once = b.once
       return out
     }),
   }
@@ -287,6 +340,8 @@ function loadScenario(sc: Record<string, unknown>, name = '') {
   title.value = String(sc.title ?? '')
   pptx.value = String(sc.pptx ?? '')   // U263b: reloading a scenario keeps its deck
   scenarioOverlay.value = String(sc.overlay ?? '').toLowerCase() === 'hidden' ? 'hidden' : ''
+  scenarioWander.value = onOff(sc.wander)
+  scenarioFollow.value = onOff(sc.follow_me)
   if (name) saveName.value = name
   beats.value = ((sc.beats as Record<string, unknown>[]) ?? []).map((b) => {
     const trig = String(b.trigger ?? 'manual')
@@ -300,6 +355,8 @@ function loadScenario(sc: Record<string, unknown>, name = '') {
       engine: String(b.engine ?? ''), persona: String(b.persona ?? ''),
       overlay: String(b.overlay ?? '').toLowerCase(),
       voice: String(b.voice ?? ''), speed: Number(b.speed ?? 0), pause: Number(b.pause ?? 0),
+      wander: onOff(b.wander), follow_me: onOff(b.follow_me),
+      once: typeof b.once === 'boolean' ? b.once : null,
     }
   })
 }

@@ -579,3 +579,103 @@ async def test_status_names_the_beat_that_ran_last() -> None:
     await r.on_slide(8)
     assert r.status()["last_fired"] == "gag"
 
+
+# --------------------------------------------------------------------------- #
+# U394: a scenario decides whether he wanders and follows, slide by slide
+#
+# Asked for as (translated): "in present mode -> provide this 'wander' mode next
+# to 'follow me' as options in a scenario; check that they are activated
+# correctly". Same shape as the overlay (U352, U387): a start for the talk, a
+# change from a beat onwards, and on any slide whatever the last beat at or
+# before it said.
+# --------------------------------------------------------------------------- #
+
+def _robot_events(rig: _Rig) -> list[dict]:
+    return [{k: v for k, v in e.items() if k != "type"}
+            for e in rig.events if e.get("type") == "robot"]
+
+
+def _stage() -> Scenario:
+    return Scenario(follow_me=True, beats=[
+        Beat(id="walk-in", trigger="slide:1", mode="silent", wander=True),
+        Beat(id="talk", trigger="slide:2", mode="silent", wander=False),
+        Beat(id="demo", trigger="slide:20", mode="silent", follow_me=False),
+        Beat(id="demo-done", trigger="slide:25", mode="silent", follow_me=True),
+        Beat(id="qa", trigger="slide:40", mode="silent", wander=True),
+    ])
+
+
+def test_a_scenario_that_says_nothing_controls_nothing() -> None:
+    """Every scenario written before U394 leaves both to the owner."""
+    rig = _Rig()
+    r = rig.runner(Scenario(beats=[Beat(id="a", trigger="slide:1", mode="silent")]))
+    assert r.status()["wander"] is None and r.status()["follow_me"] is None
+
+
+async def test_the_talk_starts_where_the_scenario_says() -> None:
+    rig = _Rig()
+    r = rig.runner(_stage())
+    assert r.status()["follow_me"] is True
+    assert r.status()["wander"] is None          # not said until a beat says it
+
+
+async def test_wander_and_follow_me_follow_the_slide() -> None:
+    rig = _Rig()
+    r = rig.runner(_stage())
+    seen = []
+    for n in (1, 2, 21, 25, 40, 22, 3):
+        await r.on_slide(n)
+        seen.append((n, r.status()["wander"], r.status()["follow_me"]))
+    assert seen == [
+        (1, True, True),      # walk-in: he looks around the room
+        (2, False, True),     # the talk starts: still, watching the speaker
+        (21, False, False),   # inside the demo: he stands still
+        (25, False, True),    # demo done: back to watching
+        (40, True, True),     # questions: he turns to whoever asks
+        (22, False, False),   # back into the demo, by jumping
+        (3, False, True),
+    ]
+
+
+async def test_only_a_change_is_announced() -> None:
+    rig = _Rig()
+    r = rig.runner(_stage())
+    for n in (2, 3, 4, 5):
+        await r.on_slide(n)
+    assert len(_robot_events(rig)) == 1, "slides that change nothing must say nothing"
+
+
+async def test_a_keyword_beat_moves_it_until_the_next_slide_decides() -> None:
+    rig = _Rig()
+    r = rig.runner(Scenario(beats=[
+        Beat(id="look", trigger="keyword:look around", mode="silent", wander=True, once=False),
+    ]))
+    await r.on_slide(5)
+    await r.on_speech("let him look around a bit")
+    assert r.status()["wander"] is True
+    await r.on_slide(6)
+    assert r.status()["wander"] is None, "the slides say nothing, so the owner's again"
+
+
+def test_on_and_off_are_what_a_person_writes() -> None:
+    import yaml
+
+    sc = Scenario.model_validate(yaml.safe_load(
+        "title: t\nwander: off\nfollow_me: on\nbeats:\n"
+        "  - {id: a, trigger: 'slide:1', mode: silent, wander: on}\n"))
+    assert sc.wander is False and sc.follow_me is True and sc.beats[0].wander is True
+
+
+def test_a_word_that_is_neither_is_refused() -> None:
+    import pytest
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError):
+        Beat(id="a", trigger="slide:1", mode="silent", wander="sometimes")
+
+
+def test_unset_stays_unset_through_save_and_load() -> None:
+    sc = Scenario(beats=[Beat(id="a", trigger="slide:1", mode="silent")])
+    again = Scenario.model_validate(sc.model_dump(exclude_none=True))
+    assert again.wander is None and again.beats[0].follow_me is None
+

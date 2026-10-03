@@ -33,7 +33,7 @@ logger = logging.getLogger(__name__)
 SILENT, TALK = "silent", "talk"
 SOUNDS = (SILENT, TALK)
 
-_last: dict = {"robot": None, "note": ""}
+_last: dict = {"robot": None, "note": "", "follow_me_overridden": False}
 
 
 def wanted() -> bool:
@@ -41,21 +41,43 @@ def wanted() -> bool:
     return os.environ.get("WANDER_ENABLED", "false").strip().lower() == "true"
 
 
-def paused_reason() -> str | None:
-    """Why it is not in force although the owner wants it, or None."""
+def _stage() -> dict | None:
+    """U394: what the running talk asks of his body, or None when no talk runs.
+    Each value is None where the scenario does not say."""
     try:
         from aura_brain import presentation_api  # noqa: PLC0415
 
         if presentation_api.is_active():
-            return "presentation"
+            return presentation_api.stage_robot()
     except Exception:  # noqa: BLE001 — a missing presentation module pauses nothing
         pass
     return None
 
 
+def paused_reason() -> str | None:
+    """Why it is not in force although the owner wants it, or None."""
+    stage = _stage()
+    if stage is not None and stage.get("wander") is not True:
+        return "presentation"
+    return None
+
+
 def effective() -> bool:
-    """Whether he should be wandering right now."""
-    return wanted() and paused_reason() is None
+    """Whether he should be wandering right now.
+
+    During a talk the scenario decides — it is the owner's own script for
+    that talk, so `wander: on` there makes him wander even with the switch
+    off, and a scenario that says nothing pauses it (U334). Otherwise, the
+    switch.
+    """
+    stage = _stage()
+    if stage is not None:
+        return stage.get("wander") is True
+    return wanted()
+
+
+def owner_follow_me() -> bool:
+    return os.environ.get("HEAD_TRACKING", "true").strip().lower() == "true"
 
 
 def sound() -> str:
@@ -95,7 +117,24 @@ async def apply(robot: Any) -> dict:
         _last["note"] = f"could not apply: {exc}"
     if _last["note"]:
         logger.info("wander: %s", _last["note"])
+    await _apply_follow_me(robot)
     return status()
+
+
+async def _apply_follow_me(robot: Any) -> None:
+    """U394: a scenario may set follow-me for the talk; when the talk ends —
+    or the scenario stops saying — the owner's own setting comes back."""
+    stage = _stage()
+    want = stage.get("follow_me") if stage is not None else None
+    try:
+        if want is not None:
+            await robot.set_tracking(want)
+            _last["follow_me_overridden"] = True
+        elif _last["follow_me_overridden"]:
+            await robot.set_tracking(owner_follow_me())
+            _last["follow_me_overridden"] = False
+    except Exception as exc:  # noqa: BLE001 — the same "never raises" as above
+        logger.debug("follow-me apply failed: %s", exc)
 
 
 def status() -> dict:
@@ -112,3 +151,4 @@ def status() -> dict:
 def forget() -> None:
     """Tests: drop what the last apply learned."""
     _last["robot"], _last["note"] = None, ""
+    _last["follow_me_overridden"] = False

@@ -76,6 +76,9 @@ def main(argv: list[str]) -> int:
     print(f"  armed keywords  {', '.join(keywords) or '-'}")
     print(f"  slide cues      {', '.join(str(n) for n in slides) or '-'}")
     print(f"  overlay starts  {'shown' if scenario.overlay_starts_visible else 'hidden'}")
+    # U394: what the talk asks of his body, in the order the room will see it.
+    print(f"  wander          {_stage_plan(scenario, 'wander')}")
+    print(f"  follow-me       {_stage_plan(scenario, 'follow_me')}")
 
     # The things that are legal and still worth a second look.
     for beat in scenario.beats:
@@ -89,6 +92,34 @@ def main(argv: list[str]) -> int:
                                 for s in beat.speech_segments())
             print(f"  ! {beat.id}: changes voice mid-line: {voices}")
     return 0
+
+
+def _stage_plan(scenario, name: str) -> str:
+    """U394: e.g. "on at the start | off from slide 2 (you-start)".
+
+    Slide beats in slide order, because on any slide he is where the last beat
+    at or before it put him; keyword and manual beats after them, because they
+    hold only until the next slide says otherwise. ASCII only, like the rest
+    of this output.
+    """
+    word = {True: "on", False: "off"}
+    start = getattr(scenario, name)
+    if start is None:
+        parts = ["paused - the scenario does not say" if name == "wander"
+                 else "your own setting - the scenario does not say"]
+    else:
+        parts = [f"{word[start]} at the start"]
+    on_slides = sorted(((b.slide_number, i, b) for i, b in enumerate(scenario.beats)
+                        if b.slide_number is not None and getattr(b, name) is not None),
+                       key=lambda t: (t[0], t[1]))
+    parts += [f"{word[getattr(b, name)]} from slide {n} ({b.id})" for n, _, b in on_slides]
+    for b in scenario.beats:
+        if getattr(b, name) is None or b.slide_number is not None:
+            continue
+        cue = (f"when you say '{b.trigger_value}'" if b.trigger_kind == "keyword"
+               else "when you press Advance")
+        parts.append(f"{word[getattr(b, name)]} {cue} ({b.id})")
+    return " | ".join(parts)
 
 
 if __name__ == "__main__":

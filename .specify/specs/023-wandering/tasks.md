@@ -16,8 +16,9 @@ feature: "023-wandering"
 
 ## Phase 2: Scenarios (U394)
 
-- [ ] T008 [U394] `wander` and `follow_me` in a scenario, per talk and per beat
-- [ ] T009 [U394] Example scenarios: a keynote and a conference talk
+- [x] T008 [U394] `wander` and `follow_me` in a scenario, per talk and per beat
+- [x] T009 [U394] Example scenarios: a keynote and a conference talk, walked step by step in the tests
+- [x] T011 [U394] The builder offers both and carries `once` through a save
 
 ## Phase 3: Emotions (U395)
 

@@ -260,7 +260,14 @@ async def _generate(topic: str, guardrails: str, engine: str, persona: str = "")
 
 
 async def _on_event(event: dict) -> None:
-    """Runner events → the bus, so the presenter view can render subtitles."""
+    """Runner events → the robot, and → the bus so the presenter view can
+    render subtitles."""
+    # U394: a slide or a beat changed whether he wanders or follows. Told to
+    # the ROBOT, so it must not wait on the subtitle bus below — found by the
+    # example-scenario walk, which runs without one.
+    if event.get("type") == "robot":
+        await _wander_follows_the_show()
+        return
     if _bus is None:
         return
     # U352: the overlay is a separate window with its own store, so a beat that
@@ -329,6 +336,14 @@ async def load_scenario(body: dict) -> JSONResponse:
 
     await _wander_follows_the_show()
     return JSONResponse(_status_payload())
+
+
+def stage_robot() -> dict:
+    """U394: what the running talk asks of his body — None where it does not say."""
+    if _runner is None:
+        return {"wander": None, "follow_me": None}
+    st = _runner.status()
+    return {"wander": st.get("wander"), "follow_me": st.get("follow_me")}
 
 
 async def _wander_follows_the_show() -> None:

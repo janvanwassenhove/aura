@@ -80,3 +80,29 @@ def test_it_flags_the_things_worth_a_second_look(tmp_path) -> None:
     out = _run(sc).stdout
     assert "voice onyx" in out and "0.85" in out
     assert "waits 7.0s" in out
+
+
+KEYNOTE = REPO / "docs" / "demo" / "keynote.scenario.yaml"
+CONFERENCE = REPO / "docs" / "demo" / "conference-talk.scenario.yaml"
+
+
+def test_the_two_example_talks_pass() -> None:
+    """U394: the examples handed out as the contract must themselves load."""
+    for path in (KEYNOTE, CONFERENCE):
+        result = _run(path)
+        assert result.returncode == 0, path.name + result.stdout + result.stderr
+
+
+def test_it_says_when_he_wanders_and_follows() -> None:
+    """U394: a scenario that moves his body says so at the desk, slide by slide,
+    and a talk that says nothing is reported as leaving it to the owner."""
+    out = _run(KEYNOTE).stdout
+    assert "wander          on at the start" in out, out
+    assert "off from slide 2 (you-start)" in out, out
+    assert "follow-me       on at the start" in out, out
+    assert "off from slide 18 (demo)" in out, out
+    conference = _run(CONFERENCE).stdout
+    assert "on when you say 'kijk eens rond' (kijk-rond)" in conference, conference
+    plain = _run(GOOD).stdout
+    assert "wander          paused - the scenario does not say" in plain, plain
+

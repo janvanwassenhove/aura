@@ -94,8 +94,11 @@ een app starten, je browser navigeren, Computer Use, code schrijven.
   zijn plek, volgt de mensen die hij ziet, draait naar stemmen en beweegt zijn
   antennes. Kies wat hij intussen mag zeggen: *stil* (hij kijkt wie hem
   aanspreekt aan en antwoordt alleen in de console) of *praat als je hem
-  aanspreekt*. Hij stopt als hij slaapt en tijdens een presentatie, en je
-  Follow me-instelling blijft precies zoals ze was.
+  aanspreekt*. Hij stopt als hij slaapt, en je Follow me-instelling blijft
+  precies zoals ze was. Tijdens een presentatie beslist het scenario
+  (`wander:` en `follow_me:`, zie `docs/demo/scenario-format.md`); een scenario
+  dat er niets over zegt, houdt hem stil, en na het beëindigen van de
+  presentatie gelden je eigen instellingen weer.
 
 ## 5. Connecties
 

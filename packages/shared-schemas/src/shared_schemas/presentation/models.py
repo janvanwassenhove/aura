@@ -115,6 +115,11 @@ class Beat(BaseModel):
     # means "leave it as it is" — which is why a scenario written before this
     # existed still shows the overlay for its whole length.
     overlay: str = ""
+    # U394: from this beat onwards, does he wander / follow the presenter?
+    # None leaves it as it was. YAML reads `on`/`off` as true/false, so
+    # `wander: on` is what a person writes.
+    wander: bool | None = None
+    follow_me: bool | None = None
     # U360: a raw voice and speed for this beat, for when a line wants a
     # different sound without a whole character behind it — a gag in a second
     # voice, say. `persona` (U349) is the richer form and wins where both are
@@ -224,6 +229,11 @@ class Scenario(BaseModel):
     # so it appears only at the beats that ask for it; empty or "shown" is the
     # behaviour every scenario had before this field existed.
     overlay: str = ""
+    # U394: how the talk starts — does he wander, does he follow the presenter.
+    # None (not mentioned) leaves both to the owner's own settings, which is
+    # what every scenario written before this does.
+    wander: bool | None = None
+    follow_me: bool | None = None
     beats: list[Beat] = Field(default_factory=list)
 
     @property

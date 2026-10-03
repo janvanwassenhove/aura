@@ -1,0 +1,70 @@
+# AURA presentation scenario — EXAMPLE: a conference talk (U394).
+#
+# A smaller room, the robot on the table in front of you, a Dutch-speaking
+# audience. Next to keynote.scenario.yaml it also shows a KEYWORD beat that
+# moves him: say the phrase and he starts looking around, until the next slide
+# that says otherwise.
+#
+# Check it at a desk before the day:
+#   python scripts/check_scenario.py docs/demo/conference-talk.scenario.yaml
+#
+# The format: docs/demo/scenario-format.md
+# The lines he speaks are Dutch on purpose: this is the talk as given.
+
+title: "Mijn robot als junior developer"
+pptx: "conference-talk.pptx"
+
+# He watches you for the whole talk; looking around only where a beat says so.
+follow_me: on
+wander: off
+
+beats:
+  # While people come in, the title slide is up: he looks around the room.
+  - id: welkom
+    trigger: slide:1
+    mode: silent
+    wander: on
+
+  # Your first slide of content: he stops and watches you, and says hello.
+  - id: start
+    trigger: slide:2
+    mode: speak
+    text: "Goeiemiddag! Ik ben de junior. Hij praat, ik knik."
+    wander: off
+    gesture: nod
+
+  # You can ask for it: say "kijk eens rond" and he looks around the room —
+  # handy when you talk about what he sees. The next slide that mentions
+  # wandering takes it back; once: false, so it works every time you say it.
+  - id: kijk-rond
+    trigger: keyword:kijk eens rond
+    mode: silent
+    wander: on
+    once: false
+
+  # The demo: he stands completely still and leaves the screen to it.
+  - id: demo
+    trigger: slide:12
+    mode: silent
+    wander: off
+    follow_me: off
+    overlay: hide
+
+  - id: demo-klaar
+    trigger: slide:13
+    mode: silent
+    follow_me: on
+    overlay: show
+
+  # Questions from the room: he turns to whoever asks.
+  - id: vragen
+    trigger: slide:24
+    mode: silent
+    wander: on
+
+  - id: afsluiter
+    trigger: slide:25
+    mode: speak
+    text: "Bedankt om te luisteren. En ja — ik heb dit allemaal zelf onthouden."
+    wander: off
+    gesture: nod

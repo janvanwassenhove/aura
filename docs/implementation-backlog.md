@@ -5813,3 +5813,55 @@ the one that waits.
 
 **Not seen on the robot yet**: the runtime half has to reach the robot (its
 hourly update), and nothing here has been watched on hardware.
+
+### U394 — a talk decides whether he wanders and follows
+
+Asked for as (translated): *"in present mode — provide this 'wander' mode next
+to 'follow me' as options in a scenario; check that they are activated
+correctly and give an example contract (e.g. for a keynote and a conference
+talk)"*.
+
+**The shape** is the overlay's (U352, U387): `wander:` and `follow_me:` (`on`
+/`off`) for the whole talk, and on any beat from that beat onwards. On any
+slide he is where the last beat at or before it put him — going back or
+jumping puts him right — and a keyword or manual beat moves them until the
+next slide decides again. YAML reads `on`/`off` as booleans, so `wander: on` is
+what a person writes; "not said" is `None` and stays absent through a save.
+
+**Who decides.** During a talk the scenario does: `wander: on` makes him wander
+even with the switch off in Settings, because the scenario is the owner's own
+script for that talk. A scenario that says nothing keeps him still (U334, as
+U393 did), and leaves follow-me to the owner. *End presentation* gives the
+owner's own Wander and Follow me back — the brain overrides follow-me only
+for the talk and restores it after, the same wishes-versus-in-force split as
+ADR-015.
+
+**"Check that they are activated correctly"** turned up the one real fault.
+The two examples are walked through the real presentation API, slide by slide,
+forwards, backwards, by jumping and by keyword, with a robot that keeps only
+the last thing it was told — the state the room sees. The first walk failed
+at the first change: the runner announced it, and the brain dropped it, because
+the handler returned early when there was no subtitle bus. Telling the robot
+what to do had been made to depend on the console's subtitles. It is handled
+first now.
+
+**The builder** offers both, for the talk and per beat, next to the projector.
+And it now carries `once` through a load and a save: it rebuilt every beat
+from the fields it had controls for, so a slide beat marked `once: true` (U387)
+came back replayable after one edit — the same class of loss as U360's
+`voice`.
+
+**The contract**: `docs/demo/keynote.scenario.yaml` (a hall: he looks around
+while it fills, watches you from the first word, stands still for the demo,
+turns to whoever asks during questions) and
+`docs/demo/conference-talk.scenario.yaml` (a room: the same, plus a keyword —
+"kijk eens rond" — that has him look around on request, every time). The
+format document gains both fields and the rules; `check_scenario.py` now says,
+slide by slide, when he wanders and follows — or that the scenario leaves it
+to the owner.
+
+**Tests**: 8 runner tests (7 red before); 4 brain tests (the scenario over the
+switch, still when it says nothing, follow-me overridden and given back,
+untouched when it says nothing); an API walk of a small stage scenario; the two
+example walks — each step's exact state, and the reason the early return was
+found; 3 builder tests (2 red before); 2 checker tests.

@@ -81,6 +81,10 @@ class ScenarioRunner:
         # nothing leaves it shown for the whole talk, which is what every
         # scenario written before this field did.
         self._overlay_visible = scenario.overlay_starts_visible
+        # U394: does he wander / follow the presenter during the talk. None is
+        # "the scenario does not say", and leaves it to the owner.
+        self._wander: bool | None = scenario.wander
+        self._follow_me: bool | None = scenario.follow_me
 
     # -- state ---------------------------------------------------------
 
@@ -116,6 +120,9 @@ class ScenarioRunner:
             # that can be opened halfway through a talk — it has to be able to
             # ASK what it should look like, not only be told.
             "overlay_visible": self._overlay_visible,
+            # U394: None means the scenario leaves it to the owner.
+            "wander": self._wander,
+            "follow_me": self._follow_me,
             "fired": sorted(self._fired),
             "last_fired": self._last_fired,
             "armed_keywords": [
@@ -160,6 +167,9 @@ class ScenarioRunner:
         if want != self._overlay_visible:
             self._overlay_visible = want
             await self._emit({"type": "overlay", "beat": deciding, "visible": want})
+        # U394: wandering and follow-me follow the slide the same way.
+        await self._set_robot(self._setting_for_slide("wander", slide_number),
+                              self._setting_for_slide("follow_me", slide_number))
 
         fired: list[Beat] = []
         for beat in self._scenario.beats:
@@ -170,6 +180,25 @@ class ScenarioRunner:
             await self._fire(beat, move_overlay=False)
             fired.append(beat)
         return fired
+
+    def _setting_for_slide(self, name: str, slide_number: int) -> bool | None:
+        """U394: what the last slide beat at or before this slide said about
+        `wander` or `follow_me`, else what the scenario starts with."""
+        best: Beat | None = None
+        for beat in self._scenario.beats:
+            n = beat.slide_number
+            if n is None or n > slide_number or getattr(beat, name) is None:
+                continue
+            if best is None or n >= (best.slide_number or 0):
+                best = beat
+        return getattr(best, name) if best is not None else getattr(self._scenario, name)
+
+    async def _set_robot(self, wander: bool | None, follow_me: bool | None) -> None:
+        """Announce a change of what the talk asks of his body — only a change."""
+        if wander == self._wander and follow_me == self._follow_me:
+            return
+        self._wander, self._follow_me = wander, follow_me
+        await self._emit({"type": "robot", "wander": wander, "follow_me": follow_me})
 
     def _overlay_for_slide(self, slide_number: int) -> tuple[bool, str]:
         """(visible, id of the beat that decided it) for a slide.
@@ -230,6 +259,12 @@ class ScenarioRunner:
         if want is not None and want != self._overlay_visible:
             self._overlay_visible = want
             await self._emit({"type": "overlay", "beat": beat.id, "visible": want})
+        # U394: a keyword or manual beat moves wandering / follow-me itself,
+        # until the next slide decides again; a slide beat was settled by it.
+        if move_overlay and (beat.wander is not None or beat.follow_me is not None):
+            await self._set_robot(
+                beat.wander if beat.wander is not None else self._wander,
+                beat.follow_me if beat.follow_me is not None else self._follow_me)
 
         await self._emit({"type": "beat_started", "beat": beat.id, "mode": beat.mode})
 

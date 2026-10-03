@@ -211,3 +211,60 @@ describe('ScenarioBuilder — fields it does not show', () => {
     expect(beat.pause).toBe(7)
   })
 })
+
+/** U394: whether he wanders and follows the presenter is part of the script —
+ *  for the whole talk, and from a beat onwards. And U387's `once` must survive
+ *  a load and a save: the builder used to drop every field it had no control
+ *  for, so a slide beat marked `once: true` came back replayable. */
+describe('ScenarioBuilder — on stage: wander and follow-me', () => {
+  const TALK = {
+    title: 'Keynote', wander: false, follow_me: true,
+    beats: [
+      { id: 'walk-in', trigger: 'slide:1', mode: 'silent', wander: true },
+      { id: 'demo', trigger: 'slide:20', mode: 'silent', follow_me: false },
+      { id: 'gag', trigger: 'slide:8', mode: 'speak', text: 'Ta.', once: true },
+      { id: 'plain', trigger: 'slide:9', mode: 'speak', text: 'Hi.' },
+    ],
+  }
+
+  async function roundTrip(w: any) {
+    await w.find('button.sb-btn--go').trigger('click')
+    return w.emitted('start')![0][0] as any
+  }
+
+  it('carries wander, follow_me and once through a load and a save', async () => {
+    const w = mount(ScenarioBuilder)
+    await settled(w)
+    ;(w.vm as any).loadScenario(TALK)
+    await w.vm.$nextTick()
+
+    const out = await roundTrip(w)
+    expect(out.wander).toBe(false)
+    expect(out.follow_me).toBe(true)
+    expect(out.beats[0].wander).toBe(true)
+    expect(out.beats[1].follow_me).toBe(false)
+    expect(out.beats[2].once).toBe(true)
+    expect('wander' in out.beats[3]).toBe(false)     // not said stays not said
+    expect('follow_me' in out.beats[3]).toBe(false)
+    expect('once' in out.beats[3]).toBe(false)
+  })
+
+  it('offers them per beat and for the whole talk', async () => {
+    const w = mount(ScenarioBuilder)
+    await settled(w)
+    await w.find('select.sb-beat-wander').setValue('on')
+    await w.find('select.sb-scenario-follow').setValue('off')
+    const out = await roundTrip(w)
+    expect(out.beats[0].wander).toBe(true)
+    expect(out.follow_me).toBe(false)
+  })
+
+  it('leaves both out when nothing is chosen', async () => {
+    const w = mount(ScenarioBuilder)
+    await settled(w)
+    const out = await roundTrip(w)
+    expect('wander' in out).toBe(false)
+    expect('follow_me' in out).toBe(false)
+  })
+})
+

@@ -131,3 +131,61 @@ def test_the_wander_sound_is_a_setting(monkeypatch, tmp_path) -> None:
     assert c.post("/setup/prefs", json={"wander_sound": "talk"}).status_code == 200
     assert c.get("/setup/prefs").json()["wander_sound"] == "talk"
     assert c.post("/setup/prefs", json={"wander_sound": "shout"}).status_code == 422
+
+
+# --------------------------------------------------------------------------- #
+# U394: during a talk the scenario decides; afterwards the owner's settings
+# --------------------------------------------------------------------------- #
+
+def _stage(monkeypatch, *, wander=None, follow_me=None):
+    from aura_brain import presentation_api
+
+    monkeypatch.setattr(presentation_api, "is_active", lambda: True)
+    monkeypatch.setattr(presentation_api, "stage_robot",
+                        lambda: {"wander": wander, "follow_me": follow_me})
+
+
+def test_a_scenario_can_make_him_wander_even_with_the_switch_off(monkeypatch) -> None:
+    """The scenario is the owner's own script for that talk."""
+    _stage(monkeypatch, wander=True)
+    assert wander.wanted() is False
+    assert wander.effective() is True
+
+
+def test_a_scenario_that_says_nothing_still_pauses_it(monkeypatch) -> None:
+    monkeypatch.setenv("WANDER_ENABLED", "true")
+    _stage(monkeypatch, wander=None)
+    assert wander.effective() is False
+    assert wander.status()["paused"] == "presentation"
+
+
+class _Tracker(_Robot):
+    def __init__(self) -> None:
+        super().__init__()
+        self.tracking: list[bool] = []
+
+    async def set_tracking(self, enabled: bool) -> bool:
+        self.tracking.append(enabled)
+        return enabled
+
+
+async def test_a_scenario_overrides_follow_me_and_gives_it_back(monkeypatch) -> None:
+    from aura_brain import presentation_api
+
+    robot = _Tracker()
+    monkeypatch.setenv("HEAD_TRACKING", "true")       # the owner has it on
+    _stage(monkeypatch, follow_me=False)              # the demo wants him still
+    await wander.apply(robot)
+    assert robot.tracking == [False]
+
+    monkeypatch.setattr(presentation_api, "is_active", lambda: False)   # End
+    await wander.apply(robot)
+    assert robot.tracking == [False, True], "the owner's follow-me must come back"
+
+
+async def test_a_scenario_that_leaves_follow_me_alone_touches_nothing(monkeypatch) -> None:
+    robot = _Tracker()
+    _stage(monkeypatch, follow_me=None)
+    await wander.apply(robot)
+    assert robot.tracking == []
+

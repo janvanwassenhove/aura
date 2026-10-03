@@ -92,8 +92,10 @@ navigating your browser, running Computer Use, writing code.
   stands, follows the people he sees, turns towards voices and moves his
   antennas. Choose what he may say meanwhile: *silent* (he looks at whoever
   speaks to him and answers only in the console) or *talks when spoken to*. He
-  stops while he sleeps and while a presentation runs, and your Follow me
-  setting is left exactly as it was.
+  stops while he sleeps, and your Follow me setting is left exactly as it was.
+  During a presentation the scenario decides (`wander:` and `follow_me:`, see
+  `docs/demo/scenario-format.md`); one that says nothing keeps him still, and
+  ending the presentation gives your own settings back.
 
 ## 5. Connections
 
