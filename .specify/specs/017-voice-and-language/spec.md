@@ -5,7 +5,7 @@ owner: "aura-brain / conversation"
 priority: P1
 risk: High
 created: "2026-09-05"
-units: [U22, U36b, U36e, U36h, U45, U46, U47, U49, U54, U67, U73, U80, U81, U82, U83, U84, U85, U86, U87, U88, U89, U91, U92, U96, U128, U129, U130, U131, U132, U133, U134, U135, U140, U141, U142, U143, U144, U145, U146, U148, U149, U150, U153, U154, U155, U156, U163, U203, U209, U256, U257, U258, U260, U273, U275, U287, U288, U289, U291, U292, U321, U322, U324, U329, U331, U333, U349, U366, U364, U384, U385]
+units: [U22, U36b, U36e, U36h, U45, U46, U47, U49, U54, U67, U73, U80, U81, U82, U83, U84, U85, U86, U87, U88, U89, U91, U92, U96, U128, U129, U130, U131, U132, U133, U134, U135, U140, U141, U142, U143, U144, U145, U146, U148, U149, U150, U153, U154, U155, U156, U163, U203, U209, U256, U257, U258, U260, U273, U275, U287, U288, U289, U291, U292, U321, U322, U324, U329, U331, U333, U349, U366, U364, U384, U385, U392]
 ---
 
 # Feature Specification: Voice and Language
@@ -379,6 +379,17 @@ the same series as this backfill.
   panic stop publish `SpeechAudioStopped` and drop unfetched lines *before*
   asking the robot to stop, so an unreachable robot cannot leave the laptop
   talking. Whether the robot confirmed is still reported as such (U385).
+- **FR-031**: Without his name he answers **at most `FOLLOWUP_CHAIN_MAX` times**
+  (2) after a real exchange, **however he was reached** — including by an
+  interruption. A character with `interruptibility: vad` may still be cut off
+  by any plausible voice, but the interrupting fragment is only treated as a
+  question while the chain allows it; after that the wake word is required
+  again. The barge-in path used to reopen the window and answer whatever it
+  heard regardless of the count, so a television kept him talking all evening
+  (U392).
+- **FR-032**: A paid **Live session opens only when he was addressed** — the
+  wake word transcribed or detected on the device. A turn that reached him any
+  other way is answered by the pipeline, once (U392).
 
 ## Traceability
 

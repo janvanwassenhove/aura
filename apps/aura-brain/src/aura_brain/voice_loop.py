@@ -476,7 +476,8 @@ class VoiceLoop:
                     if mode == "off":
                         continue
                     barge_text = (await voice.transcribe(wav, filename="robot.wav") or "").strip()
-                    if mode != "vad" and wake_word_index(barge_text, self._wake) < 0:
+                    barge_addressed = wake_word_index(barge_text, self._wake) >= 0
+                    if mode != "vad" and not barge_addressed:
                         logger.debug("barge ignored (no wake word): %r", barge_text[:60])
                         continue
                     if mode == "vad" and not is_plausible_command(barge_text):
@@ -489,6 +490,22 @@ class VoiceLoop:
                     except Exception:  # noqa: BLE001 — robot offline
                         pass
                     self._speaking_until = 0.0  # user interrupted → stop waiting
+                    # U392: an interruption that does not say his name is a
+                    # wake-word-free turn like any other, and counts against the
+                    # same cap. This path used to reopen the window and answer
+                    # the fragment whatever the count — with a television on and
+                    # a `vad` character, every answer was interrupted and every
+                    # interruption was the next question: 130 answers in a day,
+                    # six of them to someone who had said "AURA".
+                    if (not barge_addressed
+                            and self._followup_chain >= self._max_followup_chain):
+                        self._followup_until = 0.0
+                        self._stat["last_skipped"] = (
+                            "interrupted, but already answered twice without the "
+                            "wake word — say it to go on")
+                        logger.info("barge-in cut him off; not answering it "
+                                    "(follow-up chain used up): %r", barge_text[:60])
+                        continue
                     self._followup_until = time.monotonic() + self._followup_s
                     in_barge = True
                     text = barge_text
@@ -602,7 +619,8 @@ class VoiceLoop:
                 # U67: track the wake-word-less chain. Hearing the wake word
                 # (transcribed OR locally detected, U128) resets it — a real
                 # user re-engaging restores full flow.
-                if wake_confirmed or wake_word_index(text, self._wake) >= 0:
+                addressed = wake_confirmed or wake_word_index(text, self._wake) >= 0
+                if addressed:
                     self._followup_chain = 0
                 elif in_followup:
                     self._followup_chain += 1
@@ -695,7 +713,7 @@ class VoiceLoop:
                 # (or when the engine is 'pipeline') fall back to the classic
                 # transcribe→LLM→TTS handler so Richie always replies.
                 try:
-                    if not await self._speech_turn(wav, command):
+                    if not await self._speech_turn(wav, command, addressed=addressed):
                         await self._handle(command)
                 finally:
                     _TRACE.finish(self._session_id)
@@ -765,7 +783,8 @@ class VoiceLoop:
 
         return hush.silence_reason() == hush.QUIET
 
-    async def _speech_turn(self, wav: bytes, command: str = "") -> bool:
+    async def _speech_turn(self, wav: bytes, command: str = "", *,
+                           addressed: bool = True) -> bool:
         """Route a confirmed turn to the engine that owns it. False → pipeline.
 
         U324: the engine now really follows `_engine()`. `_realtime_turn`
@@ -792,6 +811,16 @@ class VoiceLoop:
             return False
         engine = self._engine()
         if engine == "live":
+            # U392: a Live session bills for every second it is open, and it
+            # stays open listening without a wake word until it goes idle.
+            # Opening one for a fragment nobody addressed to him — "Hva sa
+            # du?" from across the room — paid for him to talk to the
+            # television. Unaddressed turns go to the pipeline, which answers
+            # once and costs one request.
+            if not addressed:
+                logger.info("live engine selected, but nobody said his name — "
+                            "the pipeline answers instead of opening a session")
+                return False
             return await self._live_session_turn(wav, command)
         if engine == "realtime":
             return await self._realtime_turn(wav, command)

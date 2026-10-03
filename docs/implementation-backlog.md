@@ -5691,3 +5691,59 @@ the overlay must come down by itself and free Esc*.
 
 **Not seen on screen.** Everything above is tested; the ring and the banner on
 a real desktop need the app restarted, and that has not been done here.
+
+### U392 — he answered the television
+
+Agreed after U391, in the owner's words (translated): *"do 1-2-3"* — find out
+whether it is his own voice, stop opening paid live sessions without the wake
+word, and keep foreign-language fragments out.
+
+**What the log showed.** On 3 October, between 19:36 and 19:51, with the wake
+word *AURA* and the live engine selected, he acted on 25 fragments: *"Sie
+machen das über nationalen"*, *"Evet, bu sizinle"*, *"Kann ich ihn jetzt
+rauskaufen?"*. That day he acted on 130; the real wake-word matcher finds the
+wake word in none of them. **It was not his own voice** — his replies coming
+back through the microphone were caught and logged as self-hearing every time.
+It was speech in the room, in half a dozen languages: a television, a video,
+people talking.
+
+**Why the window never closed.** After an answer, a window accepts speech
+without the wake word, capped at `FOLLOWUP_CHAIN_MAX` (2) answers. A character
+with `interruptibility: vad` may be interrupted by any plausible voice, and that
+path did two things on its own: reopened the window for nine seconds, and
+handed the interrupting fragment to the pipeline as the next question —
+whatever the count said. With speech in the room, every answer was interrupted
+and every interruption was a question. The running build made it worse: U384's
+mute replies still opened windows sized to how long the reply *would* have
+taken, so the loop believed he was talking when he was not.
+
+The log alone could not settle this — one turn went through with no barge-in
+logged before it — so it was reproduced instead: the real listening loop, on a
+clock moved by hand, with a robot that always hears the room and a transcriber
+returning that evening's fragments. With a `vad` character it answered **200
+times in 200 listening windows**; with no interruptions allowed, the cap held.
+
+**What changed.**
+
+- An interruption that does not say his name counts against the same cap. It
+  still cuts him off — that is what `vad` asks for — but once the chain is
+  used up the fragment is not answered and the wake word is required again.
+- A Live session opens only when he was addressed (wake word transcribed, or
+  detected on the device). Anything else is answered by the pipeline: one
+  request instead of a session billed per second that keeps listening.
+
+**Not done: the language check, as proposed.** The plan was to let the
+transcriber say which language it heard and keep only Dutch and English in the
+wake-word-free window. It cannot: the transcription is already pinned to one
+language (U287 — *en* on this machine), and `gpt-4o-mini-transcribe`, the
+model in use, returns no detected language. The model that does, `whisper-1`
+with `verbose_json`, was taken out in U145 because it returned empty
+transcripts on the robot's microphone. A word-list check on the text would work
+without it, but it would also refuse some real short replies, so that is the
+owner's call and is left open. With the cap holding, the room can now cost at
+most two answers after each real exchange.
+
+**Tests**: `test_voice_loop_noise.py` — the room reproduction (red before:
+200 answers), its control without interruptions, and the Live session refused
+to an unaddressed turn (red before) — plus the existing voice suites, 56 in
+all.
