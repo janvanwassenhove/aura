@@ -438,3 +438,126 @@ async def test_a_rehearsal_does_not_sit_through_the_pauses(monkeypatch) -> None:
     monkeypatch.setattr("orchestrator.scenario_runner.asyncio.sleep", record)
     await r.next()
     assert slept == [], "a rehearsal sat through a 30-second pause"
+
+
+# --------------------------------------------------------------------------- #
+# U387: a slide is a place, not an event that happens once
+#
+# Reported as "when going back/forth, it should replay the beat if defined" and
+# "the bring him off/onscreen in scenario does not work". Both had one cause:
+# every beat fired once per show. Step back from slide 8 to the full-frame
+# slide 7 and the beat that clears the screen did not run again, so he stayed
+# on it; jump past a hide/show pair and the projector followed the history of
+# what had fired rather than the slide on the screen.
+# --------------------------------------------------------------------------- #
+
+def _devoxx_pairs() -> Scenario:
+    """The shape of the real talk: full-frame slides with a clear/back pair."""
+    return Scenario(beats=[
+        Beat(id="clear-1", trigger="slide:7", mode="silent", overlay="hide"),
+        Beat(id="back-1", trigger="slide:8", mode="silent", overlay="show"),
+        Beat(id="gag", trigger="slide:8", mode="speak", text="Ta. Ta. Ta."),
+        Beat(id="clear-4", trigger="slide:78", mode="silent", overlay="hide"),
+        Beat(id="back-4", trigger="slide:83", mode="silent", overlay="show"),
+    ])
+
+
+async def test_going_back_to_a_slide_replays_its_beat() -> None:
+    rig = _Rig()
+    r = rig.runner(_devoxx_pairs())
+    await r.on_slide(8)
+    await r.on_slide(9)
+    await r.on_slide(8)
+    assert rig.said == ["Ta. Ta. Ta.", "Ta. Ta. Ta."]
+
+
+async def test_the_same_slide_read_twice_is_not_a_visit() -> None:
+    """The watcher forgets the slide when a read fails, so one flaky read must
+    not make him say the line again."""
+    rig = _Rig()
+    r = rig.runner(_devoxx_pairs())
+    await r.on_slide(8)
+    assert await r.on_slide(8) == []
+    assert rig.said == ["Ta. Ta. Ta."]
+
+
+async def test_a_slide_beat_written_once_true_does_not_replay() -> None:
+    rig = _Rig()
+    r = rig.runner(Scenario(beats=[
+        Beat(id="only", trigger="slide:3", mode="speak", text="just the once", once=True),
+    ]))
+    await r.on_slide(3)
+    await r.on_slide(4)
+    await r.on_slide(3)
+    assert rig.said == ["just the once"]
+
+
+async def test_a_keyword_beat_still_fires_once_without_being_told() -> None:
+    rig = _Rig()
+    r = rig.runner(Scenario(beats=[
+        Beat(id="c", trigger="keyword:Java", mode="chime_in", topic="x"),
+    ]))
+    await r.on_speech("Java")
+    assert await r.on_speech("Java again") == []
+
+
+def test_once_survives_the_save_and_load_round_trip_unset() -> None:
+    """Loading a saved scenario hands the console `model_dump()` output, which
+    the console posts straight back. With `once` defaulting to True on every
+    beat, that round trip wrote it onto every slide beat and no slide would
+    ever have replayed."""
+    sc = Scenario(beats=[Beat(id="s", trigger="slide:2", mode="speak", text="hi")])
+    again = Scenario.model_validate(sc.model_dump(exclude_none=True))
+    assert again.beats[0].once is None
+    assert again.beats[0].fires_once is False
+
+
+async def test_going_back_to_a_full_frame_slide_takes_him_off_again() -> None:
+    rig = _Rig()
+    r = rig.runner(_devoxx_pairs())
+    await r.on_slide(7)
+    await r.on_slide(8)
+    await r.on_slide(7)
+    assert r.status()["overlay_visible"] is False
+    assert _overlay_events(rig) == [False, True, False]
+
+
+async def test_the_overlay_follows_the_slide_not_what_happened_to_fire() -> None:
+    """Jump into the middle of a full-frame run (78-82): slide 80 has no beat
+    of its own, and he must still be off the screen."""
+    rig = _Rig()
+    r = rig.runner(_devoxx_pairs())
+    await r.on_slide(10)
+    await r.on_slide(80)
+    assert r.status()["overlay_visible"] is False
+    await r.on_slide(50)                       # and back out of it
+    assert r.status()["overlay_visible"] is True
+
+
+async def test_starting_the_deck_halfway_puts_him_where_that_slide_wants_him() -> None:
+    rig = _Rig()
+    r = rig.runner(_devoxx_pairs())
+    await r.on_slide(80)
+    assert r.status()["overlay_visible"] is False
+
+
+async def test_slides_with_no_say_about_it_never_move_him() -> None:
+    """A beamer redrawing on every slide change is a flicker the room sees."""
+    rig = _Rig()
+    r = rig.runner(_devoxx_pairs())
+    for n in (9, 10, 11, 12, 30):
+        await r.on_slide(n)
+    assert _overlay_events(rig) == []
+
+
+async def test_a_keyword_beat_moves_him_until_the_next_slide_decides() -> None:
+    rig = _Rig()
+    r = rig.runner(Scenario(beats=[
+        Beat(id="away", trigger="keyword:demo", mode="silent", overlay="hide", once=False),
+    ]))
+    await r.on_slide(1)
+    await r.on_speech("let me show you a demo")
+    assert r.status()["overlay_visible"] is False
+    await r.on_slide(2)                       # nothing on the slides says otherwise
+    assert r.status()["overlay_visible"] is True
+

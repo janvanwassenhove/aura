@@ -104,7 +104,13 @@ class Beat(BaseModel):
     # "" inherit the persona/global engine; else force pipeline/realtime for
     # this beat (a beat that needs a tool lookup must be "pipeline" — U203).
     engine: str = ""
-    once: bool = True       # chime_in: fire at most once per run
+    # U387: None until written. A keyword beat fires once per run unless told
+    # otherwise; a slide beat runs again each time you return to its slide
+    # unless it says `once: true`. It used to default to True for every beat,
+    # and loading a saved scenario round-trips through model_dump(), which
+    # would have written `once: true` onto every slide beat — so None, which
+    # model_dump(exclude_none=True) leaves out, is the only safe "unset".
+    once: bool | None = None
     # U352: show or hide the projector overlay from this beat onwards. Empty
     # means "leave it as it is" — which is why a scenario written before this
     # existed still shows the overlay for its whole length.
@@ -141,6 +147,13 @@ class Beat(BaseModel):
             except ValueError:
                 return None
         return None
+
+    @property
+    def fires_once(self) -> bool:
+        """U387: whether this beat runs at most once per show."""
+        if self.once is not None:
+            return self.once
+        return self.trigger_kind != "slide"
 
     @property
     def overlay_change(self) -> bool | None:

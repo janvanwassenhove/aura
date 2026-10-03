@@ -6,7 +6,7 @@ priority: P2
 risk: Medium
 created: "2026-04-25"
 amended: "2026-09-13"
-units: [U27, U205, U206, U207, U208, U246, U263, U263b, U264, U265, U266, U267, U269, U282, U320, U334, U349, U351, U352, U360, U361, U386]
+units: [U27, U205, U206, U207, U208, U246, U263, U263b, U264, U265, U266, U267, U269, U282, U320, U334, U349, U351, U352, U360, U361, U386, U387]
 ---
 
 # Feature Specification: Presentation Copilot
@@ -316,6 +316,19 @@ settings aside as the example.
   which then stayed on the beamer with nothing able to reach it. Only the
   window that is current may clear the reference, and taking it down destroys
   the window rather than asking it to close (U386).
+- **FR-118**: A slide's beats run **every time the presenter arrives at it** —
+  forwards, backwards or by a jump — unless a beat says `once: true`. They used
+  to fire once per show, so stepping back to a slide played nothing. The same
+  slide reported twice is a re-read and runs nothing: the slide watcher forgets
+  its slide when a read fails, and one flaky read must not repeat a line.
+  `once` is unset unless written — a keyword beat then fires once, a slide
+  beat replays — because a saved scenario round-trips through `model_dump()`,
+  which would otherwise write `once: true` onto every beat (U387).
+- **FR-119**: The projector overlay **follows the slide**: on any slide it is
+  where the last `overlay:` beat at or before that slide put it, else where the
+  scenario starts it. It used to follow the history of what had fired, so a
+  step back to a full-frame slide left him on it, and a jump past a hide/show
+  pair or into a full-frame run put him in the wrong place (U387).
 
 ## Superseded
 
@@ -337,6 +350,7 @@ applies to `slide:N` beats; `manual` and `keyword:` beats have no such deadline.
 | U266, U267 | Four "nothing happens" with four causes; a panel that says what will happen |
 | U246 | Three broken things behind one missing word — including `uv sync` pruning the presentation extra |
 | U386 | *Take it down* works after the overlay was shown twice |
+| U387 | A slide is a place: its beats replay when you return, and the overlay follows it |
 | U320 | The panel regrouped: locks as chips, status as status, the projector block given the weight it earns, a run button that names its own action, an empty state with the two doors, and help you can put away |
 | U334 | Present mode enforces what it always promised: only the scenario speaks, and no open microphone answers the room |
 | U361 | The scenario format written down, and a pre-flight check that says what the talk will do rather than only that the file parses |

@@ -36,7 +36,8 @@ beats:
     gesture: nod           # optional
     persona: kids_companion  # optional: a character id
     overlay: hide          # optional: show | hide, from this beat onwards
-    once: true             # chime_in: fire at most once (default true)
+    once: true             # optional: keyword beats fire once anyway; a slide beat
+                           #   replays when you return to its slide unless this says true
 ```
 
 **An unknown field is refused.** Not ignored — refused, naming itself. This is
@@ -68,7 +69,7 @@ came out in one voice (U360).
 | `guardrails` | string | `""` | Extra constraints for the generated line. |
 | `gesture` | string \| null | `null` | `wave`, `nod`, `tilt`, `shrug`, … |
 | `engine` | `""` \| `pipeline` \| `realtime` | `""` | `pipeline` runs the full agentic loop — **required** if the line needs live data (calendar, a lookup). |
-| `once` | bool | `true` | `chime_in`: fire at most once however often the word is said. |
+| `once` | bool | by trigger | Leave it out. A `keyword:` beat fires once however often the word is said; a `slide:` beat runs again every time you return to its slide. Write `once: true` on a slide beat only if returning must stay silent. |
 | `overlay` | `""` \| `show` \| `hide` | `""` | Move the projector overlay from this beat onwards. Empty leaves it alone. |
 | `persona` | character id | `""` | Which character speaks this beat — its voice, speed, and (when improvising) its way of putting things. |
 | `voice` | TTS voice | `""` | A voice for this beat alone. |
@@ -126,6 +127,14 @@ line cannot be both "all in onyx" and "this bit in somebody else's voice".
 - **The scenario decides *when* the overlay is visible, never *whether*.** You
   still switch it on in the Present panel; `overlay: show` does nothing if no
   overlay is up.
+- **A slide is a place, not a moment.** Every time you arrive at a slide —
+  forwards, backwards, or by jumping — its beats run again, unless a beat says
+  `once: true`. The same slide reported twice in a row is not an arrival.
+- **The overlay follows the slide you are on.** On any slide it is where the
+  last `overlay:` beat at or before that slide put it, so jumping into the
+  middle of a full-frame run leaves him off the screen even though that slide
+  has no beat of its own. A keyword or manual beat can move it too; the next
+  slide change decides again.
 - **The builder shows no control for `voice`, `speed` or `pause`**, but it
   carries them through a load-and-save untouched.
 - **A persona that names no character is still spoken**, in the presentation

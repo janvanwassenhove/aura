@@ -5483,3 +5483,57 @@ must not orphan the second"* — the reference was `null` with window 2 alive.
 **Needs a restart of the desktop app**: the shell is read once at start, and
 the orphaned overlay on the running one cannot be reached by anything but
 quitting.
+
+### U387 — a slide is a place, not a moment
+
+Reported as two things in one message: *"when going back/forth, it should replay
+the beat if defined"*, and *"the bring him of/onscreen in scenario does not
+work"*, with a screenshot of the two beats on slides 68 and 69.
+
+They had one cause. Every beat fired **once per show** — the runner kept a set
+of fired ids and skipped anything in it. So:
+
+- stepping back to slide 8 never played the gag again, which was the first
+  report;
+- stepping back from 8 to the full-frame slide 7 did not run the beat that
+  clears the screen, so he stayed on it;
+- the overlay's state was the history of what had fired, not the slide on the
+  screen: jump past a hide/show pair, or into the middle of the 78—82 run, and
+  he was wherever the last *fired* beat had left him.
+
+The log made the second report look worse than it was. In the owner's runs the
+only overlay beats that ever fired were slides 7 and 8, three seconds apart,
+and in the running build the hide reached the projector only through the 1.5 s
+status poll — U384 had found the push was never broadcast. A flicker at best.
+Slides 68 and 69 were never reached in any run that afternoon.
+
+What changed, in `ScenarioRunner.on_slide`:
+
+- the same slide reported twice is a **re-read, not a visit**, and runs nothing.
+  This matters more now than before: the slide watcher forgets its slide when a
+  read fails, and with replay one flaky read would have repeated a spoken line;
+- the overlay is **decided by the slide** — the last `overlay:` beat at or
+  before it, else the scenario's start — before any beat runs, and a slide
+  beat no longer moves it a second time from `_fire`;
+- the slide's beats run again, unless a beat says `once: true`.
+
+**The trap in `once`.** It defaulted to `True` on every beat — it was written
+for keyword chimes — so "replay unless `once`" would have been a no-op. Worse:
+loading a saved scenario hands the console `model_dump()` output, which writes
+every default out explicitly, so even "unless `once` was written" would have
+failed on exactly the path the owner uses. `once` is now `None` until written;
+`fires_once` reads it by trigger (keyword once, slide replays), and
+`model_dump(exclude_none=True)` keeps it unset through the round trip.
+
+**Tests**: 10 in `test_scenario_runner.py`; 6 verified red — the other 4 pin
+what must stay true (a re-read is not a visit, an explicit `once`, keyword
+beats firing once, no overlay event on slides that say nothing). And the
+owner's real `devoxx-conference.scenario.yaml`, walked through the save/load
+round trip over slides 1 7 8 9 8 7 8 54 55 56 55 68 69 70 80 50 93 97 98: hidden
+on 7, back with the gag and the disclaimer on 8 — again on each return —
+hidden again on the way back to 7, hidden on 80 with no beat of its own, shown
+again on 50, and the last line on 98.
+
+**Worth knowing before the talk**: going back over slide 8 now replays the gag.
+That is what was asked for; if a stray back-press must never repeat it, the
+beat takes `once: true`.

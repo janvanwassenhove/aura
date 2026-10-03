@@ -133,14 +133,57 @@ class ScenarioRunner:
         return None
 
     async def on_slide(self, slide_number: int) -> list[Beat]:
-        """A slide became active — fire any beats bound to it."""
+        """A slide became active — put the overlay where it belongs, and run
+        that slide's beats.
+
+        U387: a slide is a place, not an event that happens once. Beats used to
+        fire once per show, so stepping back from slide 8 to the full-frame
+        slide 7 left him on the screen, and stepping back to the gag never
+        played it again. Now:
+
+        - the same slide reported twice is a re-read, not a visit — the
+          watcher forgets the slide when a read fails, and one flaky read must
+          not make him say the line again;
+        - the overlay is decided by the slide, so a jump lands it right
+          whatever fired before;
+        - the slide's beats run again, unless a beat says `once: true`.
+        """
+        if slide_number == self._current_slide:
+            return []
         self._current_slide = slide_number
+
+        want, deciding = self._overlay_for_slide(slide_number)
+        if want != self._overlay_visible:
+            self._overlay_visible = want
+            await self._emit({"type": "overlay", "beat": deciding, "visible": want})
+
         fired: list[Beat] = []
         for beat in self._scenario.beats:
-            if beat.slide_number == slide_number and beat.id not in self._fired:
-                await self._fire(beat)
-                fired.append(beat)
+            if beat.slide_number != slide_number:
+                continue
+            if beat.fires_once and beat.id in self._fired:
+                continue
+            await self._fire(beat, move_overlay=False)
+            fired.append(beat)
         return fired
+
+    def _overlay_for_slide(self, slide_number: int) -> tuple[bool, str]:
+        """(visible, id of the beat that decided it) for a slide.
+
+        The last slide beat at or before it that says anything about the
+        overlay wins — on the same slide, the later one in the file, which is
+        also the order they fire in. With none, the scenario's own start.
+        """
+        best: Beat | None = None
+        for beat in self._scenario.beats:
+            n = beat.slide_number
+            if n is None or n > slide_number or beat.overlay_change is None:
+                continue
+            if best is None or n >= (best.slide_number or 0):
+                best = beat
+        if best is None:
+            return self._scenario.overlay_starts_visible, ""
+        return bool(best.overlay_change), best.id
 
     async def on_speech(self, text: str) -> list[Beat]:
         """The presenter spoke — fire armed keyword beats whose word appears.
@@ -153,7 +196,7 @@ class ScenarioRunner:
         for beat in self._scenario.beats:
             if beat.trigger_kind != "keyword":
                 continue
-            if beat.once and beat.id in self._fired:
+            if beat.fires_once and beat.id in self._fired:
                 continue
             if beat.trigger_value.lower() in low:
                 await self._fire(beat)
@@ -162,7 +205,7 @@ class ScenarioRunner:
 
     # -- execution -----------------------------------------------------
 
-    async def _fire(self, beat: Beat) -> None:
+    async def _fire(self, beat: Beat, *, move_overlay: bool = True) -> None:
         self._fired.add(beat.id)
         logger.info("beat %r fired (mode=%s trigger=%s)", beat.id, beat.mode, beat.trigger)
 
@@ -175,7 +218,10 @@ class ScenarioRunner:
         # outputs that reach the room — voice and motion — and the overlay is
         # the one output a rehearsal exists to let you watch: checking that he
         # clears the screen at the demo is the reason to walk the show first.
-        want = beat.overlay_change
+        # U387: a slide beat's overlay was already settled by its slide in
+        # on_slide; moving it again here would flicker when two beats on one
+        # slide disagree. Keyword and manual beats still move it themselves.
+        want = beat.overlay_change if move_overlay else None
         if want is not None and want != self._overlay_visible:
             self._overlay_visible = want
             await self._emit({"type": "overlay", "beat": beat.id, "visible": want})
