@@ -33,6 +33,11 @@ and only the speaker changes - so a bigger room can hear him through the laptop
 without losing his character. That holds for every word, the live engine
 included, and Stop (or talking over him) silences the laptop as well.
 
+**Volume** (the slider on the Talk screen and on Robot — one slider): how loud
+he is, wherever he speaks. It sets the robot's own speaker, so his emotion
+sounds follow it as well as his words, and the laptop's speaker when he talks
+through the laptop.
+
 On first start a short **setup wizard** appears:
 
 1. **Name & language** — give your assistant a call name (e.g. "Richie"). This

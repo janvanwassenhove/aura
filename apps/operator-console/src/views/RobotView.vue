@@ -312,6 +312,7 @@ import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { Eye, Move, TriangleAlert } from 'lucide-vue-next'
 import { CHARACTERS } from '../lib/characters'
 import { BRAIN_URL } from '../lib/endpoints'
+import { useVolume } from '../composables/useVolume'
 import { useCameraFeed } from '../composables/useCameraFeed'
 import { useCharacterStore } from '../stores/characterStore'
 import { useKnowledgeStore } from '../stores/knowledgeStore'
@@ -470,21 +471,8 @@ async function saveBriefing(): Promise<void> {
     })
   } catch { /* offline */ }
 }
-const volumePct = ref(80)
-async function fetchVolume(): Promise<void> {
-  try {
-    const r = await fetch(`${BRAIN_URL}/robot/volume`)
-    if (r.ok) volumePct.value = Math.round(((await r.json()).volume ?? 0.8) * 100)
-  } catch { /* keep default */ }
-}
-async function applyVolume(): Promise<void> {
-  try {
-    await fetch(`${BRAIN_URL}/robot/volume`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ volume: volumePct.value / 100 }),
-    })
-  } catch { /* offline — slider stays local */ }
-}
+// U399: one volume for the robot's speaker and this laptop, shared with Talk.
+const { level: volumePct, load: fetchVolume, save: applyVolume } = useVolume()
 
 // ── Persona (the brain's characters) ───────────────────────────────────────
 interface BrainCharacter {

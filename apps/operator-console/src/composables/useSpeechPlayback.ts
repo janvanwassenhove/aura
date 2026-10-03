@@ -37,6 +37,19 @@ let finishCurrent: (() => void) | null = null
  *  quietly instead of carrying the sentence on. */
 let generation = 0
 
+/** U399: his volume on this laptop, 0..1 — the same slider as the robot's.
+ *  It applies to the next line and to the one already playing. */
+let volume = 1
+export function setPlaybackVolume(level: number): void {
+  volume = Math.max(0, Math.min(1, Number.isFinite(level) ? level : 1))
+  if (current) {
+    try { current.volume = volume } catch { /* element gone */ }
+  }
+}
+export function playbackVolume(): number {
+  return volume
+}
+
 export function resetPlayback(): void {
   stopPlayback()
   played.clear()
@@ -111,6 +124,7 @@ async function drain(): Promise<void> {
 function playOne(url: string): Promise<void> {
   return new Promise((resolve) => {
     const audio = new Audio(url)
+    audio.volume = volume                          // U399
     current = audio
     let done = false
     const finish = () => {

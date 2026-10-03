@@ -273,6 +273,7 @@ import MindCanvas from '../components/canvas/MindCanvas.vue'
 import PickerMenu from '../components/shell/PickerMenu.vue'
 import ActivityLog from '../components/ActivityLog.vue'
 import { BRAIN_URL } from '../lib/endpoints'
+import { useVolume } from '../composables/useVolume'
 import { useApprovalStore, type PendingApproval } from '../stores/approvalStore'
 import { CHARACTERS } from '../lib/characters'
 import { useCharacterStore } from '../stores/characterStore'
@@ -572,15 +573,10 @@ async function toggleSleep(): Promise<void> {
     if (resp.ok) asleep.value = target
   } catch { /* robot offline */ }
 }
-const volume = ref(80)
-async function setVolume(): Promise<void> {
-  try {
-    await fetch(`${BRAIN_URL}/robot/volume`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ volume: volume.value / 100 }),
-    })
-  } catch { /* robot offline */ }
-}
+// U399: the robot's real level, shared with the Robot screen, and applied to
+// this laptop's speaker too — it used to start at 80 whatever the robot said.
+const { level: volume, load: loadVolume, save: setVolume } = useVolume()
+onMounted(() => { void loadVolume() })
 
 const waitingLabel = 'Waiting for something to happen'
 const mindStatus = ref(waitingLabel)

@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 import {
-  applySpeechEvent, playUtterance, resetPlayback, stopPlayback,
+  applySpeechEvent, playUtterance, resetPlayback, setPlaybackVolume, stopPlayback,
 } from '../../src/composables/useSpeechPlayback'
 
 /** U364: his real voice, out of this laptop.
@@ -192,5 +192,25 @@ describe('useSpeechPlayback', () => {
   it('survives a browser with no Audio at all', async () => {
     vi.stubGlobal('Audio', undefined)
     await expect(playUtterance('abc123')).resolves.toBeUndefined()
+  })
+})
+
+/** U399: the volume slider reaches the laptop too — it never did. */
+describe('U399 — at his volume', () => {
+  it('plays a line at the level set', async () => {
+    setPlaybackVolume(0.18)
+    await playUtterance('v1')
+    await flush(); await flush()
+    expect((FakeAudio.made[0] as unknown as { volume: number }).volume).toBeCloseTo(0.18)
+    setPlaybackVolume(1)
+  })
+
+  it('turns down the line that is already playing', async () => {
+    setPlaybackVolume(1)
+    await playUtterance('v2')
+    await flush(); await flush()
+    setPlaybackVolume(0.3)
+    expect((FakeAudio.made[0] as unknown as { volume: number }).volume).toBeCloseTo(0.3)
+    setPlaybackVolume(1)
   })
 })

@@ -33,6 +33,11 @@ keer gemaakt en alleen de speaker verschilt - dus een grotere zaal kan hem via
 de laptop horen zonder dat hij zijn karakter verliest. Dat geldt voor elk woord,
 ook in de live-modus, en Stop (of door hem heen praten) legt ook de laptop stil.
 
+**Volume** (het schuifje in het Talk-scherm en bij Robot — één schuifje): hoe
+luid hij is, waar hij ook spreekt. Het zet de luidspreker van de robot zelf, dus
+ook zijn emotiegeluiden volgen het, en de luidspreker van de laptop als hij via
+de laptop praat.
+
 Bij de eerste start verschijnt een korte **setup-wizard**:
 
 1. **Naam & taal** — geef je assistent een roepnaam (bv. "Richie"). Die wordt

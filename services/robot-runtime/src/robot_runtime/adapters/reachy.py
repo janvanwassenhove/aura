@@ -94,6 +94,10 @@ class ReachyRobotAdapter(RobotAdapter):
         self._motion_lock = asyncio.Lock()
         # Speaker gain 0.0–1.0, applied to every PCM sample (U36e volume).
         self._volume = float(os.environ.get("ROBOT_VOLUME", "0.8"))
+        # U399: whether the speaker's own mixer holds that level right now. When
+        # it does, everything the robot plays follows it — his speech, and the
+        # daemon's emotion sounds — and the digital gain steps aside.
+        self._hw_volume = False
         # Whether follow-me head tracking is active. Motions pause it so they
         # play at full amplitude, then resume it (U38-fix).
         self._tracking_on = False
@@ -154,32 +158,59 @@ class ReachyRobotAdapter(RobotAdapter):
         return self._last_raw_peak
 
     def set_volume(self, level: float) -> float:
+        """U399: his volume, for everything the robot plays.
+
+        Set on the speaker's own mixer while connected, so the daemon's sounds
+        (his emotions, ADR-016) follow it as his speech does. Without a robot
+        or without `amixer`, the digital gain on his own speech does it — which
+        is all the slider ever did, and why it seemed to do nothing."""
         self._volume = max(0.0, min(1.0, level))
+        if self._mini is not None:
+            self._apply_hardware_volume(self._volume)
         return self._volume
 
     def get_volume(self) -> float:
         return self._volume
 
-    @staticmethod
-    def _set_hardware_volume_max() -> None:
-        """Force the speaker's ALSA PCM control to 0 dB (U82). Best-effort:
-        overridable via SPEAKER_ALSA_CONTROL / SPEAKER_ALSA_CARD; skipped when
-        SPEAKER_ALSA_MAX=false."""
-        if os.environ.get("SPEAKER_ALSA_MAX", "true").lower() != "true":
-            return
+    def _digital_gain(self) -> float:
+        """The gain on his own speech: none while the mixer holds the level."""
+        return 1.0 if self._hw_volume else self._volume
+
+    def _amixer(self, args: list[str]) -> bool:
+        """One `amixer` call on the speaker's card. True when it worked."""
         import subprocess
 
         card = os.environ.get("SPEAKER_ALSA_CARD", "0")
-        control = os.environ.get("SPEAKER_ALSA_CONTROL", "PCM")
         try:
-            subprocess.run(
-                ["amixer", "-c", card, "sset", control, "100%"],
-                check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                timeout=5,
-            )
-            logger.info("speaker ALSA %s set to 100%% (card %s)", control, card)
-        except Exception as exc:  # noqa: BLE001 — audio is best-effort
-            logger.warning("could not set speaker ALSA volume: %s", exc)
+            done = subprocess.run(["amixer", "-c", card, *args], check=False,
+                                  stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                                  timeout=5)
+            return done.returncode == 0
+        except Exception:  # noqa: BLE001 — no mixer is a state, not an error
+            return False
+
+    def _apply_hardware_volume(self, level: float) -> bool:
+        """Set the speaker's mixer to `level`, at the decibels the digital gain
+        gave (20·log10) — so 50 % is -6 dB, as it always sounded, and not the
+        mixer's own 50 %, which is -30 dB. SPEAKER_ALSA_MAX=false leaves the
+        mixer alone (and the digital gain in charge)."""
+        import math
+
+        if os.environ.get("SPEAKER_ALSA_MAX", "true").lower() != "true":
+            self._hw_volume = False
+            return False
+        control = os.environ.get("SPEAKER_ALSA_CONTROL", "PCM") + ",0"
+        if level <= 0.0:
+            args = ["sset", control, "0%", "mute"]
+        else:
+            db = max(-60.0, 20.0 * math.log10(level))
+            args = ["sset", control, "--", f"{db:.1f}dB", "unmute"]
+        self._hw_volume = self._amixer(args)
+        if self._hw_volume:
+            logger.info("speaker volume %d%% on the mixer (%s)", round(level * 100), args[-2])
+        else:
+            logger.info("speaker mixer not available; volume stays digital")
+        return self._hw_volume
 
     async def set_tracking(self, enabled: bool) -> bool:
         """Follow-me: daemon-side face tracking (U36g).
@@ -691,10 +722,11 @@ class ReachyRobotAdapter(RobotAdapter):
             except Exception as exc:  # noqa: BLE001 — wake is best-effort
                 logger.warning("wake-up on connect failed: %s", exc)
             # U82: the SDK/daemon resets the speaker's ALSA PCM volume to ~62%
-            # (-23 dB) on init, which made TTS "enorm stil". Force the hardware
-            # mixer to max on every connect so speech is audible; fine loudness
-            # control stays digital via the app volume slider (self._volume).
-            self._set_hardware_volume_max()
+            # (-23 dB) on init, which made TTS "enorm stil". U399: so set it on
+            # every connect — to his level, not to 100 %, because the daemon
+            # plays his emotions through the same mixer and 100 % is where the
+            # slider stopped mattering.
+            self._apply_hardware_volume(self._volume)
             # U36g: follow the person — the daemon tracks the nearest face and
             # keeps looking at them (looks up when you stand in front of it).
             if os.environ.get("HEAD_TRACKING", "true").lower() == "true" and not sleep_state.is_asleep():
@@ -980,6 +1012,7 @@ class ReachyRobotAdapter(RobotAdapter):
     async def disconnect(self) -> None:
         if self._mini is None:
             return
+        self._hw_volume = False   # U399: no robot, no mixer — the gain is digital again
         if self._tracking_watchdog is not None:
             self._tracking_watchdog.cancel()
             self._tracking_watchdog = None
@@ -1145,7 +1178,7 @@ class ReachyRobotAdapter(RobotAdapter):
                 peak = float(np.max(np.abs(pcm))) if len(pcm) else 0.0
                 if peak > 0.01:
                     pcm = pcm * (0.95 / peak)
-            pcm = np.clip(pcm * self._volume, -1.0, 1.0)
+            pcm = np.clip(pcm * self._digital_gain(), -1.0, 1.0)
             samples = (pcm * 32767.0).astype(np.int16)
             duration = len(samples) / sample_rate if sample_rate else 0.0
 
@@ -1254,7 +1287,7 @@ class ReachyRobotAdapter(RobotAdapter):
             # U329: a new utterance is the same condition the PTS re-stamp uses
             # below — the previous one has finished playing.
             gain = self._segment_gain(pcm, time.monotonic() >= self._appsrc_until)
-            pcm = np.clip(pcm * gain * self._volume, -1.0, 1.0)
+            pcm = np.clip(pcm * gain * self._digital_gain(), -1.0, 1.0)
             out_rate = media.get_output_audio_samplerate() or 16_000
             if sample_rate != out_rate and len(pcm):
                 n_out = int(len(pcm) * out_rate / sample_rate)
@@ -1346,7 +1379,7 @@ class ReachyRobotAdapter(RobotAdapter):
             import wave
 
             rate = 22_050
-            audio = self._synth_groove(beats, bpm, rate) * self._volume
+            audio = self._synth_groove(beats, bpm, rate) * self._digital_gain()
             samples = (np.clip(audio, -1.0, 1.0) * 32767.0).astype(np.int16)
             with tempfile.NamedTemporaryFile(suffix=".wav", delete=False, dir="/dev/shm") as fh:
                 path = fh.name

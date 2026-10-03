@@ -6129,3 +6129,45 @@ emotion and opens nothing; in *emotions* a heard "AURA, hallo!" plays
 answers; ten heard sentences map to their emotion, with "This is nice" kept
 out of the greetings. 16 red before, the 3 controls green. The reply path's
 emotions test now also checks the voice loop was told (red without the wiring).
+
+### U399 — the volume slider is his volume, whatever he plays
+
+Reported, in Stand with emotion sounds (translated): *"I have the impression
+the volume slider has no effect"*.
+
+**What was actually wrong.** It had none that could be heard. The slider set a
+digital gain on the speech the robot runtime itself plays, and since U82 the
+runtime put the speaker's hardware mixer at 100 % on every connect, because
+the daemon resets it to -23 dB. That evening nothing he played went through
+that gain: his emotions are played by the daemon (ADR-016), at the mixer's
+level — so always at full volume — and his words went through the laptop
+(U364), whose player had no volume at all. And the Talk screen's slider started
+at 80 whatever the robot was set to.
+
+**The change.** The slider now sets the robot's own mixer, the one the daemon
+plays through too, so his speech and his emotions follow it alike, and a
+connect applies his level instead of 100 %. Measured on the robot first: the
+mixer runs 0—60 steps at 1 dB each (-60 to 0 dB), so its own 50 % is -30 dB;
+the level is applied as 20·log10 instead — 18 % is -14.9 dB, the same as the
+digital gain gave, so nothing the owner had set changes how it sounds. The
+negative value needs `--` before it (`amixer -c 0 sset PCM,0 -- -14.9dB
+unmute`), checked on the robot and restored to 100 % after. The daemon's own
+volume endpoint was not used: it plays a test sound on every change, which on
+a stage is a noise every time the slider moves. While the mixer holds the
+level the digital gain is 1; without a robot connected, or without `amixer`,
+the digital gain takes over again — so a test run never turns anyone's
+speaker up or down. On the laptop the player takes the same level, for the
+next line and the one playing; the Talk and Robot sliders are one slider and
+read the robot's level when they open.
+
+**Not done.** The robot keeps the level in memory: a runtime restart (an update)
+brings back `ROBOT_VOLUME`, 80 %, until the slider is moved. That was true
+before this unit as well.
+
+**Tests**: 7 runtime tests against a recorded mixer — the command and its
+decibels, zero as mute, the digital gain stepping aside and taking over, no
+mixer touched without a robot, and a connect applying his level rather than
+100 % (all red before); console tests for the laptop player's volume, the
+shared level reading the robot, a save reaching robot and laptop alike and the
+laptop alone when the robot is away, and the Talk slider showing the robot's
+level (all red before).
