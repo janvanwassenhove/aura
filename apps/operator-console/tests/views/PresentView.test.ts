@@ -346,3 +346,62 @@ describe('U362 — importing the same YAML twice', () => {
     expect(writes).toContain('')
   })
 })
+
+describe('U388 — the HUD describes the show that is running', () => {
+  /** Reported with a screenshot: on slide 8, where the gag plays, the HUD said
+   *  "Saying now —" and "Next cue: the end — he bows and hands back to you".
+   *  Its beat list was filled only when Start was pressed in this window; the
+   *  owner loaded the talk from the saved list, so it was empty, and both
+   *  lines fell back to their defaults. */
+  const DEVOXX = {
+    title: 'I Hired a Real Robot as My Junior Dev',
+    beats: [
+      { id: 'sound-check', trigger: 'slide:1', mode: 'silent' },
+      { id: 'screen-1-clear', trigger: 'slide:7', mode: 'silent', overlay: 'hide' },
+      { id: 'screen-1-back', trigger: 'slide:8', mode: 'silent', overlay: 'show' },
+      { id: 'screen-2-clear', trigger: 'slide:55', mode: 'silent', overlay: 'hide' },
+      { id: 'the-gag', trigger: 'slide:8', mode: 'speak', text: 'Oh, I know this one.' },
+      { id: 'the-disclaimer', trigger: 'slide:8', mode: 'speak', text: 'I am not allowed to do the next bit.' },
+      { id: 'chime-java', trigger: 'keyword:Java', mode: 'chime_in', topic: 'kids' },
+      { id: 'chapter-1', trigger: 'slide:27', mode: 'silent' },
+      { id: 'last-word', trigger: 'slide:98', mode: 'speak', text: 'I will type the rest.' },
+    ],
+  }
+  const ON_SLIDE_8 = {
+    active: true, title: DEVOXX.title, current_slide: 8, slide: 8, slides_state: 'live',
+    beats_total: DEVOXX.beats.length, armed_keywords: ['Java'],
+    fired: ['screen-1-back', 'screen-1-clear', 'the-disclaimer', 'the-gag'],
+    last_fired: 'the-disclaimer',
+  }
+
+  it('loads the running show from the brain, without Start being pressed here', async () => {
+    stubFetch({ status: ON_SLIDE_8, active: DEVOXX })
+    const w = mount(PresentView)
+    await flushPromises(); await flushPromises()
+
+    const hud = w.text()
+    expect(hud).not.toContain('the end — he bows')
+    expect(hud).toContain('I am not allowed to do the next bit.')
+  })
+
+  it('names the next slide that does something, from the slide you are on', async () => {
+    // File order puts the overlay pairs and slide 55 BEFORE chapter-1 on
+    // slide 27, and sound-check on slide 1 never ran. Neither may decide.
+    stubFetch({ status: ON_SLIDE_8, active: DEVOXX })
+    const w = mount(PresentView)
+    await flushPromises(); await flushPromises()
+
+    expect(w.text()).toContain('Slide 27')
+    expect(w.text()).toContain('chapter-1')
+  })
+
+  it('says the end only when nothing is left ahead', async () => {
+    stubFetch({ status: { ...ON_SLIDE_8, current_slide: 98, slide: 98, last_fired: 'last-word' },
+                active: DEVOXX })
+    const w = mount(PresentView)
+    await flushPromises(); await flushPromises()
+
+    expect(w.text()).toContain('the end — he bows')
+  })
+})
+

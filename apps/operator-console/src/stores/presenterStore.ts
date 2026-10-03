@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
+import { toRows, type BeatRow, type RawBeat } from '../lib/beats'
 import { usePresentationStore } from './presentationStore'
 
 /** D2: ONE beat index drives everything — the run bar, the HUD counter, the
@@ -15,7 +16,23 @@ export const usePresenterStore = defineStore('presenter', () => {
   const rehearsing = computed(() => !!presentation.status.rehearsing)
 
   /** The scenario as loaded (for the beat list + next cue). */
-  const beats = ref<{ id: string; cue: string; kind: string; say: string; do: string }[]>([])
+  const beats = ref<BeatRow[]>([])
+
+  /** U388: the list comes from the BRAIN, whichever way the show was loaded.
+   *  It was filled only when Start was pressed in this window, so a talk
+   *  loaded from the saved list — or this window reloaded mid-talk — left it
+   *  empty, and the HUD read "Saying now —" and "Next cue: the end" on the
+   *  slide where the gag plays. Keyed on a string so a status poll that
+   *  changes nothing does not refetch. */
+  async function syncFromBrain(): Promise<void> {
+    const sc = await presentation.fetchScenario()
+    if (sc) beats.value = toRows((sc as { beats?: RawBeat[] }).beats)
+  }
+  watch(
+    () => (presentation.status.active ? String(presentation.status.title ?? '') + '\u0000' : ''),
+    (key) => { if (key) void syncFromBrain() },
+    { immediate: true },
+  )
 
   /** U267: which beats have actually run, by id.
    *
@@ -38,8 +55,12 @@ export const usePresenterStore = defineStore('presenter', () => {
 
   const finished = computed(() => total.value > 0 && done.value >= total.value)
 
-  /** The last beat that ran; -1 before anything has. Drives the highlight. */
+  /** The last beat that ran; -1 before anything has. Drives the highlight.
+   *  U388: the brain says which one, now that a beat can run more than once;
+   *  an older brain that does not say falls back to the old guess. */
   const beatIdx = computed(() => {
+    const last = presentation.status.last_fired
+    if (last) return beats.value.findIndex(b => b.id === last)
     for (let i = beats.value.length - 1; i >= 0; i--) {
       if (firedIds.value.has(beats.value[i].id)) return i
     }
@@ -47,13 +68,25 @@ export const usePresenterStore = defineStore('presenter', () => {
   })
 
   const currentBeat = computed(() => beats.value[beatIdx.value] ?? null)
-  /** The first beat still waiting — which is what "next cue" means, and is
-   *  NOT simply the one after the last fired: slide cues fire out of order
-   *  whenever the presenter jumps ahead in the deck. */
-  const nextBeat = computed(() =>
-    beats.value.find(b => !firedIds.value.has(b.id)) ?? null)
 
-  function setBeats(list: { id: string; cue: string; kind: string; say: string; do: string }[]): void {
+  /** U388: the next thing the presenter will REACH. A scenario is written in
+   *  whatever order its author liked — the real one lists every overlay pair
+   *  before the chapters — so file order says nothing about what comes next,
+   *  and "the first beat not yet fired" was stuck forever on a slide-1 beat
+   *  the presenter had walked past. Slides ahead of the current one, in slide
+   *  order; then a hand-advanced beat still waiting; then the end. Keyword
+   *  beats are not "next": they are armed, and the HUD says so separately. */
+  const nextBeat = computed<BeatRow | null>(() => {
+    const here = presentation.status.current_slide ?? null
+    const ahead = beats.value
+      .map((b, i) => ({ b, i }))
+      .filter(x => x.b.slide != null && (here == null || (x.b.slide as number) > here))
+      .sort((x, y) => ((x.b.slide as number) - (y.b.slide as number)) || (x.i - y.i))
+    if (ahead.length) return ahead[0].b
+    return beats.value.find(b => b.kind === 'manual' && !firedIds.value.has(b.id)) ?? null
+  })
+
+  function setBeats(list: BeatRow[]): void {
     beats.value = list
   }
 

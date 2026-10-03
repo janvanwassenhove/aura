@@ -561,3 +561,21 @@ async def test_a_keyword_beat_moves_him_until_the_next_slide_decides() -> None:
     await r.on_slide(2)                       # nothing on the slides says otherwise
     assert r.status()["overlay_visible"] is True
 
+
+# --------------------------------------------------------------------------- #
+# U388: the HUD has to be able to say what just happened
+# --------------------------------------------------------------------------- #
+
+async def test_status_names_the_beat_that_ran_last() -> None:
+    """`fired` is a set of ids, sorted by name: it says what has ever run, not
+    what ran last, and with U387's replay the two are different questions."""
+    rig = _Rig()
+    r = rig.runner(_devoxx_pairs())
+    assert r.status()["last_fired"] == ""
+    await r.on_slide(8)
+    assert r.status()["last_fired"] == "gag"
+    await r.on_slide(7)
+    assert r.status()["last_fired"] == "clear-1"
+    await r.on_slide(8)
+    assert r.status()["last_fired"] == "gag"
+

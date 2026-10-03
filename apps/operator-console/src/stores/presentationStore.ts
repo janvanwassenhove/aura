@@ -34,6 +34,8 @@ export interface PresentationStatus {
    *  visible — an older brain must not blank the projector. */
   overlay_visible?: boolean
   fired?: string[]
+  /** U388: the beat that ran most recently. */
+  last_fired?: string
   armed_keywords?: string[]
   /** U263: `watching` means a watcher is running; `slides_state` says whether
    *  it has actually FOUND a slideshow. The old flag conflated the two, so

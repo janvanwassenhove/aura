@@ -6,7 +6,7 @@ priority: P2
 risk: Medium
 created: "2026-04-25"
 amended: "2026-09-13"
-units: [U27, U205, U206, U207, U208, U246, U263, U263b, U264, U265, U266, U267, U269, U282, U320, U334, U349, U351, U352, U360, U361, U386, U387]
+units: [U27, U205, U206, U207, U208, U246, U263, U263b, U264, U265, U266, U267, U269, U282, U320, U334, U349, U351, U352, U360, U361, U386, U387, U388]
 ---
 
 # Feature Specification: Presentation Copilot
@@ -329,6 +329,13 @@ settings aside as the example.
   scenario starts it. It used to follow the history of what had fired, so a
   step back to a full-frame slide left him on it, and a jump past a hide/show
   pair or into a full-frame run put him in the wrong place (U387).
+- **FR-120**: The presenter HUD describes the show that is **running**, however
+  it was loaded — from the builder, from the saved list, or into a window
+  reloaded mid-talk. Its beat list comes from the brain whenever a show is
+  active; *Saying now* is the beat the brain reports as `last_fired`; *Next
+  cue* is the first slide beat **ahead of the current slide in slide order**,
+  then a hand-advanced beat still waiting, then the end — and it names the
+  beat, not only its slide. Keyword beats are armed, not next (U388).
 
 ## Superseded
 
@@ -351,6 +358,7 @@ applies to `slide:N` beats; `manual` and `keyword:` beats have no such deadline.
 | U246 | Three broken things behind one missing word — including `uv sync` pruning the presentation extra |
 | U386 | *Take it down* works after the overlay was shown twice |
 | U387 | A slide is a place: its beats replay when you return, and the overlay follows it |
+| U388 | The HUD describes the running show, however it was loaded |
 | U320 | The panel regrouped: locks as chips, status as status, the projector block given the weight it earns, a run button that names its own action, an empty state with the two doors, and help you can put away |
 | U334 | Present mode enforces what it always promised: only the scenario speaks, and no open microphone answers the room |
 | U361 | The scenario format written down, and a pre-flight check that says what the talk will do rather than only that the file parses |

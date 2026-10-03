@@ -5537,3 +5537,41 @@ again on 50, and the last line on 98.
 **Worth knowing before the talk**: going back over slide 8 now replays the gag.
 That is what was asked for; if a stray back-press must never repeat it, the
 beat takes `once: true`.
+
+### U388 — the HUD described a show that was not running
+
+Reported with a screenshot: on slide 8 — the slide where the gag plays — the
+HUD read *beat 4 of 22 — waiting for "Java"*, *Saying now: —* and *Next cue:
+the end — he bows and hands back to you*.
+
+The runner had done its job. The brain's log has the three slide-8 beats firing
+at 18:37:44 and again at 18:41:09; the silence in the room was U384 (the lines
+went to the laptop and the console was never told). The HUD was a separate
+fault, and it had three layers:
+
+1. **Its beat list was empty.** `setBeats` ran only inside `startScenario` —
+   pressing Start in *this* window. The owner loaded the talk from the saved
+   list (`GET /presentation/scenarios/i-hired-...`, then `POST
+   /presentation/scenario`), so the list stayed empty; *Saying now* fell back to
+   `—` and *Next cue* to its no-beats default, which is the closing line. U269
+   had already moved the **overlay** to fetching the scenario from the brain
+   for exactly this reason; the Present view was left behind.
+2. **"Next" meant next in the file.** The real scenario lists every overlay
+   pair before the chapters, and `sound-check` on slide 1 was walked past and
+   never fired — so "the first beat not yet fired" would have been stuck on
+   slide 1 for the rest of the talk.
+3. **"Current" meant latest in the file** among the fired set, which with
+   U387's replay cannot say what ran last.
+
+What changed: the presenter store loads the beat list from the brain whenever a
+show is active (keyed on the title, so a status poll that changes nothing does
+not refetch); the runner reports `last_fired`; *Next cue* is the first slide
+beat ahead of the current slide in slide order, then a waiting hand-advanced
+beat, then the end; and the line names the beat — *Slide 27 — chapter-1* —
+because "Slide 27" alone does not say what slide 27 is for. The overlay window
+uses the same store, so its *next* row changes with it.
+
+**Tests**: three mount tests of the Present view, served the owner's own beat
+order with nobody pressing Start — two verified red (the third, *the end only
+when nothing is ahead*, passed vacuously before and guards the fix), and
+`test_status_names_the_beat_that_ran_last` in the runner, red without the field.

@@ -30,6 +30,16 @@ export interface BeatRow {
   kind: 'manual' | 'slide' | 'keyword'
   say: string
   do: string
+  /** U388: the slide it belongs to, so "next" can mean the next slide ahead
+   *  rather than the next line in the file. */
+  slide?: number | null
+}
+
+export function slideOf(b: RawBeat): number | null {
+  const t = triggerOf(b)
+  if (!t.startsWith('slide:')) return null
+  const n = Number(t.slice('slide:'.length))
+  return Number.isFinite(n) ? n : null
 }
 
 export function triggerOf(b: RawBeat): string {
@@ -62,5 +72,6 @@ export function toRows(beats: RawBeat[] | undefined): BeatRow[] {
     kind: kindOf(b),
     say: b.text || b.topic || '',
     do: b.motion ?? b.gesture ?? b.mode ?? '',
+    slide: slideOf(b),
   }))
 }

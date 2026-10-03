@@ -58,6 +58,9 @@ class ScenarioRunner:
         self._manual_pos = 0
         self._current_slide: int | None = None
         self._fired: set[str] = set()      # beat ids that have run (once-guard)
+        # U388: which beat ran LAST. `fired` is a set — it says what has ever
+        # run, not what just did, and with U387's replay those differ.
+        self._last_fired = ""
         # U267: rehearsal — walk the whole show with the robot MUTE.
         #
         # The console has had a "Rehearse" button since D2, and it promised
@@ -114,6 +117,7 @@ class ScenarioRunner:
             # ASK what it should look like, not only be told.
             "overlay_visible": self._overlay_visible,
             "fired": sorted(self._fired),
+            "last_fired": self._last_fired,
             "armed_keywords": [
                 b.trigger_value for b in self._scenario.beats
                 if b.trigger_kind == "keyword" and b.id not in self._fired
@@ -207,6 +211,7 @@ class ScenarioRunner:
 
     async def _fire(self, beat: Beat, *, move_overlay: bool = True) -> None:
         self._fired.add(beat.id)
+        self._last_fired = beat.id
         logger.info("beat %r fired (mode=%s trigger=%s)", beat.id, beat.mode, beat.trigger)
 
         # U352: the projector moves BEFORE the line, so a beat that brings him

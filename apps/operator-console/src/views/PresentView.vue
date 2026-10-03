@@ -521,9 +521,11 @@ const progressLine = computed(() => {
 const nextCueLine = computed(() => {
   const beat = presenter.nextBeat
   if (!beat) return 'the end — he bows and hands back to you'
-  if (beat.kind === 'manual') return `${beat.cue} — he waits for you`
-  if (beat.kind === 'keyword') return `${beat.cue} — fires when you say it`
-  return `${beat.cue} — fires when you reach it`
+  // U388: "Slide 27" alone does not say what slide 27 is for.
+  const what = beat.say ? `“${beat.say.length > 48 ? beat.say.slice(0, 47) + '…' : beat.say}”` : beat.id
+  if (beat.kind === 'manual') return `${beat.cue} · ${what} — he waits for you`
+  if (beat.kind === 'keyword') return `${beat.cue} · ${what} — fires when you say it`
+  return `${beat.cue} · ${what} — fires when you reach it`
 })
 
 const hasManualBeats = computed(() =>
