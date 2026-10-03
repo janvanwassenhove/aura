@@ -19,6 +19,7 @@ feature: "023-wandering"
 - [x] T008 [U394] `wander` and `follow_me` in a scenario, per talk and per beat
 - [x] T009 [U394] Example scenarios: a keynote and a conference talk, walked step by step in the tests
 - [x] T011 [U394] The builder offers both and carries `once` through a save
+- [x] T012 [U397] Wandering per mode, in Modes; the Settings switch and preference removed
 
 ## Phase 3: Emotions (U395)
 

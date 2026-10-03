@@ -90,20 +90,29 @@ een app starten, je browser navigeren, Computer Use, code schrijven.
   betaalgegevens in.
 - In de goedkeuringsdialoog kun je per actietype **"altijd toestaan"** kiezen;
   intrekken kan altijd in het permissiecentrum.
-- **Rondkijken** (Wander, standaard uit, naast *Follow me*): hij kijkt rond op
-  zijn plek, volgt de mensen die hij ziet, draait naar stemmen en beweegt zijn
-  antennes. Kies wat hij intussen mag zeggen: *stil* (hij kijkt wie hem
-  aanspreekt aan en antwoordt alleen in de console), *emoties* (geen woorden:
-  hij antwoordt met een giechel, een knik en een *hmm*, een *oeps* — en af en
-  toe begroet hij wie binnenkomt of geeuwt hij als hij een tijd alleen is) of
-  *praat als je hem aanspreekt* (woorden, en af en toe een eigen emotie). De
-  emoties zijn opnames van Pollen en komen altijd uit de luidspreker van de
+- **Rondkijken** (Wander) hoort bij elke modus en stel je in bij **Modes**,
+  onder *How he behaves*: *wanders* (aan of uit) en *while wandering* —
+  *stil* (hij kijkt wie hem aanspreekt aan en antwoordt alleen in de console),
+  *emoties* (geen woorden: een giechel, een knik en een *hmm*, een *oeps* —
+  en af en toe begroet hij wie binnenkomt of geeuwt hij als hij een tijd
+  alleen is) of *praat als je hem aanspreekt* (woorden, en af en toe een eigen
+  emotie). Tijdens het rondkijken kijkt hij rond op zijn plek, volgt hij de
+  mensen die hij ziet, draait hij naar stemmen en beweegt hij zijn antennes.
+  De emoties zijn opnames van Pollen en komen altijd uit de luidspreker van de
   robot, ook als hij via deze laptop praat. Met Quiet aan maakt hij er geen
-  uit zichzelf, maar antwoordt hij er nog wel mee. Hij stopt als hij slaapt, en
-  je Follow me-instelling blijft precies zoals ze was. Tijdens een presentatie beslist het scenario
-  (`wander:` en `follow_me:`, zie `docs/demo/scenario-format.md`); een scenario
-  dat er niets over zegt, houdt hem stil, en na het beëindigen van de
-  presentatie gelden je eigen instellingen weer.
+  uit zichzelf, maar antwoordt hij er nog wel mee. Hij stopt als hij slaapt,
+  en je Follow me-instelling blijft precies zoals ze was. Tijdens een
+  presentatie beslist het scenario (`wander:` en `follow_me:`, zie
+  `docs/demo/scenario-format.md`); een scenario dat er niets over zegt, houdt
+  hem stil.
+- **Stand** (in de kop, tussen Work en Present) is voor een stand op een
+  beurs. Eén klik en hij kijkt rond en praat met bezoekers — en niets van jou
+  is binnen bereik: mail, agenda, herinneringen, bestanden, het scherm, muziek
+  en de tools die je toevoegde zijn geblokkeerd (grijs in de rij onder de
+  kop), hij zoekt de mensen die je kent niet op, niets over jou of je gezin
+  zit in wat hij te horen krijgt, wat je in Work zei volgt hem niet, en hij
+  onthoudt niemand die hij ontmoet. Terug naar Work en alles is zoals je het
+  liet.
 
 ## 5. Connecties
 

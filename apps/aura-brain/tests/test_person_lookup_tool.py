@@ -129,12 +129,17 @@ async def test_an_empty_name_asks_rather_than_searching() -> None:
     assert "name" in (await pipe._look_up_person("  ")).lower()
 
 
-def test_the_tool_is_offered_in_every_mode() -> None:
-    """Knowing who is being discussed is not a capability to switch on."""
+def test_the_tool_is_offered_in_every_mode_but_the_stand() -> None:
+    """Knowing who is being discussed is not a capability to switch on — in
+    the household. U397: at a stand the person asking is a stranger, and the
+    judgment layer decides what may be said to the household, not to them."""
     from shared_policies import MODE_TOOL_MAP
 
     for mode, tools in MODE_TOOL_MAP.items():
-        assert "look_up_person" in tools, mode
+        if mode == "stand":
+            assert "look_up_person" not in tools
+        else:
+            assert "look_up_person" in tools, mode
 
 
 def test_the_tool_is_shaped_like_every_other_tool() -> None:

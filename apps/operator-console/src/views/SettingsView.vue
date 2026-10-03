@@ -261,18 +261,6 @@
             <div class="row-sub">{{ c.description }}</div>
           </div>
           <span v-if="c.key === 'app_launch' && caps.allowedApps.length" class="row-val warn">limited to {{ caps.allowedApps.length }} apps</span>
-          <!-- U393: what he may say while he wanders, and why he is not, when
-               he should be — said, not guessed. -->
-          <template v-if="c.key === 'wander'">
-            <span v-if="wanderNote" class="row-val warn" data-test="wander-note">{{ wanderNote }}</span>
-            <select :value="prefs.wanderSound" class="d2-field row-field" data-test="wander-sound"
-                    aria-label="What he may say while he wanders"
-                    @change="prefs.save({ wander_sound: ($event.target as HTMLSelectElement).value as WanderSound })">
-              <option value="silent">silent — looks, says nothing</option>
-              <option value="emotions">emotions — a giggle, a hmm; no words</option>
-              <option value="talk">talks when spoken to</option>
-            </select>
-          </template>
           <button
             class="switch" :class="{ on: c.enabled }" :aria-pressed="c.enabled"
             :aria-label="c.label" @click="caps.toggle(c.key, !c.enabled)"
@@ -490,7 +478,7 @@ import { BRAIN_URL } from '../lib/endpoints'
 import { useCapabilitiesStore } from '../stores/capabilitiesStore'
 import { useConnectionsStore } from '../stores/connectionsStore'
 import { useKnowledgeStore } from '../stores/knowledgeStore'
-import { LANGUAGES, usePrefsStore, type Language, type WanderSound } from '../stores/prefsStore'
+import { LANGUAGES, usePrefsStore, type Language } from '../stores/prefsStore'
 import { useSettingsStore, type LLMProvider } from '../stores/settingsStore'
 import { useMcpStore } from '../stores/mcpStore'
 import { useThemeStore } from '../stores/themeStore'
@@ -501,19 +489,6 @@ const caps = useCapabilitiesStore()
 const knowledge = useKnowledgeStore()
 const prefs = usePrefsStore()
 
-// U393: whether wandering is in force, as the brain says it — paused for a
-// presentation, or a robot too old to do it, rather than a switch that looks on.
-const wanderStatus = ref<{ wanted?: boolean; paused?: string | null; note?: string }>({})
-async function fetchWander(): Promise<void> {
-  const r = await fetch(`${BRAIN_URL}/robot/wander`)
-  if (r.ok) wanderStatus.value = await r.json()
-}
-const wanderNote = computed(() => {
-  const s = wanderStatus.value
-  if (s.note) return s.note
-  if (s.wanted && s.paused === 'presentation') return 'paused while a presentation runs'
-  return ''
-})
 const themeStore = useThemeStore()
 const mcp = useMcpStore()
 
@@ -879,7 +854,6 @@ onMounted(() => {
     // two halves are not exported separately.
     ['connections', () => connections.refreshAllStatuses()],
     ['capabilities', () => caps.fetchCapabilities()],
-    ['wander', fetchWander],
     ['auto-approvals', () => caps.fetchAutoApprovals()],
     ['vault', () => knowledge.fetchTier()],
     ['prefs', () => prefs.fetchPrefs()],

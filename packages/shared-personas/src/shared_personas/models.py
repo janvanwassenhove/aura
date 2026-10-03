@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 class Persona(StrEnum):
     WORK = "work"
     HOME = "home"
+    STAND = "stand"  # U397: a stand at a fair — everyone is a stranger
     PRESENTATION = "presentation"
     SILENT_DESK = "silent_desk"
     DEMO = "demo"

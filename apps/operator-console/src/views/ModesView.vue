@@ -17,7 +17,7 @@
       </div>
 
       <section class="d2-card policy-card">
-        <div v-for="g in groups" :key="g.id" class="policy-row">
+        <div v-for="g in groups" :key="g.id" class="policy-row" :class="{ blocked: g.state === 'blocked' }">
           <div class="policy-text">
             <div class="policy-group">
               {{ g.label }}
@@ -72,7 +72,32 @@
               <option value="off">off</option>
             </select>
           </label>
+          <!-- U397: wandering belongs to the mode — where he is decides it. -->
+          <template v-if="editMode !== 'present'">
+            <label class="behaviour-field">
+              <span class="mono behaviour-k">wanders</span>
+              <select :value="behaviour?.wander ?? 'off'" class="d2-field" aria-label="wanders"
+                      data-test="mode-wander" @change="saveBehaviour('wander', $event)">
+                <option value="off">off — stays where you left him</option>
+                <option value="on">on — looks around, turns to voices</option>
+              </select>
+            </label>
+            <label class="behaviour-field">
+              <span class="mono behaviour-k">while wandering</span>
+              <select :value="behaviour?.wander_sound ?? 'silent'" class="d2-field" aria-label="while wandering"
+                      data-test="mode-wander-sound" @change="saveBehaviour('wander_sound', $event)">
+                <option value="silent">silent — looks, says nothing</option>
+                <option value="emotions">emotions — a giggle, a hmm; no words</option>
+                <option value="talk">talks when spoken to</option>
+              </select>
+            </label>
+          </template>
         </div>
+        <p v-if="editMode === 'present'" class="wander-note" data-test="mode-wander-present">
+          On stage the scenario decides whether he wanders and follows you — <span class="mono">wander:</span>
+          and <span class="mono">follow_me:</span>, per talk and per beat.
+        </p>
+        <p v-else-if="wanderNote && editMode === modeStore.mode" class="wander-note warn" data-test="mode-wander-note">{{ wanderNote }}</p>
 
         <!-- Apps he may drive — only when the mode does not block screen control -->
         <div v-if="screenAllowed" class="apps-sec">
@@ -111,7 +136,7 @@ import { useNavStore } from '../stores/navStore'
 const modeStore = useModeStore()
 const nav = useNavStore()
 
-const UI_MODES: UiMode[] = ['home', 'work', 'present']
+const UI_MODES: UiMode[] = ['home', 'work', 'stand', 'present']
 const STATES: PolicyState[] = ['allows', 'asks', 'blocked']
 const OPT_LABELS: Record<PolicyState, string> = { allows: 'Allow', asks: 'Ask', blocked: 'Blocked' }
 const OPT_HINTS: Record<PolicyState, string> = {
@@ -143,7 +168,7 @@ async function fetchPersonas(): Promise<void> {
     personas.value = (data.characters ?? []).map((c: { id: string; display_name?: string }) => ({ id: c.id, name: c.display_name ?? c.id }))
   } catch { personas.value = [] }
   // The backend modes are personas too — offer them even without characters.
-  for (const m of ['home', 'work', 'presentation']) {
+  for (const m of ['home', 'work', 'stand', 'presentation']) {
     if (!personas.value.some(p => p.id === m)) personas.value.push({ id: m, name: m })
   }
 }
@@ -171,10 +196,21 @@ function addApp(): void {
   newApp.value = ''
 }
 
+// U393/U397: what the robot answered about wandering, for the mode he is in
+// — "the robot needs an update", said rather than pretended.
+const wanderNote = ref('')
+async function fetchWander(): Promise<void> {
+  try {
+    const r = await fetch(`${BRAIN_URL}/robot/wander`)
+    if (r.ok) wanderNote.value = (await r.json()).note ?? ''
+  } catch { /* brain offline */ }
+}
+
 onMounted(() => {
   modeStore.fetchPolicy()
   fetchPersonas()
   fetchApps()
+  fetchWander()
 })
 </script>
 
@@ -195,6 +231,10 @@ onMounted(() => {
 .policy-card { border-radius: 12px; overflow: hidden; margin-bottom: 16px; }
 .policy-row { display: flex; align-items: center; gap: 14px; padding: 11px 16px; border-bottom: 1px solid var(--line); }
 .policy-row:last-child { border-bottom: none; }
+/* U397: what a mode blocks reads as unavailable at a glance */
+.policy-row.blocked .policy-text { opacity: .45; }
+.wander-note { margin: 10px 0 0; font-size: 12.5px; color: var(--ink-3); }
+.wander-note.warn { color: var(--warn); }
 .policy-text { flex: 1; min-width: 0; }
 .policy-group { font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 7px; }
 .override-chip {

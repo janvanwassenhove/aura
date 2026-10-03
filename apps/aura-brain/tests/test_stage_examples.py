@@ -41,7 +41,7 @@ class _Robot:
 
 
 @pytest.fixture
-def stage(monkeypatch):
+def stage(monkeypatch, tmp_path):
     from aura_brain import presentation_api, wander
     from fastapi import FastAPI
     from fastapi.testclient import TestClient
@@ -53,7 +53,12 @@ def stage(monkeypatch):
         return None
     monkeypatch.setattr(presentation_api, "_stop_watcher", _no_watcher)
     monkeypatch.setenv("HEAD_TRACKING", "true")       # the owner: follow-me on
-    monkeypatch.setenv("WANDER_ENABLED", "false")     # the owner: wander off
+    # the owner: Work does not wander (U397: a behaviour of the mode)
+    from orchestrator import mode_policy
+
+    monkeypatch.setenv("MODE_POLICY_PATH", str(tmp_path / "policy.json"))
+    mode_policy.reset_cache_for_tests()
+    mode_policy.set_active("work")
     wander.forget()
     presentation_api._runner = None
     presentation_api._kept = None

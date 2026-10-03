@@ -5991,3 +5991,82 @@ unit, which watches nothing; that one has to be stopped once by hand.
 while it lives, an app already gone, a pid that is not one, and the lifespan
 starting it) — all red before; one desktop check that `brainEnv()` names the
 shell's pid — red before.
+
+### U397 — Stand: a mode for a fair, and wandering as a behaviour of each mode
+
+Asked as (translated): *"but if I'm at a fair, say, and I want to put the robot
+in wander mode there, how do I best do that? I'd think in work mode and
+activate it there? Doing it via Settings seems so strange."* Offered two
+shapes — wandering per mode only, or a new mode for a fair as well — the owner
+chose the new mode, and added (translated): *"in that new mode, I assume a lot
+of capabilities are switched off / greyed out"*. And, about a scenario with
+`wander: on` and `follow_me: on` (translated): *"how does he handle it when
+both are on?"*
+
+**What was actually wrong** was two things. Wandering lived in Settings (U393),
+which is for how the installation is set up, not for where the robot stands
+today. And the mode the owner reached for, Work, is the owner's working life:
+calendar, mail, files, the screen and PowerShell are within reach; memory
+writing is on; and every prompt carries the day's agenda, the unread-mail
+count, the open tasks, the household roster, the profile of whoever he
+recognises and the conversation so far. At a fair, every passer-by would have
+been talking to that.
+
+**Stand** is a fourth mode in the header, between Work and Present:
+
+- *Greyed out.* Its tool set is empty: talking needs no tool, and looking
+  things up comes with every mode (U259). Every group of the owner's —
+  calendar, mail, reminders, music, dev tools, screen control, slides — is
+  therefore blocked, and the console already greys a blocked group (struck
+  through under the header); the Modes editor now dims a blocked row as well.
+  Tools added from an MCP server are blocked too, as on stage. The person
+  lookup that every mode carries (U294) is removed here: the judgment layer
+  decides what may be said about someone to the household, not to a stranger.
+- *Nothing personal in a prompt.* At a stand the pipeline sends no agenda,
+  mail or tasks snapshot, no household roster and no profile for a known face;
+  instead he is told he is at a stand, talking with strangers. The household
+  note and the person note are where both speech paths ask (U245, U293), so
+  Live and realtime are told the same.
+- *Two conversations.* The pipeline's recent-turns memory now records which
+  side of the door each turn was on. At the stand he does not recall what was
+  said at work — a visitor could ask what was just discussed — and back at work
+  the stand's small talk stays at the stand.
+- *Behaviour.* Speaks first: never (a reminder read out at a stand is the
+  owner's agenda, read to strangers). Memory writing: off. Wanders: on, and
+  talks when spoken to. Every one of these can be changed in Modes.
+
+**Wandering per mode.** `wander` and `wander_sound` joined persona, voice,
+speaks first and memory writing in each mode's behaviour row; the Modes editor
+offers them (refusing anything but `on`/`off` and `silent`/`emotions`/`talk`),
+and the Settings switch, the Settings preference and the `WANDER_ENABLED` /
+`WANDER_SOUND` variables are gone. Home and Work stand still until the owner
+says otherwise; in Present the editor says the scenario decides. The policy now
+tells listeners when the mode or a mode's row changes, and the brain re-asserts
+wandering on the robot then — so one click on *Stand* sets him wandering, and
+one click on *Work* stops him.
+
+**Both on.** Answered in the scenario format and in spec 023: wandering keeps
+the face tracker on, so while `wander` is on he follows whoever he sees,
+whatever `follow_me` says — only his antennas move while someone is in view,
+and with nobody he looks around and turns to voices. Follow-me matters once
+wandering stops; standing still needs both off. The tracker cannot tell the
+presenter from the audience, which is why the keynote example stops wandering
+at slide 2.
+
+ADR-017 records why a fair is a mode rather than Work with a switch.
+
+**Tests**: 28 orchestrator tests — the header order, the router and persona
+accepting Stand, every owner group blocked, added tools and the person lookup
+out, the behaviour row, refusal of a value that is not one, the listeners, and
+three through the real pipeline: the control (Work's prompt is personal), a
+Stand prompt with nothing personal in it, and a conversation that does not
+cross the door either way — 20 red before, the rest guards that held by
+accident while Stand did not exist; a persona test (red); the brain's wander
+tests moved from the environment to the mode policy, with new ones for each
+mode having its own wandering, a Stand wandering untold, a header switch
+reaching the robot, and the real lifespan registering both listeners (24 red);
+6 console tests for the header, the Modes tabs, greyed rows and the wander
+selects (all red). The Settings tests for wandering were replaced by one that
+says it is not there; two mode-policy tests that named three modes and four
+behaviour keys now name four and six; the persona list has six; and U294's
+"the person lookup is in every mode" is now every mode but the stand.

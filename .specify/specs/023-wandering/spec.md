@@ -5,7 +5,7 @@ owner: "robot-runtime / aura-brain"
 priority: P2
 risk: Medium
 created: "2026-10-03"
-units: [U393, U394, U395]
+units: [U393, U394, U395, U397]
 ---
 
 # Feature Specification: Wandering
@@ -25,7 +25,10 @@ with an option to enable or disable sound"*. Agreed with three conditions:
    silent, emotion sounds only ("hmm", giggling), or talking.
 
 Then extended (translated): *"in present mode, provide this wander mode next to
-follow me as options in a scenario"* — U394.
+follow me as options in a scenario"* — U394. And moved (translated): *"if I'm
+at a fair and want him in wander mode, how do I best do that? I'd think in work
+mode and activate it there? Doing it via Settings seems so strange"* — U397:
+wandering is a behaviour of each mode, and a Stand mode wanders by default.
 
 **Reachy Mini does not drive.** Wandering is done where he stands: head, torso
 and antennas. The microphone array reports which side a voice comes from but
@@ -97,19 +100,31 @@ cannot tell front from back.
    slide is reached, **Then** he stands still; **When** the presenter jumps back
    into the demo later, **Then** he stands still again.
 3. **Given** a scenario that says nothing about wandering, **Then** he does not
-   wander during the talk, whatever Settings says.
+   wander during the talk, whatever the mode says.
 4. **Given** the talk ends, **Then** the owner's own Wander and Follow me apply
    again.
 
 ## Functional Requirements
 
-- **FR-001**: Wandering is a capability, `wander` (`WANDER_ENABLED`, off by
-  default), listed directly after *Turn body too*.
+- **FR-001**: Wandering is a behaviour of each mode (U397): `wander` (`on` /
+  `off`) and `wander_sound` in the mode's behaviour row, set in Modes. A Stand
+  wanders and talks by default; Home and Work stand still until the owner says
+  otherwise; in Present the scenario decides (FR-008). Switching mode in the
+  header is what turns it on or off — at a fair, one click. It was a switch
+  in Settings (U393) until the owner asked why a fair should need a trip there;
+  the environment variables `WANDER_ENABLED` and `WANDER_SOUND` are no longer
+  read.
 - **FR-002**: The robot decides how to wander (`robot_runtime.wander`, a pure
-  planner); the brain decides whether (`aura_brain.wander`) — the owner's
-  switch, paused while a presentation runs — and tells the robot on every
-  change: the switch, a scenario loading or ending, waking up, and the robot
-  reconnecting.
+  planner); the brain decides whether (`aura_brain.wander`) — the active
+  mode's behaviour, or the scenario during a talk — and tells the robot on
+  every change: a mode switch or a change to a mode's row (U397), Quiet, a
+  scenario loading or ending, waking up, and the robot reconnecting.
+- **FR-010**: Wander and follow-me compose (U397, asked as *"how does he handle
+  it when both are on"*): wandering keeps the face tracker on, so while he
+  wanders he follows whoever he sees whatever follow-me says — only the
+  antennas move while someone is in view, and he looks around and turns to
+  voices when nobody is. Follow-me matters once wandering stops. Standing
+  still needs both off.
 - **FR-003**: Follow-me and body-follow are the owner's. The robot keeps what
   the owner asked for apart from what is in force; wandering keeps the tracker
   and the torso following people while it runs and gives both back unchanged.
@@ -120,14 +135,14 @@ cannot tell front from back.
   claiming it.
 - **FR-005**: Gestures, beats and speech hold the motion lock first; a wander
   step waits for it and does not move while he talks.
-- **FR-006**: `WANDER_SOUND` is `silent` (default, and what anything
+- **FR-006**: `wander_sound` is `silent` (default, and what anything
   unrecognised means), `emotions` (FR-009) or `talk`. While wandering silently
   or with emotions, replies are not spoken and no voice engine that speaks for
   itself is opened.
 - **FR-008**: During a presentation the scenario decides whether he wanders
   and whether he follows the presenter, slide by slide (spec 011 FR-122); the
   brain composes it with the owner's settings and gives those back at the end.
-- **FR-009**: `WANDER_SOUND` has a third level, `emotions` (U395): sounds
+- **FR-009**: `wander_sound` has a third level, `emotions` (U395): sounds
   instead of words. An emotion is a recording from Pollen's emotions library
   (`pollen-robotics/reachy-mini-emotions-library`) — a movement with its own
   sound — played by the daemon (`POST /api/move/play/recorded-move-dataset/…`)
@@ -157,6 +172,7 @@ cannot tell front from back.
 
 | Unit | What it delivered |
 |---|---|
+| U397 | Wandering is a behaviour of each mode, set in Modes; a Stand mode wanders and talks by default |
 | U395 | The *emotions* sound level: spontaneous emotions while he wanders, and a reply answered with one, from Pollen's library |
 | U394 | A scenario decides wandering and follow-me during a talk |
 | U393 | Wandering: the planner, the robot's half (follow-me untouched, never asleep, motion lock first), the brain's half (whether, and what he may say), the switch and its note in Settings |

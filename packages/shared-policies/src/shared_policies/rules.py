@@ -115,6 +115,11 @@ MODE_TOOL_MAP: dict[str, frozenset[str]] = {
             "advance_slide",
         }
     ),
+    # U397: a stand at a fair. Talking is the turn itself and needs no tool;
+    # looking things up comes from _ALWAYS below. Nothing of the owner's —
+    # agenda, mail, reminders, files, screen, music — because whoever is
+    # talking to him is a stranger.
+    "stand": frozenset(),
     "silent_desk": frozenset(
         {
             "list_todos",
@@ -160,6 +165,13 @@ MODE_TOOL_MAP: dict[str, frozenset[str]] = {
 # know is exactly the moment not to draw a blank.
 _ALWAYS = {"request_capability", "web_search", "read_url", "look_up_person"}
 
+# U397: the one exception to _ALWAYS. Looking a person up reads the owner's
+# notes through the judgment layer, which decides what may be said about them
+# to the household — not to whoever walks up to a stand.
+_NOT_IN_PUBLIC = {"look_up_person"}
+_PUBLIC_MODES = {"stand"}
+
 MODE_TOOL_MAP = {
-    mode: tools | _ALWAYS for mode, tools in MODE_TOOL_MAP.items()
+    mode: (tools | _ALWAYS) - (_NOT_IN_PUBLIC if mode in _PUBLIC_MODES else set())
+    for mode, tools in MODE_TOOL_MAP.items()
 }

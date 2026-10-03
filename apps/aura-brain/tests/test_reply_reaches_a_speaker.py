@@ -130,6 +130,14 @@ async def _reply(text: str):
 _ROBOTS: list[_Robot] = []
 
 
+def _wandering(sound: str) -> None:
+    """U397: wandering is the active mode's behaviour, set in Modes."""
+    from orchestrator import mode_policy
+
+    mode_policy.set_behaviour("work", {"wander": "on", "wander_sound": sound})
+    mode_policy.set_active("work")
+
+
 async def test_by_default_a_reply_comes_out_of_the_robot(isolated) -> None:
     """The regression that mattered most: the default mode, mute."""
     _ROBOTS[:] = isolated
@@ -153,8 +161,7 @@ async def test_wandering_silently_he_does_not_speak_the_reply(isolated, monkeypa
     """U393, as agreed (translated): "he looks at them, but only speaks if the
     sound mode is on". The robot turns to the voice by itself; the reply stays
     in the console."""
-    monkeypatch.setenv("WANDER_ENABLED", "true")
-    monkeypatch.setenv("WANDER_SOUND", "silent")
+    _wandering("silent")
     _ROBOTS[:] = isolated
     offered = await _reply("Goedemorgen, alles klaar?")
     assert all(r.heard == [] for r in isolated)
@@ -162,8 +169,7 @@ async def test_wandering_silently_he_does_not_speak_the_reply(isolated, monkeypa
 
 
 async def test_wandering_with_talk_he_answers_as_usual(isolated, monkeypatch) -> None:
-    monkeypatch.setenv("WANDER_ENABLED", "true")
-    monkeypatch.setenv("WANDER_SOUND", "talk")
+    _wandering("talk")
     _ROBOTS[:] = isolated
     await _reply("Goedemorgen, alles klaar?")
     assert [t for r in isolated for t, _ in r.heard] == ["Goedemorgen, alles klaar?"]
@@ -173,8 +179,7 @@ async def test_wandering_with_talk_he_answers_as_usual(isolated, monkeypatch) ->
 async def test_wandering_with_emotions_he_answers_with_one(isolated, monkeypatch) -> None:
     """U395: the reply's mood as a sound and a movement — a giggle, a hmm —
     instead of the words. The words stay in the console."""
-    monkeypatch.setenv("WANDER_ENABLED", "true")
-    monkeypatch.setenv("WANDER_SOUND", "emotions")
+    _wandering("emotions")
     _ROBOTS[:] = isolated
     offered = await _reply("Haha, goeie!")
     assert all(r.heard == [] for r in isolated), "emotions mode makes sounds, not words"

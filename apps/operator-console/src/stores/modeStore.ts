@@ -14,13 +14,18 @@ import { BRAIN_URL } from '../lib/endpoints'
  * UI, the config keys and the docs.
  */
 
-export type UiMode = 'home' | 'work' | 'present'
+export type UiMode = 'home' | 'work' | 'stand' | 'present'
 export type PolicyState = 'allows' | 'asks' | 'blocked'
 
 /** UI name ↔ backend name. The backend keeps `presentation` (plus silent_desk
- * and demo, reachable via API but not part of the three-way switch). */
-export const TO_BACKEND: Record<UiMode, string> = { home: 'home', work: 'work', present: 'presentation' }
-const TO_UI: Record<string, UiMode> = { home: 'home', work: 'work', presentation: 'present' }
+ * and demo, reachable via API but not part of the header switch). */
+export const TO_BACKEND: Record<UiMode, string> = { home: 'home', work: 'work', stand: 'stand', present: 'presentation' }
+const TO_UI: Record<string, UiMode> = { home: 'home', work: 'work', stand: 'stand', presentation: 'present' }
+
+/** U393/U395/U397: what he may do with his voice while he wanders — set per
+ *  mode in Modes, no longer in Settings. */
+export type WanderSound = 'silent' | 'emotions' | 'talk'
+export const WANDER_SOUNDS: WanderSound[] = ['silent', 'emotions', 'talk']
 
 export interface PolicyGroup {
   id: string
@@ -38,11 +43,15 @@ export interface ModeBehaviour {
   voice: string
   speaks_first: string
   memory_writing: string
+  /** U397: whether he wanders in this mode, and what he may say meanwhile. */
+  wander?: 'on' | 'off'
+  wander_sound?: WanderSound
 }
 
 export const MODE_META: Record<UiMode, { label: string; hint: string }> = {
   home: { label: 'Home', hint: 'Family life — chat, music, reminders. Anything sensitive asks first; dev tools and the desktop are off limits.' },
   work: { label: 'Work', hint: 'Chief of staff — mail, calendar and todos are available. Dev tools and screen control ask every time.' },
+  stand: { label: 'Stand', hint: 'A stand at a fair — he talks with visitors and looks around. Nothing of yours: no mail, agenda, files or people, and he remembers nobody.' },
   present: { label: 'Present', hint: 'On stage — speech, gestures and slides only. Everything else is refused, even if you ask.' },
 }
 

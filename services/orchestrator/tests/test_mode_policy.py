@@ -194,7 +194,9 @@ def test_present_mode_uses_its_ui_name() -> None:
 def test_behaviour_defaults_are_complete() -> None:
     for mode in mode_policy.UI_MODES:
         b = mode_policy.behaviour(mode)
-        assert set(b) == {"persona", "voice", "speaks_first", "memory_writing"}
+        # U397: wandering is part of every mode's behaviour.
+        assert set(b) == {"persona", "voice", "speaks_first", "memory_writing",
+                          "wander", "wander_sound"}
 
 
 def test_setting_a_voice_is_stored_and_live(monkeypatch) -> None:
@@ -222,10 +224,10 @@ def test_legacy_env_voice_still_honoured(monkeypatch) -> None:
 # ── The full description the console renders ───────────────────────────────
 
 
-def test_describe_covers_the_three_ui_modes_with_sources() -> None:
+def test_describe_covers_the_ui_modes_with_sources() -> None:
     d = mode_policy.describe("home")
     assert d["active_mode"] == "home"
-    assert set(d["modes"]) == {"home", "work", "presentation"}
+    assert set(d["modes"]) == {"home", "work", "stand", "presentation"}   # U397
     groups = d["modes"]["home"]["groups"]
     assert [g["id"] for g in groups] == [g[0] for g in mode_policy.TOOL_GROUPS]
     assert all(g["state"] in mode_policy.STATES for g in groups)

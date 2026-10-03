@@ -6,10 +6,11 @@ from shared_personas import Persona, get_persona_config
 from shared_personas.configs import PERSONA_CONFIGS
 
 
-def test_all_5_personas_defined() -> None:
+def test_all_personas_defined() -> None:
     assert set(PERSONA_CONFIGS.keys()) == {
         Persona.WORK,
         Persona.HOME,
+        Persona.STAND,       # U397: a stand at a fair
         Persona.PRESENTATION,
         Persona.SILENT_DESK,
         Persona.DEMO,

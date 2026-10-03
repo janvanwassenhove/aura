@@ -59,7 +59,7 @@ came out in one voice (U360).
 | `title` | string | `""` | Shown on the presenter HUD. |
 | `pptx` | string | `""` | The deck's file name. Only used to warn you that the wrong deck is on screen — he never opens it. |
 | `overlay` | `shown` \| `hidden` | `shown` | Where the projector overlay starts. `hidden` is for a talk where he should appear only at the moments you name. |
-| `wander` | `on` \| `off` | not said | Whether he looks around where he stands — follows the people he sees, turns towards voices, moves his antennas — when the talk starts. Not said: he does not wander during the talk, whatever Settings says. |
+| `wander` | `on` \| `off` | not said | Whether he looks around where he stands — follows the people he sees, turns towards voices, moves his antennas — when the talk starts. Not said: he does not wander during the talk, whatever the mode says. |
 | `follow_me` | `on` \| `off` | not said | Whether he keeps looking at the presenter when the talk starts. Not said: your own *Follow me* setting. |
 | `beats` | list | `[]` | In file order. Order matters for `manual` beats. |
 
@@ -148,9 +148,17 @@ line cannot be both "all in onyx" and "this bit in somebody else's voice".
   jumping puts him right. A keyword or manual beat can move them too; the next
   slide change decides again.
 - **During a talk the scenario decides; afterwards, your settings.** `wander:
-  on` makes him wander even if Settings has it off — the scenario is your
-  script for that talk. A scenario that says nothing about wandering keeps him
-  still on stage. *End presentation* gives your own Follow me and Wander back.
+  on` makes him wander whatever the mode says — the scenario is your script
+  for that talk. A scenario that says nothing about wandering keeps him still
+  on stage. *End presentation* gives your own Follow me and the mode's
+  wandering back.
+- **Both on.** Wandering keeps the face tracker on, so while `wander` is on he
+  follows whoever he sees whatever `follow_me` says: with someone in view only
+  his antennas move; with nobody, he looks around and turns to voices. So
+  `follow_me` matters once `wander` is off, and standing still needs both off.
+  The tracker cannot tell the presenter from the audience — that is why the
+  keynote stops wandering at slide 2, where follow-me alone keeps him on the
+  face nearest to him: yours.
 - **Wandering never makes him speak.** On stage only the scenario speaks; while
   wandering he turns towards voices, nothing more. He never wanders asleep.
 - **Two worked examples**: [`keynote.scenario.yaml`](keynote.scenario.yaml)

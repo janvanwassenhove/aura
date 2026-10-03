@@ -1,4 +1,4 @@
-"""Persona configuration definitions for all 5 AURA personas."""
+"""Persona configuration definitions for all 6 AURA personas."""
 
 from __future__ import annotations
 
@@ -12,6 +12,18 @@ Available tools: {tool_list}"""
 _HOME_SYSTEM_PROMPT = """You are AURA, a friendly home assistant.
 Be warm, conversational, and helpful. Keep responses natural.
 Today's context: {context}
+Available tools: {tool_list}"""
+
+# U397: a stand at a fair. The context it is given is the public note
+# (orchestrator.mode_policy.PUBLIC_NOTE), never the owner's agenda or people.
+_STAND_SYSTEM_PROMPT = """You are AURA, a small robot at a stand at a fair.
+Everyone you talk to is a stranger: a visitor, curious about you.
+Be friendly, playful and brief — a sentence or two, then let them talk.
+Tell them what you are and what you can do; ask what brings them here.
+You never share anything about your owner, their work, their schedule, their
+mail, their family or the people they know, and you never guess at it. If a
+visitor asks, say kindly that that is not something you talk about here.
+Context: {context}
 Available tools: {tool_list}"""
 
 _PRESENTATION_SYSTEM_PROMPT = """You are AURA, a presentation co-host.
@@ -42,6 +54,14 @@ PERSONA_CONFIGS: dict[Persona, PersonaConfig] = {
             amplitude=0.6, motion_ids=["nod", "tilt"], inter_cue_ms=300
         ),
         system_prompt_template=_HOME_SYSTEM_PROMPT,
+    ),
+    Persona.STAND: PersonaConfig(
+        name=Persona.STAND,
+        voice_style="relaxed_friendly",
+        gesture_profile=GestureProfile(
+            amplitude=0.8, motion_ids=["nod", "tilt", "wave"], inter_cue_ms=250
+        ),
+        system_prompt_template=_STAND_SYSTEM_PROMPT,
     ),
     Persona.PRESENTATION: PersonaConfig(
         name=Persona.PRESENTATION,

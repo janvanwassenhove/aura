@@ -47,8 +47,20 @@ BLOCKED = "blocked"
 STATES = (ALLOWS, ASKS, BLOCKED)
 
 # The modes the console shows. silent_desk and demo stay reachable through the
-# API but are not part of the three-way header switch.
-UI_MODES = ("home", "work", "presentation")
+# API but are not part of the header switch. U397 added Stand: a stand at a
+# fair, where whoever is talking to him is a stranger.
+UI_MODES = ("home", "work", "stand", "presentation")
+
+# U397: the modes where the room is the public. Nothing of the owner's travels
+# into a prompt there — not the agenda, not the household, not what was said
+# in another mode — and the person lookup is not offered (shared_policies).
+PUBLIC_MODES = frozenset({"stand"})
+
+PUBLIC_NOTE = (
+    "You are at a stand, talking with strangers. You know nothing about your "
+    "owner's agenda, mail, work, family or the people they know, and you never "
+    "guess at it. Who you are talking to is a visitor."
+)
 
 # ── The eight capability groups ────────────────────────────────────────────
 # (id, label, detail, tools). Conversation has no tools: talking is the turn
@@ -284,6 +296,11 @@ def _tools_without_a_connector() -> frozenset[str]:
     return frozenset(dead)
 
 
+# Tools an MCP server brought in are out of a talk (U255) and out of a stand
+# (U397) — a third-party tool at a stand would act for a stranger.
+_NO_ADDED_TOOLS = frozenset({"presentation", "stand"})
+
+
 def _mcp_tools() -> frozenset[str]:
     """Tool names of every ENABLED MCP server, or empty when there are none."""
     try:
@@ -312,7 +329,7 @@ def allowed_tools(mode: str) -> frozenset[str]:
     # things a stage needs, and a third-party tool firing mid-presentation is
     # the last thing anyone wants.
     mcp = _mcp_tools()
-    if mcp and mode != "presentation":
+    if mcp and mode not in _NO_ADDED_TOOLS:
         base |= mcp
     overrides = _load()["overrides"].get(mode) or {}
     for group_id, state in overrides.items():
@@ -340,7 +357,7 @@ def _mcp_default_state(mode: str) -> str:
     """
     if not _mcp_tools():
         return BLOCKED
-    return BLOCKED if mode == "presentation" else ASKS
+    return BLOCKED if mode in _NO_ADDED_TOOLS else ASKS
 
 
 def requires_approval(tool_name: str, mode: str) -> bool:
@@ -394,21 +411,42 @@ def rule_for(tool_name: str, mode: str) -> str:
 
 # ── Per-mode behaviour (persona, voice, memory writing) ────────────────────
 
+# U397: whether he wanders, and what he may say while he does, belong to the
+# mode — where he is decides it, not a switch in Settings. A Stand wanders and
+# talks; elsewhere he stands still until the owner says otherwise. In Present
+# the scenario decides during a talk (U394), whatever this row says.
 _BEHAVIOUR_DEFAULTS = {
     "home": {"persona": "home", "voice": "",
-             "speaks_first": "yes", "memory_writing": "on"},
+             "speaks_first": "yes", "memory_writing": "on",
+             "wander": "off", "wander_sound": "silent"},
     "work": {"persona": "work", "voice": "",
-             "speaks_first": "only for reminders", "memory_writing": "on"},
+             "speaks_first": "only for reminders", "memory_writing": "on",
+             "wander": "off", "wander_sound": "silent"},
+    # U397: a reminder read out at a stand is the owner's agenda read to
+    # strangers, and a visitor did not agree to being remembered.
+    "stand": {"persona": "stand", "voice": "",
+              "speaks_first": "never — cues only", "memory_writing": "off",
+              "wander": "on", "wander_sound": "talk"},
     "presentation": {"persona": "presentation", "voice": "",
-                     "speaks_first": "never — cues only", "memory_writing": "off"},
+                     "speaks_first": "never — cues only", "memory_writing": "off",
+                     "wander": "off", "wander_sound": "silent"},
 }
 
-_BEHAVIOUR_KEYS = frozenset({"persona", "voice", "speaks_first", "memory_writing"})
+_BEHAVIOUR_KEYS = frozenset({"persona", "voice", "speaks_first", "memory_writing",
+                             "wander", "wander_sound"})
+
+# U397: the values the Modes editor may store. Anything else is refused there;
+# a value that reaches the file some other way reads as off and silent.
+_BEHAVIOUR_CHOICES = {
+    "wander": ("on", "off"),
+    "wander_sound": ("silent", "emotions", "talk"),
+}
 
 
 def behaviour(mode: str) -> dict:
     stored = _load()["behaviour"].get(mode) or {}
-    fallback = {"persona": mode, "voice": "", "speaks_first": "yes", "memory_writing": "on"}
+    fallback = {"persona": mode, "voice": "", "speaks_first": "yes", "memory_writing": "on",
+                "wander": "off", "wander_sound": "silent"}
     base = dict(_BEHAVIOUR_DEFAULTS.get(mode, fallback))
     base.update({k: v for k, v in stored.items() if k in _BEHAVIOUR_KEYS})
     if not base.get("voice"):
@@ -421,6 +459,9 @@ def set_behaviour(mode: str, updates: dict) -> dict:
     if mode not in MODE_TOOL_MAP:
         raise ValueError(f"Unknown mode: {mode!r}")
     clean = {k: str(v) for k, v in (updates or {}).items() if k in _BEHAVIOUR_KEYS}
+    for key, allowed in _BEHAVIOUR_CHOICES.items():
+        if key in clean and clean[key] not in allowed:
+            raise ValueError(f"{key} must be one of {', '.join(allowed)}, not {clean[key]!r}")
     data = _load()
     merged = {**(data["behaviour"].get(mode) or {}), **clean}
     _save({**data, "behaviour": {**data["behaviour"], mode: merged}})
@@ -428,6 +469,7 @@ def set_behaviour(mode: str, updates: dict) -> dict:
     # true for the running process so the change is live immediately.
     if clean.get("voice"):
         os.environ[f"TTS_VOICE_{mode.upper()}"] = clean["voice"]
+    _tell_mode_listeners(mode)
     return behaviour(mode)
 
 
@@ -503,7 +545,34 @@ def set_active(mode: str) -> str:
     global _active_mode
     if mode in UI_MODES:
         _active_mode = mode
+        _tell_mode_listeners(mode)
     return _active_mode
+
+
+def in_public() -> bool:
+    """U397: is the room the public — strangers, not the household?"""
+    return _active_mode in PUBLIC_MODES
+
+
+# U397: who wants to know when the mode, or a mode's behaviour, changes. The
+# robot wanders on its own clock; it has to be told, like it is for Quiet.
+_mode_listeners: list = []
+
+
+def on_mode_change(fn, *, remove: bool = False) -> None:
+    if remove:
+        if fn in _mode_listeners:
+            _mode_listeners.remove(fn)
+    elif fn not in _mode_listeners:
+        _mode_listeners.append(fn)
+
+
+def _tell_mode_listeners(mode: str) -> None:
+    for fn in list(_mode_listeners):
+        try:
+            fn(mode)
+        except Exception as exc:  # noqa: BLE001 — a listener never undoes the change
+            logger.debug("mode listener failed: %s", exc)
 
 
 def presenting() -> bool:

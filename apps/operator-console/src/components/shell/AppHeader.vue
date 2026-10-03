@@ -104,8 +104,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import {
-  BriefcaseBusiness, ChevronDown, CircleStop, Equal, Home, Menu, Minus,
-  Moon, MoonStar, Presentation, Square, Sun, X,
+  BriefcaseBusiness, ChevronDown, CircleStop, Equal, Home, Menu, Minus, Moon, MoonStar, Presentation, Square, Sun, X, Store,
 } from 'lucide-vue-next'
 import { BRAIN_URL } from '../../lib/endpoints'
 import { DENSITY_META, usePrefsStore, type Density } from '../../stores/prefsStore'
@@ -135,11 +134,13 @@ const theme = useThemeStore()
 const modes = ([
   { id: 'home', icon: Home },
   { id: 'work', icon: BriefcaseBusiness },
+  { id: 'stand', icon: Store },          // U397: a stand at a fair
   { id: 'present', icon: Presentation },
 ] as const).map(m => ({ ...m, label: MODE_META[m.id].label, hint: MODE_META[m.id].hint }))
 
 function modeColor(id: UiMode): string {
-  return id === 'present' ? 'var(--present)' : id === 'work' ? 'var(--info)' : 'var(--accent)'
+  return id === 'present' ? 'var(--present)' : id === 'work' ? 'var(--info)'
+    : id === 'stand' ? 'var(--ok)' : 'var(--accent)'
 }
 
 const densities = ([

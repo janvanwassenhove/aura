@@ -374,8 +374,6 @@ def _prefs_snapshot() -> dict:
         # U364: where his voice comes out. "robot" is the default and always
         # has been; "laptop" plays the same audio here instead.
         "audio_output": os.environ.get("AUDIO_OUTPUT", "robot"),
-        # U393: whether he may speak while he wanders.
-        "wander_sound": os.environ.get("WANDER_SOUND", "silent"),
         "voice_engine": os.environ.get("VOICE_ENGINE", "pipeline"),  # U132
         "wake_word": os.environ.get("WAKE_WORD", os.environ.get("ASSISTANT_NAME", "AURA")),
         "tts_voice": os.environ.get("TTS_VOICE", "alloy"),
@@ -495,19 +493,6 @@ async def set_prefs(body: dict) -> JSONResponse:
                 {"error": "audio_output must be robot or laptop"}, status_code=422,
             )
         updates["AUDIO_OUTPUT"] = audio_output
-    # U393: what he may do with his voice while he wanders — `silent` (looks
-    # at whoever speaks, says nothing), `emotions` (U395: sounds, not words)
-    # or `talk`.
-    wander_sound = (body or {}).get("wander_sound")
-    if wander_sound is not None:
-        wander_sound = str(wander_sound).strip().lower()
-        from aura_brain import wander as _wander  # noqa: PLC0415
-
-        if wander_sound not in _wander.SOUNDS:
-            return JSONResponse(
-                {"error": "wander_sound must be silent, emotions or talk"}, status_code=422,
-            )
-        updates["WANDER_SOUND"] = wander_sound
     # U257: which language wins when a message is too short to tell. Only
     # consulted while `language` is auto; an explicit choice stays absolute.
     fallback = (body or {}).get("language_fallback")
@@ -600,12 +585,6 @@ async def set_prefs(body: dict) -> JSONResponse:
         return JSONResponse({"error": "nothing to update"}, status_code=422)
     os.environ.update(updates)          # effective immediately (read live)
     persisted = _write_env(updates)     # survives restarts
-    if "WANDER_SOUND" in updates:
-        # U395: whether he may emote of his own accord is the robot's to act
-        # on — tell it now, not at the next wake-up.
-        from aura_brain import wander as _wander  # noqa: PLC0415
-
-        await _wander.reapply()
     return JSONResponse({**_prefs_snapshot(), "persisted": persisted})
 
 

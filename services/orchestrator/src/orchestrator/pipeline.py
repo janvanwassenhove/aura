@@ -386,6 +386,16 @@ _TOOL_ROUTES: dict[str, tuple[str, str]] = {
 }
 
 
+def _in_public() -> bool:
+    """U397: is the room strangers? Asked of the policy, which owns the mode."""
+    try:
+        from orchestrator import mode_policy
+
+        return mode_policy.in_public()
+    except Exception:  # noqa: BLE001 — a broken policy module is not the public
+        return False
+
+
 class OrchestratorPipeline:
     def __init__(
         self,
@@ -534,15 +544,22 @@ class OrchestratorPipeline:
         return self._persona.config
 
     def _recall(self, session_id: str) -> list[dict]:
+        """Recent turns of this conversation — U397: from the same side of the
+        door. At a stand he does not recall what was said at work (a visitor
+        could ask what was just discussed), and back at work the stand's
+        small talk stays at the stand."""
         if os.environ.get("SESSION_MEMORY", "true").lower() != "true":
             return []
-        return self._history.get(session_id, [])
+        public = _in_public()
+        return [{"role": t["role"], "content": t["content"]}
+                for t in self._history.get(session_id, [])
+                if bool(t.get("public", False)) == public]
 
     def _remember(self, session_id: str, role: str, content: str) -> None:
         if not content:
             return
         hist = self._history.setdefault(session_id, [])
-        hist.append({"role": role, "content": content})
+        hist.append({"role": role, "content": content, "public": _in_public()})
         if len(hist) > self._max_history:
             del hist[: len(hist) - self._max_history]
 
@@ -591,6 +608,8 @@ class OrchestratorPipeline:
         facts into every prompt would hand a guest the household's private
         life to overhear.
         """
+        if _in_public():
+            return ""           # U397: at a stand, the household is nobody's business
         store = getattr(self._judgment, "_store", None)
         if store is None:
             return ""
@@ -636,6 +655,13 @@ class OrchestratorPipeline:
         directly: that is where the role rules live (a guest gets a name only,
         a minor gets explicit facts and never observed signals — ADR-008 §10).
         """
+        if _in_public():
+            # U397: at a stand everyone is a visitor — even a face he knows,
+            # because whoever stands beside them can hear. Both speech paths
+            # ask this, so both are told where he is.
+            from orchestrator.mode_policy import PUBLIC_NOTE
+
+            return PUBLIC_NOTE
         if self._judgment is None or not self._active_person_id:
             return ""
         person_ctx = await self._judgment.build_context(self._active_person_id)
@@ -777,8 +803,12 @@ class OrchestratorPipeline:
         persona = self._persona.current_persona
         allowed = self._router.allowed_tools()
 
-        # Build system prompt + context string
-        ctx_str = await self._context.build_context()
+        # Build system prompt + context string. U397: at a stand the context is
+        # where he is — never the owner's agenda, mail or tasks.
+        if _in_public():
+            ctx_str = ""
+        else:
+            ctx_str = await self._context.build_context()
 
         # U19e: prepend a minimal personal-context note when a person is active.
         note = await self.person_note()

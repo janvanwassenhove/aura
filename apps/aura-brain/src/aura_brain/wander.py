@@ -10,14 +10,17 @@ looks at them but only speaks if his wander sound allows it.
 The robot decides HOW to wander (`robot_runtime.wander`) and refuses to while
 asleep. This module decides WHETHER, in one place:
 
-- the owner's switch, the `wander` capability (`WANDER_ENABLED`);
+- the active mode's behaviour (U397: `wander` and `wander_sound` per mode, set
+  in Modes — a Stand wanders and talks, the others stand still until the
+  owner says otherwise). It was a switch in Settings until the owner asked,
+  translated, why a fair should need a trip to Settings;
 - paused while a presentation runs — on stage only the scenario moves and
   speaks (U334). U394 lets a scenario turn it on;
 - re-asserted on every change that could matter: the switch, a scenario
   loading or ending, waking up, and the robot coming back — the robot does
   not remember it across its own restart.
 
-His wander sound (`WANDER_SOUND`), three levels:
+His wander sound (the mode's `wander_sound`), three levels:
 
 - `silent` — the default, and what anything unrecognised means, because a
   typo must never be the reason he starts talking. He looks; he makes no sound.
@@ -58,9 +61,20 @@ _MOOD_EMOTION = {
 _LAUGH = ("haha", "hihi", "hehe", "lol", "grappig", "funny", "\U0001f602", "\U0001f923")
 
 
+def _behaviour() -> dict:
+    """The active mode's behaviour row (U397). Unreadable is "not wandering"
+    — a broken policy is never the reason he starts moving or talking."""
+    try:
+        from orchestrator import mode_policy  # noqa: PLC0415
+
+        return mode_policy.behaviour(mode_policy.active())
+    except Exception:  # noqa: BLE001
+        return {}
+
+
 def wanted() -> bool:
-    """The owner's switch."""
-    return os.environ.get("WANDER_ENABLED", "false").strip().lower() == "true"
+    """What the owner set for the mode he is in."""
+    return str(_behaviour().get("wander", "off")).strip().lower() == "on"
 
 
 def _stage() -> dict | None:
@@ -103,7 +117,7 @@ def owner_follow_me() -> bool:
 
 
 def sound() -> str:
-    value = os.environ.get("WANDER_SOUND", SILENT).strip().lower()
+    value = str(_behaviour().get("wander_sound", SILENT)).strip().lower()
     return value if value in SOUNDS else SILENT
 
 
@@ -243,10 +257,21 @@ async def reapply() -> dict:
     return await apply(_last["bound"])
 
 
+def mode_changed(_mode: str) -> None:
+    """A `mode_policy` listener (U397): switching to a Stand, or changing a
+    mode's wandering in Modes, has to reach the robot now — one click in the
+    header, not a wake-up later."""
+    _tell_soon()
+
+
 def quiet_changed(_on: bool) -> None:
     """A `mode_policy` listener. Spontaneous emotions live on the robot and
     Quiet lives here; a switch the robot never hears about would change the
     header and nothing else (U366's lesson)."""
+    _tell_soon()
+
+
+def _tell_soon() -> None:
     import asyncio  # noqa: PLC0415
 
     try:

@@ -5,7 +5,7 @@ owner: "orchestrator"
 priority: P1
 risk: High
 created: "2026-09-05"
-units: [U40, U43, U50, U57, U58, U59, U60, U61, U62, U64, U65, U66, U70, U71, U74, U75, U107, U108, U110, U118, U159, U194, U195, U247, U248, U249, U250, U251, U253c, U259, U259b, U261, U296, U335, U377, U378, U379, U380, U381, U382, U391]
+units: [U40, U43, U50, U57, U58, U59, U60, U61, U62, U64, U65, U66, U70, U71, U74, U75, U107, U108, U110, U118, U159, U194, U195, U247, U248, U249, U250, U251, U253c, U259, U259b, U261, U296, U335, U377, U378, U379, U380, U381, U382, U391, U397]
 ---
 
 # Feature Specification: Skills, Automation and the Agentic Loop
@@ -209,6 +209,22 @@ about two questions:
   `mode_policy` read those values at all: work briefed out loud under a row
   that said "only for reminders", and a presentation learned about its
   audience (U335).
+- **FR-MODE-STAND**: **Stand** is a fourth mode in the header, between Work
+  and Present, for a stand at a fair where whoever talks to him is a stranger
+  (U397). It allows talking and looking things up and nothing else: every
+  group of the owner's — calendar, mail, reminders, music, dev tools, screen
+  control, slides, and tools added from an MCP server — is blocked, and the
+  console greys them out. The person lookup that every other mode carries
+  (U294) is not offered: the judgment layer decides what may be said about
+  someone to the household, not to a passer-by. Nothing personal reaches a
+  prompt — not the agenda, mail or tasks snapshot, not the household roster,
+  not the profile of a face he knows; both speech paths are told *"you are at
+  a stand, talking with strangers"* instead (`mode_policy.PUBLIC_NOTE`). What
+  was said in another mode is not recalled at the stand, and what was said at
+  the stand is not recalled afterwards. Its behaviour row: speaks first
+  *never* (a reminder read out is the agenda read to strangers), memory
+  writing *off*, wanders *on* and *talks when spoken to*. The owner can change
+  any of it in Modes.
 - **FR-001**: The loop is multi-round, steerable and stoppable, and its rounds
   are visible in the console while they run (U57, U62).
 - **FR-002**: Every tool that touches the outside world passes the approval
@@ -250,6 +266,7 @@ about two questions:
 |---|---|
 | U57, U58, U62 | The agentic loop; the automation ladder; live rounds, steering, stop and teach in the console |
 | U335 | The behaviour row of every mode enforced at its chokepoints: unprompted speech, and learning about people |
+| U397 | Stand: a mode for a fair — nothing of the owner's within reach or in a prompt, and he wanders and talks |
 | U59, U60, U64, U65, U66, U71 | Skills with triggers and scope; teach-mode; person-scoped skills; the starter skill |
 | U61 | Declarative hooks and scoped subagents |
 | U107, U108, U118, U159 | The self-optimising loop; proactive suggestions; polished at creation; the stuck "ready to optimize" |

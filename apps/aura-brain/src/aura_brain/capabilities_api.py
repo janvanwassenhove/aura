@@ -34,13 +34,6 @@ _CAPS: dict[str, tuple[str, str, str, str, bool]] = {
                   "The robot keeps looking at your face.", True),
     "body_follow": ("BODY_FOLLOW", "false", "Turn body too",
                     "The torso rotates along with the face, not just the head.", True),
-    # U393: next to follow-me, which it keeps on while it runs and gives back
-    # untouched when it stops.
-    "wander": ("WANDER_ENABLED", "false", "Wander",
-               "He looks around where he stands: follows the people he sees, turns "
-               "towards voices, moves his antennas. Paused while a presentation "
-               "runs and while he sleeps. While wandering he only speaks if his "
-               "wander sound allows it.", True),
     "speak_replies": ("SPEAK_REPLIES", "true", "Speak replies aloud",
                       "Say answers out loud on the robot with a gesture.", True),
     "gestures": ("GESTURES_ENABLED", "true", "React to gestures",

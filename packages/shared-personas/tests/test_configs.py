@@ -29,3 +29,12 @@ def test_invalid_persona_raises():
     import pytest
     with pytest.raises(ValueError):
         get_persona_config("nonexistent")
+
+
+def test_the_stand_persona_keeps_the_owner_private():
+    """U397: at a stand everyone is a stranger."""
+    cfg = get_persona_config("stand")
+    prompt = cfg.system_prompt_template.lower()
+    assert "stranger" in prompt
+    assert "never" in prompt and "owner" in prompt
+    assert "{context}" in cfg.system_prompt_template

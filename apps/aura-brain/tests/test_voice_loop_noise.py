@@ -189,11 +189,16 @@ async def test_a_fragment_nobody_addressed_does_not_open_a_paid_session(monkeypa
     assert opened == ["wat is het weer"]
 
 
-async def test_wandering_silently_no_engine_speaks_for_itself(monkeypatch) -> None:
+async def test_wandering_silently_no_engine_speaks_for_itself(monkeypatch, tmp_path) -> None:
     """U393: a Live session talks on its own; while he wanders silently even an
-    addressed turn goes to the pipeline, whose reply stays text."""
-    monkeypatch.setenv("WANDER_ENABLED", "true")
-    monkeypatch.setenv("WANDER_SOUND", "silent")
+    addressed turn goes to the pipeline, whose reply stays text. U397: wandering
+    is the active mode's behaviour."""
+    from orchestrator import mode_policy
+
+    monkeypatch.setenv("MODE_POLICY_PATH", str(tmp_path / "policy.json"))
+    mode_policy.reset_cache_for_tests()
+    mode_policy.set_behaviour("work", {"wander": "on", "wander_sound": "silent"})
+    mode_policy.set_active("work")
     from aura_brain import presentation_api
     monkeypatch.setattr(presentation_api, "is_active", lambda: False)
     loop = vl.VoiceLoop(robot=_Room(_Clock(), 0), pipeline=_Pipeline(), bus=_Bus(),

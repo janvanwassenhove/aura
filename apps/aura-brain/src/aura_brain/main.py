@@ -435,20 +435,16 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     capabilities_api.set_live_hook("body_follow", _apply_body_follow)
 
-    # U393: wandering — one place decides whether it is in force.
+    # U393: wandering — one place decides whether it is in force. U395: the
+    # robot is told again when Quiet changes; U397: and when the mode, or a
+    # mode's wandering, does — wandering is a behaviour of the mode now.
     from aura_brain import wander as _wander
 
-    def _apply_wander(_enabled: bool) -> None:
-        import asyncio as _asyncio
-
-        _asyncio.ensure_future(_wander.apply(_robot))
-
-    capabilities_api.set_live_hook("wander", _apply_wander)
-    # U395: the robot is told again when its sound level or Quiet changes.
     _wander.bind(_robot)
     from orchestrator import mode_policy as _mode_policy
 
     _mode_policy.on_quiet_change(_wander.quiet_changed)
+    _mode_policy.on_mode_change(_wander.mode_changed)
 
     # U84: conversation state machine + character personas.
     from aura_brain.characters import CharacterStore

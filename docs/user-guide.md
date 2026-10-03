@@ -88,20 +88,27 @@ navigating your browser, running Computer Use, writing code.
   for approval and it never enters passwords or payment details.
 - In the approval dialog you can pick **"always allow"** per action type;
   revoke it any time in the permissions center.
-- **Wander** (off by default, next to *Follow me*): he looks around where he
-  stands, follows the people he sees, turns towards voices and moves his
-  antennas. Choose what he may say meanwhile: *silent* (he looks at whoever
-  speaks to him and answers only in the console), *emotions* (no words: he
-  answers with a giggle, a nod and a *hmm*, an *oops* — and now and then greets
-  someone who arrives or yawns when he has been alone a while) or *talks when
-  spoken to* (words, and the odd emotion of his own). The emotions are Pollen's
-  recordings and always come from the robot's own speaker, even when he talks
-  through this laptop. With Quiet on he makes none of his own accord, but still
-  answers with one. He stops while he sleeps, and your Follow me setting is left
-  exactly as it was.
-  During a presentation the scenario decides (`wander:` and `follow_me:`, see
-  `docs/demo/scenario-format.md`); one that says nothing keeps him still, and
-  ending the presentation gives your own settings back.
+- **Wandering** is part of each mode, set in **Modes** under *How he behaves*:
+  *wanders* (on or off) and *while wandering* — *silent* (he looks at whoever
+  speaks to him and answers only in the console), *emotions* (no words: a
+  giggle, a nod and a *hmm*, an *oops* — and now and then he greets someone
+  who arrives or yawns when he has been alone a while) or *talks when spoken
+  to* (words, and the odd emotion of his own). While wandering he looks around
+  where he stands, follows the people he sees, turns towards voices and moves
+  his antennas. The emotions are Pollen's recordings and always come from the
+  robot's own speaker, even when he talks through this laptop. With Quiet on he
+  makes none of his own accord, but still answers with one. He stops while he
+  sleeps, and your Follow me setting is left exactly as it was. During a
+  presentation the scenario decides (`wander:` and `follow_me:`, see
+  `docs/demo/scenario-format.md`); one that says nothing keeps him still.
+- **Stand** (in the header, between Work and Present) is for a stand at a
+  fair. One click and he wanders and talks with visitors — and nothing of
+  yours is within reach: mail, calendar, reminders, files, the screen, music
+  and the tools you added are blocked (greyed out in the row under the
+  header), he does not look up the people you know, nothing about you or your
+  household is in what he is told, what you said in Work does not follow him
+  there, and he remembers nobody he meets. Switch back to Work and everything
+  is as you left it.
 
 ## 5. Connections
 

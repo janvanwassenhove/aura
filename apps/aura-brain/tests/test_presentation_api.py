@@ -470,13 +470,18 @@ class _StageRobot:
         return _nothing
 
 
-async def test_the_scenario_moves_wander_and_follow_me_on_the_real_robot_path(monkeypatch) -> None:
+async def test_the_scenario_moves_wander_and_follow_me_on_the_real_robot_path(
+        monkeypatch, tmp_path) -> None:
     from aura_brain import presentation_api, wander
+    from orchestrator import mode_policy
 
     robot = _StageRobot()
     monkeypatch.setattr(presentation_api, "_robot", robot)
     monkeypatch.setenv("HEAD_TRACKING", "true")
-    monkeypatch.delenv("WANDER_ENABLED", raising=False)
+    # The owner's mode does not wander (U397: a behaviour of the mode).
+    monkeypatch.setenv("MODE_POLICY_PATH", str(tmp_path / "policy.json"))
+    mode_policy.reset_cache_for_tests()
+    mode_policy.set_active("work")
     monkeypatch.setattr(presentation_api, "_stop_watcher", _noop)
     wander.forget()
     presentation_api._runner = None

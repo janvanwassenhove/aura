@@ -14,9 +14,6 @@ export const LANGUAGES: { id: Language; label: string }[] = [
 ]
 
 export type VoiceMode = 'off' | 'wake_word'
-/** U393/U395: what he may do with his voice while he wanders. */
-export type WanderSound = 'silent' | 'emotions' | 'talk'
-export const WANDER_SOUNDS: readonly string[] = ['silent', 'emotions', 'talk']
 export type VoiceEngine = 'pipeline' | 'realtime' | 'live'  // U132, U324 (GPT-Live)
 
 /** D2: one surface, three depths. Density changes how much of the SAME screen
@@ -47,8 +44,6 @@ export const usePrefsStore = defineStore('prefs', () => {
   const voiceMode = ref<VoiceMode>('off')
   /** U364: where his voice comes out - the robot's speaker, or this laptop. */
   const audioOutput = ref<'robot' | 'laptop'>('robot')
-  /** U393: what he may do with his voice while he wanders. U395: emotions. */
-  const wanderSound = ref<WanderSound>('silent')
   const voiceEngine = ref<VoiceEngine>('pipeline')
   const wakeWord = ref('AURA')
   const ttsVoice = ref('alloy')
@@ -95,8 +90,6 @@ export const usePrefsStore = defineStore('prefs', () => {
         languageFallbackEffective.value = data.language_fallback_effective ?? ''
         voiceMode.value = (data.voice_mode ?? 'off') as VoiceMode
         audioOutput.value = (data.audio_output ?? 'robot') as 'robot' | 'laptop'
-        // U395: anything unknown reads as silent — never as permission to speak.
-        wanderSound.value = WANDER_SOUNDS.includes(data.wander_sound) ? data.wander_sound as WanderSound : 'silent'
         voiceEngine.value = (data.voice_engine ?? 'pipeline') as VoiceEngine
         wakeWord.value = data.wake_word
         ttsVoice.value = data.tts_voice ?? 'alloy'
@@ -110,7 +103,6 @@ export const usePrefsStore = defineStore('prefs', () => {
     assistant_name?: string; language?: Language; language_fallback?: string;
     voice_mode?: VoiceMode; voice_engine?: VoiceEngine; wake_word?: string; tts_voice?: string
     audio_output?: 'robot' | 'laptop'
-    wander_sound?: WanderSound
   }): Promise<boolean> {
     saving.value = true
     error.value = null
@@ -133,7 +125,6 @@ export const usePrefsStore = defineStore('prefs', () => {
       }
       voiceMode.value = data.voice_mode
       if (data.audio_output) audioOutput.value = data.audio_output
-      if (data.wander_sound) wanderSound.value = data.wander_sound
       voiceEngine.value = data.voice_engine ?? voiceEngine.value
       wakeWord.value = data.wake_word
       ttsVoice.value = data.tts_voice ?? ttsVoice.value
@@ -150,7 +141,7 @@ export const usePrefsStore = defineStore('prefs', () => {
 
   return {
     assistantName, language, languageFallback, languageFallbackEffective,
-    voiceMode, voiceEngine, audioOutput, wanderSound, wakeWord, ttsVoice, voiceInUse, voiceSource, saving, error,
+    voiceMode, voiceEngine, audioOutput, wakeWord, ttsVoice, voiceInUse, voiceSource, saving, error,
     density, densityTouched, railCollapsed,
     setDensity, followPerson, resetDensityTouch, toggleRail,
     fetchPrefs, save,
