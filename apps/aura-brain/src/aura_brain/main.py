@@ -545,7 +545,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
                         # U364: the robot's speaker or this laptop - one place
                         # decides, because five call sites deciding separately
                         # is a decision that drifts.
-                        await speech_out.deliver(_robot, bus, chunk, audio_b64)
+                        await speech_out.deliver(_robot, ctx.bus, chunk, audio_b64)
 
                     await stream_speech(capped, _synth, _speak_chunk)
                 else:
@@ -554,7 +554,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
                         return  # interrupted during synthesis — stay silent
                     if _t is not None:
                         _t.mark("playback_first_sample")
-                    await speech_out.deliver(_robot, bus, capped, audio_b64)   # U364
+                    # U384: ctx.bus — a bare `bus` was never defined here, and the
+                    # NameError it raised was swallowed at DEBUG below, so every
+                    # reply was mute on BOTH speakers from U364 on.
+                    await speech_out.deliver(_robot, ctx.bus, capped, audio_b64)
                     if _t is not None:
                         _t.mark("playback_complete")
 
@@ -565,7 +568,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             except asyncio.CancelledError:
                 logging.getLogger(__name__).info("speak task cancelled (barge-in)")
         except Exception as exc:  # robot offline → the console turn still shows
-            logging.getLogger(__name__).debug("embodied reply failed: %s", exc)
+            # U384: WARNING, not DEBUG. At DEBUG this hid a NameError that muted
+            # every reply for a day; "robot offline" is the common case, but a
+            # reply that reached no speaker is never something to whisper.
+            logging.getLogger(__name__).warning("embodied reply failed: %s: %s",
+                                                type(exc).__name__, exc)
 
     ctx.bus.subscribe(ResponseDrafted, _embody_reply)
 

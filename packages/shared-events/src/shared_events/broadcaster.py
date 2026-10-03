@@ -1,4 +1,13 @@
-"""WebSocketBroadcaster — fans out all bus events to WebSocket clients."""
+"""WebSocketBroadcaster — fans out bus events to WebSocket clients.
+
+Not literally all of them, whatever the first line of this file used to say.
+`_ALL_EVENT_TYPES` is a hand-written list, and an event that is not on it never
+reaches a console however carefully the console handles it. U384 found seven
+had fallen off — `SpeechAudioReady` among them, so U364's laptop audio was
+synthesized, held and never played. Every exported event is now either on the
+list or in `NOT_FOR_THE_CONSOLE` with the reason, and
+`tests/test_broadcaster_coverage.py` fails on one that is neither.
+"""
 
 from __future__ import annotations
 
@@ -7,15 +16,20 @@ import logging
 from fastapi import WebSocket
 from fastapi.websockets import WebSocketState
 from shared_schemas.events import (
+    AgentRoundCompleted,
+    AgentRoundStarted,
     ApprovalDenied,
     ApprovalGranted,
     ApprovalRequested,
     AudioInputStarted,
+    AuthRequiredEvent,
     BackendHeartbeatFailed,
     BackendHeartbeatOk,
     BaseEvent,
     BehaviorPlanned,
     BehaviorStateChanged,
+    ComputerControlEnded,
+    ComputerControlStarted,
     GestureDetected,
     IntentRecognized,
     MaintenanceReport,
@@ -28,11 +42,13 @@ from shared_schemas.events import (
     PersonRecognized,
     PresentationBeatFired,
     PresentationCueReceived,
+    PresentationOverlayChanged,
     ReminderTriggered,
     ResponseDrafted,
     RobotConnected,
     RobotDisconnected,
     RobotModeChanged,
+    SpeechAudioReady,
     SpeechPlaybackCompleted,
     SpeechPlaybackStarted,
     ToolCallFailed,
@@ -82,7 +98,46 @@ _ALL_EVENT_TYPES: tuple[type[BaseEvent], ...] = (
     PersonRecognized,
     GestureDetected,
     MaintenanceReport,
+    # U384: U364's laptop audio. The console fetches the line it names; without
+    # this it was held in the brain and nobody was ever told to fetch it.
+    SpeechAudioReady,
+    # U384: U352's overlay switch. The overlay also polls every 1.5 s, which is
+    # why this was never missed — but the push was designed in, and without it
+    # a scenario's "hide the overlay" lands up to a second and a half late.
+    PresentationOverlayChanged,
 )
+
+# Exported events that deliberately do NOT go to the console, and why. A new
+# event has to land in one of the two — the coverage test refuses a third
+# state, because "nobody decided" is how SpeechAudioReady went missing.
+NOT_FOR_THE_CONSOLE: dict[type[BaseEvent], str] = {
+    AuthRequiredEvent: (
+        "An orchestrator-internal signal to start a re-authentication flow. "
+        "The console has no handler for it and nothing publishes it today."
+    ),
+    # The four below have console handlers that have never once received an
+    # event: they were written against a broadcast that did not include them.
+    # Turning them on changes what the Talk screen and the desktop show — an
+    # agent-round counter, and U75's screen-control glow with its abort button
+    # — none of which has run in production. That is the owner's call, not a
+    # side effect of fixing the audio (see the U384 ledger entry).
+    AgentRoundStarted: (
+        "Pending the owner's decision (U384): would light up the Talk screen's "
+        "agent-round counter, which has never run in production."
+    ),
+    AgentRoundCompleted: (
+        "Pending the owner's decision (U384): the closing half of the "
+        "agent-round counter; enabled together with AgentRoundStarted."
+    ),
+    ComputerControlStarted: (
+        "Pending the owner's decision (U384): would show U75's screen-control "
+        "glow and abort button, which have never once appeared in production."
+    ),
+    ComputerControlEnded: (
+        "Pending the owner's decision (U384): clears the screen-control glow; "
+        "must be enabled together with ComputerControlStarted, never alone."
+    ),
+}
 
 
 class WebSocketBroadcaster:

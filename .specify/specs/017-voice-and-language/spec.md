@@ -5,7 +5,7 @@ owner: "aura-brain / conversation"
 priority: P1
 risk: High
 created: "2026-09-05"
-units: [U22, U36b, U36e, U36h, U45, U46, U47, U49, U54, U67, U73, U80, U81, U82, U83, U84, U85, U86, U87, U88, U89, U91, U92, U96, U128, U129, U130, U131, U132, U133, U134, U135, U140, U141, U142, U143, U144, U145, U146, U148, U149, U150, U153, U154, U155, U156, U163, U203, U209, U256, U257, U258, U260, U273, U275, U287, U288, U289, U291, U292, U321, U322, U324, U329, U331, U333, U349, U366, U364]
+units: [U22, U36b, U36e, U36h, U45, U46, U47, U49, U54, U67, U73, U80, U81, U82, U83, U84, U85, U86, U87, U88, U89, U91, U92, U96, U128, U129, U130, U131, U132, U133, U134, U135, U140, U141, U142, U143, U144, U145, U146, U148, U149, U150, U153, U154, U155, U156, U163, U203, U209, U256, U257, U258, U260, U273, U275, U287, U288, U289, U291, U292, U321, U322, U324, U329, U331, U333, U349, U366, U364, U384]
 ---
 
 # Feature Specification: Voice and Language
@@ -358,6 +358,16 @@ the same series as this backfill.
   only the voice moves. The realtime/live path is the exception and still speaks
   to the robot, because it streams provider audio rather than synthesizing it
   (U364).
+- **FR-027**: A reply that reaches no speaker is a failure the log says out
+  loud. From U364 to U384 the reply path handed `deliver()` a name that did not
+  exist in its scope; every reply raised, and the handler logged it at DEBUG,
+  so a reply looked spoken — `tts_started`, a successful TTS call,
+  `tts_finished` — while neither speaker played anything. The handler logs at
+  WARNING with the exception type, and `apps/` is held to ruff F821 in CI so an
+  undefined name cannot ship again (U384).
+- **FR-028**: The console is *told* there is a line to play. `SpeechAudioReady`
+  is on the WebSocket broadcast (spec 003 FR-005); without it the brain held
+  the audio and no console ever fetched it (U384).
 
 ## Traceability
 

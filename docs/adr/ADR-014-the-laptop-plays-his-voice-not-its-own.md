@@ -1,6 +1,10 @@
 # ADR-014: The laptop plays his voice, not its own
 
-**Status**: **Accepted — implemented in U364** (2026-10-02).
+**Status**: **Accepted — implemented in U364** (2026-10-02); **working from
+U384** (2026-10-03). As shipped in U364 the decision held and the code did not:
+the reply path passed an undefined name to `deliver()`, and the event that tells
+the console to fetch the line was never broadcast. The live engine, listed below
+as the exception, is what the owner heard instead.
 **Date**: 2026-10-02
 **Owner**: aura-brain / speech_out, operator-console / playback
 **Related**: [ADR-005](ADR-005-voice-pipeline.md) (the speech paths),

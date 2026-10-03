@@ -5314,3 +5314,78 @@ console changed.
 be caught by CI, because the runner only ever has LF on disk. This unit pins the
 one reader that exists; a general guard would have to be a lint rule over test
 sources, which is a different unit with a different shape.
+
+### U384 — he spoke from neither speaker, and it sounded like the robot
+
+Reported as: *"activated, but speaks via robot"*, with a screenshot of Settings
+showing *Where he speaks: this laptop*.
+
+Three things were wrong. They were found in this order, and the report only
+described the last one.
+
+**1. Every ordinary reply was mute, on both speakers, from U364 on.** `_do_speak`
+passed `bus` to `speech_out.deliver()`; there is no `bus` in that scope, only
+`ctx.bus`. Every reply raised `NameError`, and `_embody_reply` logs a failure at
+DEBUG — so the log showed `tts_started`, a successful TTS call and
+`tts_finished`: a reply that looked spoken. The robot's own journal settled it:
+in 90 minutes it received **zero** `POST /robot/speak` across six replies, and
+144 `POST /robot/motion` — the gestures, which start before synthesis, still
+ran. In robot mode, the default, he had been answering with his head only. The
+robot's clock runs exactly one hour behind the laptop, which made its log look
+as if it had stopped at 17:14.
+
+**2. The laptop would have stayed silent anyway.** `SpeechAudioReady` was never
+added to the broadcaster. The brain held each line — `GET /speech/output` showed
+`pending` climbing — and no console was ever told to fetch it. Spec 003 FR-005
+says the broadcaster sends *all* published events; it sends a hand-written
+tuple, and seven events had fallen off it.
+
+**3. What he heard from the robot was the live engine.** At 17:55:38 the voice
+loop opened a live session on a misheard *"Hva sa du?"*, gave three replies, and
+voiced them over `POST /robot/speak/segment` — the path U364 left unrouted on
+purpose, and the eight segment calls in the robot's log. Routing it is U385.
+
+Why none of this was caught: every U364 test called `deliver()` or `/robot/say`
+directly, and none ran a reply through `_embody_reply`, which is the only path
+a conversation takes. And CI's lint step runs `ruff check packages/ services/`
+— `apps/` was never linted, while ruff's F821 flags this exact line.
+
+What changed:
+
+- `main.py`: `ctx.bus` at both call sites, and the failure handler logs WARNING
+  with the exception type. "Robot offline" is the common failure and it is
+  still worth one line; a reply that reached no speaker never deserved DEBUG.
+- `broadcaster.py`: `SpeechAudioReady` and `PresentationOverlayChanged` are
+  broadcast. The overlay one was never missed because the overlay also polls
+  every 1.5 s, but the push was designed in and was simply absent. Every other
+  exported event is in `NOT_FOR_THE_CONSOLE` with a reason.
+- `checks.yml`: `ruff check --select F821 apps/`. Only my two findings existed
+  in all of `apps/`, so the rule costs nothing to hold.
+
+**Left for the owner, deliberately.** Four events have console handlers that
+have never received anything: `AgentRoundStarted`/`Completed` (a round counter
+on the Talk screen) and `ComputerControlStarted`/`Ended` — U75's screen-control
+glow **and its abort button**, which have therefore never appeared while he
+drives the desktop. Turning them on changes what an audience sees, so they are
+classified as pending a decision rather than switched on as a side effect of an
+audio fix.
+
+**Tests**: `test_broadcaster_coverage.py` (4) and `test_reply_reaches_a_speaker.py`
+(2). Verified red by mutation: removing `SpeechAudioReady` from the tuple fails
+two of the first; restoring the bare `bus` fails both of the second — including
+the robot-mode one, which is the regression that mattered most. The reply tests
+run the real lifespan with only the robot and the TTS faked, and give each test
+its own `BrainContext`, because the lifespan never unsubscribes and a second one
+in the same process would offer every reply twice.
+
+**Verified end to end** on a throwaway stack (brain on 8031, console on 5174,
+data in a scratch folder, discovery off, robot address pointing at nothing): a
+typed reply gave `speech routed to the laptop (924000 bytes)`, then
+`GET /speech/<id>.wav 200`, then the console's `play()` resolving. Before the
+fix the same probe saw no event at all. **Not verified by ear**: the browser
+played it; nobody listened.
+
+**Noticed, not fixed** — both pre-existing: the voice loop accepted noise as
+speech all afternoon (*"Kolarakaltvyou."*, *"Moćete beli."*) and answered it,
+once opening a paid live session; and 5 of 58 replies in the log started twice
+in the same second.

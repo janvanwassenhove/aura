@@ -236,3 +236,10 @@ jobs:
 
       - name: Lint
         run: ruff check packages/ services/
+
+      # U384: apps/ was never linted at all, so U364's `deliver(_robot, bus, ...)`
+      # — a name that does not exist in that scope — shipped, raised NameError
+      # on every reply, and was swallowed at DEBUG. Undefined names are never
+      # a style question, so this one rule holds for apps/ too.
+      - name: Undefined names in apps
+        run: ruff check --select F821 apps/

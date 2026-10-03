@@ -5,7 +5,7 @@ owner: "platform"
 priority: P1
 risk: Low
 created: "2026-04-25"
-units: [U6]
+units: [U6, U384]
 amended: "2026-09-05"
 ---
 
@@ -85,7 +85,7 @@ The operator console event log panel shows real-time events from any connected s
 - **FR-002**: All event models MUST include `event_id` (UUID), `event_type` (str), `timestamp` (datetime), and `session_id` (str) fields.
 - **FR-003**: `AsyncEventBus` MUST support `publish(event)`, `subscribe(event_type, handler)`, `unsubscribe(event_type, handler)`.
 - **FR-004**: `AsyncEventBus` MUST dispatch events to all registered handlers asynchronously using `asyncio.create_task`.
-- **FR-005**: `WebSocketBroadcaster` MUST accept WebSocket connections and broadcast all published events as JSON.
+- **FR-005**: `WebSocketBroadcaster` MUST accept WebSocket connections and broadcast published events as JSON. Every event exported from `shared_schemas.events` is either on its broadcast list or in `NOT_FOR_THE_CONSOLE` with the reason it is withheld; a test refuses a third state. "All published events" was the promise and a hand-written tuple was the implementation — seven events had fallen off it, `SpeechAudioReady` among them, which is how U364's laptop audio was held and never played (U384).
 - **FR-006**: Event schemas MUST be importable from `shared_schemas.events` with a consistent import path.
 - **FR-007**: `RobotState`, `RobotMode`, `Persona`, `MotionCommand`, `MotionTimeline` models MUST exist in `shared_schemas`.
 - **FR-008**: All models MUST support `model_dump()` and `model_validate()` (Pydantic v2 API).
