@@ -404,11 +404,18 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # _base_url per call, and this used to be the one thing that did not — so
     # the picture kept streaming from the new address while the event stream
     # announced "disconnected" from the old one, every five seconds.
+    async def _robot_is_back() -> None:
+        # U393: he forgets wandering across his own restart — tell him again.
+        from aura_brain import wander as _w
+
+        await _w.apply(_robot)
+
     ctx._robot_bridge = RobotEventBridge(
         ctx.broadcaster,
         lambda: getattr(_robot, "_base_url", None)
         or os.environ.get("ROBOT_RUNTIME_URL", "http://robot-runtime:8001"),
         robot_client=_robot,
+        on_connected=_robot_is_back,
     )
     ctx._robot_bridge.start()
 
@@ -427,6 +434,16 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         _asyncio.ensure_future(_robot.set_body_follow(enabled))
 
     capabilities_api.set_live_hook("body_follow", _apply_body_follow)
+
+    # U393: wandering — one place decides whether it is in force.
+    from aura_brain import wander as _wander
+
+    def _apply_wander(_enabled: bool) -> None:
+        import asyncio as _asyncio
+
+        _asyncio.ensure_future(_wander.apply(_robot))
+
+    capabilities_api.set_live_hook("wander", _apply_wander)
 
     # U84: conversation state machine + character personas.
     from aura_brain.characters import CharacterStore
@@ -464,6 +481,14 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             return
         # Read the flag per reply so the Capabilities toggle applies live.
         if os.environ.get("SPEAK_REPLIES", "true").lower() != "true":
+            return
+        # U393: wandering silently — he looks at whoever spoke (the robot
+        # turns to the voice) and the answer stays in the console as text.
+        from aura_brain import wander as _wander_now
+
+        if _wander_now.silences_speech():
+            logging.getLogger(__name__).info(
+                "wandering silently: the reply is not spoken")
             return
         if not text or text.startswith("[echo]"):
             return

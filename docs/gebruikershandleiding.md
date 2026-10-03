@@ -90,6 +90,12 @@ een app starten, je browser navigeren, Computer Use, code schrijven.
   betaalgegevens in.
 - In de goedkeuringsdialoog kun je per actietype **"altijd toestaan"** kiezen;
   intrekken kan altijd in het permissiecentrum.
+- **Rondkijken** (Wander, standaard uit, naast *Follow me*): hij kijkt rond op
+  zijn plek, volgt de mensen die hij ziet, draait naar stemmen en beweegt zijn
+  antennes. Kies wat hij intussen mag zeggen: *stil* (hij kijkt wie hem
+  aanspreekt aan en antwoordt alleen in de console) of *praat als je hem
+  aanspreekt*. Hij stopt als hij slaapt en tijdens een presentatie, en je
+  Follow me-instelling blijft precies zoals ze was.
 
 ## 5. Connecties
 

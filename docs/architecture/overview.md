@@ -45,12 +45,14 @@ on the Pi and no key reaches it.
 
 ![The degradation ladder: a heartbeat every 30 s, three consecutive failures to DEGRADED, 30 s clean back to ONLINE. No robot — text only, and it says so. No internet — a local model answers without tools. No model at all — six regex commands survive. No laptop — after 15 s the robot says so once and keeps moving on its own.](../diagrams/degradation-ladder.svg)
 
-### Three loops on three clocks
+### Four loops on four clocks
 
 Perception is continuous, conversation is event-driven, maintenance runs every
-five minutes. The interesting failures are between them, not inside them.
+five minutes, and wandering ticks every half second on the robot when the owner
+has asked for it (U393). The interesting failures are between them, not inside
+them — and wandering added one: four things now want the same head.
 
-![Three loops: perception runs continuously against the camera; conversation is an event-driven state machine with interrupted as a first-class state; maintenance ticks every five minutes. Below, the two composition hazards: shared camera hardware, and the speaker feeding back into the microphone.](../diagrams/three-loops.svg)
+![Four loops: perception runs continuously against the camera; conversation is an event-driven state machine with interrupted as a first-class state; maintenance ticks every five minutes; wandering looks around, turns to voices and moves the antennas every half second, only when asked. Below, three composition hazards: shared camera hardware, the speaker feeding back into the microphone, and one body that wandering, gestures, beats and speech all want, where wandering is the one that waits.](../diagrams/three-loops.svg)
 
 ### The knowledge model
 

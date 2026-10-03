@@ -54,6 +54,16 @@ class FakeRobotAdapter(RobotAdapter):
         self._body_follow = enabled
         return enabled
 
+    async def set_wander(self, enabled: bool) -> dict:
+        """U393: recorded, not performed — the fake has no head to turn."""
+        self._wander = enabled
+        return self.wander_state()
+
+    def wander_state(self) -> dict:
+        return {"enabled": getattr(self, "_wander", False),
+                "active": getattr(self, "_wander", False),
+                "sound_direction": None}
+
     async def gaze(self, dyaw: float = 0.0, dpitch: float = 0.0,
                    duration: float = 0.6) -> dict:
         """U325: relative look-toward nudge, recorded rather than performed.

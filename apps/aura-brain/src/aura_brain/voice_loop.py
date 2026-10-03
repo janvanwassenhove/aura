@@ -809,6 +809,12 @@ class VoiceLoop:
 
         if scenario_only():
             return False
+        # U393: wandering silently — no engine that speaks for itself; the
+        # pipeline answers, and the reply path keeps it to text.
+        from aura_brain import wander  # noqa: PLC0415
+
+        if wander.silences_speech():
+            return False
         engine = self._engine()
         if engine == "live":
             # U392: a Live session bills for every second it is open, and it

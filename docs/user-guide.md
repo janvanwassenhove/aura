@@ -88,6 +88,12 @@ navigating your browser, running Computer Use, writing code.
   for approval and it never enters passwords or payment details.
 - In the approval dialog you can pick **"always allow"** per action type;
   revoke it any time in the permissions center.
+- **Wander** (off by default, next to *Follow me*): he looks around where he
+  stands, follows the people he sees, turns towards voices and moves his
+  antennas. Choose what he may say meanwhile: *silent* (he looks at whoever
+  speaks to him and answers only in the console) or *talks when spoken to*. He
+  stops while he sleeps and while a presentation runs, and your Follow me
+  setting is left exactly as it was.
 
 ## 5. Connections
 

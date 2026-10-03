@@ -160,3 +160,19 @@ async def test_the_robot_s_own_events_still_reach_the_console_verbatim() -> None
     await _run_briefly(bridge, 0.1)
 
     assert any(f.get("name") == "wave" for f in bus.sent), bus.types()
+
+
+async def test_when_he_comes_back_the_brain_tells_him_again() -> None:
+    """U393: the robot does not remember wandering across its own restart, so
+    every (re)connect hands it what is in force again."""
+    told: list[str] = []
+
+    async def reassert() -> None:
+        told.append("again")
+
+    bridge = RobotEventBridge(FakeBroadcaster(), "http://robot:8001",
+                              robot_client=FakeRobot(), reconnect_s=0.02,
+                              connect=_connector(), on_connected=reassert)
+    await _run_briefly(bridge, 0.15)
+    assert len(told) >= 2, "each reconnect must re-assert, not only the first"
+

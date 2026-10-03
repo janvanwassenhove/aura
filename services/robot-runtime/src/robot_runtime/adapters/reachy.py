@@ -43,6 +43,7 @@ from shared_schemas.robot.models import (
 )
 
 from robot_runtime import sleep_state
+from robot_runtime.wander import WanderPlanner
 
 logger = logging.getLogger(__name__)
 
@@ -89,6 +90,18 @@ class ReachyRobotAdapter(RobotAdapter):
         # play at full amplitude, then resume it (U38-fix).
         self._tracking_on = False
         self._body_follow = False  # U37: torso turns with the tracked face
+        # U393: what the OWNER asked for, kept apart from what is in force.
+        # Wandering keeps the tracker and the torso following people while it
+        # is on; turning it off has to put back exactly what was there, and
+        # follow-me toggled meanwhile must be remembered, not overwritten.
+        self._follow_me_wanted = False
+        self._body_follow_wanted = False
+        self._wander_on = False
+        self._wander_task: asyncio.Task | None = None
+        self._wander_planner = WanderPlanner()
+        self._doa_ok: bool | None = None       # None: not read yet
+        self._doa_failures = 0
+        self._doa_client = None
         self._tracking_watchdog: asyncio.Task | None = None  # U126
         # U253: the daemon's FaceTracker can stall — its face_target.ts stops
         # advancing and enable/disable no longer revives it. Remember the last
@@ -157,10 +170,30 @@ class ReachyRobotAdapter(RobotAdapter):
             logger.warning("could not set speaker ALSA volume: %s", exc)
 
     async def set_tracking(self, enabled: bool) -> bool:
-        """Follow-me: daemon-side face tracking (U36g)."""
+        """Follow-me: daemon-side face tracking (U36g).
+
+        U393: this is the owner's follow-me. While he wanders the tracker stays
+        on whatever this says, and is put back to it when wandering stops.
+        """
         if self._mini is None:
             raise RuntimeError("not connected")
+        self._follow_me_wanted = enabled
+        want = self._tracking_wanted()
+        # Applied as before whenever the request and the result agree; skipped
+        # only when wandering is what keeps it on — the U165 recentre on
+        # "off" would otherwise interrupt a wander for a setting not in force.
+        if want == enabled or want != self._tracking_on:
+            await self._apply_tracking(want)
+        return enabled
 
+    def _tracking_wanted(self) -> bool:
+        """Follow-me, or wandering — and never while asleep (U357)."""
+        return self._follow_me_wanted or (self._wander_on and not sleep_state.is_asleep())
+
+    def _body_wanted(self) -> bool:
+        return self._body_follow_wanted or (self._wander_on and self._tracking_on)
+
+    async def _apply_tracking(self, enabled: bool) -> None:
         def _toggle() -> None:
             if enabled:
                 self._mini.start_head_tracking(1.0)
@@ -187,7 +220,6 @@ class ReachyRobotAdapter(RobotAdapter):
         async with self._motion_lock:
             await asyncio.to_thread(_toggle)
         self._tracking_on = enabled
-        return enabled
 
     # U161: manual aiming (console joystick). Head yaw/pitch and torso yaw are
     # driven directly; ranges are conservative so the pad can never command a
@@ -333,7 +365,13 @@ class ReachyRobotAdapter(RobotAdapter):
         daemon rotate the body toward the tracked face as well."""
         if self._mini is None:
             raise RuntimeError("not connected")
+        self._body_follow_wanted = enabled
+        want = self._body_wanted()
+        if want == enabled or want != self._body_follow:
+            await self._apply_body_follow(want)
+        return enabled
 
+    async def _apply_body_follow(self, enabled: bool) -> None:
         def _apply() -> None:
             self._mini.set_automatic_body_yaw(enabled)
             if not enabled:
@@ -342,7 +380,97 @@ class ReachyRobotAdapter(RobotAdapter):
         async with self._motion_lock:
             await asyncio.to_thread(_apply)
         self._body_follow = enabled
-        return enabled
+
+    # ------------------------------------------------------------------
+    # U393: wandering — looking around where he stands
+    # ------------------------------------------------------------------
+
+    async def set_wander(self, enabled: bool) -> dict:
+        """Wander on or off. Follow-me and body-follow are the owner's and are
+        not touched: while wandering they are kept on, and afterwards they are
+        put back to whatever the owner has them set to."""
+        if self._mini is None:
+            raise RuntimeError("not connected")
+        self._wander_on = enabled
+        want = self._tracking_wanted()
+        if want != self._tracking_on:
+            await self._apply_tracking(want)
+        body = self._body_wanted()
+        if body != self._body_follow:
+            await self._apply_body_follow(body)
+        logger.info("wander %s", "on" if enabled else "off")
+        return self.wander_state()
+
+    def wander_state(self) -> dict:
+        return {
+            "enabled": self._wander_on,
+            "active": (self._wander_on and self._mini is not None
+                       and not sleep_state.is_asleep()),
+            # None: not read yet — never claimed until the array has answered.
+            "sound_direction": self._doa_ok,
+        }
+
+    async def _read_doa(self) -> tuple[float, bool] | None:
+        """Where sound comes from, from the daemon's microphone array."""
+        import httpx
+
+        url = os.environ.get("WANDER_DOA_URL") or f"http://{self._host}:8000/api/state/doa"
+        try:
+            if self._doa_client is None:
+                self._doa_client = httpx.AsyncClient(timeout=0.6)
+            r = await self._doa_client.get(url)
+            body = r.json() if r.status_code == 200 else None
+            if not body:
+                raise ValueError(f"no reading (HTTP {r.status_code})")
+            self._doa_ok, self._doa_failures = True, 0
+            return float(body["angle"]), bool(body["speech_detected"])
+        except Exception as exc:  # noqa: BLE001 — looking around works without it
+            self._doa_failures += 1
+            if self._doa_failures >= 3:
+                if self._doa_ok is not False:
+                    logger.info("wander: no sound direction from the array (%s)", exc)
+                self._doa_ok = False
+            return None
+
+    async def _wander_step(self, now: float):
+        """One tick. Gestures, beats and speech come first; asleep, nothing."""
+        import time
+
+        if not self._wander_on or self._mini is None or sleep_state.is_asleep():
+            return None
+        if self._motion_lock.locked() or time.monotonic() < self._appsrc_until + 1.0:
+            return None
+        face = await asyncio.to_thread(self._face_visible)
+        doa = await self._read_doa()
+        look = self._wander_planner.decide(now, face_visible=bool(face), doa=doa)
+        if look is None:
+            return None
+        mini = self._mini
+
+        def _move() -> None:
+            kwargs = {"antennas": list(look.antennas), "duration": 1.2,
+                       # None keeps the torso where it is (U158)
+                       "body_yaw": look.body_yaw}
+            if look.head_yaw is not None:
+                kwargs["head"] = _rot("z", look.head_yaw) @ _rot("x", look.head_pitch)
+            mini.goto_target(**kwargs)
+
+        async with self._motion_lock:
+            await asyncio.to_thread(_move)
+        return look
+
+    async def _wander_loop(self) -> None:
+        import time
+
+        tick = float(os.environ.get("WANDER_TICK_S", "0.5"))
+        while self._mini is not None:
+            await asyncio.sleep(tick)
+            try:
+                await self._wander_step(time.monotonic())
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:  # noqa: BLE001 — wandering is best-effort
+                logger.debug("wander step failed: %s", exc)
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -457,6 +585,7 @@ class ReachyRobotAdapter(RobotAdapter):
             # U36g: follow the person — the daemon tracks the nearest face and
             # keeps looking at them (looks up when you stand in front of it).
             if os.environ.get("HEAD_TRACKING", "true").lower() == "true" and not sleep_state.is_asleep():
+                self._follow_me_wanted = True
                 try:
                     mini.start_head_tracking()
                     self._tracking_on = True
@@ -465,6 +594,7 @@ class ReachyRobotAdapter(RobotAdapter):
                 # U37: BODY_FOLLOW — the daemon also rotates the torso toward
                 # the tracked face (head tracking alone only moves the neck).
                 if os.environ.get("BODY_FOLLOW", "false").lower() == "true":
+                    self._body_follow_wanted = True
                     try:
                         mini.set_automatic_body_yaw(True)
                         self._body_follow = True
@@ -503,6 +633,9 @@ class ReachyRobotAdapter(RobotAdapter):
         # A slow periodic look-around lets the tracker re-find you.
         if self._idle_scan_task is None or self._idle_scan_task.done():
             self._idle_scan_task = asyncio.ensure_future(self._idle_scan_loop())
+        # U393: wandering, when the brain has asked for it.
+        if self._wander_task is None or self._wander_task.done():
+            self._wander_task = asyncio.ensure_future(self._wander_loop())
         logger.info(
             "ReachyRobotAdapter connected (host=%s mode=%s media=%s)",
             self._host, self._connection_mode, self._media_backend,
@@ -648,6 +781,8 @@ class ReachyRobotAdapter(RobotAdapter):
                 break
             if not self._tracking_on:            # follow-me off, or asleep
                 continue
+            if self._wander_on:                   # U393: wandering looks around itself
+                continue
             now = time.monotonic()
             try:
                 if await asyncio.to_thread(self._face_visible):
@@ -738,6 +873,15 @@ class ReachyRobotAdapter(RobotAdapter):
         if self._idle_scan_task is not None:
             self._idle_scan_task.cancel()
             self._idle_scan_task = None
+        if self._wander_task is not None:
+            self._wander_task.cancel()
+            self._wander_task = None
+        if self._doa_client is not None:
+            try:
+                await self._doa_client.aclose()
+            except Exception:  # noqa: BLE001
+                pass
+            self._doa_client = None
         if self._talk_task is not None:
             self._talk_task.cancel()
             self._talk_task = None

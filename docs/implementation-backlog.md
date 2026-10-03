@@ -5747,3 +5747,69 @@ most two answers after each real exchange.
 200 answers), its control without interruptions, and the Live session refused
 to an unaddressed turn (red before) — plus the existing voice suites, 56 in
 all.
+
+### U393 — he wanders, where he stands
+
+Asked for as (translated): *"can we add a 'wandering' mode — the robot wanders
+around, following people, moving the antennas, moving towards sound or people —
+add an option to enable / disable sound"*. Agreed, after three questions, with
+three conditions: a switch next to follow-me; *"review that this cannot
+conflict with other settings and modes"*; and when someone speaks to him while
+he wanders, *"he looks at him, but only speaks if the sound mode or emo mode is
+activated"* — sound as levels: silent, emotion sounds, talking.
+
+**What the robot can do, checked on the robot first.** Reachy Mini does not
+drive, so wandering is done where he stands. The daemon already answers
+`GET /api/state/doa` — `{"angle": 1.45, "speech_detected": false}` on the
+first try — from the ReSpeaker array: 0 is left, π/2 straight ahead *or
+behind* (it cannot tell), π right. And Pollen's emotion library is in the
+robot's cache: about 85 recorded emotions, each a move with its own sound —
+which is what U395 will use for the emotion level.
+
+**The split.** The robot decides *how* (`robot_runtime.wander`, a pure planner:
+glances every few seconds, the whole body now and then, antennas, a turn to a
+voice from one side — not more often than every four seconds, and never away
+from a face already in view). The brain decides *whether* (`aura_brain.wander`:
+the owner's switch, paused while a presentation runs), and tells the robot on
+every change — the switch, a scenario loading or ending, waking up, and every
+reconnect, because the robot does not remember it across its own restart.
+
+**The review that was asked for**, and what each answer is in code:
+
+- *Follow-me and body-follow* are kept as the owner's wishes, apart from what
+  is in force ([ADR-015](adr/ADR-015-wandering-is-a-layer-not-a-setting.md)).
+  Wandering keeps them on while it runs and gives them back unchanged; turning
+  follow-me off mid-wander is remembered, and does not recentre the head (the
+  U165 recentre would have jerked it for a setting not in force).
+- *Sleep*: what is in force is never tracking while asleep, so the U357 rule
+  holds — the brain's sleep sequence turns follow-me off and wandering cannot
+  keep the tracker on through it. The wander step does nothing while asleep,
+  and waking re-applies it.
+- *Presentation*: paused for the talk (U334), back when it ends. U394 lets a
+  scenario say otherwise.
+- *Gestures, beats, speech*: they hold the motion lock; a wander step waits
+  for it and never moves while he is talking. The U157 idle scan steps aside
+  while he wanders — two things looking around would fight.
+- *Silent*: replies are not spoken and no engine that speaks for itself is
+  opened; the conversation still happens, in the console. He still turns to
+  the voice — that is the "looks at him" half.
+- *An older robot*: a 404 from it reads "the robot needs an update to wander"
+  in Settings, never a broken switch (the Pi is older than the app).
+
+**Tests**: 11 for the planner; 9 adapter tests on the existing fake Reachy, red
+before (follow-me untouched both ways, never asleep without lifting the head,
+the torso following and settling back, a voice on the left, gestures and speech
+first, looking around without the array, the status); 10 brain tests; the
+bridge re-asserting on every reconnect; a silent wander keeping a real reply
+off both speakers and *talk* still answering (both proven by disabling the gate
+and watching them fail); no Live session while silent; three Settings mount
+tests. The existing 41 adapter tests — follow-me, sleep, U357 — pass
+unchanged.
+
+**The drawing changed**: Fig. 1 was *three loops, three clocks*; it is four,
+with wandering's half-second tick, and a third panel between them — *one body*:
+wandering, gestures, beats and speech all want the same head, and wandering is
+the one that waits.
+
+**Not seen on the robot yet**: the runtime half has to reach the robot (its
+hourly update), and nothing here has been watched on hardware.

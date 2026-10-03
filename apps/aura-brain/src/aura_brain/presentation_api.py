@@ -327,7 +327,19 @@ async def load_scenario(body: dict) -> JSONResponse:
     except Exception as exc:  # noqa: BLE001
         logger.debug("slides watcher not started: %s", exc)
 
+    await _wander_follows_the_show()
     return JSONResponse(_status_payload())
+
+
+async def _wander_follows_the_show() -> None:
+    """U393: on stage only the scenario moves and speaks (U334), so wandering
+    pauses for the talk and comes back after it."""
+    try:
+        from aura_brain import wander  # noqa: PLC0415
+
+        await wander.apply(_robot)
+    except Exception as exc:  # noqa: BLE001 — never break a load for it
+        logger.debug("wander re-apply failed: %s", exc)
 
 
 def _readable(exc: Exception) -> str:
@@ -488,6 +500,7 @@ async def end_presentation() -> JSONResponse:
     await _stop_watcher()
     _runner = None
     _voice_note = ""
+    await _wander_follows_the_show()
     return JSONResponse(_status_payload())
 
 
@@ -499,6 +512,7 @@ async def clear_scenario() -> JSONResponse:
     _runner = None
     _kept = None
     _voice_note = ""
+    await _wander_follows_the_show()
     return JSONResponse({"active": False})
 
 

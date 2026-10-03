@@ -381,6 +381,30 @@ async def budget() -> JSONResponse:
     return JSONResponse(budget_guard.status())
 
 
+@router.post("/robot/wander")
+async def set_wander(body: dict) -> JSONResponse:
+    """U393: look around where he stands — follow people, turn to voices."""
+    assert adapter is not None
+    _touch()
+    enabled = bool(body.get("enabled", True))
+    toggler = getattr(adapter, "set_wander", None)
+    if toggler is None:
+        return JSONResponse({"error": "adapter cannot wander"}, status_code=501)
+    try:
+        return JSONResponse(await toggler(enabled))
+    except Exception as exc:  # noqa: BLE001
+        return JSONResponse({"error": f"wander failed: {exc}"}, status_code=500)
+
+
+@router.get("/robot/wander")
+async def get_wander() -> JSONResponse:
+    assert adapter is not None
+    state = getattr(adapter, "wander_state", None)
+    if state is None:
+        return JSONResponse({"error": "adapter cannot wander"}, status_code=501)
+    return JSONResponse(state())
+
+
 @router.post("/robot/body_follow")
 async def set_body_follow(body: dict) -> JSONResponse:
     """U37: torso turns with the tracked face (automatic body yaw)."""

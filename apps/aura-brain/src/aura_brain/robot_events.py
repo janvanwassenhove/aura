@@ -48,8 +48,12 @@ class RobotEventBridge:
         robot_client: Any = None,  # RobotClient for the initial status snapshot
         reconnect_s: float = 5.0,
         connect: Any = None,       # seam: websockets.connect
+        on_connected: Callable[[], Any] | None = None,
     ) -> None:
         self._broadcaster = broadcaster
+        # U393: called on every (re)connect — the robot does not remember
+        # what the brain asked of it (wandering) across its own restart.
+        self._on_connected = on_connected
         # A string keeps every existing caller working (docker-compose, tests);
         # a callable is how the brain hands over an address that can move.
         self._address: Callable[[], str] = (
@@ -120,6 +124,11 @@ class RobotEventBridge:
                     logger.info("robot event stream connected (%s)", url)
                     self._connected = True
                     await self._announce_status()
+                    if self._on_connected is not None:
+                        try:
+                            await self._on_connected()
+                        except Exception as exc:  # noqa: BLE001 — never drop the stream for it
+                            logger.debug("on_connected hook failed: %s", exc)
                     async for frame in ws:
                         if isinstance(frame, str):
                             await self._broadcaster.broadcast_raw(frame)

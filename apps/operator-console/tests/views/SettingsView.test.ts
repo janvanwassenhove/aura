@@ -234,3 +234,50 @@ describe('U364 — the speaker his voice comes out of', () => {
     expect(bodies.some(b => b.includes('"audio_output":"laptop"'))).toBe(true)
   })
 })
+
+/** U393: wandering sits next to follow-me, with what he may say while he does. */
+describe('U393 — wandering in Settings', () => {
+  const WANDER = { key: 'wander', label: 'Wander', description: 'He looks around.', enabled: true }
+
+  function wanderBrain(wander: Record<string, unknown>) {
+    const bodies: string[] = []
+    vi.stubGlobal('fetch', (url: string, init?: RequestInit) => {
+      if (init?.body) bodies.push(String(init.body))
+      const u = String(url)
+      if (u.includes('/capabilities')) return OK({ capabilities: [WANDER], allowed_apps: [] })
+      if (u.includes('/robot/wander')) return OK(wander)
+      if (u.includes('/setup/prefs')) return OK({ voice_mode: 'off', wander_sound: 'silent' })
+      return OK({})
+    })
+    return bodies
+  }
+
+  it('offers silent or talk, and saves the choice', async () => {
+    const bodies = wanderBrain({ wanted: true, effective: true, paused: null, note: '' })
+    const w = mount(SettingsView)
+    await flushPromises(); await flushPromises()
+
+    const sel = w.find('[data-test="wander-sound"]')
+    expect(sel.exists()).toBe(true)
+    expect(sel.findAll('option').map(o => o.element.value)).toEqual(['silent', 'talk'])
+    await sel.setValue('talk')
+    await flushPromises()
+    expect(bodies.some(b => b.includes('"wander_sound":"talk"'))).toBe(true)
+  })
+
+  it('says when a presentation has paused it', async () => {
+    wanderBrain({ wanted: true, effective: false, paused: 'presentation', note: '' })
+    const w = mount(SettingsView)
+    await flushPromises(); await flushPromises()
+    expect(w.find('[data-test="wander-note"]').text()).toMatch(/presentation/i)
+  })
+
+  it('says when the robot is too old to wander, instead of pretending', async () => {
+    wanderBrain({ wanted: true, effective: true, paused: null,
+                  note: 'the robot needs an update to wander' })
+    const w = mount(SettingsView)
+    await flushPromises(); await flushPromises()
+    expect(w.find('[data-test="wander-note"]').text()).toMatch(/update/i)
+  })
+})
+

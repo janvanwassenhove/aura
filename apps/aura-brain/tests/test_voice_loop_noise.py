@@ -188,3 +188,24 @@ async def test_a_fragment_nobody_addressed_does_not_open_a_paid_session(monkeypa
     assert await loop._speech_turn(b"w", "wat is het weer", addressed=True) is True
     assert opened == ["wat is het weer"]
 
+
+async def test_wandering_silently_no_engine_speaks_for_itself(monkeypatch) -> None:
+    """U393: a Live session talks on its own; while he wanders silently even an
+    addressed turn goes to the pipeline, whose reply stays text."""
+    monkeypatch.setenv("WANDER_ENABLED", "true")
+    monkeypatch.setenv("WANDER_SOUND", "silent")
+    from aura_brain import presentation_api
+    monkeypatch.setattr(presentation_api, "is_active", lambda: False)
+    loop = vl.VoiceLoop(robot=_Room(_Clock(), 0), pipeline=_Pipeline(), bus=_Bus(),
+                        default_wake_word="aura")
+    opened: list[str] = []
+
+    async def live(_wav, command):
+        opened.append(command)
+        return True
+
+    loop._live_session_turn = live
+    loop._engine = lambda: "live"
+    assert await loop._speech_turn(b"w", "wat is het weer", addressed=True) is False
+    assert opened == []
+

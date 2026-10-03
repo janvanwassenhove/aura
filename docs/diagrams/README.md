@@ -11,7 +11,7 @@ accurate is the wrong place for anything that draws plausible boxes.
 | `wiring.svg` | What listens on what: the two loopback processes, the console's one address, and the one-way Wi-Fi link | `docs/architecture/overview.md` |
 | `media-paths.svg` | The three media paths — camera, microphone, speaker — and where each one is processed | `docs/architecture/overview.md` |
 | `degradation-ladder.svg` | The heartbeat, and the four rungs the system falls through | `docs/architecture/overview.md` |
-| `three-loops.svg` | Perception, conversation and maintenance on three different clocks | `docs/architecture/overview.md` |
+| `three-loops.svg` | Perception, conversation, maintenance and wandering on four different clocks — and the one body they share | `docs/architecture/overview.md` |
 | `knowledge-model.svg` | The four node types and the two edge types | ADR-008, `docs/architecture/overview.md` |
 | `envelope-encryption.svg` | Passphrase → owner key → one key per person → records | README, ADR-008 |
 | `delegation-bounds.svg` | What a delegated sub-agent may reach, and the three bounds on it | `docs/architecture/overview.md` |

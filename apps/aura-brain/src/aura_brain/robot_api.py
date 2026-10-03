@@ -669,6 +669,11 @@ async def wake() -> JSONResponse:
         await _robot.set_tracking(True)
     except (httpx.HTTPError, OSError):
         pass
+    # U393: awake again, wandering again if it was on — its own call, and it
+    # reports a too-old robot instead of failing (the Pi is older than the app).
+    from aura_brain import wander
+
+    await wander.apply(_robot)
     return JSONResponse({"asleep": False})
 
 
@@ -766,6 +771,14 @@ async def _say(speech_out: Any, text: str, audio_b64: str | None,
     result is appended rather than returned — a gesture that plays while the
     speech failed must not report success."""
     out.append(await speech_out.deliver(_robot, _bus, text, audio_b64))
+
+
+@router.get("/wander")
+async def wander_status() -> JSONResponse:
+    """U393: is he wandering, why not if he should be, and what he may say."""
+    from aura_brain import wander
+
+    return JSONResponse(wander.status())
 
 
 @router.post("/say")

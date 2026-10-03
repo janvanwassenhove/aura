@@ -213,6 +213,10 @@ class RobotClient:
         """U37: torso turns with the tracked face (automatic body yaw)."""
         return (await self._request("POST", "/robot/body_follow", {"enabled": enabled})).json()
 
+    async def set_wander(self, enabled: bool) -> dict:
+        """U393: look around where he stands — follow people, turn to voices."""
+        return (await self._request("POST", "/robot/wander", {"enabled": enabled})).json()
+
     async def listen(self, duration_s: float = 5.0) -> tuple[bytes, float]:
         """Record from the robot's mic. Returns (16 kHz mono WAV, raw peak).
 

@@ -771,3 +771,154 @@ async def test_the_suppression_lasts_exactly_as_long_as_the_sleep(adapter) -> No
 
     assert any(name == "goto_target" and kw["head"] is not None
                for name, kw in mini.calls), "U165's recentre did not come back"
+
+
+# --------------------------------------------------------------------------- #
+# U393: wandering lives next to follow-me, body-follow and sleep without
+# changing any of them. "Review that this cannot conflict with other settings"
+# (translated) was the condition it was agreed on.
+# --------------------------------------------------------------------------- #
+
+def _tracking_weights(mini: FakeMini) -> list[float]:
+    return [kw["weight"] for name, kw in mini.calls if name == "start_head_tracking"]
+
+
+async def test_wandering_follows_people_even_with_follow_me_off(adapter) -> None:
+    await adapter.connect()
+    mini = adapter._created[0]
+    await adapter.set_tracking(False)
+    mini.calls.clear()
+
+    await adapter.set_wander(True)
+    assert _tracking_weights(mini) == [1.0]
+
+
+async def test_stopping_wandering_puts_follow_me_back_as_it_was(adapter) -> None:
+    await adapter.connect()
+    mini = adapter._created[0]
+
+    await adapter.set_tracking(False)            # the owner has follow-me off
+    await adapter.set_wander(True)
+    mini.calls.clear()
+    await adapter.set_wander(False)
+    assert _tracking_weights(mini) == [0.0], "follow-me was off; it must be off again"
+
+    await adapter.set_tracking(True)             # and with follow-me on
+    await adapter.set_wander(True)
+    mini.calls.clear()
+    await adapter.set_wander(False)
+    assert _tracking_weights(mini) == [], "follow-me was on; nothing to undo"
+
+
+async def test_turning_follow_me_off_while_wandering_does_not_stop_him(adapter) -> None:
+    await adapter.connect()
+    mini = adapter._created[0]
+    await adapter.set_wander(True)
+    mini.calls.clear()
+
+    await adapter.set_tracking(False)
+    assert _tracking_weights(mini) == []
+    assert not any(name == "goto_target" for name, _ in mini.calls), \
+        "the follow-me recentre must not interrupt a wander"
+
+
+async def test_asleep_he_does_not_wander_and_does_not_lift_his_head(adapter) -> None:
+    """U357: sleep means take no action of your own. The brain turns follow-me
+    off on the way down; wandering must not keep the tracker on through it."""
+    from robot_runtime import sleep_state
+
+    await adapter.connect()
+    mini = adapter._created[0]
+    await adapter.set_wander(True)
+    mini.calls.clear()
+
+    sleep_state.set_asleep(True)
+    try:
+        await adapter.set_tracking(False)
+        assert _tracking_weights(mini) == [0.0], "tracking must pause for sleep"
+        adapter._read_doa = _doa(0.0, True)
+        moved = await adapter._wander_step(500.0)
+        assert moved is None
+        assert not any(name == "goto_target" and kw["head"] is not None
+                       for name, kw in mini.calls)
+    finally:
+        sleep_state.set_asleep(False)
+
+
+async def test_his_body_follows_people_while_he_wanders_and_settles_back(adapter) -> None:
+    await adapter.connect()
+    mini = adapter._created[0]
+    await adapter.set_body_follow(False)
+    mini.calls.clear()
+
+    await adapter.set_wander(True)
+    assert ("set_automatic_body_yaw", {"enabled": True}) in mini.calls
+    mini.calls.clear()
+    await adapter.set_wander(False)
+    assert ("set_automatic_body_yaw", {"enabled": False}) in mini.calls
+
+
+def _doa(angle, speech):
+    async def read():
+        return (angle, speech)
+    return read
+
+
+async def test_a_voice_on_his_left_turns_his_head_left(adapter) -> None:
+    await adapter.connect()
+    mini = adapter._created[0]
+    await adapter.set_wander(True)
+    adapter._read_doa = _doa(0.0, True)          # left, and it is speech
+    adapter._face_visible = lambda: False
+    mini.calls.clear()
+
+    look = await adapter._wander_step(500.0)
+    assert look is not None and look.reason == "sound"
+    heads = [kw["head"] for name, kw in mini.calls if name == "goto_target" and kw["head"] is not None]
+    assert heads, "no head move for a voice on his left"
+    assert heads[-1][1][0] > 0, "a positive yaw turns him left"
+
+
+async def test_gestures_and_speech_come_first(adapter) -> None:
+    import time as _time
+
+    await adapter.connect()
+    mini = adapter._created[0]
+    await adapter.set_wander(True)
+    adapter._read_doa = _doa(0.0, True)
+    adapter._face_visible = lambda: False
+    mini.calls.clear()
+
+    async with adapter._motion_lock:             # a gesture is playing
+        assert await adapter._wander_step(500.0) is None
+    adapter._appsrc_until = _time.monotonic() + 10.0   # he is talking
+    assert await adapter._wander_step(510.0) is None
+    assert not any(name == "goto_target" for name, _ in mini.calls)
+
+
+async def test_without_the_microphone_array_he_still_looks_around(adapter) -> None:
+    await adapter.connect()
+    await adapter.set_wander(True)
+
+    async def broken():
+        return None
+    adapter._read_doa = broken
+    adapter._face_visible = lambda: False
+    acts = [await adapter._wander_step(float(t)) for t in range(0, 60)]
+    assert any(a is not None and a.reason == "look-around" for a in acts)
+
+
+async def test_status_says_whether_he_wanders(adapter) -> None:
+    from robot_runtime import sleep_state
+
+    await adapter.connect()
+    assert adapter.wander_state()["enabled"] is False
+    await adapter.set_wander(True)
+    assert adapter.wander_state() == {"enabled": True, "active": True,
+                                      "sound_direction": None}
+    sleep_state.set_asleep(True)
+    try:
+        assert adapter.wander_state()["active"] is False
+    finally:
+        sleep_state.set_asleep(False)
+

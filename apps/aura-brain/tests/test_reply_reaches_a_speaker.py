@@ -142,3 +142,24 @@ async def test_with_the_laptop_chosen_the_reply_is_offered_to_the_laptop(
     offered = await _reply("Goedemorgen, alles klaar?")
     assert [e.text for e in offered] == ["Goedemorgen, alles klaar?"]
     assert all(r.heard == [] for r in isolated), "the robot spoke anyway"
+
+
+async def test_wandering_silently_he_does_not_speak_the_reply(isolated, monkeypatch) -> None:
+    """U393, as agreed (translated): "he looks at them, but only speaks if the
+    sound mode is on". The robot turns to the voice by itself; the reply stays
+    in the console."""
+    monkeypatch.setenv("WANDER_ENABLED", "true")
+    monkeypatch.setenv("WANDER_SOUND", "silent")
+    _ROBOTS[:] = isolated
+    offered = await _reply("Goedemorgen, alles klaar?")
+    assert all(r.heard == [] for r in isolated)
+    assert offered == []
+
+
+async def test_wandering_with_talk_he_answers_as_usual(isolated, monkeypatch) -> None:
+    monkeypatch.setenv("WANDER_ENABLED", "true")
+    monkeypatch.setenv("WANDER_SOUND", "talk")
+    _ROBOTS[:] = isolated
+    await _reply("Goedemorgen, alles klaar?")
+    assert [t for r in isolated for t, _ in r.heard] == ["Goedemorgen, alles klaar?"]
+
