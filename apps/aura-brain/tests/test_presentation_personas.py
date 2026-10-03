@@ -77,6 +77,7 @@ def rig(monkeypatch, tmp_path):
     robot, bus = _FakeRobot(), _FakeBus()
     presentation_api.init(robot, bus)
     presentation_api._runner = None
+    presentation_api._kept = None   # U389: a kept talk is module state too
     presentation_api._voice_note = ""
 
     calls: list[tuple[str, str, float]] = []
@@ -93,6 +94,7 @@ def rig(monkeypatch, tmp_path):
     app.include_router(presentation_api.router)
     yield TestClient(app), robot, bus, calls
     presentation_api._runner = None
+    presentation_api._kept = None   # U389: a kept talk is module state too
 
 
 def _load(c, yaml_text=TWO_VOICES_YAML):

@@ -68,6 +68,7 @@ def rig(monkeypatch, tmp_path):
     robot, bus = _FakeRobot(), _FakeBus()
     presentation_api.init(robot, bus)
     presentation_api._runner = None
+    presentation_api._kept = None   # U389: a kept talk is module state too
 
     async def fake_tts(text, *a, **kw):
         return "AAAA"
@@ -77,6 +78,7 @@ def rig(monkeypatch, tmp_path):
     app.include_router(presentation_api.router)
     yield TestClient(app), bus
     presentation_api._runner = None
+    presentation_api._kept = None   # U389: a kept talk is module state too
 
 
 def _overlay_events(bus) -> list[bool]:

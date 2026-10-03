@@ -53,6 +53,7 @@ def client(monkeypatch):
     robot, bus = _FakeRobot(), _FakeBus()
     presentation_api.init(robot, bus)
     presentation_api._runner = None
+    presentation_api._kept = None   # U389: a kept talk is module state too
     # Deterministic 'improvise' so tests don't call a real LLM.
     async def fake_generate(topic, guardrails, engine, persona=""):
         return f"[improv: {topic}]"
@@ -75,6 +76,7 @@ def client(monkeypatch):
     app.include_router(presentation_api.router)
     yield TestClient(app), robot, bus
     presentation_api._runner = None
+    presentation_api._kept = None   # U389: a kept talk is module state too
 
 
 def test_status_is_inactive_before_loading(client) -> None:
@@ -379,3 +381,56 @@ def test_a_good_scenario_still_saves(client) -> None:
     }})
     assert r.status_code == 200
     assert r.json()["beats"] == 1
+
+
+# ------------------------------------------------------------------
+# U389: End stops the show; it does not throw the talk away
+#
+# Reported as "when scenario is imported, when we click end presentation, we
+# loose the scneario again, we should be able to keep it (reload it, remove it)
+# afterwards". End called DELETE, so the brain forgot the scenario. Run again
+# then rebuilt it from the HUD's display rows - which U267 notes turns every
+# slide and keyword cue into a hand-advanced speak beat - and a reload or a
+# second window found nothing at all.
+# ------------------------------------------------------------------
+
+def test_ending_keeps_the_talk_so_it_can_run_again(client) -> None:
+    c, _, _ = client
+    c.post("/presentation/scenario", json={"yaml": SCENARIO_YAML})
+    assert c.post("/presentation/end").json()["active"] is False
+
+    status = c.get("/presentation/status").json()
+    assert status["active"] is False
+    assert status["kept"]["title"] == "Demo"
+
+    kept = c.get("/presentation/scenario").json()
+    assert kept["running"] is False
+    triggers = [b["trigger"] for b in kept["scenario"]["beats"]]
+    assert triggers == ["slide:1", "keyword:agents", "manual"], \
+        "running it again must be the same talk, cues and all"
+
+    again = c.post("/presentation/scenario", json={"scenario": kept["scenario"]}).json()
+    assert again["active"] is True
+
+
+def test_a_running_talk_reports_itself_as_running(client) -> None:
+    c, _, _ = client
+    c.post("/presentation/scenario", json={"yaml": SCENARIO_YAML})
+    assert c.get("/presentation/scenario").json()["running"] is True
+
+
+def test_remove_forgets_it(client) -> None:
+    c, _, _ = client
+    c.post("/presentation/scenario", json={"yaml": SCENARIO_YAML})
+    c.post("/presentation/end")
+    assert c.delete("/presentation/scenario").json() == {"active": False}
+    assert c.get("/presentation/status").json() == {"active": False}
+    assert c.get("/presentation/scenario").status_code == 409
+
+
+def test_ending_with_nothing_loaded_is_harmless(client) -> None:
+    c, _, _ = client
+    r = c.post("/presentation/end")
+    assert r.status_code == 200
+    assert r.json() == {"active": False}
+

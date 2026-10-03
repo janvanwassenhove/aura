@@ -5575,3 +5575,39 @@ uses the same store, so its *next* row changes with it.
 order with nobody pressing Start — two verified red (the third, *the end only
 when nothing is ahead*, passed vacuously before and guards the fix), and
 `test_status_names_the_beat_that_ran_last` in the runner, red without the field.
+
+### U389 — End no longer throws the talk away
+
+Reported as: *"when scenario is imported, when we click end presentation, we
+loose the scneario again, we should be able to keep it (reload it, remove it)
+afterwards"*.
+
+End and Remove were the same call. *End presentation* sent `DELETE
+/presentation/scenario`, so the brain forgot the talk the moment it ended. The
+page then held on to the HUD's display rows for as long as it stayed open, and
+its *Run* fell into a branch U267 had written for exactly this gap — ask the
+brain for the real scenario, and only if it has none, rebuild one from the rows.
+After End the brain never had one, so the fallback always ran, and the rows
+carry no triggers: every slide and keyword cue came back as a hand-advanced
+speak beat. A reload, or the other window, found nothing at all.
+
+What changed: `POST /presentation/end` stops the watcher and the runner and
+keeps the scenario; status reports it as `kept`; `GET /presentation/scenario`
+returns it with `running: false`; `DELETE` is now only Remove. The presenter
+store loads a kept talk the same way it loads a running one (U388), and the
+Present view shows it as *Ended. Run it again, edit it, or remove it.*
+
+**Tests**: four API tests (three red before — *Remove forgets it* already held
+and guards the other half; the three test modules that reset `_runner` reset
+`_kept` too, because a kept talk is module state that would otherwise leak from
+one test into the next) and four Present-view mount tests, all red before:
+End posts `/end` and sends no DELETE, a kept talk offers *Run again* and
+*Remove*, *Run again* posts the original triggers, *Remove* empties the page.
+
+**Verified** on a throwaway stack with the owner's real Devoxx scenario: loaded
+from outside the console, ended from the HUD, still offered after a full page
+reload, run again — 21 slide cues and 1 keyword, none turned into a hand press
+— then ended and removed, leaving *No scenario yet*.
+
+**Not kept across a restart**: the talk lives in the brain's memory. The saved
+list (U207) is what survives a restart.

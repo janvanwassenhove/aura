@@ -28,9 +28,16 @@ export const usePresenterStore = defineStore('presenter', () => {
     const sc = await presentation.fetchScenario()
     if (sc) beats.value = toRows((sc as { beats?: RawBeat[] }).beats)
   }
+  // U389: a talk that was ended and kept is loaded too, so Run again and the
+  // beat list survive End; removing it empties the list.
   watch(
-    () => (presentation.status.active ? String(presentation.status.title ?? '') + '\u0000' : ''),
-    (key) => { if (key) void syncFromBrain() },
+    () => (presentation.status.active
+      ? 'run:' + String(presentation.status.title ?? '')
+      : presentation.status.kept ? 'kept:' + presentation.status.kept.title : ''),
+    (key, before) => {
+      if (key) void syncFromBrain()
+      else if (before) beats.value = []
+    },
     { immediate: true },
   )
 

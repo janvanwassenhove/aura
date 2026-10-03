@@ -405,3 +405,99 @@ describe('U388 — the HUD describes the show that is running', () => {
   })
 })
 
+describe('U389 — ending a talk keeps it', () => {
+  /** Reported as "when we click end presentation, we loose the scneario again,
+   *  we should be able to keep it (reload it, remove it) afterwards". End sent
+   *  DELETE, so the brain forgot the talk; "run again" then rebuilt it from the
+   *  HUD rows, which turns every slide and keyword cue into a hand press. */
+  const TALK = {
+    title: 'I Hired a Real Robot as My Junior Dev',
+    beats: [
+      { id: 'the-gag', trigger: 'slide:8', mode: 'speak', text: 'Oh, I know this one.' },
+      { id: 'chime-java', trigger: 'keyword:Java', mode: 'chime_in', topic: 'kids' },
+    ],
+  }
+
+  function brain(state: { status: unknown; scenario: unknown }) {
+    const calls: { method: string; url: string; body: unknown }[] = []
+    vi.stubGlobal('fetch', (url: string, init?: RequestInit) => {
+      const u = String(url)
+      const method = init?.method ?? 'GET'
+      calls.push({ method, url: u, body: init?.body ? JSON.parse(String(init.body)) : null })
+      if (u.includes('/presentation/end')) {
+        state.status = { active: false, kept: { title: TALK.title, beats_total: 2 } }
+        return OK(state.status)
+      }
+      if (u.includes('/presentation/scenarios')) return OK({ scenarios: [] })
+      if (u.includes('/presentation/scenario')) {
+        if (method === 'DELETE') {
+          state.status = { active: false }; state.scenario = null
+          return OK({ active: false })
+        }
+        if (method === 'POST') {
+          state.status = { active: true, title: TALK.title, beats_total: 2, fired: [] }
+          return OK(state.status)
+        }
+        return state.scenario
+          ? OK({ scenario: state.scenario, running: false })
+          : Promise.resolve({ ok: false, status: 409, json: () => Promise.resolve({}) } as Response)
+      }
+      if (u.includes('/presentation/status')) return OK(state.status)
+      if (u.includes('/personas')) return OK({ personas: [] })
+      return OK({})
+    })
+    return calls
+  }
+  const KEPT = { active: false, kept: { title: TALK.title, beats_total: 2 } }
+
+  it('End stops the show without throwing the talk away', async () => {
+    const calls = brain({ status: { active: true, title: TALK.title, beats_total: 2, fired: [] },
+                          scenario: TALK })
+    const w = mount(PresentView)
+    await flushPromises(); await flushPromises()
+
+    await w.find('.run-btn').trigger('click')
+    await flushPromises(); await flushPromises()
+
+    expect(calls.some(c => c.method === 'POST' && c.url.includes('/presentation/end'))).toBe(true)
+    expect(calls.some(c => c.method === 'DELETE')).toBe(false)
+    expect(w.text()).toContain(TALK.title)
+    expect(w.text()).not.toContain('No scenario yet')
+  })
+
+  it('a kept talk offers Run again and Remove, in any window', async () => {
+    brain({ status: KEPT, scenario: TALK })
+    const w = mount(PresentView)
+    await flushPromises(); await flushPromises()
+
+    expect(w.text()).toContain(TALK.title)
+    expect(w.find('.run-btn').text()).toBe('Run again')
+    expect(w.find('[data-test="remove-scenario"]').exists()).toBe(true)
+  })
+
+  it('Run again runs the same talk, cues and all', async () => {
+    const calls = brain({ status: KEPT, scenario: TALK })
+    const w = mount(PresentView)
+    await flushPromises(); await flushPromises()
+
+    await w.find('.run-btn').trigger('click')
+    await flushPromises(); await flushPromises()
+
+    const post = calls.find(c => c.method === 'POST' && c.url.endsWith('/presentation/scenario'))
+    const beats = (post?.body as { scenario: { beats: { trigger: string }[] } }).scenario.beats
+    expect(beats.map(b => b.trigger)).toEqual(['slide:8', 'keyword:Java'])
+  })
+
+  it('Remove forgets it, and the page says there is nothing loaded', async () => {
+    const calls = brain({ status: KEPT, scenario: TALK })
+    const w = mount(PresentView)
+    await flushPromises(); await flushPromises()
+
+    await w.find('[data-test="remove-scenario"]').trigger('click')
+    await flushPromises(); await flushPromises()
+
+    expect(calls.some(c => c.method === 'DELETE' && c.url.includes('/presentation/scenario'))).toBe(true)
+    expect(w.text()).toContain('No scenario yet')
+  })
+})
+

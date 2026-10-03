@@ -59,10 +59,14 @@
         <div v-if="presenter.beats.length || presenting || builderOpen"
              class="run-bar" :class="{ live: presenting }">
           <div class="run-text">
-            <div class="run-title">{{ presenting ? `Presenting — ${presentation.status.title ?? 'scenario'}` : (presentation.status.title ?? 'No scenario loaded') }}</div>
+            <div class="run-title">{{ presenting ? `Presenting — ${presentation.status.title ?? 'scenario'}` : (presentation.status.title ?? presentation.status.kept?.title ?? 'No scenario loaded') }}</div>
             <div class="run-sub">
               <template v-if="presenting">
                 {{ progressLine }}{{ presenter.rehearsing ? '' : armedNote }}
+              </template>
+              <!-- U389: ended, and kept — not gone. -->
+              <template v-else-if="presentation.status.kept">
+                Ended. Run it again, edit it, or remove it.
               </template>
               <template v-else>
                 Running a scenario switches him to Present mode and locks mail, dev tools and screen control.
@@ -72,8 +76,12 @@
           <!-- U267: editing what is loaded. "New scenario" opened an EMPTY
                builder and was the only way in, so changing one line meant
                typing the whole talk again. -->
-          <button v-if="presentation.status.title && !builderOpen" class="d2-ghost-btn"
+          <button v-if="(presentation.status.title || presentation.status.kept) && !builderOpen" class="d2-ghost-btn"
                   title="Open this scenario in the builder" @click="editScenario">Edit</button>
+          <button v-if="!presenting && presentation.status.kept && !builderOpen" class="d2-ghost-btn"
+                  data-test="remove-scenario"
+                  title="Forget this scenario — import it or pick it from your saved list to use it again"
+                  @click="presentation.remove()">Remove</button>
           <button v-if="presenting" class="d2-ghost-btn"
                   :title="presenter.rehearsing
                     ? 'Back to the real thing — he speaks and moves again'
@@ -384,10 +392,11 @@ const OVERLAY_MODES = [
  *  `toggleRun` opens the builder, so that is what it should say. */
 const runLabel = computed(() =>
   presenting.value ? 'End presentation'
-    : presenter.beats.length ? 'Run presentation'
-      : 'Write a scenario')
+    : presentation.status.kept ? 'Run again'
+      : presenter.beats.length ? 'Run presentation'
+        : 'Write a scenario')
 const runHint = computed(() =>
-  presenting.value ? 'Stop, and hand the mode back'
+  presenting.value ? 'Stop, and hand the mode back — the scenario stays loaded'
     : presenter.beats.length
       ? 'Switches him to Present mode and starts watching your deck'
       : 'Nothing is loaded yet — this opens the builder')

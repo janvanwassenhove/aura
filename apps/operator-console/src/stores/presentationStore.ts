@@ -36,6 +36,8 @@ export interface PresentationStatus {
   fired?: string[]
   /** U388: the beat that ran most recently. */
   last_fired?: string
+  /** U389: a talk that was ended and kept, so it can run again or be removed. */
+  kept?: { title: string; beats_total: number }
   armed_keywords?: string[]
   /** U263: `watching` means a watcher is running; `slides_state` says whether
    *  it has actually FOUND a slideshow. The old flag conflated the two, so
@@ -166,7 +168,22 @@ export const usePresentationStore = defineStore('presentation', () => {
     } catch { /* ignore */ }
   }
 
+  /** End the show. U389: the brain KEEPS the talk — End used to be the same
+   *  call as Remove, so the scenario was gone the moment the talk ended. */
   async function stop(): Promise<void> {
+    busy.value = true
+    try {
+      const r = await fetch(`${BRAIN_URL}/presentation/end`, { method: 'POST' })
+      status.value = r.ok ? await r.json() : { active: false }
+    } catch {
+      status.value = { active: false }
+    } finally {
+      subtitle.value = ''; lastBeat.value = ''; busy.value = false
+    }
+  }
+
+  /** U389: forget the talk — what End used to do. */
+  async function remove(): Promise<void> {
     busy.value = true
     try {
       await fetch(`${BRAIN_URL}/presentation/scenario`, { method: 'DELETE' })
@@ -179,5 +196,5 @@ export const usePresentationStore = defineStore('presentation', () => {
 
   return { status, subtitle, lastBeat, lastMode, lastPersona, busy, error,
            applyEvent, fetchStatus, start, startScenario, next, pushSpeech, stop,
-           setRehearsing, fetchScenario }
+           setRehearsing, fetchScenario, remove }
 })

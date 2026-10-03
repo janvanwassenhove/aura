@@ -6,7 +6,7 @@ priority: P2
 risk: Medium
 created: "2026-04-25"
 amended: "2026-09-13"
-units: [U27, U205, U206, U207, U208, U246, U263, U263b, U264, U265, U266, U267, U269, U282, U320, U334, U349, U351, U352, U360, U361, U386, U387, U388]
+units: [U27, U205, U206, U207, U208, U246, U263, U263b, U264, U265, U266, U267, U269, U282, U320, U334, U349, U351, U352, U360, U361, U386, U387, U388, U389]
 ---
 
 # Feature Specification: Presentation Copilot
@@ -336,6 +336,14 @@ settings aside as the example.
   cue* is the first slide beat **ahead of the current slide in slide order**,
   then a hand-advanced beat still waiting, then the end — and it names the
   beat, not only its slide. Keyword beats are armed, not next (U388).
+- **FR-121**: **End** stops the show and **keeps** the talk: `POST
+  /presentation/end` stops watching and firing, and the brain holds the
+  scenario. Status reports it as `kept`, `GET /presentation/scenario` returns it
+  with `running: false`, and every window offers **Run again**, **Edit** and
+  **Remove** — Run again posting the real scenario, cues and all. **Remove**
+  is `DELETE /presentation/scenario`, which is what End used to be. The kept
+  talk lives in memory: a restart of AURA forgets it, the saved list does not
+  (U389).
 
 ## Superseded
 
@@ -359,6 +367,7 @@ applies to `slide:N` beats; `manual` and `keyword:` beats have no such deadline.
 | U386 | *Take it down* works after the overlay was shown twice |
 | U387 | A slide is a place: its beats replay when you return, and the overlay follows it |
 | U388 | The HUD describes the running show, however it was loaded |
+| U389 | End keeps the talk: Run again, Edit or Remove |
 | U320 | The panel regrouped: locks as chips, status as status, the projector block given the weight it earns, a run button that names its own action, an empty state with the two doors, and help you can put away |
 | U334 | Present mode enforces what it always promised: only the scenario speaks, and no open microphone answers the room |
 | U361 | The scenario format written down, and a pre-flight check that says what the talk will do rather than only that the file parses |

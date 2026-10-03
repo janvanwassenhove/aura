@@ -40,6 +40,10 @@ _robot: Any = None      # RobotClient
 _bus: Any = None        # AsyncEventBus
 _pipeline: Any = None    # OrchestratorPipeline — for tool-backed improvise (U208)
 _runner: ScenarioRunner | None = None
+# U389: the talk that was loaded, kept after End so it can run again or be
+# removed. End used to forget it, and "run again" rebuilt it from the HUD's
+# display rows — every slide and keyword cue turned into a hand press.
+_kept: Scenario | None = None
 _watcher: Any = None    # PowerPointWatcher | None
 # U349: why the last line did not sound the way the scenario asked, if it
 # didn't. Empty means every persona it named was found.
@@ -296,7 +300,7 @@ def _scenario_from_body(body: dict) -> tuple[Scenario, str | None]:
 
 @router.post("/scenario")
 async def load_scenario(body: dict) -> JSONResponse:
-    global _runner, _watcher, _voice_note
+    global _runner, _watcher, _voice_note, _kept
     try:
         scenario, _ = _scenario_from_body(body or {})
     except Exception as exc:  # noqa: BLE001 — bad YAML / failed validation
@@ -308,6 +312,7 @@ async def load_scenario(body: dict) -> JSONResponse:
     _voice_note = ""
     _runner = ScenarioRunner(
         scenario, speak=_speak, generate=_generate, gesture=_gesture, on_event=_on_event)
+    _kept = scenario
 
     # U263: ALWAYS start watching. The old code asked once whether a slideshow
     # was already up and, if not, created no watcher at all - so setting the
@@ -392,14 +397,14 @@ async def active_scenario() -> JSONResponse:
     in, so changing one line of a loaded talk meant typing the whole thing
     again — asked as "how to edit presentation".
     """
-    if _runner is None:
-        return JSONResponse({"error": "no presentation loaded"}, status_code=409)
-    scenario = getattr(_runner, "_scenario", None)
+    scenario = getattr(_runner, "_scenario", None) if _runner is not None else _kept
     if scenario is None:
         return JSONResponse({"error": "no presentation loaded"}, status_code=409)
     # Same shape the saved-scenario endpoint hands back, so the builder has
-    # exactly one thing to load.
-    return JSONResponse({"scenario": scenario.model_dump(mode="json", exclude_none=True)})
+    # exactly one thing to load. U389: `running` says whether it is on now or
+    # was ended and kept.
+    return JSONResponse({"scenario": scenario.model_dump(mode="json", exclude_none=True),
+                         "running": _runner is not None})
 
 
 @router.post("/speech")
@@ -418,7 +423,12 @@ def _status_payload() -> dict:
     one thing the presenter actually needs to know before walking on stage.
     """
     if _runner is None:
-        return {"active": False}
+        if _kept is None:
+            return {"active": False}
+        # U389: ended, not gone. Enough for any window to offer Run again and
+        # Remove; the scenario itself is one GET away.
+        return {"active": False, "kept": {"title": _kept.title,
+                                          "beats_total": len(_kept.beats)}}
     out: dict = {"active": True, **_runner.status()}
     # U349: he was heard, but not as the scenario asked. Distinct from
     # speech_error, which means he was not heard at all.
@@ -470,11 +480,24 @@ async def status() -> JSONResponse:
     return JSONResponse(_status_payload())
 
 
-@router.delete("/scenario")
-async def clear_scenario() -> JSONResponse:
+@router.post("/end")
+async def end_presentation() -> JSONResponse:
+    """U389: stop the show and keep the talk — it can run again, be edited,
+    or be removed. Ending used to be the same call as removing."""
     global _runner, _voice_note
     await _stop_watcher()
     _runner = None
+    _voice_note = ""
+    return JSONResponse(_status_payload())
+
+
+@router.delete("/scenario")
+async def clear_scenario() -> JSONResponse:
+    """Remove the talk: stop it if it runs, and forget it."""
+    global _runner, _voice_note, _kept
+    await _stop_watcher()
+    _runner = None
+    _kept = None
     _voice_note = ""
     return JSONResponse({"active": False})
 
