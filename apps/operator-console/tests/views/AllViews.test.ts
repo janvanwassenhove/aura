@@ -53,12 +53,29 @@ function stubFetch(): void {
   })
 }
 
-/** The union in navStore.ts, read as text — the one place the views are listed. */
-function declaredViews(): View[] {
-  const src = readFileSync(resolve(__dirname, '../../src/stores/navStore.ts'), 'utf-8')
+/** navStore.ts exactly as it sits on disk, line endings included — which is
+ *  the platform-dependent part, and what the CRLF case below needs. */
+function navStoreSource(): string {
+  return readFileSync(resolve(__dirname, '../../src/stores/navStore.ts'), 'utf-8')
+}
+
+/** The union in navStore.ts, read as text — the one place the views are listed.
+ *
+ *  Line endings are normalised once, up front, rather than written into each
+ *  pattern: `\r` is invisible in a regex and the next person to add an
+ *  assertion here would have to remember it. The parse is separate from the
+ *  read so that the line endings this file does *not* have can still be tested
+ *  (see the CRLF case below).
+ */
+function viewsIn(source: string): View[] {
+  const src = source.replace(/\r\n/g, '\n')
   const m = src.match(/export type View =([\s\S]*?)\n\n/)
   expect(m, 'the View union moved — update this reader').toBeTruthy()
   return [...m![1].matchAll(/'([a-z]+)'/g)].map(x => x[1] as View)
+}
+
+function declaredViews(): View[] {
+  return viewsIn(navStoreSource())
 }
 
 beforeEach(() => {
@@ -86,6 +103,24 @@ describe('every view the shell can show', () => {
     const views = declaredViews()
     expect(views.length).toBeGreaterThanOrEqual(10)
     expect(views).toContain('talk')
+  })
+
+  /** U383: this repository is written on Windows with `core.autocrlf=true`, so
+   *  `navStore.ts` is CRLF on disk there — `.gitattributes` pins LF only for
+   *  what a Linux kernel, shell or systemd has to parse — `.sh`, `.py`,
+   *  `.toml`, `.yaml` and the like, never `.ts`. `\n\n` does not match
+   *  `\r\n\r\n`,
+   *  so the reader returned null and this whole file failed at collection with
+   *  "the View union moved" on every Windows checkout, while CI — Linux, LF —
+   *  stayed green and nobody saw it.
+   *
+   *  The assertion is made against a synthesised CRLF copy rather than against
+   *  the file as checked out, because a test that only fails on one developer's
+   *  platform is how this went unnoticed in the first place. This one is red on
+   *  the runner too. */
+  it('reads the same union from a CRLF checkout', () => {
+    const lf = navStoreSource().replace(/\r\n/g, '\n')
+    expect(viewsIn(lf.replace(/\n/g, '\r\n'))).toEqual(viewsIn(lf))
   })
 
   for (const view of declaredViews()) {

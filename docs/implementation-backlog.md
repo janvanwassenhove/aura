@@ -5216,3 +5216,101 @@ for the audio and now shows two.
 **Not verified by ear**: nothing here has been played through a laptop speaker.
 The bytes are asserted to be identical to what the robot would have received,
 which is the part a test can hold.
+
+### U383 — green on the runner, red on the machine it is written on
+
+Asked for as: *"the console test suite `apps/operator-console/tests/views/AllViews.test.ts`
+fails on any Windows checkout and passes on CI"*.
+
+Both halves are true at the same time, and the second is why the first survived
+seventeen units. `AllViews.test.ts` deliberately keeps no list of views: it reads
+the `View` union out of `navStore.ts` as text, so that adding `'diary'` to the
+type without a mount test fails the suite rather than the owner's next launch
+(U370). The reader ended its pattern on a blank line:
+
+```ts
+const m = src.match(/export type View =([\s\S]*?)\n\n/)
+```
+
+`core.autocrlf` is `true` in this checkout, so `navStore.ts` is CRLF on disk.
+`\n\n` does not match `\r\n\r\n`. `m` is `null`, the `expect` inside the reader
+throws — and because the reader is also called at *collection* time to generate
+the per-view cases, the file does not fail one test. It fails with no tests at
+all:
+
+```
+❯ tests/views/AllViews.test.ts (0 test)
+AssertionError: the View union moved — update this reader: expected null to be truthy
+```
+
+**The message is the trap.** It names the one thing that had not happened. The
+union had not moved; it was exactly where U370 left it. Anyone reading that line
+goes to `navStore.ts` looking for a change that is not there, and the real
+difference — 33 carriage returns — is invisible in an editor and invisible in a
+diff. Ten views' worth of mount coverage, the only compile step this app has,
+was silently absent on the one machine where the code is written. CI is Ubuntu
+and LF, so the sweep ran there and passed, and a green badge covered it.
+
+**`.gitattributes` is not the hole, and was left alone.** U242 pinned `eol=lf`
+for everything a Linux kernel, shell or systemd has to parse: `.sh`, `.service`,
+`.timer`, `Dockerfile`, `.py`, `.toml`, `.yaml`. That list is right, and `.ts`
+does not belong on it — Vite, vitest and esbuild do not care about line endings,
+and adding it would rewrite every frontend file in every Windows working tree to
+fix one regular expression. The hole is a test that reads source as text and
+quietly assumes the line endings of whichever machine ran it. So the reader was
+fixed, not the checkout.
+
+**What changed.** The normalisation happens once, on the way in, rather than
+being written into each pattern — `\r` is invisible in a regex and the next
+person to add an assertion here would have to remember it:
+
+```ts
+function viewsIn(source: string): View[] {
+  const src = source.replace(/\r\n/g, '\n')
+  const m = src.match(/export type View =([\s\S]*?)\n\n/)
+```
+
+The read is now separate from the parse, and that separation is the point of the
+new test. Asserting against the file *as checked out* would have produced a test
+that is red on Windows and green on the runner — the same asymmetry that hid the
+defect, now with a test's name on it. Instead the parse is handed a synthesised
+CRLF copy of the real source and must return the same views as the LF copy, so
+the case is red on CI too:
+
+```ts
+it('reads the same union from a CRLF checkout', () => {
+  const lf = navStoreSource().replace(/\r\n/g, '\n')
+  expect(viewsIn(lf.replace(/\n/g, '\r\n'))).toEqual(viewsIn(lf))
+})
+```
+
+Tests verified red (1 of 1), on Linux with an LF tree — the new case fails
+against the old reader for the reported reason, `expected null to be truthy` at
+the `expect` inside the reader. Then the original fault was reproduced the way
+it actually arrives: `navStore.ts` converted to CRLF on disk, suite red with
+`(0 test)`, fix applied, suite green with the same CRLF file still in place.
+
+**It is the only reader like this, and that was measured rather than assumed.**
+Every file in `apps/operator-console` with a text extension — 106 of them, `.ts`,
+`.vue`, `.css`, `.html`, `.js`, `.json` — was converted to CRLF and the whole
+console suite run against it: 40 files, 353 tests, green. The other two sweeps
+named in FR-MOUNT-01 enumerate by `readdirSync` and `import.meta.glob`, so they
+read filenames and never content. `ButtonStates.test.ts` does read `App.vue` as
+text (U356), but its patterns are `\s*` and `[^}]*`, both of which match `\r`
+already. Across the repository, this was the only line-ending-sensitive pattern
+applied to a tracked source file that `.gitattributes` does not pin: the other
+`\n\n` matches are over strings the tests build themselves or over fixtures under
+`tmp_path`, and the Python readers either take `.py` (pinned LF) or go through
+`splitlines()`.
+
+No ADR: the decision not to pin `.ts` is recorded above with the alternative that
+was rejected, and the durable rule — a sweep that reads source as text normalises
+first and is tested against both endings — is in FR-MOUNT-01 of
+`.specify/specs/008-operator-console/spec.md`, which is where the next person
+adding a sweep will be reading. No diagram: nothing about the shape of the
+console changed.
+
+**Not fixed here**: a CRLF-only regression in some *future* reader still cannot
+be caught by CI, because the runner only ever has LF on disk. This unit pins the
+one reader that exists; a general guard would have to be a lint rule over test
+sources, which is a different unit with a different shape.

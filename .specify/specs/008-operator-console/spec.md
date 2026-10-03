@@ -6,7 +6,7 @@ priority: P1
 risk: Medium
 created: "2026-04-25"
 amended: "2026-09-13"
-units: [U28, U30, U36c, U38, U53, U63, U68, U72, U76, U77, U78, U79, U95, U98, U112, U113, U114, U115, U117, U119, U120, U122, U123, U124, U125, U187, U188, U216, U217, U222, U223, U252, U252c, U252e, U253b, U262, U319, U350, U356, U362, U370]
+units: [U28, U30, U36c, U38, U53, U63, U68, U72, U76, U77, U78, U79, U95, U98, U112, U113, U114, U115, U117, U119, U120, U122, U123, U124, U125, U187, U188, U216, U217, U222, U223, U252, U252c, U252e, U253b, U262, U319, U350, U356, U362, U370, U383]
 ---
 
 # Feature Specification: Operator Console
@@ -112,6 +112,16 @@ A developer can type text in the console and submit it as a conversation turn, r
   `use*Store` under `src/stores` is constructed. A view, component or store
   added without a test therefore fails the gate with its own name in the
   message (U370, audit T4).
+
+  A sweep that reads source as text **MUST normalise line endings before
+  matching it**, and MUST be tested against both. `.gitattributes` pins LF
+  only for what a Linux kernel, shell or systemd parses — not `.ts` or `.vue`
+  — so on a Windows checkout with `core.autocrlf=true` those files are CRLF,
+  and a pattern containing `\n` silently matches nothing. The View sweep's
+  `\n\n` did exactly that: the whole file failed at collection on every
+  Windows checkout for the seventeen units since U370, while CI — Linux, LF —
+  stayed green. The CRLF case is asserted against a synthesised copy rather
+  than against the file as checked out, so the runner is red too (U383).
 
 
 - **FR-001**: Console MUST connect to the backend via WebSocket on startup.
