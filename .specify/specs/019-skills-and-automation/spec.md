@@ -5,7 +5,7 @@ owner: "orchestrator"
 priority: P1
 risk: High
 created: "2026-09-05"
-units: [U40, U43, U50, U57, U58, U59, U60, U61, U62, U64, U65, U66, U70, U71, U74, U75, U107, U108, U110, U118, U159, U194, U195, U247, U248, U249, U250, U251, U253c, U259, U259b, U261, U296, U335, U377, U378, U379, U380, U381, U382]
+units: [U40, U43, U50, U57, U58, U59, U60, U61, U62, U64, U65, U66, U70, U71, U74, U75, U107, U108, U110, U118, U159, U194, U195, U247, U248, U249, U250, U251, U253c, U259, U259b, U261, U296, U335, U377, U378, U379, U380, U381, U382, U391]
 ---
 
 # Feature Specification: Skills, Automation and the Agentic Loop
@@ -223,7 +223,19 @@ about two questions:
   and only for turns a person actually started (`from_user`).
 - **FR-006**: A tool schema is built with `_fn()` in `tool_schemas.py`. A
   hand-written dict broke two unrelated tests that walk the schema list (U294).
-- **FR-007**: Screen control announces itself and can be aborted.
+- **FR-007**: Screen control announces itself and can be aborted — and since
+  U391 it actually does. While he drives the owner's input (`use_computer`, and
+  the desktop rung's `send_keys` and `type_into`; finding and listing apps do
+  not count) the brain publishes `ComputerControlStarted`/`Ended` and the
+  broadcaster forwards them, so the cursor ring, the banner and the Talk
+  screen's *Stop screen control* button appear. Until U391 the broadcaster
+  withheld both events and none of it had ever been seen, while this line said
+  otherwise. The state is kept in one place in the brain and can be asked for
+  (`GET /orchestrator/computeruse/status`); the console asks on every
+  (re)connect and every 3 s while he drives, and confirms the warning to the
+  desktop shell each time. The shell's overlay holds **Esc** system-wide, so it
+  is a dead-man's switch: unconfirmed for 15 s it comes down by itself, and a
+  missed "ended" can never leave Esc taken (U391).
 
 ## Out of scope
 
@@ -244,6 +256,7 @@ about two questions:
 | U247 | The ledger recorded intentions, never outcomes — and counted the robot's greetings as skill uses |
 | U248, U261, U253c | A promise is not an answer; the guard that only knew one language; the invented refusal |
 | U249, U250, U251 | Asking to be unblocked; raising and drafting a skill; a proposal that waits for one click |
+| U391 | The screen-control warning appears, and can never outlive the action |
 | U40, U43, U50, U70, U74, U75, U194, U195 | The allow-listed launcher; desktop media control; gated computer use, then computer use that actually works; the overlay and abort; desktop skills |
 | U259, U259b | Looking things up, and surviving a search model that disappeared |
 | U110 | Voice reminders and the daily briefing |

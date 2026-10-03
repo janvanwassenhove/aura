@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import logging
 import os
@@ -38,6 +39,10 @@ from orchestrator.promise import looks_like_a_promise
 from orchestrator.tool_schemas import LADDER_NOTE, build_tool_specs
 
 logger = logging.getLogger(__name__)
+
+# U391: the desktop tools that put keystrokes into the owner's apps — these
+# raise the "AURA controls the screen" warning; finding and listing do not.
+_DRIVES_INPUT = frozenset({"send_keys", "type_into"})
 
 # Tool name → connector-service path (method, path)
 _LANGUAGE_NAMES = {"en": "English", "nl": "Dutch", "fr": "French",
@@ -410,6 +415,12 @@ class OrchestratorPipeline:
         self._dev_agent = dev_agent
         # U50: gated Computer Use agent (None unless COMPUTER_USE_ENABLED + key).
         self._computer_use = computer_use
+        # U391: whether he is driving the owner's mouse or keyboard right now,
+        # kept in ONE place so the console can ask. The overlay that warns
+        # about it captures Esc system-wide; a console that missed the "ended"
+        # event must be able to find out it is over rather than leave Esc taken.
+        self._screen_control: dict | None = None
+        self._screen_control_depth = 0
         # U19e: judgment/anticipation layer + active-person tracking.
         self._judgment = None  # JudgmentLayer | None — set via set_judgment_layer()
         self._active_person_id: str | None = None
@@ -435,6 +446,36 @@ class OrchestratorPipeline:
         self._character_note = None  # Callable[[], str] | None
         self._cancel_events: dict[str, asyncio.Event] = {}
         self._memory_hook = None  # U109: long-term memory hook (set by the brain)
+
+    def screen_control_status(self) -> dict:
+        """U391: is he driving the screen, and doing what. Polled by the console."""
+        if self._screen_control is None:
+            return {"active": False}
+        return {"active": True, **self._screen_control}
+
+    @contextlib.asynccontextmanager
+    async def _driving(self, session_id: str, goal: str, tool: str):
+        """U391: announce screen control around an action that drives the owner's
+        input — the cursor ring, the banner and the Stop button follow these
+        two events — and say it is over however the action ends."""
+        from shared_schemas.events.orchestrator import (  # noqa: PLC0415
+            ComputerControlEnded,
+            ComputerControlStarted,
+        )
+
+        self._screen_control_depth += 1
+        self._screen_control = {"goal": goal[:200], "tool": tool, "since": time.time()}
+        await self._bus.publish(ComputerControlStarted(session_id=session_id, goal=goal[:200]))
+        outcome = {"summary": ""}
+        try:
+            yield outcome
+        finally:
+            self._screen_control_depth -= 1
+            if self._screen_control_depth <= 0:
+                self._screen_control_depth = 0
+                self._screen_control = None
+            await self._bus.publish(ComputerControlEnded(
+                session_id=session_id, summary=str(outcome["summary"])[:200]))
 
     def set_skill_store(self, store) -> None:
         self._skills = store
@@ -1107,19 +1148,10 @@ class OrchestratorPipeline:
                         "Use in the capabilities panel (works with your "
                         "OpenAI or Anthropic key)]")
                 else:
-                    from shared_schemas.events.orchestrator import (
-                        ComputerControlEnded,
-                        ComputerControlStarted,
-                    )
-
                     goal = arguments.get("goal", "")
-                    await self._bus.publish(ComputerControlStarted(
-                        session_id=session_id, goal=goal[:200]))
-                    try:
+                    async with self._driving(session_id, goal, "use_computer") as outcome:
                         result_text = await self._computer_use.run(goal, session_id)
-                    finally:
-                        await self._bus.publish(ComputerControlEnded(
-                            session_id=session_id, summary=str(result_text)[:200] if 'result_text' in dir() else ""))
+                        outcome["summary"] = result_text
             elif tool_name == "request_capability":
                 result_text = self._grant_capability(arguments)
             elif tool_name == "save_skill":
@@ -1148,7 +1180,16 @@ class OrchestratorPipeline:
                 result_text = await _launch_app(arguments.get("name", ""))
             elif tool_name in _desktop.DESKTOP_TOOLS:
                 # U378: the desktop rung — any app, its windows, its keys.
-                result_text = await _desktop.DESKTOP_TOOLS[tool_name](arguments)
+                if tool_name in _DRIVES_INPUT:
+                    # U391: pressing keys and typing in the owner's apps IS
+                    # driving his input, and says so; looking does not.
+                    app = arguments.get("app") or arguments.get("name") or "an app"
+                    async with self._driving(session_id, f"{tool_name} in {app}",
+                                             tool_name) as outcome:
+                        result_text = await _desktop.DESKTOP_TOOLS[tool_name](arguments)
+                        outcome["summary"] = result_text
+                else:
+                    result_text = await _desktop.DESKTOP_TOOLS[tool_name](arguments)
             elif tool_name == "media_control":
                 result_text = await _media_control(arguments.get("action", ""))
             else:

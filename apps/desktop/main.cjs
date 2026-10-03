@@ -19,6 +19,7 @@ const fs = require('fs')
 const path = require('path')
 const { listenPreferring, pickFreePort, withRuntimeConfig } = require('./serving.cjs')
 const { createPresentOverlay } = require('./present-overlay.cjs')
+const { createScreenControlWarning } = require('./screen-control.cjs')
 
 // U37-installer: a packaged (NSIS) install carries the Python workspace under
 // resources/aura and the built console under resources/console; a dev checkout
@@ -531,9 +532,14 @@ function hideOverlay() {
   if (overlayWin) { overlayWin.destroy(); overlayWin = null }
 }
 
+// U391: a dead-man's switch around U75's overlay. It holds Esc globally, so it
+// stays only while the console keeps confirming it (every 3 s, after asking the
+// brain); unconfirmed for 15 s, it comes down by itself. See screen-control.cjs.
+const screenControlWarning = createScreenControlWarning({
+  show: showOverlay, hide: hideOverlay, keepAliveMs: 15000,
+})
 ipcMain.on('aura:screen-control', (_e, active) => {
-  if (active) showOverlay()
-  else hideOverlay()
+  screenControlWarning.set(!!active)
 })
 
 // ---------------------------------------------------------------------------

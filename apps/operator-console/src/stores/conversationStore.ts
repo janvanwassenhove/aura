@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import { BRAIN_URL } from '../lib/endpoints'
 
 export interface ConversationTurn {
@@ -85,11 +85,9 @@ BRAIN_URL
       if (event.done) agentRound.value = null
       else if (agentRound.value) agentRound.value.tools = (event.tool_names as string[]) ?? []
     } else if (type === 'ComputerControlStarted') {
-      screenControl.value = true
-      ;(window as any).aura?.screenControl?.(true)
+      setScreenControl(true)
     } else if (type === 'ComputerControlEnded') {
-      screenControl.value = false
-      ;(window as any).aura?.screenControl?.(false)
+      setScreenControl(false)
     } else if (type === 'TurnLatencyMeasured') {
       // U23: per-turn latency instrumentation.
       lastLatency.value = {
@@ -153,6 +151,38 @@ BRAIN_URL
     }).catch(() => {})
   }
 
+  // ── U391: the "AURA controls the screen" warning ─────────────────────────
+  // The desktop shell's overlay captures Esc system-wide while it is up, so it
+  // must never outlive the action. While this console believes he is driving,
+  // it asks the brain every few seconds and passes the answer on; the shell
+  // takes the warning down by itself if that confirmation stops. A missed
+  // "ended" event — a dropped socket, a reloaded window — can no longer leave
+  // Esc taken, and Esc is the key that ends a PowerPoint slideshow.
+  let screenTimer: ReturnType<typeof setInterval> | undefined
+
+  function setScreenControl(on: boolean): void {
+    screenControl.value = on
+    ;(window as any).aura?.screenControl?.(on)
+  }
+
+  /** What the brain says, now. Called while driving, and on every (re)connect,
+   *  when events may have been missed. */
+  async function syncScreenControl(): Promise<void> {
+    try {
+      const r = await fetch(`${orchestratorUrl}/orchestrator/computeruse/status`)
+      if (!r.ok) return
+      setScreenControl(!!(await r.json()).active)
+    } catch {
+      // Brain away: say nothing. The shell's warning lapses on its own when
+      // nobody confirms it.
+    }
+  }
+
+  watch(screenControl, (on) => {
+    if (screenTimer) { clearInterval(screenTimer); screenTimer = undefined }
+    if (on) screenTimer = setInterval(() => { void syncScreenControl() }, 3000)
+  })
+
   async function abortScreenControl(): Promise<void> {
     await fetch(`${orchestratorUrl}/orchestrator/computeruse/abort`, { method: 'POST' })
       .catch(() => {})
@@ -214,6 +244,6 @@ BRAIN_URL
 
   return {
     clearTurns, turns, pendingText, isProcessing, sessionId, lastLatency, agentRound,
-           screenControl, abortScreenControl,
+           screenControl, abortScreenControl, syncScreenControl,
            addTurn, applyEvent, submitTurn, steerAgent, stopAgent, teach, $reset }
 })

@@ -151,6 +151,15 @@ async def agent_steer(body: dict) -> JSONResponse:
     return JSONResponse({"queued": True, "session_id": session_id})
 
 
+@router.get("/orchestrator/computeruse/status")
+async def computeruse_status() -> JSONResponse:
+    """U391: is he driving the screen right now. The console asks this to clear
+    a warning whose "ended" event it missed — the overlay holds Esc."""
+    if _pipeline is None:
+        return JSONResponse({"active": False})
+    return JSONResponse(_pipeline.screen_control_status())
+
+
 @router.post("/orchestrator/computeruse/abort")
 async def computeruse_abort() -> JSONResponse:
     """U75: abort the running screen-control action immediately."""

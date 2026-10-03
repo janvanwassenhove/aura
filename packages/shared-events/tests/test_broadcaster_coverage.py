@@ -89,3 +89,13 @@ async def test_the_laptop_is_told_there_is_a_line_to_play() -> None:
 
     assert [e["event_type"] for e in console.sent] == ["SpeechAudioReady"]
     assert console.sent[0]["utterance_id"] == "abc123"
+
+
+def test_the_screen_control_warning_reaches_the_console() -> None:
+    """U391: the cursor ring, the banner and the Stop button are switched by
+    these two. Withheld, he could drive the mouse with nothing on screen."""
+    from shared_schemas.events.orchestrator import ComputerControlEnded, ComputerControlStarted
+
+    assert ComputerControlStarted in _ALL_EVENT_TYPES
+    assert ComputerControlEnded in _ALL_EVENT_TYPES
+

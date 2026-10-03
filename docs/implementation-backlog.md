@@ -5640,3 +5640,54 @@ grip: 150 px, dragged up 250 to 400 px and saved, dragged far past the top to
 double-click back to 150. A mouse drag through the browser pane itself missed
 — the pane scales that window down until the 8 px grip is two pixels tall —
 so the drag was driven with pointer events at the grip's real position instead.
+
+### U391 — the screen-control warning appears, and cannot get stuck
+
+Agreed after U384 found it, in the owner's words (translated): *"OK for this
+safety one."*
+
+U75 built a warning for the moments he drives the owner's mouse or keyboard: a
+glowing ring that follows the cursor, a banner — *AURA controls the screen,
+press Esc to abort* — and a *Stop screen control* button on the Talk screen.
+Spec 019 FR-007 has said since then that screen control "announces itself and
+can be aborted". It never had. The pipeline published `ComputerControlStarted`
+and `ComputerControlEnded`; the broadcaster's hand-written list did not include
+them (U384), so the console never heard, and none of the three ever appeared.
+The run still stopped on its own after 180 s.
+
+Two more gaps came with switching it on.
+
+**The U378 desktop rung announced nothing.** `send_keys` and `type_into` press
+shortcuts and type text in the owner's apps — the rung's own docstring names
+Ctrl+Enter sending a mail in Outlook as the failure that does real damage —
+and no warning of any kind went with them. They now go through the same
+`_driving()` context as `use_computer`. `find_app`, `list_windows` and the other
+look-only tools do not: a banner on every lookup teaches the owner to ignore it.
+
+**The overlay holds Esc system-wide.** It registers Esc as a global shortcut so
+the abort works whatever app has focus. Before U391 that never mattered, because
+the overlay never appeared. Once it can, one missed `Ended` — a dropped socket,
+a reloaded console, a crash — would leave it up and keep Esc, and Esc is the
+key that ends a PowerPoint slideshow. So:
+
+- the brain keeps the state in one place (`screen_control_status()`, depth-
+  counted, cleared in a `finally`) and answers `GET
+  /orchestrator/computeruse/status`;
+- the console asks on every WebSocket (re)connect, and every 3 s while it
+  believes he is driving, and passes the answer to the shell each time;
+- the shell's warning is a dead-man's switch (`screen-control.cjs`): kept up
+  only while confirmed, taken down by itself after 15 s without confirmation.
+
+The agent-round counter that was withheld alongside these (U384) stays
+withheld; only the safety pair was agreed.
+
+**Tests**: 7 in `test_screen_control_banner.py` (5 red before; the two
+*looking is not driving* cases pass on the old code and guard that), the
+broadcaster coverage test, 6 store tests (4 red before — the two that pass on
+the old code are *comes up and down* and *stops checking once done*), a Talk
+view mount test for the Stop button, and `test-screen-control.cjs` in CI —
+red against the old logic transplanted unchanged: *with nobody confirming it,
+the overlay must come down by itself and free Esc*.
+
+**Not seen on screen.** Everything above is tested; the ring and the banner on
+a real desktop need the app restarted, and that has not been done here.

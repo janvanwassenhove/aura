@@ -74,3 +74,28 @@ describe('U390 — the Talk screen log can be resized', () => {
     expect(basis(w.find('[data-activity-strip]').element)).toMatch(/^0 0 /)
   })
 })
+
+describe('U391 — the Stop button while he drives the screen', () => {
+  it('appears when he takes control, and stops him when pressed', async () => {
+    const calls: string[] = []
+    vi.stubGlobal('fetch', (url: string, init?: RequestInit) => {
+      calls.push(`${init?.method ?? 'GET'} ${String(url)}`)
+      if (String(url).includes('/computeruse/status')) return OK({ active: true })
+      return OK({})
+    })
+    const { useConversationStore } = await import('../../src/stores/conversationStore')
+    const w = mount(TalkView)
+    await flushPromises()
+    expect(w.text()).not.toContain('Stop screen control')
+
+    useConversationStore().applyEvent({ event_type: 'ComputerControlStarted', goal: 'x' })
+    await flushPromises()
+    const stop = w.findAll('button').find(b => b.text().includes('Stop screen control'))
+    expect(stop).toBeTruthy()
+
+    await stop!.trigger('click')
+    await flushPromises()
+    expect(calls.some(c => c.startsWith('POST') && c.includes('/orchestrator/computeruse/abort'))).toBe(true)
+  })
+})
+

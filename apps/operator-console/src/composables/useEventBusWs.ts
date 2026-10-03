@@ -44,6 +44,9 @@ export function useEventBusWs() {
       // U175: tell the stores the backend is (back) alive — the camera panel
       // remounts its silently-stalled MJPEG stream on this signal.
       useRobotStore().noteWsOpen()
+      // U391: events may have been missed while the socket was down — ask
+      // whether he is driving the screen rather than trust the last one heard.
+      void useConversationStore().syncScreenControl()
     }
 
     ws.onmessage = (e) => {

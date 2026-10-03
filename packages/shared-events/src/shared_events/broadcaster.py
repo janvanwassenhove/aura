@@ -104,6 +104,10 @@ _ALL_EVENT_TYPES: tuple[type[BaseEvent], ...] = (
     SpeechAudioReady,
     # U385: Stop has to reach the laptop too, or it keeps talking.
     SpeechAudioStopped,
+    # U391: he is driving the owner's mouse or keyboard — the cursor ring,
+    # the banner and the Stop button. Withheld until U391, so none appeared.
+    ComputerControlStarted,
+    ComputerControlEnded,
     # U384: U352's overlay switch. The overlay also polls every 1.5 s, which is
     # why this was never missed — but the push was designed in, and without it
     # a scenario's "hide the overlay" lands up to a second and a half late.
@@ -118,12 +122,10 @@ NOT_FOR_THE_CONSOLE: dict[type[BaseEvent], str] = {
         "An orchestrator-internal signal to start a re-authentication flow. "
         "The console has no handler for it and nothing publishes it today."
     ),
-    # The four below have console handlers that have never once received an
-    # event: they were written against a broadcast that did not include them.
-    # Turning them on changes what the Talk screen and the desktop show — an
-    # agent-round counter, and U75's screen-control glow with its abort button
-    # — none of which has run in production. That is the owner's call, not a
-    # side effect of fixing the audio (see the U384 ledger entry).
+    # The two below have console handlers that have never once received an
+    # event: an agent-round counter on the Talk screen. Turning it on changes
+    # what the screen shows, so it waits for the owner (U384). The
+    # screen-control pair that sat here was turned on in U391.
     AgentRoundStarted: (
         "Pending the owner's decision (U384): would light up the Talk screen's "
         "agent-round counter, which has never run in production."
@@ -131,14 +133,6 @@ NOT_FOR_THE_CONSOLE: dict[type[BaseEvent], str] = {
     AgentRoundCompleted: (
         "Pending the owner's decision (U384): the closing half of the "
         "agent-round counter; enabled together with AgentRoundStarted."
-    ),
-    ComputerControlStarted: (
-        "Pending the owner's decision (U384): would show U75's screen-control "
-        "glow and abort button, which have never once appeared in production."
-    ),
-    ComputerControlEnded: (
-        "Pending the owner's decision (U384): clears the screen-control glow; "
-        "must be enabled together with ComputerControlStarted, never alone."
     ),
 }
 
