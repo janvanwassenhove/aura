@@ -18,6 +18,7 @@ const http = require('http')
 const fs = require('fs')
 const path = require('path')
 const { listenPreferring, pickFreePort, withRuntimeConfig } = require('./serving.cjs')
+const { createPresentOverlay } = require('./present-overlay.cjs')
 
 // U37-installer: a packaged (NSIS) install carries the Python workspace under
 // resources/aura and the built console under resources/console; a dev checkout
@@ -615,22 +616,31 @@ function createWindow() {
   // control overlay, which is the one part of this already proven on this
   // machine. ONE overlay window: on two screens the audience layer goes to
   // the beamer and the console itself is the presenter view.
-  let presentOverlayWin = null
-  // U266: the window outlives the console view that opened it. PresentView is
-  // behind a v-if, so switching to Talk and back re-creates it with a fresh
-  // `overlayShown = false` — the Hide button vanished while the overlay was
-  // still on the beamer, and nothing in the app could take it down again.
-  // Reported as "ik kan overlay ook niet terug desactiveren". The main
-  // process is the only thing that actually knows; it now says so.
-  let presentOverlayState = { shown: false, mode: 'audience', displayId: null }
-
-  function hidePresentOverlay() {
-    if (presentOverlayWin) {
-      try { presentOverlayWin.close() } catch { /* already gone */ }
-      presentOverlayWin = null
-    }
-    presentOverlayState = { ...presentOverlayState, shown: false }
-  }
+  // U266: the window outlives the console view that opened it, so the main
+  // process is the one place that knows whether it is up. U386: and that
+  // bookkeeping lives in present-overlay.cjs, where a re-show can no longer
+  // orphan the window it just created (see test-present-overlay.cjs).
+  const presentOverlay = createPresentOverlay({
+    makeWindow: (target, { mode = 'audience', size = 120, camera = false }) => {
+      const w = new BrowserWindow({
+        x: target.bounds.x, y: target.bounds.y,
+        width: target.bounds.width, height: target.bounds.height,
+        frame: false, transparent: true, alwaysOnTop: true, skipTaskbar: true,
+        focusable: false, hasShadow: false, resizable: false,
+        webPreferences: { sandbox: true },
+      })
+      // Click-through: the presenter keeps clicking PowerPoint, not us.
+      w.setIgnoreMouseEvents(true)
+      // 'screen-saver' outranks a fullscreen slideshow in the z-order contest —
+      // the same level the U75 overlay already wins with.
+      w.setAlwaysOnTop(true, 'screen-saver')
+      w.loadURL(
+        `${consoleUrl()}#overlay?mode=${encodeURIComponent(mode)}&size=${Number(size) || 120}`
+        // U269: "show what he sees" — opt-in, so it is absent unless asked for.
+        + `&camera=${camera ? 1 : 0}`)
+      return w
+    },
+  })
 
   ipcMain.handle('overlay:present:displays', () => {
     const primary = screen.getPrimaryDisplay()
@@ -643,46 +653,21 @@ function createWindow() {
   })
 
   ipcMain.handle('overlay:present:show', (_e, opts) => {
-    const { mode = 'audience', displayId = null, size = 120, camera = false } = opts || {}
-    hidePresentOverlay()
+    const { displayId = null } = opts || {}
     const displays = screen.getAllDisplays()
     const target = displays.find((d) => d.id === displayId)
       // Default: the display you are NOT working on — that is where the
       // slides usually are. One display → that one.
       ?? displays.find((d) => d.id !== screen.getPrimaryDisplay().id)
       ?? screen.getPrimaryDisplay()
-    presentOverlayWin = new BrowserWindow({
-      x: target.bounds.x, y: target.bounds.y,
-      width: target.bounds.width, height: target.bounds.height,
-      frame: false, transparent: true, alwaysOnTop: true, skipTaskbar: true,
-      focusable: false, hasShadow: false, resizable: false,
-      webPreferences: { sandbox: true },
-    })
-    // Click-through: the presenter keeps clicking PowerPoint, not us.
-    presentOverlayWin.setIgnoreMouseEvents(true)
-    // 'screen-saver' outranks a fullscreen slideshow in the z-order contest —
-    // the same level the U75 overlay already wins with.
-    presentOverlayWin.setAlwaysOnTop(true, 'screen-saver')
-    presentOverlayWin.loadURL(
-      `${consoleUrl()}#overlay?mode=${encodeURIComponent(mode)}&size=${Number(size) || 120}`
-      // U269: "show what he sees" — opt-in, so it is absent unless asked for.
-      + `&camera=${camera ? 1 : 0}`)
-    presentOverlayWin.on('closed', () => {
-      presentOverlayWin = null
-      presentOverlayState = { ...presentOverlayState, shown: false }
-    })
-    presentOverlayState = { shown: true, mode, displayId: target.id }
-    return { ...presentOverlayState, display: target.id }
+    return presentOverlay.show(target, opts || {})
   })
 
-  ipcMain.handle('overlay:present:hide', () => { hidePresentOverlay(); return { ...presentOverlayState } })
+  ipcMain.handle('overlay:present:hide', () => { presentOverlay.hide(); return presentOverlay.state() })
 
   // U266: what is ACTUALLY on the beamer right now, for a view that has just
   // been re-created and knows nothing.
-  ipcMain.handle('overlay:present:state', () => ({
-    ...presentOverlayState,
-    shown: presentOverlayState.shown && !!presentOverlayWin,
-  }))
+  ipcMain.handle('overlay:present:state', () => presentOverlay.state())
 
   // Window controls for the custom title bar (see preload.cjs).
   ipcMain.on('win:minimize', () => mainWindow?.minimize())

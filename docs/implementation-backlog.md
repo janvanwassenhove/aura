@@ -5449,3 +5449,37 @@ microphone; its three call sites are covered by the source guard and by
 robot's own TTS reads it. Nothing in the console drives it any more — scenarios
 use the U206 runner, which is routed — so routing it would mean synthesizing for
 a path no one takes.
+
+### U386 — "Take it down" took nothing down
+
+Reported as: *"taking down overlap does not longer respond neither"*, with a
+screenshot of the overlay panel.
+
+The overlay window was healthy — one renderer, responding, about a fifth of a
+core for the camera and the animation — and the console's button reached the
+main process. What it found there was nothing to close.
+
+`overlay:present:show` first hid the current window, then created a new one,
+and every window registered the same handler: on `closed`, set the one shared
+reference to null. `close()` is asynchronous. So on a **re-show** — pressing
+Show again, or ticking *Show what he sees*, which re-shows the overlay so the
+camera appears at once — window A was asked to close, window B was created and
+stored, and A's `closed` event arrived a moment later and nulled the reference.
+To B. From then on B was on the beamer with no handle, `state` said *not shown*,
+and every *Take it down* was a no-op. Only quitting the app removed it.
+
+What changed: the bookkeeping moved out of `main.cjs` into `present-overlay.cjs`,
+so it can be driven with fake windows whose `close` reports back late, the way
+Electron's does. A window may only clear the reference if it is still the
+current one, and *Take it down* now `destroy()`s the window — immediate, and
+not something a page can refuse — which is what the U75 screen-control overlay
+has always done.
+
+**Tests**: `test-present-overlay.cjs` (4), in CI as its own step, and the new
+module is linted with the rest of the shell. Verified red by transplanting the
+old logic into the module unchanged first: *"the first window's late 'closed'
+must not orphan the second"* — the reference was `null` with window 2 alive.
+
+**Needs a restart of the desktop app**: the shell is read once at start, and
+the orphaned overlay on the running one cannot be reached by anything but
+quitting.

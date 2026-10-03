@@ -180,7 +180,7 @@ jobs:
           node-version: "20"
       - name: Lint Electron main process
         working-directory: apps/desktop
-        run: npx --yes eslint@9 main.cjs preload.cjs updater.cjs serving.cjs sign.cjs
+        run: npx --yes eslint@9 main.cjs preload.cjs updater.cjs serving.cjs sign.cjs present-overlay.cjs
       - name: Updater verification tests
         working-directory: apps/desktop
         run: node test-updater-verify.cjs
@@ -201,6 +201,10 @@ jobs:
       - name: Brain env tests
         working-directory: apps/desktop
         run: node test-brain-env.cjs
+      # U386: a re-shown overlay must stay reachable by "Take it down".
+      - name: Presentation overlay tests
+        working-directory: apps/desktop
+        run: node test-present-overlay.cjs
 
   # U379: the desktop rung on a real Mac. The unit tests pin the exact osascript
   # and `open -b` commands on any OS; this runs them against macOS itself —

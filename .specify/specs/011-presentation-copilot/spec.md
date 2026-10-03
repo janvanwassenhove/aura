@@ -6,7 +6,7 @@ priority: P2
 risk: Medium
 created: "2026-04-25"
 amended: "2026-09-13"
-units: [U27, U205, U206, U207, U208, U246, U263, U263b, U264, U265, U266, U267, U269, U282, U320, U334, U349, U351, U352, U360, U361]
+units: [U27, U205, U206, U207, U208, U246, U263, U263b, U264, U265, U266, U267, U269, U282, U320, U334, U349, U351, U352, U360, U361, U386]
 ---
 
 # Feature Specification: Presentation Copilot
@@ -309,6 +309,13 @@ settings aside as the example.
   [`docs/demo/scenario-format.md`](../../../docs/demo/scenario-format.md), which is
   written to be handed to whoever — or whatever — generates a scenario, and says
   plainly that an unknown field is refused rather than ignored (U361).
+- **FR-117**: *Take it down* removes the overlay **now**, however many times it
+  was shown before. Showing it again — pressing Show twice, or ticking *Show
+  what he sees*, which re-shows it so the camera lands at once — used to let
+  the old window's late `closed` event clear the reference to the new one,
+  which then stayed on the beamer with nothing able to reach it. Only the
+  window that is current may clear the reference, and taking it down destroys
+  the window rather than asking it to close (U386).
 
 ## Superseded
 
@@ -329,6 +336,7 @@ applies to `slide:N` beats; `manual` and `keyword:` beats have no such deadline.
 | U265, U269 | The projector overlay: transparent, click-through, animated, with cues and subtitles |
 | U266, U267 | Four "nothing happens" with four causes; a panel that says what will happen |
 | U246 | Three broken things behind one missing word — including `uv sync` pruning the presentation extra |
+| U386 | *Take it down* works after the overlay was shown twice |
 | U320 | The panel regrouped: locks as chips, status as status, the projector block given the weight it earns, a run button that names its own action, an empty state with the two doors, and help you can put away |
 | U334 | Present mode enforces what it always promised: only the scenario speaks, and no open microphone answers the room |
 | U361 | The scenario format written down, and a pre-flight check that says what the talk will do rather than only that the file parses |
