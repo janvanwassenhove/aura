@@ -5,7 +5,7 @@ owner: "apps/desktop + CI"
 priority: P1
 risk: High
 created: "2026-09-05"
-units: [U32, U33, U44, U55, U56, U151, U152, U166, U168, U168b, U168c, U168d, U168e, U169, U169b, U170, U171, U172, U173, U174, U176, U177, U178, U192, U193, U197, U201, U211, U228, U229, U230, U231, U232, U233, U234, U235, U236, U283, U284, U285, U285b, U297, U179, U184, U185, U186, U210, U317, U318, U327, U330, U337, U338, U343, U344, U353, U354, U355, U363, U367, U367b, U368, U375]
+units: [U32, U33, U44, U55, U56, U151, U152, U166, U168, U168b, U168c, U168d, U168e, U169, U169b, U170, U171, U172, U173, U174, U176, U177, U178, U192, U193, U197, U201, U211, U228, U229, U230, U231, U232, U233, U234, U235, U236, U283, U284, U285, U285b, U297, U179, U184, U185, U186, U210, U317, U318, U327, U330, U337, U338, U343, U344, U353, U354, U355, U363, U367, U367b, U368, U375, U396]
 amended: "2026-09-13"
 ---
 
@@ -310,6 +310,14 @@ and installers for Windows, macOS (arm64 and x64) and Linux.
 - **FR-015**: A brain that exited fails the startup wait **immediately**,
   quoting its own last stderr. Waiting out a timeout on a dead process turns a
   named, logged cause into an unexplained freeze.
+- **FR-020**: A brain never outlives the app that started it. The shell passes
+  its own pid as `AURA_PARENT_PID`; the brain watches that process
+  (`aura_brain.launcher_watch`, every five seconds, through a handle held from
+  the start on Windows so a reused pid cannot pass for the shell) and, once it
+  is gone, stops the way Ctrl+C does — the lifespan's shutdown runs — with a
+  hard exit fifteen seconds later if that has not ended it. A brain started by
+  hand is given no pid and watched by nobody. Measured on Windows: a real brain
+  stopped 2.3 s after its app was killed, exit code 0 (U396).
 
 ## Out of scope
 
@@ -355,3 +363,4 @@ and installers for Windows, macOS (arm64 and x64) and Linux.
 | U338 | SignPath Foundation wired into the release: free signing for an open-source project, guarded and order-checked |
 | U343 | The from-source launcher caught up with the app it starts: it syncs Python with the extras, rebuilds a stale console, and stops baking a port |
 | U344 | The brain launched through the interpreter instead of a shim a corporate ASR rule forbids, and a dead brain that now names its cause instead of freezing the splash |
+| U396 | A brain stops when the app that started it is gone — one had listened to the room and driven the robot all evening with no window open |

@@ -75,3 +75,12 @@ assert.ok(/const USER_ROOT = IS_PACKAGED \? app\.getPath\('userData'\)/.test(mai
 assert.ok(/const ENV_FILE = IS_PACKAGED\s*\?\s*path\.join\(USER_ROOT, '\.env'\)/.test(main),
   'the env file must live in userData when packaged')
 console.log('ok  the roots live in userData when packaged')
+
+// --- U396: the brain is told which app started it ---------------------------
+// A shell that dies without reaching `quit` left its brain running with no
+// window, still listening and still driving the robot. The brain stops itself
+// once the process named here is gone; it has to be named for that to work.
+assert.ok(/env\.AURA_PARENT_PID\s*=\s*String\(process\.pid\)/.test(body),
+  'brainEnv() must pass the shell\'s own pid as AURA_PARENT_PID, so a brain '
+  + 'never outlives the app that started it (U396)')
+console.log('ok  the brain knows which app to outlive no longer')

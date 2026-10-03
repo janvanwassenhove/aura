@@ -5943,3 +5943,51 @@ an older robot — plus the reply path through the real brain, and the
 Settings choice reaching the robot (verified red with the hook removed); 2
 console tests (red). `test_status_says_whether_he_wanders` changed with the
 status shape.
+
+### U396 — a brain does not outlive the app that started it
+
+Found, not reported, while making *"everything work on the robot too, and
+tested"* (translated). The robot's runtime log showed the laptop listening
+every few seconds and sending it gestures all evening; no AURA window was open
+and no Electron process existed. The brain answering was the one started the
+night before (23:50) — its `uv` process had no parent left. Every fix since
+U384 was absent from it, and it was still the thing listening to the room and
+moving the robot.
+
+**What was actually wrong.** The shell stops its brain on `quit`, with
+`taskkill /T` on the tree it spawned. A shell that never reaches `quit` —
+killed, crashed, or replaced by its own updater — leaves the brain running.
+And the next launch does not notice: U234 picks the next free port when 8020
+is taken, so the new brain starts beside the old one. Two brains, one robot,
+both listening and both answering. (Whether this is behind any of the replies
+that started twice, noted earlier, is not established — it fits, and it is
+written here as a lead, not a finding.)
+
+**The change.** The shell passes its own pid as `AURA_PARENT_PID`. The brain
+watches it (— `aura_brain.launcher_watch`) and, once that process has gone,
+stops the way Ctrl+C does, so the lifespan's shutdown still lets go of the
+voice loop, the robot bridge and the camera stream; a hard exit follows fifteen
+seconds later if that has not ended it. On Windows the brain holds a handle to
+the shell from the start: a pid reused by a later process cannot pass for it.
+A brain started by hand — a developer, a throwaway stack, CI — is given no
+pid and is watched by nobody.
+
+**Why not a job object.** Windows can end a whole process tree when the last
+handle to its job closes, which is the textbook answer. Node cannot create one
+without a native module, and a native module in the shell is a build-and-sign
+problem on a managed laptop (U354, U355). Watching the parent needs nothing but
+the standard library, and works the same on every platform.
+
+**Verified, not assumed.** A real brain on a throwaway stack (port 8033,
+scratch data, no robot), started with a sleeping process as its "app": still
+running while the app lived; 2.3 s after the app was killed it logged *"the
+desktop app that started this brain is gone — stopping"*, ran its shutdown
+(*"Application shutdown complete"*) and exited with code 0.
+
+**What it does not do.** It does not clean up a brain started before this
+unit, which watches nothing; that one has to be stopped once by hand.
+
+**Tests**: 9 brain tests (the watch noticing a real process die, carrying on
+while it lives, an app already gone, a pid that is not one, and the lifespan
+starting it) — all red before; one desktop check that `brainEnv()` names the
+shell's pid — red before.

@@ -131,6 +131,9 @@ function brainEnv() {
   // no longer relative paths that land inside the install directory.
   const posix = (p) => p.replace(/\\/g, '/')
   env.AURA_ENV_FILE = ENV_FILE                    // where prefs/wizard write
+  // U396: the brain stops itself once this process is gone. A shell that died
+  // without reaching `quit` left its brain listening to the room all night.
+  env.AURA_PARENT_PID = String(process.pid)
   env.KNOWLEDGE_DB_PATH = env.KNOWLEDGE_DB_PATH || path.join(DATA_DIR, 'knowledge.enc.json')
   env.RECOGNITION_DB_PATH = env.RECOGNITION_DB_PATH || path.join(DATA_DIR, 'recognition.enc.json')
   env.DATABASE_URL = env.DATABASE_URL || `sqlite+aiosqlite:///${posix(path.join(DATA_DIR, 'aura-memory.db'))}`

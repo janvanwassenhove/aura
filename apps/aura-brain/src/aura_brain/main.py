@@ -1029,8 +1029,16 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     if os.environ.get("PROACTIVE_BRIEFING_TIME", "").strip():
         _briefing_task = asyncio.ensure_future(_briefing_loop())
 
+    # U396: started by the desktop app, the brain stops when the app does — a
+    # shell that died without quitting left one listening to the room all night.
+    from aura_brain import launcher_watch
+
+    _launcher_task = launcher_watch.start_from_env()
+
     yield
 
+    if _launcher_task is not None:
+        _launcher_task.cancel()
     if _briefing_task is not None:
         _briefing_task.cancel()
     if _refresh_task is not None:
