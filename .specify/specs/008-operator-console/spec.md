@@ -6,7 +6,7 @@ priority: P1
 risk: Medium
 created: "2026-04-25"
 amended: "2026-09-13"
-units: [U28, U30, U36c, U38, U53, U63, U68, U72, U76, U77, U78, U79, U95, U98, U112, U113, U114, U115, U117, U119, U120, U122, U123, U124, U125, U187, U188, U216, U217, U222, U223, U252, U252c, U252e, U253b, U262, U319, U350, U356, U362, U370, U383]
+units: [U28, U30, U36c, U38, U53, U63, U68, U72, U76, U77, U78, U79, U95, U98, U112, U113, U114, U115, U117, U119, U120, U122, U123, U124, U125, U187, U188, U216, U217, U222, U223, U252, U252c, U252e, U253b, U262, U319, U350, U356, U362, U370, U383, U390]
 ---
 
 # Feature Specification: Operator Console
@@ -306,6 +306,15 @@ able to choose directly"*, and the same for the robot on the Talk screen.
   The `finally` matters as much as the clearing: the one time you are certain
   to pick the same name again is straight after a rejected file, having just
   fixed it (U362).
+- **FR-110**: The activity log under the conversation on the Talk screen (at
+  *Full*) is as tall as the owner makes it: a grip on its top edge drags it,
+  the arrow keys move it in 24 px steps (Home/End to the limits), and a
+  double-click puts it back to 150 px. It never shrinks below 60 px and never
+  takes the last 220 px the conversation needs; a remembered height that no
+  longer fits a smaller window is clamped and given back when the window grows.
+  The height is kept on this machine (`aura-talk-strip`), like the other layout
+  choices. It used to be `flex: 0 1 150px` — shrinkable, so it gave up its room
+  whenever the conversation wanted it, down to two lines (U390).
 
 ## Traceability
 
@@ -323,4 +332,5 @@ able to choose directly"*, and the same for the robot on the Talk screen.
 | U252, U252c, U252e, U253b | One surface and honest capability chips; the guessed field names; Settings that loaded nothing |
 | U262 | The cross that did nothing, and the typo that was forever |
 | U319 | `PickerMenu` — the identity chevron and the robot avatar open a list you choose from, instead of a control you press until it lands |
+| U390 | The Talk screen's activity log can be resized by its top edge |
 | U350 | Node 25 brought its own inert `localStorage`, vitest yielded to it, and 57 console tests died before they asserted anything |

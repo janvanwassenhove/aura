@@ -1,5 +1,5 @@
 <template>
-  <main class="talk">
+  <main ref="talkEl" class="talk">
     <div class="talk-cols">
       <!-- ═══ The conversation, with presence inside it at every density ═══ -->
       <section class="talk-card convo">
@@ -248,7 +248,16 @@
     </div>
 
     <!-- Activity strip: only at Full — the same log the Activity view shows -->
-    <div v-if="full" data-activity-strip class="talk-strip">
+    <div v-if="full" data-activity-strip class="talk-strip"
+         :style="{ flex: `0 0 ${stripHeight}px` }">
+      <!-- U390: drag the top edge, or focus it and use the arrow keys. -->
+      <div class="strip-grip" role="separator" aria-orientation="horizontal"
+           tabindex="0" :aria-valuenow="stripHeight" aria-valuemin="60"
+           aria-label="Resize the activity log — drag, or use the arrow keys"
+           title="Drag to resize · double-click to reset"
+           @pointerdown="onStripPointerDown" @pointermove="onStripPointerMove"
+           @pointerup="onStripPointerUp" @pointercancel="onStripPointerUp"
+           @keydown="onStripKeydown" @dblclick="resetStrip" />
       <ActivityLog strip />
     </div>
   </main>
@@ -256,6 +265,7 @@
 
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { useDragHeight } from '../composables/useDragHeight'
 import {
   ChevronLeft, ChevronRight, Crosshair, GraduationCap, Mic, TriangleAlert, Volume2,
 } from 'lucide-vue-next'
@@ -288,6 +298,19 @@ const camera = useCameraFeed()
 
 const calm = computed(() => prefs.density === 'calm')
 const full = computed(() => prefs.density === 'full')
+
+// U390: the log under the conversation is as tall as the owner drags it, and
+// never takes the room the conversation needs (220 px of it).
+const talkEl = ref<HTMLElement | null>(null)
+const {
+  height: stripHeight, onPointerDown: onStripPointerDown, onPointerMove: onStripPointerMove,
+  onPointerUp: onStripPointerUp, onKeydown: onStripKeydown, reset: resetStrip, reclamp: reclampStrip,
+} = useDragHeight({
+  key: 'aura-talk-strip', initial: 150, min: 60,
+  max: () => (talkEl.value?.getBoundingClientRect().height ?? 0) - 220,
+})
+onMounted(() => { reclampStrip(); window.addEventListener('resize', reclampStrip) })
+onUnmounted(() => window.removeEventListener('resize', reclampStrip))
 const character = computed(() => characterStore.current)
 const avatarBox = computed(() => (calm.value ? 76 : 58))
 const bubbleSize = computed(() => ({
@@ -841,10 +864,23 @@ const nowCard = computed(() => {
 .abort-btn { margin-top: 9px; }
 
 .talk-strip {
-  flex: 0 1 150px; min-height: 0; overflow: hidden;
+  /* U390: the height comes from the grip (inline style); this is only the
+     fallback. It used to be `0 1 150px` — shrinkable, so the log gave up its
+     room whenever the conversation wanted it, down to two lines. */
+  flex: 0 0 150px; min-height: 0; overflow: hidden;
   border-top: 1px solid var(--line); background: var(--surface);
   display: flex; flex-direction: column;
 }
+.strip-grip {
+  flex-shrink: 0; height: 8px; margin-top: -4px; cursor: row-resize;
+  position: relative; z-index: 1; touch-action: none;
+}
+.strip-grip::after {
+  content: ''; display: block; width: 40px; height: 3px; border-radius: 2px;
+  margin: 3px auto 0; background: var(--line-2, var(--line));
+}
+.strip-grip:hover::after, .strip-grip:focus-visible::after { background: var(--accent); }
+.strip-grip:focus-visible { outline: none; }
 /* Short windows: the log strip is the first thing to go — the conversation is not. */
 @media (max-height: 700px) { [data-activity-strip] { display: none !important; } }
 </style>

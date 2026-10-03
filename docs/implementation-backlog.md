@@ -5611,3 +5611,32 @@ reload, run again — 21 slide cues and 1 keyword, none turned into a hand press
 
 **Not kept across a restart**: the talk lives in the brain's memory. The saved
 list (U207) is what survives a restart.
+
+### U390 — the Talk screen's log can be made taller
+
+Reported as: *"i should be able to drag/resize bottom window in talk screen"*,
+with a screenshot of the Events / Motion / App log / Approvals strip squeezed
+to two lines.
+
+It was `flex: 0 1 150px`. The `1` is flex-shrink: whenever the conversation
+column wanted room the log gave it up, and nothing could ask for it back.
+
+What changed: a `useDragHeight` composable and a grip on the strip's top edge.
+Drag it; or focus it and use the arrow keys (24 px a step, Home/End to the
+limits) — a resize handle only a mouse can use is half a control; double-click
+to put it back to 150 px. It never goes below 60 px (the tab bar and a couple of
+lines) and never takes the last 220 px of the conversation; the strip no longer
+shrinks. The height is remembered on this machine as `aura-talk-strip`, next to
+`aura-density` and `aura-overlay` — it is how this person likes this screen,
+not something the brain needs. A remembered height that no longer fits a
+smaller window is clamped, and given back when the window grows again.
+
+**Tests**: 8 for the composable and 3 mount tests of the Talk view — the three
+red before (no grip, and a strip that could still shrink).
+
+**Verified** in a real browser at 1100—820 with genuine pointer events on the
+grip: 150 px, dragged up 250 to 400 px and saved, dragged far past the top to
+503 px with the conversation left exactly 220 px, Arrow Down to 479, and a
+double-click back to 150. A mouse drag through the browser pane itself missed
+— the pane scales that window down until the 8 px grip is two pixels tall —
+so the drag was driven with pointer events at the grip's real position instead.
