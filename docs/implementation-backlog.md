@@ -6374,3 +6374,36 @@ console was last set to; it lists the household only when opened.
 or fetched at a stand, visitor buttons, no household names, the notice (and
 not outside a stand), and the conversation on each side of the door
 (five red before).
+
+### U406 — at a stand nobody on screen has a name
+
+Asked (translated): *"deal with this too — what is the impact actually, what
+has to happen?"* — of the header's who-is-talking chip, which I had left over
+from U405.
+
+**The impact, worked out before changing anything.** In what he *says* at a
+stand there was none: since U397 the brain treats everyone as a visitor,
+whoever the console has chosen. On the *screen*, and in what it leaves
+behind, there was:
+
+- the chip named the owner and their role the whole time;
+- a face the camera recognised — a colleague, one of the children — became
+  the speaker by itself, and its name showed in the chip, on the camera tag
+  ("Elke · 87%") and in the Mind panel;
+- one tap on the chevron listed the household, with roles ("minor" included);
+- a tap on the chip, or a recognised face, changed who the brain thinks is
+  speaking, and that followed the owner back to Work — where long-term memory
+  attributes what is said to that person.
+
+**The change.** At a stand the chip says *Visitors · at the stand* and does
+nothing on a tap — no switching, no list; a recognised face does not become
+the speaker (the rule sits in the knowledge store, where every path to it
+passes); the camera tag and the Mind panel say *someone*. The owner's own
+choice stays underneath and is back when the header leaves Stand. The Mind
+panel's event reading moved into its own module to be testable without its
+animation loop.
+
+**Tests**: seven — the chip at work (control) and at a stand, a tap that
+neither switches nor lists, a known face that does not become the speaker
+(and still does at work), the camera tag and the Mind panel saying someone
+(five red before).

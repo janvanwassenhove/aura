@@ -7,6 +7,7 @@
 import { onMounted, onUnmounted, ref } from 'vue'
 import { useEventStore } from '../../stores/eventStore'
 import { useModeStore } from '../../stores/modeStore'
+import { routeEvent, type Spike } from './mindRoutes'
 
 /** The Mind — the brain actually working, drawn from the real event stream.
  *
@@ -70,49 +71,6 @@ const MIND_EDGES: [string, string][] = [
 ]
 
 // ── The real event stream → spikes ─────────────────────────────────────────
-type Tone = 'ok' | 'warn' | 'info'
-interface Spike { from: string; to: string; word: string; evt: string; tone: Tone; start: number }
-
-function routeEvent(raw: Record<string, unknown>): Omit<Spike, 'start'> | null {
-  const t = raw.event_type as string
-  const s = (v: unknown, n = 22) => String(v ?? '').slice(0, n)
-  switch (t) {
-    case 'PersonRecognized':
-      return { from: 'eyes', to: 'mem', tone: 'info', evt: t, word: `${s(raw.display_name || raw.person_id || 'unknown', 14)} · ${Number(raw.confidence ?? 0).toFixed(2)}` }
-    case 'GestureDetected':
-      return { from: 'eyes', to: 'lang', tone: 'info', evt: t, word: s(raw.gesture) }
-    case 'TranscriptUpdated':
-      return raw.is_final ? { from: 'ears', to: 'lang', tone: 'ok', evt: t, word: `“${s(raw.transcript, 18)}…”` } : null
-    case 'IntentRecognized':
-      return { from: 'lang', to: 'rules', tone: 'ok', evt: t, word: s(raw.tool_name || raw.intent) }
-    case 'ToolCallRequested':
-      return { from: 'rules', to: 'tools', tone: 'ok', evt: t, word: s(raw.tool_name) }
-    case 'ToolCallSucceeded':
-      return { from: 'tools', to: 'lang', tone: 'ok', evt: t, word: s(raw.tool_name) }
-    case 'ToolCallFailed':
-      return { from: 'tools', to: 'lang', tone: 'warn', evt: t, word: s(raw.error_code || raw.tool_name) }
-    case 'ApprovalRequested':
-      return { from: 'rules', to: 'voice', tone: 'warn', evt: `${t} · mode asks`, word: 'may I?' }
-    case 'ApprovalGranted':
-      return { from: 'voice', to: 'rules', tone: 'ok', evt: t, word: 'approved' }
-    case 'ApprovalDenied':
-      return { from: 'voice', to: 'rules', tone: 'warn', evt: t, word: 'denied' }
-    case 'ResponseDrafted':
-      return { from: 'lang', to: 'voice', tone: 'ok', evt: t, word: `“${s(raw.response_text, 16)}…”` }
-    case 'MotionStarted':
-      return { from: 'lang', to: 'body', tone: 'info', evt: t, word: s(raw.motion_id) }
-    case 'SpeechPlaybackStarted':
-    case 'SpeechStarted':
-      return { from: 'voice', to: 'body', tone: 'ok', evt: t, word: 'speaking' }
-    case 'MemoryRecalled':
-      return { from: 'mem', to: 'lang', tone: 'info', evt: t, word: 'recall' }
-    case 'AgentRoundStarted':
-      return { from: 'lang', to: 'rules', tone: 'ok', evt: t, word: `round ${s(raw.round_no, 3)}` }
-    default:
-      return null
-  }
-}
-
 const TRAVEL = 850
 const LINGER = 900
 let spikes: Spike[] = []
@@ -217,7 +175,7 @@ function ingestEvents(): void {
   const fresh: Spike[] = []
   for (const e of eventStore.events) {
     if (e.id === lastSeenEventId) break
-    const routed = routeEvent(e.payload)
+    const routed = routeEvent(e.payload, { atStand: modeStore.mode === 'stand' })
     if (routed) fresh.push({ ...routed, start: now + fresh.length * 180 })
   }
   if (eventStore.events.length) lastSeenEventId = eventStore.events[0].id

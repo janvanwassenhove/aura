@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { BRAIN_URL } from '../lib/endpoints'
+import { useModeStore } from './modeStore'
 
 // The knowledge API is served by the brain (same origin as orchestrator after U11).
 
@@ -452,6 +453,10 @@ export const useKnowledgeStore = defineStore('knowledge', () => {
   const remembering = ref(false)
 
   function setSpeaker(personId: string | null, source: 'face' | 'manual' = 'manual'): void {
+    // U406: at a stand a face he knows is a visitor like any other. Following
+    // it put a colleague's or a child's name in the header for anyone to read,
+    // and left them as the speaker when the owner went back to Work.
+    if (source === 'face' && useModeStore().mode === 'stand') return
     speaker.value = personId
     speakerSource.value = personId === null ? null : source
     if (guestTimer) { clearTimeout(guestTimer); guestTimer = null }

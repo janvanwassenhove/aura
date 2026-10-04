@@ -564,6 +564,8 @@ async function toggleMic(): Promise<void> {
 const camTag = computed(() => {
   const r = robot.lastRecognized
   if (!robot.connected) return 'robot offline'
+  // U406: at a stand a face he knows is "someone" — the screen is in view.
+  if (r?.known && modeStore.mode === 'stand') return 'someone in view'
   if (r?.known && r.display_name) return `${r.display_name} · ${Math.round(r.confidence * 100)}%`
   if (r && !r.known) return 'unknown face'
   return 'no one in view'

@@ -40,7 +40,7 @@
          worst of both. Now the pill is two controls: the body still steps to
          the next person (fast when there are two of you), the chevron opens
          the list and you pick. -->
-    <div class="who-group" :class="{ unknown: !speakerPerson }">
+    <div class="who-group" :class="{ unknown: !speakerPerson && !atStand, stand: atStand }">
       <button class="who-chip" :title="whoHint" @click="cycleSpeaker">
         <span class="who-avatar" :class="{ guest: isGuestSpeaker || !speakerPerson }">{{ whoInitials }}</span>
         <span class="who-text">
@@ -52,7 +52,7 @@
         class="who-more" :aria-expanded="whoOpen" aria-haspopup="menu"
         aria-label="Choose who is talking"
         title="Choose who is talking"
-        @click.stop="whoOpen = !whoOpen"
+        @click.stop="whoOpen = atStand ? false : !whoOpen"
       >
         <ChevronDown :size="12" class="who-chev" />
       </button>
@@ -174,20 +174,28 @@ const speakerPerson = computed(() =>
   knowledge.people.find(p => p.person_id === knowledge.speaker) ?? null)
 const isGuestSpeaker = computed(() => knowledge.speaker === 'guest')
 
-const whoName = computed(() =>
-  isGuestSpeaker.value ? 'Guest' : speakerPerson.value?.display_name ?? 'Who is this?')
+// U406: at a stand nobody on screen has a name — the chip says visitors, and
+// does not switch or list anyone. The owner's choice is untouched underneath
+// and back when the header leaves Stand.
+const atStand = computed(() => modeStore.mode === 'stand')
+
+const whoName = computed(() => atStand.value ? 'Visitors'
+  : isGuestSpeaker.value ? 'Guest' : speakerPerson.value?.display_name ?? 'Who is this?')
 const whoInitials = computed(() => {
+  if (atStand.value) return '·'
   if (isGuestSpeaker.value) return 'G'
   const n = speakerPerson.value?.display_name
   return n ? n.slice(0, 2).toUpperCase() : '?'
 })
 const whoSub = computed(() => {
+  if (atStand.value) return 'at the stand'
   if (isGuestSpeaker.value) return 'nothing saved'
   if (!speakerPerson.value) return 'tap to choose'
   return `${speakerPerson.value.role} · tap to switch`  // the chevron lists them
 })
-const whoHint = computed(() =>
-  speakerPerson.value || isGuestSpeaker.value
+const whoHint = computed(() => atStand.value
+  ? 'At a stand everyone is a visitor: he keeps no one, and no one is named here.'
+  : speakerPerson.value || isGuestSpeaker.value
     ? `Answering as ${whoName.value}. Click to switch person or drop to Guest — he also drops to Guest after 10 minutes with no face.`
     : 'Nobody selected — click to say who is talking')
 
@@ -220,6 +228,7 @@ function pickSpeaker(id: string): void {
  *  in what "becoming this person" means — the density follow is easy to
  *  forget on one path. */
 function applySpeaker(id: string): void {
+  if (atStand.value) return                       // U406
   knowledge.setSpeaker(id, 'manual')
   prefs.resetDensityTouch()
   prefs.followPerson(

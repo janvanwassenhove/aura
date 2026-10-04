@@ -5,7 +5,7 @@ owner: "orchestrator"
 priority: P1
 risk: High
 created: "2026-09-05"
-units: [U40, U43, U50, U57, U58, U59, U60, U61, U62, U64, U65, U66, U70, U71, U74, U75, U107, U108, U110, U118, U159, U194, U195, U247, U248, U249, U250, U251, U253c, U259, U259b, U261, U296, U335, U377, U378, U379, U380, U381, U382, U391, U397, U405]
+units: [U40, U43, U50, U57, U58, U59, U60, U61, U62, U64, U65, U66, U70, U71, U74, U75, U107, U108, U110, U118, U159, U194, U195, U247, U248, U249, U250, U251, U253c, U259, U259b, U261, U296, U335, U377, U378, U379, U380, U381, U382, U391, U397, U405, U406]
 ---
 
 # Feature Specification: Skills, Automation and the Agentic Loop
@@ -232,6 +232,11 @@ about two questions:
   said at the stand; the other modes' conversation comes back when the header
   leaves Stand. A notice at the top says it is a stand and what is kept off
   the screen.
+  **And nobody on it has a name** (U406): the header's who-is-talking chip
+  says *Visitors · at the stand* and neither switches the speaker nor lists
+  the household; a face he knows does not become the speaker; the camera tag
+  and the Mind panel say *someone*. The owner's choice is untouched underneath
+  and applies again when the header leaves Stand.
 - **FR-001**: The loop is multi-round, steerable and stoppable, and its rounds
   are visible in the console while they run (U57, U62).
 - **FR-002**: Every tool that touches the outside world passes the approval
@@ -273,6 +278,7 @@ about two questions:
 |---|---|
 | U57, U58, U62 | The agentic loop; the automation ladder; live rounds, steering, stop and teach in the console |
 | U335 | The behaviour row of every mode enforced at its chokepoints: unprompted speech, and learning about people |
+| U406 | At a stand nobody on screen has a name, and the speaker cannot be switched by a visitor or a face |
 | U405 | At a stand the laptop's screen keeps the owner private too, and says so |
 | U397 | Stand: a mode for a fair — nothing of the owner's within reach or in a prompt, and he wanders and talks |
 | U59, U60, U64, U65, U66, U71 | Skills with triggers and scope; teach-mode; person-scoped skills; the starter skill |
