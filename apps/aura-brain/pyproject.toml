@@ -48,6 +48,10 @@ dev = [
 # Real face recognition (U18): uv sync --package aura-brain --extra recognition
 recognition = [
     "insightface>=0.7",
+    # U402: the OpenCV insightface imports, asked for here rather than left to
+    # it — and the same build the gestures extra uses (see the root
+    # pyproject's override), so neither can delete the other's cv2/.
+    "opencv-contrib-python>=4.10",
     "onnxruntime>=1.18",
     "pillow>=10.0",
     "numpy>=1.26",

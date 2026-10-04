@@ -5,7 +5,7 @@ owner: "aura-brain / knowledge"
 priority: P1
 risk: High
 created: "2026-09-05"
-units: [U18, U19a, U19b, U19c, U19d, U19e, U20, U29, U93, U94, U97, U103, U104, U105, U106, U109, U136, U160, U180, U181, U189, U190, U204, U213, U214, U218, U243, U244, U245, U271, U272, U274, U276, U277, U278, U279, U280, U281, U290, U293, U294, U36f, U342, U348, U358, U364]
+units: [U18, U19a, U19b, U19c, U19d, U19e, U20, U29, U93, U94, U97, U103, U104, U105, U106, U109, U136, U160, U180, U181, U189, U190, U204, U213, U214, U218, U243, U244, U245, U271, U272, U274, U276, U277, U278, U279, U280, U281, U290, U293, U294, U36f, U342, U348, U358, U364, U402]
 amended: "2026-09-05"
 ---
 
@@ -194,6 +194,13 @@ while he was, in fact, remembering.
 - **FR-005**: Face recognition matches at living-room distance, files unknowns
   as capped guest profiles with snapshots, and deletes face data with the
   person.
+- **FR-005b**: Recognition's OpenCV is asked for by the recognition extra
+  itself, and only one OpenCV build is ever installed: `opencv-contrib-python`,
+  the one the gestures extra needs too, with insightface's request for
+  `opencv-python` set aside by an override in the root `pyproject.toml`. Two
+  builds share `cv2/`; with both installed once, a sync without gestures
+  deleted it, uv kept reporting "no changes", and recognition said it was not
+  installed on a machine where it was (U402).
 - **FR-006**: The console never claims a memory state the brain does not share,
   in either direction.
 - **FR-007**: A fresh install contains exactly one fictional demo persona and
@@ -229,6 +236,7 @@ while he was, in fact, remembering.
 | U19d, U93, U94, U97 | Transparency API and UI: inspect, edit, erase; Knowledge inside the Brain panel; add a person back; and the 500 that made everybody "vanish" |
 | U19e | The judgment / anticipation layer, stateless over the store |
 | U18, U271, U213, U218, U244 | Recognition: the embedding matcher, faces at 34 pixels, honest teach feedback, surviving updates, and a deleted person who kept their face |
+| U402 | Recognition lost OpenCV to the gestures extra; one OpenCV build now, asked for by recognition itself |
 | U136, U181, U189, U190 | Flagging a wrong recognition; guest profiles; naming or attaching a guest; capping the guest explosion |
 | U103, U104, U105, U106, U214 | Growing from sources, import/export, provenance, pan/zoom, filter by person |
 | U342 | The brain as one sealed, importable file — faces and skills included, merged rather than replaced |

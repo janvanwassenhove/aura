@@ -37,6 +37,13 @@ identity-service     = { workspace = true }
 
 [tool.uv]
 package = false
+# U402: one OpenCV, ever. insightface (recognition) asks for opencv-python and
+# mediapipe (gestures) for opencv-contrib-python; both write the same cv2/, so
+# a sync that drops gestures deleted it from under recognition and uv, seeing
+# opencv-python's record, never put it back. The contrib build is a superset —
+# the recognition extra asks for it itself, and insightface's request is set
+# aside here.
+override-dependencies = ["opencv-python; sys_platform == 'never'"]
 
 [build-system]
 requires = ["hatchling"]

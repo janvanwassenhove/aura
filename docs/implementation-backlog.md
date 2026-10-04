@@ -6244,3 +6244,41 @@ meantime, which is what CI sees.
 
 **Tests**: two that fail without the fixture whatever the owner has set — no
 test may fall back to `./data/mode-policy.json`, and Quiet starts off in Work.
+
+### U402 — face recognition lost OpenCV to the gestures extra
+
+Reported with a screenshot of the People screen, teaching Limme's face:
+*"Face recognition isn't installed on this machine"* — with the question
+(translated) *"what is needed for face recognition? I ran it on this computer
+via the AURA start bat"*.
+
+**What was actually wrong.** It was installed. `insightface` and `onnxruntime`
+were in the environment; `import insightface` failed on `import cv2`; and
+`opencv_python-5.0.0.93.dist-info` was there, its record listing forty `cv2/`
+files, with no `cv2/` directory at all. The recognition extra gets OpenCV
+through insightface (`opencv-python`); the gestures extra gets it through
+mediapipe (`opencv-contrib-python`); both write the same `cv2/`. Install both
+once, then sync without gestures — which `start-aura.bat` does, it never asks
+for them — and uv removes the contrib package with its files, which are the
+shared directory. uv then sees opencv-python's record, reports "Would make no
+changes", and never puts it back. My first reading, that recognition did not
+declare OpenCV at all, was wrong: the lock had it through insightface.
+
+**Reproduced first**, on a scratch environment: recognition with gestures,
+`cv2` imports; recognition without, `ModuleNotFoundError: No module named
+'cv2'`, and a dry run says nothing would change.
+
+**The change.** One OpenCV, ever: the contrib build, a superset of the other.
+The recognition extra asks for `opencv-contrib-python` itself, and the root
+`pyproject.toml` sets insightface's `opencv-python` request aside with a uv
+override (a marker that is never true), so the lock can never install both.
+
+**Verified on a real install**, starting from the broken state: the next sync
+uninstalled `opencv-python`, installed `opencv-contrib-python`, and `cv2` with
+insightface's `FaceAnalysis` imported; then gestures on and off again, and
+`cv2` survived both. The owner's next `start-aura.bat` makes exactly that
+repair. Not verified here: learning a face, which needs the running app and
+downloads insightface's model once on first use.
+
+**Tests**: two against the lock and the extra — only one OpenCV is installable,
+and recognition names its own — red against the old lock, green now.
