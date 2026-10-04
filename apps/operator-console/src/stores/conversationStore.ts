@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { BRAIN_URL } from '../lib/endpoints'
+import { useModeStore } from './modeStore'
 
 export interface ConversationTurn {
   id: string
@@ -8,6 +9,9 @@ export interface ConversationTurn {
   text: string
   timestamp: string
   toolCall?: { name: string; status: 'pending' | 'approved' | 'denied' | 'succeeded' | 'failed' }
+  /** U405: said at a stand. The stand's screen shows only these, and the
+   *  other modes only the rest — what the brain does with them since U397. */
+  public?: boolean
 }
 
 export const useConversationStore = defineStore('conversation', () => {
@@ -27,8 +31,15 @@ export const useConversationStore = defineStore('conversation', () => {
 BRAIN_URL
 
   function addTurn(turn: ConversationTurn) {
+    turn.public = useModeStore().mode === 'stand'   // the same object: callers keep updating it
     turns.value.push(turn)
   }
+
+  /** U405: the turns for the screen as it is now — a stand's, or the rest. */
+  const visibleTurns = computed(() => {
+    const atStand = useModeStore().mode === 'stand'
+    return turns.value.filter(t => !!t.public === atStand)
+  })
 
   // Turns arrive twice by design: once from the HTTP round-trip (submitTurn)
   // and once as bus events over the WebSocket. Treat an identical role+text
@@ -243,7 +254,7 @@ BRAIN_URL
   }
 
   return {
-    clearTurns, turns, pendingText, isProcessing, sessionId, lastLatency, agentRound,
+    clearTurns, turns, visibleTurns, pendingText, isProcessing, sessionId, lastLatency, agentRound,
            screenControl, abortScreenControl, syncScreenControl,
            addTurn, applyEvent, submitTurn, steerAgent, stopAgent, teach, $reset }
 })

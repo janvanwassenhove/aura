@@ -117,7 +117,9 @@ een app starten, je browser navigeren, Computer Use, code schrijven.
   kop), hij zoekt de mensen die je kent niet op, niets over jou of je gezin
   zit in wat hij te horen krijgt, wat je in Work zei volgt hem niet, en hij
   onthoudt niemand die hij ontmoet. Terug naar Work en alles is zoals je het
-  liet. Op een stand zegt een bezoeker zijn naam **en** de vraag samen ("AURA,
+  liet. Het scherm van de laptop doet mee: geen agenda, geen briefing-knoppen,
+  geen namen van je huisgenoten, en alleen het gesprek van de stand — met
+  bovenaan een melding die dat zegt. Op een stand zegt een bezoeker zijn naam **en** de vraag samen ("AURA,
   wat ben jij?") — zijn naam alleen, of de volgende zin na zijn antwoord, is
   een menigte die praat, niet iemand die hem aanspreekt.
 - In *emoties* beantwoordt hij wat hij hoorde met een emotie en maakt hij geen

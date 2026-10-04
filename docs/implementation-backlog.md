@@ -6342,3 +6342,35 @@ before looks existed, a persona of the owner's without one, changing it,
 refusing an unknown one, the API saying each — red before; 2 console tests,
 the overlay switching through two personas and back to the header's character,
 and the editor saving a look (red before).
+
+### U405 — at a stand the screen keeps the owner private too
+
+Asked for (translated): *"the laptop screen still shows personal things in
+Stand: the Next up card and the Today's agenda button — change this, with a
+notification (stand mode)"* — after I had pointed them out as left over from
+U397.
+
+**What was actually wrong.** U397 kept the owner out of what he is *told* at a
+stand; the screen beside him still showed it to whoever walked up. More than
+the two named: the *Next up* card with the day's agenda (fetched every two
+minutes), the *Brief me / What did I miss? / Today's agenda* buttons, the
+speaker picker listing the household by name, and the whole conversation
+from Work — which the brain had stopped carrying into the stand since U397,
+while the screen went on showing it.
+
+**The change.** At a stand the Talk screen shows no agenda and does not fetch
+one; the buttons are for visitors (*Introduce yourself*, *What can you do?*,
+*Tell a joke*); the speaker picker is not shown; and the transcript shows only
+what was said at the stand — each turn now records which side of the door it
+was said on, as the brain's history does, and the other modes' conversation is
+back when the header leaves Stand. A notice at the top of the conversation
+says it is a stand, what is kept off the screen, and that visitors use his
+name and their question together (U398).
+
+**Not done.** The header's *Who is this?* chip still names the person the
+console was last set to; it lists the household only when opened.
+
+**Tests**: six on the real Talk view — the control at work, no agenda shown
+or fetched at a stand, visitor buttons, no household names, the notice (and
+not outside a stand), and the conversation on each side of the door
+(five red before).

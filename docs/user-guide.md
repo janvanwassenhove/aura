@@ -113,7 +113,9 @@ navigating your browser, running Computer Use, writing code.
   header), he does not look up the people you know, nothing about you or your
   household is in what he is told, what you said in Work does not follow him
   there, and he remembers nobody he meets. Switch back to Work and everything
-  is as you left it. At a stand a visitor says his name **and** the question
+  is as you left it. The laptop's screen keeps it too: no agenda, no briefing
+  buttons, no names of the people you know, and only the conversation from the
+  stand — with a notice at the top saying so. At a stand a visitor says his name **and** the question
   together ("AURA, what are you?") — his name alone, or the next sentence
   after his answer, is a crowd talking, not someone talking to him.
 - In *emotions* he answers what he heard with an emotion and composes no

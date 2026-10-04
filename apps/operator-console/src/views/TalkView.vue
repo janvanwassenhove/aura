@@ -3,6 +3,12 @@
     <div class="talk-cols">
       <!-- ═══ The conversation, with presence inside it at every density ═══ -->
       <section class="talk-card convo">
+        <!-- U405: say it is a stand, and what that keeps off this screen. -->
+        <div v-if="inStand" class="stand-notice" data-test="stand-notice" role="status">
+          <strong>Stand</strong> — your agenda, briefings, the people you know and what was
+          said in your other modes are kept off this screen, and out of what he is told.
+          Visitors talk to him with his name and their question together.
+        </div>
         <div class="presence">
           <!-- U319: he is the most obvious thing on the screen to press, and
                pressing him did nothing. Now he is the character picker: the
@@ -50,7 +56,7 @@
         </div>
 
         <div ref="scrollEl" role="log" class="log" :style="{ gap: (calm ? 18 : 14) + 'px', padding: calm ? '20px 22px 12px' : '14px 16px 10px' }">
-          <template v-for="turn in convo.turns" :key="turn.id">
+          <template v-for="turn in convo.visibleTurns" :key="turn.id">
             <!-- user bubble -->
             <div v-if="turn.role === 'user'" class="turn-user">
               <div class="bubble-user" :style="bubbleSize">{{ turn.text }}</div>
@@ -111,14 +117,14 @@
             </div>
           </div>
 
-          <p v-if="!convo.turns.length && !approvals.pending.length" class="log-empty">
+          <p v-if="!convo.visibleTurns.length && !approvals.pending.length" class="log-empty">
             Say something — type below{{ calm ? '' : ', or hold Talk' }}.
           </p>
         </div>
 
         <!-- Identity prompt, only when the camera cannot answer.
              Misattributed memory is worse than no memory. -->
-        <div v-if="needsIdentity" class="identity-bar">
+        <div v-if="needsIdentity && !inStand" class="identity-bar">
           <div class="identity-text">
             <div class="identity-title">{{ identityTitle }}</div>
             <div class="identity-sub">{{ identitySub }}</div>
@@ -139,7 +145,7 @@
             v-for="q in quickAsks" :key="q.label"
             class="quick-ask" :title="q.hint" @click="convo.submitTurn(q.ask)"
           >{{ q.label }}</button>
-          <button v-if="convo.turns.length" class="clear-btn" title="Clear the visible transcript — his memory of the session stays"
+          <button v-if="convo.visibleTurns.length" class="clear-btn" title="Clear the visible transcript — his memory of the session stays"
                   @click="convo.clearTurns()">Clear</button>
         </div>
 
@@ -214,8 +220,9 @@
           <div class="mono mind-event">{{ mindStatus }}</div>
         </section>
 
-        <!-- Next up: today's agenda, straight from the connector -->
-        <section class="talk-card agenda-card">
+        <!-- Next up: today's agenda, straight from the connector. U405: not at
+             a stand — the screen is in view of whoever walks up. -->
+        <section v-if="!inStand" class="talk-card agenda-card">
           <div class="mind-head">
             <h2>Next up</h2>
             <span class="mind-spacer" />
@@ -335,7 +342,7 @@ const stateSentence = computed(() => {
 
 // ── Transcript ─────────────────────────────────────────────────────────────
 const scrollEl = ref<HTMLElement | null>(null)
-watch(() => convo.turns.length, async () => {
+watch(() => convo.visibleTurns.length, async () => {
   await nextTick()
   if (scrollEl.value) scrollEl.value.scrollTop = scrollEl.value.scrollHeight
 })
@@ -412,6 +419,9 @@ function countdown(a: PendingApproval): string {
 }
 
 // ── Identity ───────────────────────────────────────────────────────────────
+// U405: at a stand, whoever walks up can see this screen too.
+const inStand = computed(() => modeStore.mode === 'stand')
+watch(inStand, (now) => { if (!now) void fetchAgenda() })
 const needsIdentity = computed(() => knowledge.speaker === null && knowledge.people.length > 0)
 const unknownFace = computed(() => robot.lastRecognized !== null && !robot.lastRecognized.known)
 const identityTitle = computed(() => unknownFace.value ? 'Who is this?' : 'Who is typing?')
@@ -432,7 +442,15 @@ function chooseSpeaker(id: string, role: string): void {
 }
 
 // ── Quick asks ─────────────────────────────────────────────────────────────
-const quickAsks = computed(() => calm.value
+const quickAsks = computed(() => inStand.value
+  // U405: at a stand the buttons are for the visitor in front of him — the
+  // briefing, the mail and the agenda are the owner's, and not on show here.
+  ? [
+    { label: 'Introduce yourself', ask: 'Introduce yourself to a visitor at our stand, in two sentences.', hint: 'Who he is, for whoever just walked up' },
+    { label: 'What can you do?', ask: 'What can you do? Tell a visitor in a few words.', hint: 'A short tour of what he is' },
+    { label: 'Tell a joke', ask: 'Tell a short joke for a visitor.', hint: 'Something light for the stand' },
+  ]
+  : calm.value
   ? [
     { label: 'Brief me', ask: 'Give me my briefing', hint: 'The morning briefing, out loud' },
     { label: 'Play music', ask: 'Play some music', hint: 'Resume what was last playing' },
@@ -586,6 +604,8 @@ const mindStatus = ref(waitingLabel)
 const agenda = ref<{ time: string; title: string; sub: string }[]>([])
 const agendaNote = ref('Loading…')
 async function fetchAgenda(): Promise<void> {
+  // U405: at a stand the agenda is not even fetched — nothing to leave on screen.
+  if (inStand.value) { agenda.value = []; return }
   try {
     const r = await fetch(`${BRAIN_URL}/connector/calendar/today`)
     if (!r.ok) { agendaNote.value = 'Calendar unavailable — connect it in Settings › Connections.'; return }
@@ -847,6 +867,11 @@ const nowCard = computed(() => {
 .agenda-title { font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .agenda-sub { font-size: 11.5px; color: var(--ink-3); }
 .agenda-empty { font-size: 12px; color: var(--ink-3); margin: 0; }
+.stand-notice {
+  margin: 0 0 10px; padding: 8px 12px; border-radius: 9px; font-size: 12.5px; line-height: 1.4;
+  background: var(--ok-wash); color: var(--ink-2); border: 1px solid var(--ok);
+}
+.stand-notice strong { color: var(--ok); }
 
 .now-tag {
   display: inline-flex; align-items: center; font-size: 10.5px; font-weight: 700;
