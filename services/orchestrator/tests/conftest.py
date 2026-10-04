@@ -27,3 +27,25 @@ def _restore_llm_config():
     before = (_cfg._config.provider, _cfg._config.model)
     yield
     _cfg._config.provider, _cfg._config.model = before
+
+
+@pytest.fixture(autouse=True)
+def _own_mode_policy(monkeypatch, tmp_path):
+    """U401: every test gets its own mode policy, never the owner's.
+
+    A source checkout keeps the running AURA's policy in ./data — Quiet, each
+    mode's behaviour, the boundaries. A test that named no path read it (twenty
+    went red the morning the owner switched Quiet on) and could have written it.
+    Work is active and nothing is quiet, as on a fresh install.
+    """
+    monkeypatch.setenv("MODE_POLICY_PATH", str(tmp_path / "mode-policy.json"))
+    try:
+        from orchestrator import mode_policy
+    except Exception:  # noqa: BLE001 — a suite without the orchestrator has no policy
+        yield
+        return
+    mode_policy.reset_cache_for_tests()
+    mode_policy.set_active("work")
+    yield
+    mode_policy.reset_cache_for_tests()
+    mode_policy.set_active("work")

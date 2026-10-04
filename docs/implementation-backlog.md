@@ -6215,3 +6215,32 @@ line, timing the pieces, starting at once or on the player's word or after the
 grace period, ignoring another line's start, the finished beat not bringing
 the line back, the player reporting its start, and the overlay stepping
 through a line on a moved clock (all red before).
+
+### U401 — the tests read the owner's Quiet
+
+Found, not reported, while verifying U400 on the owner's machine: the gate went
+red with twenty brain tests failing on "quiet switched on" — live sessions,
+proactive speech, the realtime session — none of them touched by U400.
+
+**What was actually wrong.** A source checkout keeps the running AURA's mode
+policy in `./data/mode-policy.json`, and the owner had switched Quiet on that
+morning. Every test that did not set its own `MODE_POLICY_PATH` read that file.
+CI has no such file, so the suite was green there and red only on the one
+machine where AURA actually runs — which made it look like flakiness rather
+than what it was. Reading was the half that showed; a test that switched Quiet
+or a mode's behaviour without its own path would have changed the owner's live
+settings, silently.
+
+**The change.** An autouse fixture in the brain's and the orchestrator's
+`conftest.py` gives every test its own policy file in a temporary directory,
+resets the policy's cache, and starts in Work with Quiet off, as on a fresh
+install. Tests that already chose their own path are unaffected — theirs wins
+inside the test.
+
+**Verified against the live file**, with the owner's Quiet still on: brain
+862 passed (twenty red before), orchestrator 566 passed, and the owner's file
+untouched afterwards. U400's gate had been run with a scratch path in the
+meantime, which is what CI sees.
+
+**Tests**: two that fail without the fixture whatever the owner has set — no
+test may fall back to `./data/mode-policy.json`, and Quiet starts off in Work.
