@@ -146,6 +146,14 @@
               <option value="off">never — he finishes his sentence</option>
             </select>
           </label>
+          <!-- U404: how he looks on the projector when this persona speaks -->
+          <label class="pe-field">
+            <span>Look</span>
+            <select v-model="editingCharacter.look" class="d2-field" aria-label="Look">
+              <option value="">the character in the header</option>
+              <option v-for="(a, id) in CHARACTERS" :key="id" :value="id">{{ a.tag }}</option>
+            </select>
+          </label>
           <label class="pe-field">
             <span>Engine</span>
             <select v-model="editingCharacter.voice_engine" class="d2-field" aria-label="Conversation engine">
@@ -482,6 +490,8 @@ interface BrainCharacter {
   id: string; display_name: string; character_prompt: string; verbosity: string
   humor_level: string; voice_id: string; interruptibility: string
   learned_traits: string; voice_engine?: string
+  /** U404: one of CHARACTERS' ids, or '' for the header's character. */
+  look?: string
 }
 const brainCharacters = ref<BrainCharacter[]>([])
 const activePersona = ref('')
@@ -518,6 +528,7 @@ async function savePersona(): Promise<void> {
         humor_level: c.humor_level, voice_id: c.voice_id,
         interruptibility: c.interruptibility, learned_traits: c.learned_traits,
         voice_engine: c.voice_engine ?? '',
+        look: c.look ?? '',
       }),
     })
     personaSaved.value = r.ok

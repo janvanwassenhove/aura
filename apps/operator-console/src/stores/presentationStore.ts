@@ -73,9 +73,14 @@ export const usePresentationStore = defineStore('presentation', () => {
   /** U400: the line on the projector, timed to his voice. `end` is when he
    *  stops; the last piece lingers a moment after so the room can finish it. */
   const timeline = ref<{ cues: Cue[]; end: number } | null>(null)
-  let waiting: { id: string; text: string; ms: number; timer: ReturnType<typeof setTimeout> } | null = null
+  let waiting: { id: string; text: string; ms: number; persona: string;
+                  timer: ReturnType<typeof setTimeout> } | null = null
+  /** U404: whose line is on the projector — the beat's persona, '' for the
+   *  talk's own voice. Set when the line starts, not when it is announced. */
+  const speakerPersona = ref('')
 
-  function startLine(text: string, ms: number): void {
+  function startLine(text: string, ms: number, persona = ''): void {
+    speakerPersona.value = persona
     const now = Date.now()
     const length = ms > 0 ? ms : Math.min(20_000, 1_500 + text.length * 66)
     const cues = timeCues(splitCues(text), now, length)
@@ -107,9 +112,10 @@ export const usePresentationStore = defineStore('presentation', () => {
       lastPersona.value = String(raw.persona ?? '')
       if (waiting) { clearTimeout(waiting.timer); waiting = null }
       const id = String(raw.utterance_id ?? '')
-      if (!id) { startLine(text, ms); return }
-      waiting = { id, text, ms, timer: setTimeout(() => {
-        if (waiting && waiting.id === id) { waiting = null; startLine(text, ms) }
+      const persona = String(raw.persona ?? '')
+      if (!id) { startLine(text, ms, persona); return }
+      waiting = { id, text, ms, persona, timer: setTimeout(() => {
+        if (waiting && waiting.id === id) { waiting = null; startLine(text, ms, persona) }
       }, START_GRACE_MS) }
       return
     }
@@ -117,9 +123,9 @@ export const usePresentationStore = defineStore('presentation', () => {
       if (!waiting || waiting.id !== String(raw.utterance_id ?? '')) return
       clearTimeout(waiting.timer)
       const measured = Number(raw.duration_s ?? 0) * 1000
-      const { text, ms } = waiting
+      const { text, ms, persona } = waiting
       waiting = null
-      startLine(text, measured > 0 ? measured : ms)
+      startLine(text, measured > 0 ? measured : ms, persona)
       return
     }
     // U352: a beat moved the overlay. Written onto the SAME field the status
@@ -166,7 +172,7 @@ export const usePresentationStore = defineStore('presentation', () => {
       const body = await r.json().catch(() => null)
       if (!r.ok) { error.value = body?.error ?? 'Could not load the scenario.'; return false }
       status.value = { active: true, ...body }
-      subtitle.value = ''; timeline.value = null; lastBeat.value = ''
+      subtitle.value = ''; timeline.value = null; speakerPersona.value = ''; lastBeat.value = ''
       return true
     } catch {
       error.value = 'The brain did not respond.'
@@ -234,7 +240,7 @@ export const usePresentationStore = defineStore('presentation', () => {
     } catch {
       status.value = { active: false }
     } finally {
-      subtitle.value = ''; timeline.value = null; lastBeat.value = ''; busy.value = false
+      subtitle.value = ''; timeline.value = null; speakerPersona.value = ''; lastBeat.value = ''; busy.value = false
     }
   }
 
@@ -246,12 +252,12 @@ export const usePresentationStore = defineStore('presentation', () => {
     } catch { /* ignore */ }
     finally {
       status.value = { active: false }
-      subtitle.value = ''; timeline.value = null; lastBeat.value = ''; busy.value = false
+      subtitle.value = ''; timeline.value = null; speakerPersona.value = ''; lastBeat.value = ''; busy.value = false
     }
   }
 
   return { status, subtitle, lastBeat, lastMode, lastPersona, busy, error,
-    timeline, cueAt, speakingUntil,
+    timeline, cueAt, speakingUntil, speakerPersona,
            applyEvent, fetchStatus, start, startScenario, next, pushSpeech, stop,
            setRehearsing, fetchScenario, remove }
 })

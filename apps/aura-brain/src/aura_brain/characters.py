@@ -55,6 +55,10 @@ class CharacterPersona:
     # U85: the character GROWS — owner-approved trait notes accumulate here
     # (edited in the Robot panel; the agent suggests additions in teach-mode).
     learned_traits: str = ""
+    # U404: how he looks on screen when this persona speaks — one of the
+    # console's drawn archetypes (LOOKS). Empty: the character chosen in the
+    # console's header, as before.
+    look: str = ""
 
     def motion_scale(self) -> float:
         return _MOTION_SCALE.get(self.robot_motion_style, 1.0)
@@ -80,6 +84,21 @@ class CharacterPersona:
             parts.append(f"Traits you have developed over time: {self.learned_traits}")
         return " ".join(p for p in parts if p.strip())
 
+
+# U404: the console's ten drawn archetypes (operator-console lib/characters.ts).
+LOOKS = ("scout", "sentinel", "slab", "mender", "astro", "grump", "halo",
+         "buddy", "host", "orb")
+
+# U404: the look each built-in persona comes with — matched on the traits the
+# console gives each archetype. Also filled in on reading a persona file
+# seeded before looks existed: the owner's copies are never rewritten.
+_BUILTIN_LOOKS = {
+    "friendly_assistant": "scout",    # warm voice, chatty, bouncy
+    "dry_tech_butler": "slab",        # low voice, dry humour, deliberate
+    "kids_companion": "buddy",        # bright voice, simple words, bouncy
+    "workshop_coach": "host",         # projected voice, theatrical, broad
+    "quiet_mode": "orb",              # clear voice, sparse words, gliding
+}
 
 _BUILTINS: list[dict] = [
     dict(id="friendly_assistant", display_name="Friendly Assistant",
@@ -133,7 +152,9 @@ class CharacterStore:
         for b in _BUILTINS:
             path = self._dir / f"{b['id']}.json"
             if not path.exists():
-                path.write_text(json.dumps(asdict(CharacterPersona(**b)), indent=2,
+                seeded = CharacterPersona(**b)
+                seeded.look = _BUILTIN_LOOKS.get(seeded.id, "")
+                path.write_text(json.dumps(asdict(seeded), indent=2,
                                            ensure_ascii=False), encoding="utf-8")
 
     def all(self) -> list[CharacterPersona]:
@@ -145,7 +166,10 @@ class CharacterStore:
                 known = {k: v for k, v in data.items()
                          if k in CharacterPersona.__dataclass_fields__}
                 if known.get("id"):
-                    out.append(CharacterPersona(**known))
+                    c = CharacterPersona(**known)
+                    if "look" not in data:        # U404: seeded before looks existed
+                        c.look = _BUILTIN_LOOKS.get(c.id, "")
+                    out.append(c)
             except (json.JSONDecodeError, TypeError) as exc:
                 logger.warning("character %s unreadable: %s", f.name, exc)
         return out
@@ -161,7 +185,7 @@ class CharacterStore:
                  "interruptibility", "emotional_style", "voice_id",
                  "voice_speed", "robot_motion_style", "greeting_message",
                  "fallback_message", "learned_traits", "language",
-                 "voice_engine"}  # U203
+                 "voice_engine", "look"}  # U203, U404
 
     def update(self, character_id: str, fields: dict) -> CharacterPersona | None:
         """U85: owner edits a character (Robot panel). Unknown fields ignored."""
@@ -175,6 +199,9 @@ class CharacterStore:
             # (realtime) or worse. Ignore anything that is not a real choice.
             if k == "voice_engine" and str(v).strip().lower() not in (
                     "", "pipeline", "realtime", "live"):
+                continue
+            # U404: a look the console cannot draw would leave a blank avatar.
+            if k == "look" and str(v).strip().lower() not in ("", *LOOKS):
                 continue
             setattr(current, k, type(getattr(current, k))(v))
         (self._dir / f"{character_id}.json").write_text(

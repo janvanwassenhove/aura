@@ -79,7 +79,7 @@ came out in one voice (U360).
 | `overlay` | `""` \| `show` \| `hide` | `""` | Move the projector overlay from this beat onwards. Empty leaves it alone. |
 | `wander` | `on` \| `off` | not said | From this beat onwards, does he look around. Not said leaves it as it was. |
 | `follow_me` | `on` \| `off` | not said | From this beat onwards, does he watch the presenter. Not said leaves it as it was. |
-| `persona` | character id | `""` | Which character speaks this beat — its voice, speed, and (when improvising) its way of putting things. |
+| `persona` | character id | `""` | Which character speaks this beat — its voice, speed, (when improvising) its way of putting things, and its look on the projector while it speaks (U404). |
 | `voice` | TTS voice | `""` | A voice for this beat alone. |
 | `speed` | float | `0` | `0.25`–`4.0`. `0` means leave it alone. |
 | `pause` | float | `0` | Seconds to wait **before** speaking. |
@@ -167,6 +167,12 @@ line cannot be both "all in onyx" and "this bit in somebody else's voice".
   robot is told at every step.
 - **The builder shows no control for `voice`, `speed` or `pause`**, but it
   carries them through a load-and-save untouched. `once` is carried the same way.
+- **The projector shows who is speaking.** While a beat with `persona:` speaks,
+  the overlay draws that persona's look — set per persona under Robot ›
+  Persona › Edit › *Look*; the built-ins come with one (the butler is Slab, the
+  kids companion Buddy, the workshop coach Host). A line in the talk's own
+  voice, or a persona without a look, shows the character chosen in the header.
+  A mid-line `[persona:x]` hand-over keeps the beat's look for the whole line.
 - **A persona that names no character is still spoken**, in the presentation
   voice, and the Present panel says which id it could not find.
 

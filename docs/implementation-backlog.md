@@ -6311,3 +6311,34 @@ keeping his own emotions in — and that he still answers with one.
 scenario still decides (the first red before); the U393/U394 tests that
 simulated a talk with the header elsewhere now put it on Present, as the
 console does; two console tests for the Quiet note (one red before).
+
+### U404 — the projector shows who is speaking
+
+Asked for (translated): *"make it possible"* — the avatar on the projector
+changing with a beat's `persona:`, after I had said that the subtitle named the
+speaker but the picture stayed the character chosen in the header.
+
+**What was missing.** A persona (the brain's: voice and character, in
+`personas/*.json`) and a look (the console's ten drawn archetypes) had no link
+at all, so there was nothing the overlay could have switched to.
+
+**The change.** A persona has a `look`. The built-ins come with one matched to
+the traits the console gives each archetype — the friendly assistant Scout,
+the dry butler Slab, the kids companion Buddy, the workshop coach Host, quiet
+mode Orb — and because the owner's copies of the built-ins were seeded long
+ago and are never rewritten, a persona file without the field gets its
+built-in look on reading. The persona editor (Robot › Persona › Edit) has a
+*Look* select; an unknown look is refused rather than drawn as a blank. The
+overlay reads the looks from the brain and, when a line starts (U400's
+`PresentationSubtitle` carries the beat's persona), draws that persona's look,
+keeping it until the next line; a line in the talk's own voice shows the
+header's character.
+
+**Not done.** A mid-line `[persona:x]` hand-over (U349) keeps the beat's look
+for the whole line: the subtitle event names one persona per line.
+
+**Tests**: 7 brain tests — the ten looks, the built-ins' looks, a file seeded
+before looks existed, a persona of the owner's without one, changing it,
+refusing an unknown one, the API saying each — red before; 2 console tests,
+the overlay switching through two personas and back to the header's character,
+and the editor saving a look (red before).

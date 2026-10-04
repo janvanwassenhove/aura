@@ -52,7 +52,7 @@
       <div class="ov-subtitle" data-test="ov-subtitle">{{ subtitleNow }}</div>
     </div>
 
-    <div class="ov-avatar" :title="character.name">
+    <div class="ov-avatar" :title="character.name" :data-look="lookId">
       <span v-html="character.art(avatarPx, act)" />
     </div>
   </div>
@@ -87,6 +87,8 @@ import { useEventBusWs } from '../composables/useEventBusWs'
 import { usePresentationStore } from '../stores/presentationStore'
 import { usePresenterStore } from '../stores/presenterStore'
 import { toRows, type RawBeat } from '../lib/beats'
+import { BRAIN_URL } from '../lib/endpoints'
+import { CHARACTERS, archetype } from '../lib/characters'
 
 const presentation = usePresentationStore()
 const presenter = usePresenterStore()
@@ -118,7 +120,24 @@ function onHashChange(): void {
   showCamera.value = h.camera
 }
 
-const character = computed(() => characterStore.current)
+// U404: the look of whoever is speaking — a beat's persona carries one (set in
+// its editor); a line in the talk's own voice, or a persona without a look,
+// shows the character chosen in the header, as before.
+const personaLooks = ref<Record<string, string>>({})
+async function loadPersonaLooks(): Promise<void> {
+  try {
+    const r = await fetch(`${BRAIN_URL}/setup/characters`)
+    if (!r.ok) return
+    const data = await r.json()
+    personaLooks.value = Object.fromEntries(
+      (data.characters ?? []).map((c: { id: string; look?: string }) => [c.id, c.look ?? '']))
+  } catch { /* brain away: the header's character */ }
+}
+const lookId = computed(() => {
+  const look = personaLooks.value[presentation.speakerPersona]
+  return look && look in CHARACTERS ? look : characterStore.selected
+})
+const character = computed(() => archetype(lookId.value))
 
 /** U352: is the overlay meant to be on the projector right now?
  *
@@ -179,7 +198,7 @@ async function loadBeats(): Promise<void> {
   const sc = await presentation.fetchScenario()
   presenter.setBeats(toRows((sc as { beats?: RawBeat[] } | null)?.beats))
 }
-watch(() => presentation.status.title, () => { void loadBeats() })
+watch(() => presentation.status.title, () => { void loadBeats(); void loadPersonaLooks() })
 
 // ── Lifecycle ───────────────────────────────────────────────────────────────
 let poll: ReturnType<typeof setInterval> | undefined
@@ -187,6 +206,7 @@ onMounted(() => {
   connect()
   presentation.fetchStatus()
   void loadBeats()
+  void loadPersonaLooks()                                     // U404
   poll = setInterval(() => presentation.fetchStatus(), 1_500)
   clock = setInterval(() => { now.value = Date.now() }, 100)   // U400: a cue is ~2 s
   window.addEventListener('hashchange', onHashChange)
