@@ -5,7 +5,7 @@ owner: "robot-runtime / aura-brain"
 priority: P2
 risk: Medium
 created: "2026-10-03"
-units: [U393, U394, U395, U397, U398]
+units: [U393, U394, U395, U397, U398, U403]
 ---
 
 # Feature Specification: Wandering
@@ -142,6 +142,10 @@ cannot tell front from back.
 - **FR-008**: During a presentation the scenario decides whether he wanders
   and whether he follows the presenter, slide by slide (spec 011 FR-122); the
   brain composes it with the owner's settings and gives those back at the end.
+  U403: only while the header is on **Present** — the console puts it there
+  when a talk starts. A talk left loaded after the owner moved the header to
+  another mode no longer keeps him still there: the header is where he is.
+  Modes says so when Quiet is keeping his own emotions in.
 - **FR-009**: `wander_sound` has a third level, `emotions` (U395): sounds
   instead of words. An emotion is a recording from Pollen's emotions library
   (`pollen-robotics/reachy-mini-emotions-library`) — a movement with its own
@@ -178,6 +182,7 @@ cannot tell front from back.
 
 | Unit | What it delivered |
 |---|---|
+| U403 | A talk left running no longer overrules the mode the header is in; Modes says when Quiet keeps his emotions in |
 | U398 | In *emotions* a heard question gets an emotion picked from what was said, without composing an answer |
 | U397 | Wandering is a behaviour of each mode, set in Modes; a Stand mode wanders and talks by default |
 | U395 | The *emotions* sound level: spontaneous emotions while he wanders, and a reply answered with one, from Pollen's library |

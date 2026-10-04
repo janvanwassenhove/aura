@@ -58,7 +58,9 @@ def stage(monkeypatch, tmp_path):
 
     monkeypatch.setenv("MODE_POLICY_PATH", str(tmp_path / "policy.json"))
     mode_policy.reset_cache_for_tests()
-    mode_policy.set_active("work")
+    # The console puts the header on Present when a talk starts (U403: the
+    # scenario decides only there).
+    mode_policy.set_active("presentation")
     wander.forget()
     presentation_api._runner = None
     presentation_api._kept = None

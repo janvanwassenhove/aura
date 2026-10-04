@@ -103,11 +103,18 @@ def wanted() -> bool:
 
 def _stage() -> dict | None:
     """U394: what the running talk asks of his body, or None when no talk runs.
-    Each value is None where the scenario does not say."""
+    Each value is None where the scenario does not say.
+
+    U403: only while the header is on Present. A talk left loaded after the
+    owner moved to Stand kept him still and silent there — reported as
+    emotions that never came, with the status saying `paused: presentation`.
+    The console puts the header on Present when it starts a talk, so on stage
+    nothing changes; the header is where he is."""
     try:
         from aura_brain import presentation_api  # noqa: PLC0415
+        from orchestrator import mode_policy  # noqa: PLC0415
 
-        if presentation_api.is_active():
+        if presentation_api.is_active() and mode_policy.presenting():
             return presentation_api.stage_robot()
     except Exception:  # noqa: BLE001 — a missing presentation module pauses nothing
         pass

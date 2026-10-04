@@ -98,6 +98,13 @@
           and <span class="mono">follow_me:</span>, per talk and per beat.
         </p>
         <p v-else-if="wanderNote && editMode === modeStore.mode" class="wander-note warn" data-test="mode-wander-note">{{ wanderNote }}</p>
+        <!-- U403: Quiet keeps his own emotions in — say so where they are set,
+             or it reads as emotions that simply never come. -->
+        <p v-if="editMode !== 'present' && modeStore.quiet && behaviour?.wander === 'on'
+                 && behaviour?.wander_sound !== 'silent'"
+           class="wander-note" data-test="mode-wander-quiet">
+          Quiet is on: he makes no emotion of his own accord. He still answers with one.
+        </p>
 
         <!-- Apps he may drive — only when the mode does not block screen control -->
         <div v-if="screenAllowed" class="apps-sec">

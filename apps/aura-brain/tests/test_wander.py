@@ -72,10 +72,9 @@ def test_off_unless_the_owner_turns_it_on(monkeypatch) -> None:
 
 
 def test_a_presentation_pauses_it(monkeypatch) -> None:
-    from aura_brain import presentation_api
-
-    _owner(wander=True)
-    monkeypatch.setattr(presentation_api, "is_active", lambda: True)
+    # A talk on stage: the header is on Present (U403).
+    _owner(wander=True, mode="presentation")
+    _stage(monkeypatch, wander=None)
     assert wander.effective() is False
     assert wander.status()["paused"] == "presentation"
 
@@ -184,9 +183,13 @@ def test_at_a_stand_he_wanders_and_talks_without_being_told() -> None:
 # U394: during a talk the scenario decides; afterwards the owner's settings
 # --------------------------------------------------------------------------- #
 
-def _stage(monkeypatch, *, wander=None, follow_me=None):
+def _stage(monkeypatch, *, wander=None, follow_me=None, mode="presentation"):
+    """A talk is running. The console puts the header on Present when it
+    starts one (U403: and only then does the scenario decide)."""
     from aura_brain import presentation_api
+    from orchestrator import mode_policy
 
+    mode_policy.set_active(mode)
     monkeypatch.setattr(presentation_api, "is_active", lambda: True)
     monkeypatch.setattr(presentation_api, "stage_robot",
                         lambda: {"wander": wander, "follow_me": follow_me})
@@ -200,7 +203,7 @@ def test_a_scenario_can_make_him_wander_even_with_the_switch_off(monkeypatch) ->
 
 
 def test_a_scenario_that_says_nothing_still_pauses_it(monkeypatch) -> None:
-    _owner(wander=True)
+    _owner(wander=True, mode="presentation")      # U403: the talk is on stage
     _stage(monkeypatch, wander=None)
     assert wander.effective() is False
     assert wander.status()["paused"] == "presentation"
@@ -463,3 +466,30 @@ async def test_the_brain_listens_for_mode_and_quiet(monkeypatch, tmp_path) -> No
     async with app.router.lifespan_context(app):
         assert wander.mode_changed in mode_policy._mode_listeners
         assert wander.quiet_changed in mode_policy._quiet_listeners
+
+
+# --------------------------------------------------------------------------- #
+# U403: a talk left running does not overrule the mode the header is in
+# --------------------------------------------------------------------------- #
+
+def test_a_talk_left_running_does_not_overrule_the_stand(monkeypatch) -> None:
+    """Reported in Stand with emotions on (translated): "should normally hear
+    emotions through the robot" — none came, and the status said `paused:
+    presentation`. A talk was still loaded from the Present panel; the owner
+    had moved the header to Stand. The header is where he is."""
+    _owner(mode="stand")
+    _stage(monkeypatch, wander=None, mode="stand")
+    assert wander.effective() is True
+    assert wander.paused_reason() is None
+    assert wander.spontaneous_emotions() is True
+    assert wander.answers_with_emotion() is False   # Stand talks by default
+    _owner(sound="emotions", mode="stand")
+    assert wander.answers_with_emotion() is True
+
+
+def test_on_stage_the_scenario_still_decides(monkeypatch) -> None:
+    _owner(wander=True, sound="emotions", mode="presentation")
+    _stage(monkeypatch, wander=None, mode="presentation")
+    assert wander.effective() is False
+    assert wander.paused_reason() == "presentation"
+

@@ -131,4 +131,28 @@ describe('U397 — Stand, and wandering per mode', () => {
     expect(w.find('[data-test="mode-wander"]').exists()).toBe(false)
     expect(w.find('[data-test="mode-wander-present"]').text()).toMatch(/scenario/i)
   })
+
+  // U403: reported as emotions that never came, in Stand with Quiet on. Quiet
+  // stops the emotions he starts — which is right — and nothing said so.
+  it('says when Quiet is keeping his own emotions in', async () => {
+    const quietPolicy = { ...POLICY, quiet: true }
+    vi.stubGlobal('fetch', (url: string) => {
+      const u = String(url)
+      if (u.includes('/orchestrator/policy')) return OK(quietPolicy)
+      if (u.includes('/robot/wander')) return OK({ note: '' })
+      return OK({})
+    })
+    const w = mount(ModesView)
+    await flushPromises()
+    await openTab(w, 'Stand')
+    expect(w.find('[data-test="mode-wander-quiet"]').text()).toMatch(/quiet/i)
+  })
+
+  it('says nothing about Quiet when it is off', async () => {
+    brain()
+    const w = mount(ModesView)
+    await flushPromises()
+    await openTab(w, 'Stand')
+    expect(w.find('[data-test="mode-wander-quiet"]').exists()).toBe(false)
+  })
 })

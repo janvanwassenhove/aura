@@ -481,7 +481,8 @@ async def test_the_scenario_moves_wander_and_follow_me_on_the_real_robot_path(
     # The owner's mode does not wander (U397: a behaviour of the mode).
     monkeypatch.setenv("MODE_POLICY_PATH", str(tmp_path / "policy.json"))
     mode_policy.reset_cache_for_tests()
-    mode_policy.set_active("work")
+    # U403: a talk is on stage — the console puts the header on Present.
+    mode_policy.set_active("presentation")
     monkeypatch.setattr(presentation_api, "_stop_watcher", _noop)
     wander.forget()
     presentation_api._runner = None

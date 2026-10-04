@@ -6282,3 +6282,32 @@ downloads insightface's model once on first use.
 
 **Tests**: two against the lock and the extra — only one OpenCV is installable,
 and recognition names its own — red against the old lock, green now.
+
+### U403 — a talk left running kept the Stand silent
+
+Reported, in Stand with the sound on *emotions* (translated): *"should
+normally hear emotions through the robot"* — and *"conversation is activated
+via laptop audio, but emotions would still go through the robot?"* (they do,
+ADR-016).
+
+**What was actually wrong.** Two things, one of them a fault. The brain's own
+status said `"effective": false, "paused": "presentation"`: a talk was still
+loaded in the Present panel, the owner had moved the header to Stand, and
+U394's rule — during a talk the scenario decides — looked only at whether a
+talk was loaded, not at where the owner was. The scenario said nothing about
+wandering, so he stood still, without emotions, in a mode set to wander with
+them, and no screen said why. The other was Quiet, switched on: it keeps the
+emotions he starts in, by design (U395), and nothing on the Modes screen said
+that either.
+
+**The change.** The scenario decides only while the header is on Present. The
+console puts it there when a talk starts and back when it ends, so on stage
+nothing changes; a header moved away from Present means that mode's behaviour,
+talk loaded or not. The mode listener (U397) re-tells the robot on the switch.
+And the Modes screen says, under a wandering mode with a sound, when Quiet is
+keeping his own emotions in — and that he still answers with one.
+
+**Tests**: a talk left running does not overrule the Stand, and on stage the
+scenario still decides (the first red before); the U393/U394 tests that
+simulated a talk with the header elsewhere now put it on Present, as the
+console does; two console tests for the Quiet note (one red before).
