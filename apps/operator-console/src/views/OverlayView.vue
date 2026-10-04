@@ -49,7 +49,7 @@
 
     <!-- ═══ The audience layer: him, and what he says ═══ -->
     <div v-if="subtitleVisible" class="ov-subtitle-wrap">
-      <div class="ov-subtitle">{{ presentation.subtitle }}</div>
+      <div class="ov-subtitle" data-test="ov-subtitle">{{ subtitleNow }}</div>
     </div>
 
     <div class="ov-avatar" :title="character.name">
@@ -139,24 +139,18 @@ const overlayVisible = computed(() => presentation.status.overlay_visible !== fa
 // (~15 chars/s, the same rate the echo guard uses). robotStore's isSpeaking
 // also feeds characterStore.act via the shared WS — this is the fallback for
 // beats whose audio state never reaches us.
-const speakUntil = ref(0)
 const now = ref(Date.now())
 let clock: ReturnType<typeof setInterval> | undefined
 
-watch(() => presentation.subtitle, (text) => {
-  // U269: the floor used to be 1.5s + reading time, so a short beat ("tell a
-  // joke") flashed by in under three seconds — and with the robot mute there
-  // was no sound to tell anyone to look up. A subtitle nobody can catch is
-  // the same as no subtitle: reported as "nor did i see subtitles".
-  if (text) speakUntil.value = Date.now() + Math.min(20_000, 3_500 + text.length * 66)
-})
+// U400: the subtitle is the piece of the line he is saying NOW — started when
+// his voice starts and stepped through at his pace (presentationStore). It
+// used to be the whole line, shown when the beat had FINISHED (on the robot,
+// after he had said it) and held for a guess at its length.
+const subtitleNow = computed(() => presentation.cueAt(now.value))
+const subtitleVisible = computed(() => !!subtitleNow.value)
 
 const act = computed(() =>
-  now.value < speakUntil.value ? 'speak' : characterStore.act)
-
-// Subtitles linger a beat after speech so the room can finish reading, then go.
-const subtitleVisible = computed(() =>
-  !!presentation.subtitle && now.value < speakUntil.value + 2_500)
+  now.value < presentation.speakingUntil ? 'speak' : characterStore.act)
 
 // ── Presenter extras ────────────────────────────────────────────────────────
 const slidesState = computed(() => presentation.status.slides_state ?? 'off')
@@ -194,7 +188,7 @@ onMounted(() => {
   presentation.fetchStatus()
   void loadBeats()
   poll = setInterval(() => presentation.fetchStatus(), 1_500)
-  clock = setInterval(() => { now.value = Date.now() }, 250)
+  clock = setInterval(() => { now.value = Date.now() }, 100)   // U400: a cue is ~2 s
   window.addEventListener('hashchange', onHashChange)
   // The window behind this page is transparent; the page must be too, or the
   // "overlay" is a white sheet over the slides.

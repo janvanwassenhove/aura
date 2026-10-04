@@ -195,9 +195,12 @@ async def _speak(text: str, beat: Any = None) -> None:
     # chose. The joined utterance is the same either way.
     from aura_brain import speech_out  # noqa: PLC0415
 
+    line = " ".join(s.text for s in segments)
     await speech_out.deliver(
-        _robot, _bus, " ".join(s.text for s in segments),
-        voice.join_pcm_b64(list(audio), _HANDOVER_MS))
+        _robot, _bus, line, voice.join_pcm_b64(list(audio), _HANDOVER_MS),
+        # U400: announced as it starts, with its real length, for the overlay.
+        subtitle={"text": line, "persona": persona,
+                  "beat_id": str(getattr(beat, "id", "") or "")})
 
 
 async def _gesture(name: str) -> None:

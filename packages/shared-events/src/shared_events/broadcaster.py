@@ -43,6 +43,7 @@ from shared_schemas.events import (
     PresentationBeatFired,
     PresentationCueReceived,
     PresentationOverlayChanged,
+    PresentationSubtitle,
     ReminderTriggered,
     ResponseDrafted,
     RobotConnected,
@@ -50,6 +51,7 @@ from shared_schemas.events import (
     RobotModeChanged,
     SpeechAudioReady,
     SpeechAudioStopped,
+    SpeechLineStarted,
     SpeechPlaybackCompleted,
     SpeechPlaybackStarted,
     ToolCallFailed,
@@ -112,6 +114,10 @@ _ALL_EVENT_TYPES: tuple[type[BaseEvent], ...] = (
     # why this was never missed — but the push was designed in, and without it
     # a scenario's "hide the overlay" lands up to a second and a half late.
     PresentationOverlayChanged,
+    # U400: a talk's line as he starts saying it, and the laptop saying it has
+    # started one — what keeps the projector's subtitles on his voice.
+    PresentationSubtitle,
+    SpeechLineStarted,
 )
 
 # Exported events that deliberately do NOT go to the console, and why. A new

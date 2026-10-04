@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { mount, flushPromises } from '@vue/test-utils'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { mount, flushPromises, enableAutoUnmount } from '@vue/test-utils'
 import { ref } from 'vue'
 import { setActivePinia, createPinia } from 'pinia'
 import OverlayView from '../../src/views/OverlayView.vue'
@@ -52,6 +52,12 @@ function stubFetch(status: Record<string, unknown> = {}) {
     return OK({})
   })
 }
+
+// U400: every overlay a test mounts is taken down after it. Left mounted, its
+// 1.5 s status poll outlived the test, and once the next test's beforeEach
+// restored the real fetch it asked the brain on this machine — found because
+// a talk loaded in the owner's running AURA turned up in a test's store.
+enableAutoUnmount(afterEach)
 
 beforeEach(() => {
   vi.unstubAllGlobals()
@@ -214,5 +220,33 @@ describe('U352 — the scenario can take the overlay off the screen', () => {
     await flushPromises()
 
     expect(w.find('.ov').classes()).not.toContain('ov--offstage')
+  })
+})
+
+/** U400: "subtitles are not following fluently with talking, should be in
+ *  sync". On the projector the subtitle is the piece he is saying now. */
+describe('U400 — the subtitle follows his voice', () => {
+  it('steps through the line at his pace and is gone after', async () => {
+    vi.useFakeTimers()
+    try {
+      stubFetch()
+      window.location.hash = '#overlay?mode=audience'
+      const { usePresentationStore } = await import('../../src/stores/presentationStore')
+      const w = mount(OverlayView)
+      await flushPromises()
+      usePresentationStore().applyEvent({
+        event_type: 'PresentationSubtitle', duration_s: 8,
+        text: 'Today I want to show you a robot that helps a developer through the day. '
+            + 'It listens, it looks things up, and it never pretends to know what it does not.',
+      })
+      await vi.advanceTimersByTimeAsync(200)
+      expect(w.find('[data-test="ov-subtitle"]').text()).toMatch(/^Today I want/)
+      await vi.advanceTimersByTimeAsync(6_000)
+      expect(w.find('[data-test="ov-subtitle"]').text()).toMatch(/^It listens/)
+      await vi.advanceTimersByTimeAsync(5_000)
+      expect(w.find('[data-test="ov-subtitle"]').exists()).toBe(false)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })

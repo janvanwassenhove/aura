@@ -214,3 +214,26 @@ describe('U399 — at his volume', () => {
     setPlaybackVolume(1)
   })
 })
+
+/** U400: the window playing a line says when it starts, through the brain —
+ *  the projector's subtitle waits for exactly that moment. */
+describe('U400 — saying when a line starts', () => {
+  it('tells the brain the moment it plays, with how long it lasts', async () => {
+    const posted: { url: string; body: string }[] = []
+    vi.stubGlobal('fetch', async (url: string, init?: RequestInit) => {
+      if (init?.method === 'POST') {
+        posted.push({ url: String(url), body: String(init.body) })
+        return { ok: true, json: async () => ({}) } as Response
+      }
+      return { ok: true, blob: async () => new Blob(['s1']) } as Response
+    })
+    await playUtterance('s1')
+    await flush(); await flush()
+    const audio = FakeAudio.made[0] as unknown as { duration: number; onplaying: (() => void) | null }
+    audio.duration = 2.4
+    audio.onplaying?.()
+    await flush()
+    expect(posted.map(p => p.url.replace(/^.*\/speech\//, ''))).toEqual(['s1/started'])
+    expect(JSON.parse(posted[0].body)).toEqual({ duration_s: 2.4 })
+  })
+})

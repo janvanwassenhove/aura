@@ -22,6 +22,9 @@ import { BRAIN_URL } from '../lib/endpoints'
  *  queued behind a long one would otherwise age out before it was asked for.
  */
 
+/** U400: the line id behind each fetched blob URL. */
+const lineOf = new Map<string, string>()
+
 /** Ids already played. The brain serves each line once and 404s afterwards, so
  *  asking twice can only mean a replay — the last sentence again, into a quiet
  *  room. Guarded on both sides rather than relying on the server. */
@@ -79,6 +82,7 @@ export async function playUtterance(utteranceId: string): Promise<void> {
       URL.revokeObjectURL(url)
       return null
     }
+    if (url) lineOf.set(url, utteranceId)        // U400: which line this is
     return url
   })
   queue.push(slot)
@@ -126,6 +130,20 @@ function playOne(url: string): Promise<void> {
     const audio = new Audio(url)
     audio.volume = volume                          // U399
     current = audio
+    // U400: say when it really starts. The projector's subtitle waits for
+    // this — through the brain, because the overlay is another window.
+    const id = lineOf.get(url)
+    lineOf.delete(url)
+    let told = false
+    audio.onplaying = () => {
+      if (told || !id) return
+      told = true
+      const seconds = Number.isFinite(audio.duration) ? audio.duration : 0
+      void fetch(`${BRAIN_URL}/speech/${encodeURIComponent(id)}/started`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ duration_s: seconds }),
+      }).catch(() => { /* the subtitle starts on its own a little later */ })
+    }
     let done = false
     const finish = () => {
       if (done) return

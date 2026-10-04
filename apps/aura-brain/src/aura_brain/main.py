@@ -112,6 +112,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     secret_store.load_into_env()
 
     await ctx.bus.start()
+    # U400: a laptop window says on this bus when it starts playing a line.
+    from aura_brain import speech_out as _speech_out_bus
+
+    _speech_out_bus.bind_bus(ctx.bus)
 
     # One in-process ASGI client for all intra-brain seams (U8/U9): connector,
     # memory, orchestrator calls route back into THIS app — no network hop.

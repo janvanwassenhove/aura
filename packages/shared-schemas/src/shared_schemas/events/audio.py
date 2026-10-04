@@ -51,3 +51,18 @@ class SpeechAudioStopped(BaseEvent):
     """
 
     event_type: Literal["SpeechAudioStopped"] = "SpeechAudioStopped"
+
+
+class SpeechLineStarted(BaseEvent):
+    """U400: the laptop has started playing a line — now, not when it was offered.
+
+    The window that plays a line (`SpeechAudioReady`) says so through the brain,
+    because the window that subtitles it is another one: the projector overlay
+    has its own store, and only an explicit channel reaches it. `duration_s` is
+    what the player measured; 0 when it could not tell.
+    """
+
+    event_type: Literal["SpeechLineStarted"] = "SpeechLineStarted"
+    utterance_id: str
+    duration_s: float = 0.0
+

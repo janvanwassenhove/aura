@@ -6,7 +6,7 @@ priority: P2
 risk: Medium
 created: "2026-04-25"
 amended: "2026-09-13"
-units: [U27, U205, U206, U207, U208, U246, U263, U263b, U264, U265, U266, U267, U269, U282, U320, U334, U349, U351, U352, U360, U361, U386, U387, U388, U389, U394]
+units: [U27, U205, U206, U207, U208, U246, U263, U263b, U264, U265, U266, U267, U269, U282, U320, U334, U349, U351, U352, U360, U361, U386, U387, U388, U389, U394, U400]
 ---
 
 # Feature Specification: Presentation Copilot
@@ -352,6 +352,18 @@ settings aside as the example.
   the owner; *End presentation* gives the owner's own settings back. The robot
   is told independently of the subtitle bus. The builder offers both, for the
   talk and per beat, and carries `once` through a save (U394).
+- **FR-123**: **The projector's subtitles follow his voice** (U400). A beat's
+  line is announced as it starts (`PresentationSubtitle`) with its real length
+  from the synthesized audio: just before the robot is handed it — its
+  `speak` returns only once the line has played — or, through the laptop, tied
+  to the line's id and started when the window that plays it reports
+  `SpeechLineStarted` through the brain (the overlay is another window; after
+  3 s without a report it starts anyway). The overlay shows the piece of the
+  line he is saying now: cut by sentence, a long one at its commas, at most
+  ~84 characters, each piece given its share of the line's length; the last
+  lingers 1.5 s. `PresentationBeatFired` keeps the HUD and the record and no
+  longer drives the projector's subtitle, which used to appear after the line
+  had been heard, as one block held for a guess.
 
 ## Superseded
 
@@ -377,6 +389,7 @@ applies to `slide:N` beats; `manual` and `keyword:` beats have no such deadline.
 | U388 | The HUD describes the running show, however it was loaded |
 | U389 | End keeps the talk: Run again, Edit or Remove |
 | U394 | Wander and follow-me in a scenario, with a keynote and a conference talk as worked examples |
+| U400 | The projector's subtitles start with his voice, last as long as he speaks, and step through the line |
 | U320 | The panel regrouped: locks as chips, status as status, the projector block given the weight it earns, a run button that names its own action, an empty state with the two doors, and help you can put away |
 | U334 | Present mode enforces what it always promised: only the scenario speaks, and no open microphone answers the room |
 | U361 | The scenario format written down, and a pre-flight check that says what the talk will do rather than only that the file parses |

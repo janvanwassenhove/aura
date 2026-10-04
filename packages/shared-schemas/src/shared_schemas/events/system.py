@@ -113,6 +113,26 @@ class PresentationBeatFired(BaseEvent):
     persona: str = ""
 
 
+class PresentationSubtitle(BaseEvent):
+    """U400: a line of a talk, announced as he starts to say it.
+
+    `PresentationBeatFired` comes after the beat — after the robot has finished
+    playing it, and after its gesture — so a subtitle taken from it was read
+    after it was heard. This one leaves before the audio does, with the line's
+    real length, so the overlay can show it while he speaks and step through it
+    at his pace. With `utterance_id` set the laptop plays it, and the overlay
+    starts on `SpeechLineStarted` for that id; empty, the robot is playing it
+    from now.
+    """
+
+    event_type: Literal["PresentationSubtitle"] = "PresentationSubtitle"
+    text: str
+    duration_s: float = 0.0
+    persona: str = ""
+    beat_id: str = ""
+    utterance_id: str = ""
+
+
 class PresentationOverlayChanged(BaseEvent):
     """U352: a beat moved the projector overlay on or off the screen.
 

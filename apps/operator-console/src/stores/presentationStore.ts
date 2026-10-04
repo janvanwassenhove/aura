@@ -1,6 +1,12 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { BRAIN_URL } from '../lib/endpoints'
+import { splitCues, timeCues, type Cue } from '../lib/subtitleCues'
+
+/** U400: how long the last piece stays after he stops, and how long a laptop
+ *  line may take to report that it started before it is shown anyway. */
+const LINGER_MS = 1_500
+const START_GRACE_MS = 3_000
 
 // U206: co-presenter state for the presenter view. The subtitle comes from
 // PresentationBeatFired events on the WS; slide/armed-keywords come from the
@@ -64,8 +70,58 @@ export const usePresentationStore = defineStore('presentation', () => {
   const busy = ref(false)
   const error = ref('')
 
+  /** U400: the line on the projector, timed to his voice. `end` is when he
+   *  stops; the last piece lingers a moment after so the room can finish it. */
+  const timeline = ref<{ cues: Cue[]; end: number } | null>(null)
+  let waiting: { id: string; text: string; ms: number; timer: ReturnType<typeof setTimeout> } | null = null
+
+  function startLine(text: string, ms: number): void {
+    const now = Date.now()
+    const length = ms > 0 ? ms : Math.min(20_000, 1_500 + text.length * 66)
+    const cues = timeCues(splitCues(text), now, length)
+    timeline.value = cues.length ? { cues, end: now + length } : null
+  }
+
+  /** The piece to show at `t` — '' when he is not saying anything. */
+  function cueAt(t: number): string {
+    const tl = timeline.value
+    if (!tl || t > tl.end + LINGER_MS) return ''
+    const cue = tl.cues.find(c => t >= c.from && t < c.to)
+    return cue ? cue.text : (t >= tl.end ? tl.cues[tl.cues.length - 1].text : '')
+  }
+
+  /** When he stops talking, for the avatar's mouth. 0 when he is not. */
+  const speakingUntil = computed(() => timeline.value?.end ?? 0)
+
   /** Applied for every WS frame; only reacts to our beat events. */
   function applyEvent(raw: Record<string, unknown>): void {
+    // U400: a talk's line, as he starts to say it — on the robot at once, on
+    // the laptop when the playing window says so (it may be another window,
+    // so the start comes back through the brain). If no window says so within
+    // a few seconds the line shows anyway: late, never missing.
+    if (raw.event_type === 'PresentationSubtitle') {
+      const text = String(raw.text ?? '')
+      const ms = Math.max(0, Number(raw.duration_s ?? 0) * 1000)
+      if (!text) return
+      subtitle.value = text
+      lastPersona.value = String(raw.persona ?? '')
+      if (waiting) { clearTimeout(waiting.timer); waiting = null }
+      const id = String(raw.utterance_id ?? '')
+      if (!id) { startLine(text, ms); return }
+      waiting = { id, text, ms, timer: setTimeout(() => {
+        if (waiting && waiting.id === id) { waiting = null; startLine(text, ms) }
+      }, START_GRACE_MS) }
+      return
+    }
+    if (raw.event_type === 'SpeechLineStarted') {
+      if (!waiting || waiting.id !== String(raw.utterance_id ?? '')) return
+      clearTimeout(waiting.timer)
+      const measured = Number(raw.duration_s ?? 0) * 1000
+      const { text, ms } = waiting
+      waiting = null
+      startLine(text, measured > 0 ? measured : ms)
+      return
+    }
     // U352: a beat moved the overlay. Written onto the SAME field the status
     // poll fills, so there is one answer to "should it be on screen" rather
     // than two that can disagree — this one just arrives 1.5 s sooner, which
@@ -110,7 +166,7 @@ export const usePresentationStore = defineStore('presentation', () => {
       const body = await r.json().catch(() => null)
       if (!r.ok) { error.value = body?.error ?? 'Could not load the scenario.'; return false }
       status.value = { active: true, ...body }
-      subtitle.value = ''; lastBeat.value = ''
+      subtitle.value = ''; timeline.value = null; lastBeat.value = ''
       return true
     } catch {
       error.value = 'The brain did not respond.'
@@ -178,7 +234,7 @@ export const usePresentationStore = defineStore('presentation', () => {
     } catch {
       status.value = { active: false }
     } finally {
-      subtitle.value = ''; lastBeat.value = ''; busy.value = false
+      subtitle.value = ''; timeline.value = null; lastBeat.value = ''; busy.value = false
     }
   }
 
@@ -190,11 +246,12 @@ export const usePresentationStore = defineStore('presentation', () => {
     } catch { /* ignore */ }
     finally {
       status.value = { active: false }
-      subtitle.value = ''; lastBeat.value = ''; busy.value = false
+      subtitle.value = ''; timeline.value = null; lastBeat.value = ''; busy.value = false
     }
   }
 
   return { status, subtitle, lastBeat, lastMode, lastPersona, busy, error,
+    timeline, cueAt, speakingUntil,
            applyEvent, fetchStatus, start, startScenario, next, pushSpeech, stop,
            setRehearsing, fetchScenario, remove }
 })

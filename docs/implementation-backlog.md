@@ -6171,3 +6171,47 @@ mixer touched without a robot, and a connect applying his level rather than
 shared level reading the robot, a save reaching robot and laptop alike and the
 laptop alone when the robot is away, and the Talk slider showing the robot's
 level (all red before).
+
+### U400 — the subtitles follow his voice
+
+Reported, in Present (translated): *"it seems like subtitles are not following
+fluently with talking, should be in sync"*.
+
+**What was actually wrong.** The projector's subtitle came from
+`PresentationBeatFired`, which the runner emits when a beat is *done* — after
+the line has been spoken and after the gesture that follows it. On the robot's
+speaker that is after he has finished: the runtime's `speak` blocks for the
+length of the audio. So the room read each line after hearing it. Through the
+laptop the line was offered and the beat finished almost at once, so the
+subtitle arrived roughly with the voice — but as one block for the whole line,
+held for 3.5 s plus 66 ms a character, a guess unrelated to how long he spoke.
+
+**The change.** The line is announced as it starts, with its real length
+(computed from the synthesized PCM): `PresentationSubtitle`, published just
+before the robot is handed the audio. Through the laptop it carries the line's
+id and the overlay waits for that line to start playing: the playing window
+reports it (`POST /speech/{id}/started`, published as `SpeechLineStarted`),
+because the overlay is another window and the brain is the channel both share
+— and either window may be the one playing it, since both fetch and the first
+one wins. No report within 3 s and it shows anyway: late, never missing. The
+overlay then shows the piece he is saying now: by sentence, a long sentence at
+its commas, a run-on between words, at most ~84 characters (two cinema lines),
+each piece its share of the line's length, the last lingering 1.5 s; the
+avatar's mouth follows the same length. The presenter's *saying now* updates
+at the start too.
+
+**Found on the way.** The overlay's tests left every overlay they mounted
+running. Their 1.5 s status poll outlived the test, and once the next test
+restored the real `fetch`, asked the brain on this machine — found because a
+talk loaded in the owner's running AURA turned up in a test's store. Read-only,
+and only while AURA runs, which is why it never showed before; now every
+overlay a test mounts is unmounted after it.
+
+**Tests**: 6 brain tests — announced before the robot plays, its measured
+length, tied to the laptop's line and published before it is offered, the
+player's start reaching the bus, ordinary replies untouched, and the running
+brain binding the route (red without the wiring); console tests for cutting a
+line, timing the pieces, starting at once or on the player's word or after the
+grace period, ignoring another line's start, the finished beat not bringing
+the line back, the player reporting its start, and the overlay stepping
+through a line on a moved clock (all red before).

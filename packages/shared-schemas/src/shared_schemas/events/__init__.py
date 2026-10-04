@@ -4,6 +4,7 @@ from shared_schemas.events.audio import (
     AudioInputStarted,
     SpeechAudioReady,
     SpeechAudioStopped,
+    SpeechLineStarted,
     TranscriptUpdated,
     UserSpeechDetected,
 )
@@ -43,6 +44,7 @@ from shared_schemas.events.system import (
     PresentationBeatFired,
     PresentationCueReceived,
     PresentationOverlayChanged,
+    PresentationSubtitle,
     ReminderTriggered,
     TurnLatencyMeasured,
 )
@@ -58,6 +60,7 @@ __all__ = [
     "UserSpeechDetected",
     "SpeechAudioReady",
     "SpeechAudioStopped",
+    "SpeechLineStarted",
     "TranscriptUpdated",
     # conversation
     "IntentRecognized",
@@ -94,4 +97,5 @@ __all__ = [
     "PresentationBeatFired",
     "PresentationCueReceived",
     "PresentationOverlayChanged",
+    "PresentationSubtitle",
 ]

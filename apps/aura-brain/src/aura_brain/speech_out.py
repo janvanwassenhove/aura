@@ -95,18 +95,48 @@ def _hold(pcm: bytes) -> str:
     return utterance_id
 
 
-async def deliver(robot: Any, bus: Any, text: str, audio_b64: str | None) -> bool:
+async def deliver(robot: Any, bus: Any, text: str, audio_b64: str | None,
+                  subtitle: dict | None = None) -> bool:
     """Play one line. Returns whether it was actually handed anywhere.
 
     Never pretends: a line with no audio reports False rather than looking
     like a successful utterance (U269's rule).
+
+    U400: `subtitle` ({"text", "persona", "beat_id"}) announces a talk's line
+    as it starts — before the robot is handed it (its `speak` returns only
+    once it has finished playing), or tied to the laptop's line id, which the
+    playing window reports starting.
     """
     if output() == LAPTOP:
-        return await _offer(bus, text, audio_b64)
+        return await _offer(bus, text, audio_b64, subtitle)
     if robot is None:
         return False
+    if subtitle is not None:
+        await _announce(bus, subtitle, _seconds(audio_b64), "")
     await robot.speak(text, audio_b64=audio_b64)
     return True
+
+
+def _seconds(audio_b64: str | None) -> float:
+    """How long a PCM line plays: 24 kHz, 16-bit, mono."""
+    try:
+        return len(base64.b64decode(audio_b64 or "")) / (SAMPLE_RATE * CHANNELS * BITS // 8)
+    except Exception:  # noqa: BLE001 — a length is never worth a failed line
+        return 0.0
+
+
+async def _announce(bus: Any, subtitle: dict, seconds: float, utterance_id: str) -> None:
+    if bus is None:
+        return
+    from shared_schemas.events.system import PresentationSubtitle  # noqa: PLC0415
+
+    try:
+        await bus.publish(PresentationSubtitle(
+            session_id="presentation", text=str(subtitle.get("text", "")),
+            duration_s=round(seconds, 3), persona=str(subtitle.get("persona", "")),
+            beat_id=str(subtitle.get("beat_id", "")), utterance_id=utterance_id))
+    except Exception as exc:  # noqa: BLE001 — a subtitle never costs the line
+        logger.debug("subtitle not announced: %s", exc)
 
 
 async def deliver_segment(robot: Any, bus: Any, audio_b64: str | None) -> bool:
@@ -147,7 +177,8 @@ async def stop(robot: Any, bus: Any) -> None:
         await robot.stop_audio()
 
 
-async def _offer(bus: Any, text: str, audio_b64: str | None) -> bool:
+async def _offer(bus: Any, text: str, audio_b64: str | None,
+                 subtitle: dict | None = None) -> bool:
     """Hold one piece of audio for the console and tell it so."""
     if not audio_b64:
         return False
@@ -165,6 +196,10 @@ async def _offer(bus: Any, text: str, audio_b64: str | None) -> bool:
     from shared_schemas.events.audio import SpeechAudioReady  # noqa: PLC0415
 
     utterance_id = _hold(pcm)
+    if subtitle is not None:
+        # U400: before the line is offered, so it is known before it can play.
+        await _announce(bus, subtitle, len(pcm) / (SAMPLE_RATE * CHANNELS * BITS // 8),
+                        utterance_id)
     await bus.publish(SpeechAudioReady(
         session_id="default", utterance_id=utterance_id, text=text))
     logger.info("speech routed to the laptop (%d bytes)", len(pcm))
@@ -179,6 +214,32 @@ from fastapi import APIRouter  # noqa: E402
 from fastapi.responses import JSONResponse, Response  # noqa: E402
 
 router = APIRouter(tags=["speech"])
+
+_bus: Any = None
+
+
+def bind_bus(bus: Any) -> None:
+    """The bus a playing window's start is told on (U400)."""
+    global _bus
+    _bus = bus
+
+
+@router.post("/speech/{utterance_id}/started")
+async def speech_started(utterance_id: str, body: dict | None = None) -> JSONResponse:
+    """U400: the window playing a line says it has started — the moment the
+    projector's subtitle for it may start, which only that window knows."""
+    try:
+        seconds = float((body or {}).get("duration_s") or 0.0)
+    except (TypeError, ValueError):
+        seconds = 0.0
+    if seconds != seconds or seconds < 0:      # NaN from an <audio> that cannot tell
+        seconds = 0.0
+    if _bus is not None:
+        from shared_schemas.events.audio import SpeechLineStarted  # noqa: PLC0415
+
+        await _bus.publish(SpeechLineStarted(
+            session_id="default", utterance_id=utterance_id, duration_s=seconds))
+    return JSONResponse({"ok": True})
 
 
 @router.get("/speech/{utterance_id}.wav")
