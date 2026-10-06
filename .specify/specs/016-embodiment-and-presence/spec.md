@@ -5,7 +5,7 @@ owner: "robot-runtime"
 priority: P1
 risk: Medium
 created: "2026-09-05"
-units: [U16, U36a, U36d, U36g, U37, U51, U99, U100, U101, U102, U111, U116, U126, U127, U137, U138, U139, U147, U157, U158, U161, U162, U164, U165, U175, U196, U212, U219, U237, U238, U252b, U252d, U253, U268, U270, U286, U325, U326, U328, U336, U341, U341b, U357, U357b, U359, U365, U407]
+units: [U16, U36a, U36d, U36g, U37, U51, U99, U100, U101, U102, U111, U116, U126, U127, U137, U138, U139, U147, U157, U158, U161, U162, U164, U165, U175, U196, U212, U219, U237, U238, U252b, U252d, U253, U268, U270, U286, U325, U326, U328, U336, U341, U341b, U357, U357b, U359, U365, U407, U408]
 ---
 
 # Feature Specification: Embodiment and Presence
@@ -298,6 +298,21 @@ while he is speaking, so that a conversation looks like a conversation.
   tapper moves the antennae and says the head stays still. Measured on the
   robot: head pitch over 0.115 rad and antennae over 0.40 rad during a 3 s
   laptop line, against 0.001 and 0 before it (ADR-018).
+- **FR-011c**: **His speaking gestures happen while he speaks** (U408). The
+  persona's speaking timeline is spread over the line's real length — from the
+  audio, else 250 ms a word, 2.5 words a second for a line with only audio —
+  at most one cue per eight words and never closer than `inter_cue_ms`, none
+  starting later than 600 ms before the end. A cue's `offset_ms` is its wait
+  from the cue before it, as `MotionCue` promises, counted from that cue's
+  start. A gesture from the follow set (silent, eyes kept, not manual) moves
+  through the motion lock when his own voice holds it, taking turns with the
+  antennae; an emotion, a dance or a quick action still waits for the line.
+  `POST /robot/speak` returns when the line ends: cues not yet begun are
+  dropped then, or when the line is cut short. A laptop line moved along with
+  (FR-011b) gets the same gestures through the engine, and Stop
+  (`/robot/audio/stop`) ends them. Measured on the robot: a 4 s line with 32
+  words came back after 15–19 s, all its gestures played behind it; after,
+  5.0–8.1 s, the rest being emotions that the brain played in Stand.
 - **FR-010**: The re-acquire sweep follows the room: nothing while a face is in
   view, `IDLE_SCAN_LOST_S` after one was just lost, `IDLE_SCAN_S` once nobody
   has been seen for `IDLE_SCAN_RECENT_S` (U325). The sweep leaves the head
@@ -370,6 +385,7 @@ while he is speaking, so that a conversation looks like a conversation.
 | U336 | The brain follows the robot to a new network instead of reporting offline until somebody scans by hand |
 | U365 | The event bridge follows him too, a disconnect stops repeating itself, and the console keeps asking |
 | U407 | He moves while he talks on either speaker: antennae through his own voice's lock, and a line the laptop plays moved along with — a nod laid over follow-me through the speech offsets |
+| U408 | His speaking gestures during the line rather than after it: spread over its real length, through his own voice's lock, dropped when it ends — and a line that no longer waits for them |
 | U328 | Antenna reactions: an antenna-led vocabulary, head-and-antennae in one command, and one tone classification feeding both |
 | U326 | Conversational body language both ways: acknowledging while someone speaks, moving with what he says, and a reply gesture that no longer delays the reply |
 | U325 | `gaze`: looking at someone without taking follow-me away; the face position the recogniser already had; a sweep whose cadence follows the room |

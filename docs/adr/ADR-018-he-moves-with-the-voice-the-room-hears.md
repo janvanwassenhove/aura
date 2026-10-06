@@ -1,6 +1,7 @@
 # ADR-018: He moves with the voice the room hears, wherever it comes out
 
-**Status**: **Accepted — implemented in U407** (2026-10-06).
+**Status**: **Accepted — implemented in U407** (2026-10-06); **extended in
+U408** to the persona's speaking gestures (see the addendum).
 **Date**: 2026-10-06
 **Owner**: robot-runtime / reachy adapter, aura-brain / speech_out
 **Related**: [spec 016](../../.specify/specs/016-embodiment-and-presence/spec.md)
@@ -81,3 +82,29 @@ He did not, on either speaker:
   gestures (`create_speaking_timeline`) still queue behind a whole line's lock
   and play after it, as they did before; they are a separate question from
   moving *while* he talks.
+
+## Addendum — U408: his gestures, during the line
+
+Asked of the "not done" above (translated where needed): *"why not during,
+wouldn't that be more natural?"* It would, and nothing chose otherwise. U80
+made speech hold the motion lock when audio was fed to the speaker in paced
+blocks a motion call could starve; U83 moved playback to GStreamer, which plays
+on its own, and the lock stayed. The persona's speaking gestures queued behind
+it and all played after the sentence — and `/robot/speak` waited for them, so a
+talk's next beat started late: a 4 s line came back after 15–19 s on the robot.
+
+The same rule as the antennae now covers them. A gesture from the follow set —
+silent, keeps his eyes where they are, not asked for by hand — moves through
+the lock when his own voice holds it; they take turns with the antennae on a
+lock of their own. Anything that makes a sound or takes the head (an emotion, a
+dance, a quick action) still waits, because those are what the lock still
+protects the line from. The cues are spread over the line's real length, and
+the ones not yet begun when it ends are dropped (U326: a gesture after the
+sentence is worse than none). A laptop line moved along with gets them too,
+through the engine.
+
+**Rejected**: dropping the lock during speech altogether — an emotion's sound
+would then play over his voice; and keeping the gestures after the line but not
+waiting for them — the call would return in time, and the gesture would still
+arrive after the sentence.
+

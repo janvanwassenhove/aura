@@ -6,7 +6,7 @@ priority: P2
 risk: Medium
 created: "2026-04-25"
 amended: "2026-09-13"
-units: [U27, U205, U206, U207, U208, U246, U263, U263b, U264, U265, U266, U267, U269, U282, U320, U334, U349, U351, U352, U360, U361, U386, U387, U388, U389, U394, U400, U404, U407]
+units: [U27, U205, U206, U207, U208, U246, U263, U263b, U264, U265, U266, U267, U269, U282, U320, U334, U349, U351, U352, U360, U361, U386, U387, U388, U389, U394, U400, U404, U407, U408]
 ---
 
 # Feature Specification: Presentation Copilot
@@ -383,7 +383,10 @@ settings aside as the example.
   happened (`robot`: moving along, older than this app, or why not); a 404 or a
   failure never costs the line or its subtitle. Ordinary replies on the laptop
   are not part of this. Where he looks stays `follow_me`'s: on, the face nearest
-  him; `off` on a beat, straight ahead at the room.
+  him; `off` on a beat, straight ahead at the room. His persona's speaking
+  gestures land during the line on either speaker, and the robot's
+  `POST /robot/speak` returns when the line ends rather than after them, so the
+  next beat is not held back by gestures of the last (U408, spec 016 FR-011c).
 
 ## Superseded
 
@@ -411,6 +414,7 @@ applies to `slide:N` beats; `manual` and `keyword:` beats have no such deadline.
 | U394 | Wander and follow-me in a scenario, with a keynote and a conference talk as worked examples |
 | U404 | The projector's avatar is the look of the persona speaking |
 | U407 | In a talk he moves as he speaks — antennae and a nodding head — whichever speaker the room hears him from |
+| U408 | His speaking gestures during the line, not after it — and a beat no longer waits for the last one's gestures |
 | U400 | The projector's subtitles start with his voice, last as long as he speaks, and step through the line |
 | U320 | The panel regrouped: locks as chips, status as status, the projector block given the weight it earns, a run button that names its own action, an empty state with the two doors, and help you can put away |
 | U334 | Present mode enforces what it always promised: only the scenario speaks, and no open microphone answers the room |

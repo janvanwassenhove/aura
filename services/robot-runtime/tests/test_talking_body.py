@@ -21,6 +21,16 @@ laptop plays is handed to him as it starts, to move along with rather than to
 play: the antennae as above, and the head nods through the channel the SDK's
 own sway uses — composed on top of wherever follow-me points it, so he never
 looks away from the room to do it.
+
+U408, asked about the gestures still landing after the line (*"why not during,
+wouldn't that be more natural?"*): they waited for the same lock. The persona's
+speaking gestures queued behind his own voice and all played once he had
+finished — and `/robot/speak` waited for them, so a talk's next beat started
+late. Through the laptop there were none at all. Now a silent gesture that keeps
+his eyes where they are moves through his voice like the antennae do, the cues
+are spread over the line's real length, and when the line ends — or is cut
+short — the cues still to come are dropped (U326: a gesture after the sentence
+is worse than none).
 """
 
 from __future__ import annotations
@@ -36,6 +46,8 @@ import types
 import numpy as np
 import pytest
 from robot_runtime import sleep_state
+from shared_personas import Persona
+from shared_schemas.robot.models import MotionCommand
 
 RATE = 24_000
 ZERO = [0.0] * 6
@@ -340,3 +352,111 @@ def test_a_body_that_cannot_says_so() -> None:
         assert _client(object()).post("/robot/speak/along", json=audio).status_code == 501
     finally:
         routes.adapter = None
+
+
+# ── U408: the persona's gestures during the line, not after it ──────────────
+
+async def test_a_gesture_during_his_own_line_is_not_kept_waiting(adapter, speaker) -> None:
+    await adapter.connect()
+    mini = adapter._mini
+    line = asyncio.ensure_future(adapter.speak("Goedemorgen.", _tone(1.0)))
+    await asyncio.sleep(0.3)
+    before = len(_head_targets(mini))
+    await adapter.execute_motion(MotionCommand(motion_id="nod"))
+    assert not line.done(), "the nod waited for the end of the line"
+    assert len(_head_targets(mini)) > before, "and it moved his head"
+    await line
+    await adapter.disconnect()
+
+
+@pytest.mark.parametrize("command", [
+    MotionCommand(motion_id="nod", manual=True),      # a quick action, done by hand
+    MotionCommand(motion_id="spin"),                  # not a gesture that keeps his eyes
+])
+async def test_anything_else_still_waits_for_the_line(adapter, speaker, command) -> None:
+    await adapter.connect()
+    line = asyncio.ensure_future(adapter.speak("Goedemorgen.", _tone(0.8)))
+    await asyncio.sleep(0.2)
+    await adapter.execute_motion(command)
+    assert line.done(), "it cut into the line"
+    await adapter.disconnect()
+
+
+class _Speaker:
+    """Plays for as long as the line lasts, or until it is cut; notes when
+    each gesture starts."""
+
+    def __init__(self, cut: float | None = None) -> None:
+        self.cut = cut
+        self.played: tuple[float, float] | None = None
+        self.moves: list[float] = []
+
+    async def speak(self, text, audio_bytes=None) -> None:
+        start = time.monotonic()
+        seconds = len(audio_bytes) / 2 / RATE if audio_bytes else 0.0
+        await asyncio.sleep(seconds if self.cut is None else self.cut)
+        self.played = (start, time.monotonic())
+
+    async def execute_motion(self, command) -> None:
+        self.moves.append(time.monotonic())
+        await asyncio.sleep(0.05)
+
+    async def set_state(self, *args, **kwargs) -> None: ...
+
+
+async def _engine(robot):
+    from robot_runtime.engine.behavior import BehaviorEngine
+    from shared_events.bus import AsyncEventBus
+
+    bus = AsyncEventBus()
+    await bus.start()
+    return BehaviorEngine(robot, bus, session_id="t", persona=Persona.WORK), bus
+
+
+WORDS = " ".join(["woord"] * 32)
+
+
+async def test_his_speaking_gestures_happen_while_he_says_the_line() -> None:
+    robot = _Speaker()
+    engine, bus = await _engine(robot)
+    t0 = time.monotonic()
+    await engine.speak(WORDS, _tone(1.5))
+    took = time.monotonic() - t0
+    start, end = robot.played
+    assert robot.moves, "no gestures at all"
+    assert all(start <= t <= end for t in robot.moves), \
+        "a gesture after the sentence is worse than none (U326)"
+    assert took < 1.5 + 0.3, "the line waited for its gestures"
+    await bus.stop()
+
+
+async def test_a_line_cut_short_takes_its_gestures_with_it() -> None:
+    robot = _Speaker(cut=0.3)
+    engine, bus = await _engine(robot)
+    await engine.speak(WORDS, _tone(3.0))
+    await asyncio.sleep(0.5)
+    end = robot.played[1]
+    assert all(t <= end + 0.06 for t in robot.moves), "still gesturing after Stop"
+    await bus.stop()
+
+
+async def test_a_line_on_the_laptop_gets_his_gestures_too() -> None:
+    """The persona's gestures were part of `/robot/speak` only, so through the
+    laptop there were none. The engine moves along now, not the adapter alone."""
+    from robot_runtime import routes
+    from robot_runtime.adapters.fake import FakeRobotAdapter
+
+    fake = FakeRobotAdapter()
+    await fake.connect()
+    engine, bus = await _engine(fake)
+    routes.adapter, routes.engine = fake, engine
+    try:
+        audio = {"audio_b64": base64.b64encode(_tone(1.2)).decode()}
+        r = await routes.speak_along(audio)
+        assert r.status_code == 200
+        await asyncio.sleep(1.4)
+        assert fake._motions, "he moved along without a single gesture"
+        assert fake._played_audio == []
+    finally:
+        routes.adapter = routes.engine = None
+        await bus.stop()

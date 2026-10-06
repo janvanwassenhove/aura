@@ -6467,3 +6467,53 @@ own speaker, an older robot and a failing one costing nothing, Stop, ordinary
 replies untouched, and the client against the real runtime (sixteen red
 before).
 
+### U408 — his speaking gestures, during the line
+
+Asked, of U407's "not done" (the persona's speaking gestures still playing
+after a whole line): *"why not during, wouldn't that be more natural?"*
+
+**Why they were after.** Nothing chose it. U80 made speech hold the motion lock
+while audio was hand-paced into the speaker in blocks, which a motion call
+could starve; U83 moved playback to GStreamer's playbin, which plays on its own,
+and the lock stayed. The behaviour engine's speaking timeline waits on that
+lock like any motion, so every cue queued behind his voice and played after the
+sentence — and `/robot/speak` gathered the line with its gestures, so it
+returned only once they were done. Two more things made it worse: the timeline
+wrote each cue's time from the start of the line while the engine waited it
+from the cue before (the `MotionCue` contract), so the cues drifted later and
+later; and through the laptop there were no gestures at all.
+
+**Measured first, on the robot** (Stand, wandering on): a 4 s line with 32
+words of text came back after **15.3 s and 19.1 s**.
+
+**The change.** A gesture from the follow set — silent, keeps his eyes, not
+manual — moves through the lock when his own voice holds it, taking turns with
+the antennae on a lock of their own; anything with a sound or a hand behind it
+still waits. The timeline is spread over the line's real length (from the
+audio), offsets as the contract says, none starting in the last 600 ms; the
+engine schedules each cue from the previous cue's start, and drops the cues not
+yet begun when the line ends or is cut short. `/robot/speak` returns with the
+line. A laptop line now goes through the engine (`move_along`), so the persona's
+gestures go with it too, and `/robot/audio/stop` ends them. ADR-018 has an
+addendum with the two alternatives turned down.
+
+**Measured after**, same robot, same conditions: **6.6 s, 5.0 s and 8.1 s** for
+the same 4 s line (4.4 s with its tail); the spread is the brain's Stand
+emotions, which make a sound and so still wait for his voice — and are why the
+line itself sometimes waits to start. Head pitch was flat in the 2 s after each
+call returned: nothing trailing.
+
+**Not done**: the robot's gesture profile is fixed when it starts
+(`ACTIVE_PERSONA`, unset on this robot, so *work*: nods) — it does not follow
+the mode, so a talk gestures like Work. A separate question.
+
+**Drawing**: the loops drawing's ONE BODY panel — his voice holds the lock and
+lets silent gestures and the antennae through. The panel also overran the
+drawing's frame since it was added; the frame now contains it.
+
+**Tests**: nine — a nod during his own line not kept waiting, a manual nod and
+a spin still waiting (guards), gestures inside the line and the line not
+waiting for them, a line cut short taking its gestures with it, a laptop line
+getting them, and the timeline spread over the line, ending in time, and sized
+by length alone (seven red before).
+

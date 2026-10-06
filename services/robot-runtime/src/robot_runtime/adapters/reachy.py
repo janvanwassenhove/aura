@@ -151,6 +151,9 @@ class ReachyRobotAdapter(RobotAdapter):
         # move through but a gesture may not.
         self._talk_until = 0.0
         self._speech_holds_lock = False
+        # U408: what moves through his voice — the antennae and the silent
+        # gestures — takes turns here rather than on the lock his voice holds.
+        self._voice_moves = asyncio.Lock()
         # U407: the head nodding along with a line the laptop is playing.
         self._along_task: asyncio.Task | None = None
         # U325: where WE last pointed the head, in the operator frame, so a
@@ -1027,7 +1030,8 @@ class ReachyRobotAdapter(RobotAdapter):
                     mini.goto_target(antennas=[0.0, 0.0], duration=0.7, body_yaw=None)
 
                 if through_his_voice:
-                    await asyncio.to_thread(_wiggle)
+                    async with self._voice_moves:
+                        await asyncio.to_thread(_wiggle)
                 else:
                     async with self._motion_lock:
                         await asyncio.to_thread(_wiggle)
@@ -1800,8 +1804,27 @@ class ReachyRobotAdapter(RobotAdapter):
     async def execute_motion(self, command: MotionCommand) -> None:
         if self._mini is None:
             raise RuntimeError("not connected")
+        if self._moves_through_his_voice(command):
+            # U408: it waits for the body like any motion — unless what holds
+            # the body is his own voice. Then it moves while he speaks, which
+            # is when a speaking gesture belongs; behind the line it played
+            # after the sentence, which U326 calls worse than none.
+            while self._motion_lock.locked():
+                if self._speech_holds_lock:
+                    async with self._voice_moves:
+                        await asyncio.to_thread(self._run_motion_tracked, command)
+                    return
+                await asyncio.sleep(0.05)
         async with self._motion_lock:
             await asyncio.to_thread(self._run_motion_tracked, command)
+
+    def _moves_through_his_voice(self, command: MotionCommand) -> bool:
+        """U408: a gesture that makes no sound and keeps his eyes where they
+        are (the follow set, U81), not one asked for by hand. A voice cannot be
+        cut by it; an emotion, a dance or a quick action still waits."""
+        return (command.motion_id.lower() in self._FOLLOW_GESTURES
+                and not getattr(command, "manual", False)
+                and os.environ.get("FOLLOW_WHILE_SPEAKING", "true").lower() == "true")
 
     # Reply-time gestures (embodiment): keep looking at the person while doing
     # them so follow-me is not interrupted every time the robot speaks (U81).

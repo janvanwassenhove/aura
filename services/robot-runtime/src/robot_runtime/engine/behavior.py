@@ -42,6 +42,10 @@ _IDLE_FIDGET_INTERVAL_S = 30.0
 _IDLE_FIDGET_JITTER_S = 10.0
 
 
+#: The brain's TTS: PCM s16le mono at 24 kHz (U36b).
+_SPEECH_RATE = 24_000
+
+
 class BehaviorEngine:
     """Manages the robot's behavior state and coordinates speech + motion.
 
@@ -66,6 +70,9 @@ class BehaviorEngine:
         self._state = BehaviorState.IDLE
         self._idle_task: asyncio.Task[None] | None = None
         self._speak_task: asyncio.Task[None] | None = None
+        # U408: the gestures of a line the laptop is playing, and its end.
+        self._along_over: asyncio.Event | None = None
+        self._along_gestures: asyncio.Task[None] | None = None
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -168,8 +175,11 @@ class BehaviorEngine:
         with_gestures: bool = True,
     ) -> None:
         await self.transition(BehaviorState.SPEAKING)
+        # U408: spread over the line's real length when the audio is here.
+        duration_ms = (int(len(audio_bytes) / 2 / _SPEECH_RATE * 1000)
+                       if audio_bytes else None)
         timeline = (
-            create_speaking_timeline(text, self._persona_cfg)
+            create_speaking_timeline(text, self._persona_cfg, duration_ms)
             if with_gestures and self._persona_cfg.gesture_profile.motion_ids
             else None
         )
@@ -189,11 +199,14 @@ class BehaviorEngine:
             )
         )
 
-        tasks: list[asyncio.Task[None]] = [
-            asyncio.create_task(self._adapter.speak(text, audio_bytes))
-        ]
-        if timeline:
-            tasks.append(asyncio.create_task(self._run_timeline(timeline)))
+        # U408: the gestures run beside the line and end with it. They used to
+        # be gathered with it, and they queued behind his voice on the motion
+        # lock — so every one of them played after the sentence, and this
+        # waited for them, starting a talk's next beat late. A gesture still
+        # moving when the line ends finishes; one not yet begun is dropped.
+        line_over = asyncio.Event()
+        gestures = (asyncio.create_task(self._run_timeline(timeline, line_over))
+                    if timeline else None)
 
         # U359: the state comes back whatever happens to the audio.
         #
@@ -208,8 +221,11 @@ class BehaviorEngine:
         # The failure still propagates: the caller must hear that the line was
         # not said (U269). What must not survive it is the state.
         try:
-            await asyncio.gather(*tasks)
+            await self._adapter.speak(text, audio_bytes)
         finally:
+            line_over.set()
+            if gestures is not None:
+                await gestures
             # Completed means "no longer playing", not "played well" — the
             # console derives its speaking indicator from the pair, and a start
             # with no completion is a subtitle that never clears.
@@ -235,9 +251,55 @@ class BehaviorEngine:
                 MotionFailed(session_id=self._session_id, motion_id=motion_id, reason=str(exc))
             )
 
-    async def _run_timeline(self, timeline: MotionTimeline) -> None:
+    async def move_along(self, audio_bytes: bytes, sample_rate: int = _SPEECH_RATE) -> dict | None:
+        """U408: a line the laptop plays. The adapter moves along with it
+        (U407) and the persona's gestures go with it, as they do with a line he
+        plays himself. None when the adapter cannot move along at all."""
+        mover = getattr(self._adapter, "talk_along", None)
+        if mover is None:
+            return None
+        result = await mover(audio_bytes, sample_rate)
+        self.end_line()
+        if result.get("moving") and self._persona_cfg.gesture_profile.motion_ids:
+            seconds = float(result.get("seconds") or 0.0)
+            timeline = create_speaking_timeline("", self._persona_cfg, int(seconds * 1000))
+            if timeline.cues:
+                over = asyncio.Event()
+                asyncio.get_running_loop().call_later(seconds, over.set)
+                self._along_over = over
+                self._along_gestures = asyncio.ensure_future(self._run_timeline(timeline, over))
+        return result
+
+    def end_line(self) -> None:
+        """U408: the line the laptop was playing is over — Stop, or the next
+        one. Its gestures still to come are dropped."""
+        if self._along_over is not None:
+            self._along_over.set()
+            self._along_over = None
+
+    async def _run_timeline(self, timeline: MotionTimeline,
+                            line_over: asyncio.Event | None = None) -> None:
+        """Each cue at its time, counted from the start of the cue before it
+        rather than from the end of its motion, so a slow gesture does not push
+        the rest later. U408: with `line_over`, nothing starts once the line
+        has ended."""
+        loop = asyncio.get_running_loop()
+        start = loop.time()
+        at = 0.0
         for cue in timeline.cues:
-            await asyncio.sleep(cue.offset_ms / 1000.0)
+            at += cue.offset_ms / 1000.0
+            delay = start + at - loop.time()
+            if line_over is None:
+                if delay > 0:
+                    await asyncio.sleep(delay)
+            else:
+                if delay > 0:
+                    try:
+                        await asyncio.wait_for(line_over.wait(), timeout=delay)
+                    except (asyncio.TimeoutError, TimeoutError):
+                        pass
+                if line_over.is_set():
+                    return
             cmd = MotionCommand(
                 motion_id=cue.motion_id,
                 speed=cue.speed,

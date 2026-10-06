@@ -193,7 +193,10 @@ async def speak_along(body: dict) -> JSONResponse:
         rate = int(body.get("sample_rate") or 24_000)
     except (TypeError, ValueError):
         return JSONResponse({"error": "sample_rate is not a number"}, status_code=422)
-    result = await mover(audio_bytes, rate)
+    # U408: through the engine when there is one, so the persona's speaking
+    # gestures go with a laptop line as they go with one he plays himself.
+    along = getattr(engine, "move_along", None) if engine is not None else None
+    result = await (along(audio_bytes, rate) if along is not None else mover(audio_bytes, rate))
     if not result.get("moving"):
         return JSONResponse({"error": result.get("reason") or "not moving"}, status_code=409)
     return JSONResponse(result)
@@ -405,7 +408,12 @@ async def audio_stop() -> JSONResponse:
     stopper = getattr(adapter, "stop_audio", None)
     if stopper is None:
         return JSONResponse({"error": "adapter has no stop_audio"}, status_code=501)
-    return JSONResponse({"stopped": bool(stopper())})
+    stopped = bool(stopper())
+    # U408: and the gestures of a line the laptop was playing stop with it.
+    end_line = getattr(engine, "end_line", None) if engine is not None else None
+    if end_line is not None:
+        end_line()
+    return JSONResponse({"stopped": stopped})
 
 
 @router.get("/robot/budget")

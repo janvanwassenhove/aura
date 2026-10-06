@@ -65,3 +65,36 @@ def test_idle_timeline_amplitude_is_subdued() -> None:
 
 
 import pytest  # noqa: E402 (keep at bottom so tests above are clear)
+
+
+# ── U408: spread over the line he is actually saying ────────────────────────
+
+def _at(timeline) -> list[int]:
+    """When each cue starts, from the start of the line. A cue's offset is its
+    wait from the cue before it — the MotionCue contract."""
+    out, t = [], 0
+    for cue in timeline.cues:
+        t += cue.offset_ms
+        out.append(t)
+    return out
+
+
+def test_the_gestures_are_spread_over_the_line_not_bunched_at_its_start() -> None:
+    cfg = get_persona_config(Persona.WORK)
+    at = _at(create_speaking_timeline(" ".join(["woord"] * 48), cfg, duration_ms=12_000))
+    assert len(at) >= 4
+    assert at[0] < 3_000, "the first comes early in the line"
+    assert at[-1] > 6_000, "and the last in its second half"
+
+
+def test_no_gesture_starts_too_late_to_finish_inside_the_line() -> None:
+    cfg = get_persona_config(Persona.DEMO)
+    for _ in range(20):
+        at = _at(create_speaking_timeline(" ".join(["woord"] * 40), cfg, duration_ms=4_000))
+        assert at and max(at) <= 4_000 - 600
+
+
+def test_without_words_the_length_of_the_line_decides() -> None:
+    """A line the laptop plays reaches the robot as audio only."""
+    cfg = get_persona_config(Persona.WORK)
+    assert len(create_speaking_timeline("", cfg, duration_ms=8_000).cues) >= 2

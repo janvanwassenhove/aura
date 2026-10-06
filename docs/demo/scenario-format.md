@@ -161,7 +161,9 @@ line cannot be both "all in onyx" and "this bit in somebody else's voice".
   face nearest to him: yours.
 - **He moves as he speaks.** Every line — from his own speaker or the
   laptop's — keeps his antennas going and his head nodding with the words,
-  laid over wherever he is looking; nothing in the scenario turns it on (U407).
+  laid over wherever he is looking, with his character's speaking gestures
+  spread over the line; nothing in the scenario turns it on (U407, U408). A
+  `gesture:` on a beat is different: it plays once the beat's line has been said.
   For a line to the room rather than to you, put `follow_me: off` on that beat:
   he faces forward and nods there.
 - **Wandering never makes him speak.** On stage only the scenario speaks; while
