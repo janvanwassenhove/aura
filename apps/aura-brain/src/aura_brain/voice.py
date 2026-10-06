@@ -80,28 +80,45 @@ def resolve_voice(
     return explain_voice(persona, mode, character_voice)[0]
 
 
+def tts_model() -> str:
+    """The TTS model in use, read live (TTS_MODEL)."""
+    return os.environ.get("TTS_MODEL", "gpt-4o-mini-tts").strip() or "gpt-4o-mini-tts"
+
+
+def direction_applies() -> bool:
+    """U409: whether a direction reaches the model at all (see
+    `openai_provider.supports_instructions`)."""
+    from conversation_runtime.providers.openai_provider import supports_instructions
+
+    return supports_instructions(tts_model())
+
+
 async def synthesize_b64(text: str, voice: str | None = None,
-                         speed: float = 1.0) -> str | None:
+                         speed: float = 1.0, instructions: str = "") -> str | None:
     """Return base64 PCM (s16le mono 24 kHz) for ``text``, or None if TTS is
     unavailable (no key / provider error). ``voice`` defaults to the global
-    preference (read live, so the Settings dropdown applies immediately)."""
+    preference (read live, so the Settings dropdown applies immediately).
+
+    U409: ``instructions`` is how to say it ("powerful, short"). It goes with
+    each call rather than into the cached provider, so a provider kept for a
+    voice and speed can never carry the last line's direction into the next.
+    A model that cannot be directed speaks the line undirected; callers that
+    care ask `direction_applies()` and say so."""
     if not os.environ.get("OPENAI_API_KEY"):
         return None
     voice = (voice or resolve_voice()).lower()
     if voice not in TTS_VOICES:
         voice = "alloy"
     try:
-        cache_key = f"{voice}@{speed:.2f}"
+        cache_key = f"{voice}@{speed:.2f}@{tts_model()}"
         provider = _tts_cache.get(cache_key)
         if provider is None:
             from conversation_runtime.providers.openai_provider import OpenAITTSProvider
 
-            provider = OpenAITTSProvider(
-                model=os.environ.get("TTS_MODEL", "gpt-4o-mini-tts"),
-                voice=voice, speed=speed,
-            )
+            provider = OpenAITTSProvider(model=tts_model(), voice=voice, speed=speed)
             _tts_cache[cache_key] = provider
-        pcm = await provider.synthesize(text)
+        pcm = await (provider.synthesize(text, instructions=instructions) if instructions
+                     else provider.synthesize(text))
         return base64.b64encode(pcm).decode()
     except Exception as exc:  # noqa: BLE001 — voice is best-effort, never fatal
         logger.warning("TTS synthesis failed: %s", exc)

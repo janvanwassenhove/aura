@@ -106,3 +106,16 @@ def test_it_says_when_he_wanders_and_follows() -> None:
     plain = _run(GOOD).stdout
     assert "wander          paused - the scenario does not say" in plain, plain
 
+
+
+def test_it_says_how_the_lines_are_delivered(tmp_path) -> None:
+    """U409: the direction the talk and each beat ask for — read at a desk,
+    where a direction that says the wrong thing is still cheap to fix."""
+    sc = tmp_path / "s.yaml"
+    sc.write_text(
+        'title: T\ndirection: warm, unhurried\nbeats:\n'
+        '  - id: gag\n    mode: speak\n    text: "Ta."\n    direction: powerful, short\n',
+        encoding="utf-8")
+    out = _run(sc).stdout
+    assert "warm, unhurried" in out
+    assert "gag: delivered powerful, short" in out

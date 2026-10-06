@@ -76,3 +76,5 @@ skills/*.md
 
 # U207: saved presentation scenarios are the owner's talk content.
 scenarios/*.yaml
+# U409: a talk's recorded lines, kept between rehearsal and the talk.
+scenarios/recordings/

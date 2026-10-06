@@ -61,6 +61,18 @@ BeatMode = Literal["speak", "improvise", "chime_in", "silent"]
 # reads naturally as the first and a beat as the second, and people reach for
 # either in both places. Refusing one of them teaches nothing, so both are
 # accepted everywhere and normalised here.
+#: U409: how long a direction may be. A note to a performer, not a script —
+#: and the TTS model reads every word of it on every line it directs.
+DIRECTION_MAX = 300
+
+
+def _direction_problem(value: str) -> str:
+    if len(value or "") > DIRECTION_MAX:
+        return (f"direction is {len(value)} characters - keep it under "
+                f"{DIRECTION_MAX}, a few words on how to say it")
+    return ""
+
+
 _OVERLAY_SHOW = ("show", "shown")
 _OVERLAY_HIDE = ("hide", "hidden")
 
@@ -135,6 +147,10 @@ class Beat(BaseModel):
     # improvises. Within `text`, `[persona:other_id]` hands the line over
     # mid-sentence and `[persona]` hands it back.
     persona: str = ""
+    # U409: how the line is delivered — "powerful, short", "warm, a smile in
+    # the voice". Sent to the TTS model as its instructions. The narrowest one
+    # wins: this beat, then the persona speaking, then the talk's `direction`.
+    direction: str = ""
 
     @property
     def trigger_kind(self) -> str:
@@ -215,6 +231,8 @@ class Beat(BaseModel):
                 f"beat {self.id!r}: speed must be between {SPEED_MIN} and {SPEED_MAX}")
         if self.pause < 0:
             raise ValueError(f"beat {self.id!r}: pause cannot be negative")
+        if problem := _direction_problem(self.direction):
+            raise ValueError(f"beat {self.id!r}: {problem}")
         return self
 
 
@@ -234,6 +252,9 @@ class Scenario(BaseModel):
     # what every scenario written before this does.
     wander: bool | None = None
     follow_me: bool | None = None
+    # U409: how every line of the talk is delivered unless a beat, or the
+    # persona speaking it, says otherwise.
+    direction: str = ""
     beats: list[Beat] = Field(default_factory=list)
 
     @property
@@ -244,6 +265,8 @@ class Scenario(BaseModel):
     @model_validator(mode="after")
     def _unique_ids(self) -> Scenario:
         _overlay_word(self.overlay)
+        if problem := _direction_problem(self.direction):
+            raise ValueError(f"the talk's {problem}")
         seen: set[str] = set()
         for b in self.beats:
             if b.id in seen:

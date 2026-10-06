@@ -6531,3 +6531,72 @@ are clean, and the robot-runtime tests that cover the two files pass. The
 lesson is the commit's, not the code's: read the number, not the presence of a
 summary. No behaviour changed.
 
+And the same gate had a second complaint U408b itself caused: its claim in spec
+016 was named by no test, which the *every claimed unit is named by a test*
+step refuses. Named, with U409, in the runtime test that exercises the line it
+corrected (`test_a_line_cut_short_takes_its_gestures_with_it`).
+
+### U409 — a scenario directs how a line is spoken, and a directed line sounds the same every time
+
+Reported (translated): *"In the presentation scenario I want to define not
+only the persona and the voice, but also the direction: powerful, short,
+emotional, …"* — and the same line on the same slide sounded different on every
+run, and started with a delay.
+
+**Verified first.** `Beat` had `persona`, `voice`, `speed` and `pause` and
+nothing for delivery; `_speak` handed `voice.synthesize_b64` the text only, and
+`OpenAITTSProvider` called `audio.speech.create` without `instructions` (the
+locked SDK, 3.13, has the parameter). `TTS_MODEL` defaults to
+`gpt-4o-mini-tts`, a generative model, and nothing cached audio — `voice.py`'s
+cache holds *provider objects* per voice and speed — so every firing was a new
+performance and a network round-trip at the cue.
+
+**Direction.** `direction` (≤ 300) on a beat and on the scenario, refused when
+longer; unknown fields stay refused (U360). A character has `voice_direction`,
+editable in the persona editor and filled in on reading for files written
+before it; the built-ins: butler *dry, unhurried, understated*, kids companion
+*warm, soft, playful*, workshop coach *confident, clear, energetic*, friendly
+assistant *warm, natural, upbeat*, quiet *calm, quiet, plain*. Each persona
+stretch of a line takes the beat's direction, else its own persona's, else the
+talk's. It goes to the provider as `instructions`, only for a model that has the
+parameter; `tts-1`/`tts-1-hd` speak the line undirected and `voice_note` says
+the direction was not applied. The request asked for the provider cache key to
+include the instructions; they are passed per call instead, so a cached
+provider cannot carry one line's direction into the next (the key now includes
+the model). The builder has a Delivery field for the talk and a Direction per
+beat; the pre-flight check prints both.
+
+**One recording per line.** New `recordings.py`: a take is keyed by text,
+voice, speed, direction and model. Loading a talk records every `speak` beat in
+the background, three at a time; the cue plays the take, awaits one still
+rendering, and only synthesizes on a miss. Takes are kept in memory and on disk
+(`RECORDINGS_DIR`, default `scenarios/recordings`, gitignored, the 400 most
+recently used), so they survive a reload, End/Run again and a restart — the
+optional persistence was done, because a restart between rehearsal and the talk
+is the likeliest way to lose the rehearsed take. `status.recordings` says ready
+/ total / failed / rendering and each beat's state; a failed take is retried at
+the cue and the beat raises as before if that fails too. `POST
+/presentation/rerecord {beat_id?}` takes one line or all again. The Present
+view shows *N of M lines recorded* and, per spoken beat, its state and a
+*re-record* button.
+
+**Older tests.** Five TTS fakes took no `instructions` and now get one from the
+built-in personas' directions; they accept it. Tests that read the order of TTS
+calls (`calls[0]`) assumed synthesis happens only at the cue; recording at load
+makes the order meaningless, so they ask how each line was requested instead.
+One test whose fake failed "the first call" now fails the line it meant. A
+brain-wide fixture gives each test its own `RECORDINGS_DIR` and a fresh store.
+
+**Not verified**: a real call with `instructions` against the OpenAI API —
+the SDK's signature and the documented parameter are what was checked, with no
+key in the test shell. The Present view was not seen in the browser pane (it
+refused the preview's port); the mount tests drive the real components.
+**Drawing**: none — the media paths are the same; *when* a talk's audio is
+made changed, not where it travels. **ADR-019** records the decision and the
+alternatives.
+
+**Tests**: forty-four — the model (4), the provider (5), direction precedence,
+the hand-over, the undirectable model, the voice module and the persona field
+(14), the recordings (12), the pre-flight check (1), the console (8: builder,
+persona editor, Present view). Red first: all but the guards that pin what must not change.
+

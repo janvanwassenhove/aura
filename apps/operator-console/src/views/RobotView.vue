@@ -168,6 +168,13 @@
           <span>How he should sound</span>
           <textarea v-model="editingCharacter.character_prompt" rows="4" aria-label="Persona instructions" class="pe-prompt-area" />
         </label>
+        <!-- U409: how this persona delivers a talk's lines; a beat's own
+             direction still wins -->
+        <label class="pe-prompt">
+          <span>Voice direction <em>how he delivers a talk's lines, unless a beat says otherwise</em></span>
+          <input v-model="editingCharacter.voice_direction" class="pe-prompt-area pe-direction"
+                 maxlength="300" aria-label="Voice direction" placeholder="e.g. warm, soft, playful" />
+        </label>
         <label class="pe-prompt">
           <span>Learned traits <em>added by teach-mode, yours to prune</em></span>
           <textarea v-model="editingCharacter.learned_traits" rows="2" aria-label="Learned traits" class="pe-prompt-area" />
@@ -492,6 +499,8 @@ interface BrainCharacter {
   learned_traits: string; voice_engine?: string
   /** U404: one of CHARACTERS' ids, or '' for the header's character. */
   look?: string
+  /** U409: how this persona delivers a talk's lines ("dry, unhurried"). */
+  voice_direction?: string
 }
 const brainCharacters = ref<BrainCharacter[]>([])
 const activePersona = ref('')
@@ -529,6 +538,7 @@ async function savePersona(): Promise<void> {
         interruptibility: c.interruptibility, learned_traits: c.learned_traits,
         voice_engine: c.voice_engine ?? '',
         look: c.look ?? '',
+        voice_direction: c.voice_direction ?? '',
       }),
     })
     personaSaved.value = r.ok
@@ -863,6 +873,7 @@ onUnmounted(() => clearInterval(statusTimer))
   border: 1.5px solid var(--line-strong); border-radius: 11px; color: var(--ink);
   padding: 11px 13px; font-size: 13px; line-height: 1.6; resize: vertical; font-family: inherit;
 }
+.pe-direction { line-height: 1.4; }
 .pe-foot { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .pe-saved { margin: 8px 0 0; font-size: 12.5px; color: var(--ok); }
 

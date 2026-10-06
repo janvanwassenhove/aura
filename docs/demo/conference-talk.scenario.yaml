@@ -18,6 +18,9 @@ pptx: "conference-talk.pptx"
 follow_me: on
 wander: off
 
+# Hoe hij zijn zinnen zegt, tenzij een beat het anders zegt (U409).
+direction: "warm, relaxed, conversational"
+
 beats:
   # While people come in, the title slide is up: he looks around the room.
   - id: welkom
@@ -30,6 +33,7 @@ beats:
     trigger: slide:2
     mode: speak
     text: "Goeiemiddag! Ik ben de junior. Hij praat, ik knik."
+    direction: "bright, quick, proud of himself"
     wander: off
     gesture: nod
 

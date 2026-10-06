@@ -26,6 +26,7 @@ pptx: "AURA-Devoxx-2026-conference-talk.pptx"    # optional, for the wrong-deck 
 overlay: hidden                                   # optional: hidden | shown (default)
 wander: on                                        # optional: on | off — does he look around?
 follow_me: on                                     # optional: on | off — does he watch you?
+direction: "warm, unhurried"                      # optional: how every line is delivered
 
 beats:
   - id: the-fanfare        # required, unique
@@ -37,6 +38,7 @@ beats:
     pause: 7.0             # optional: seconds to wait before speaking
     gesture: nod           # optional
     persona: kids_companion  # optional: a character id
+    direction: powerful, short  # optional: how this line is delivered
     overlay: hide          # optional: show | hide, from this beat onwards
     wander: off            # optional: on | off, from this beat onwards
     follow_me: off         # optional: on | off, from this beat onwards
@@ -61,6 +63,7 @@ came out in one voice (U360).
 | `overlay` | `shown` \| `hidden` | `shown` | Where the projector overlay starts. `hidden` is for a talk where he should appear only at the moments you name. |
 | `wander` | `on` \| `off` | not said | Whether he looks around where he stands — follows the people he sees, turns towards voices, moves his antennas — when the talk starts. Not said: he does not wander during the talk, whatever the mode says. |
 | `follow_me` | `on` \| `off` | not said | Whether he keeps looking at the presenter when the talk starts. Not said: your own *Follow me* setting. |
+| `direction` | string, ≤ 300 | `""` | How every line of the talk is delivered — `warm, unhurried` — unless a beat, or the persona speaking it, says otherwise. See *How a line is delivered*. |
 | `beats` | list | `[]` | In file order. Order matters for `manual` beats. |
 
 ### Beat
@@ -83,6 +86,7 @@ came out in one voice (U360).
 | `voice` | TTS voice | `""` | A voice for this beat alone. |
 | `speed` | float | `0` | `0.25`–`4.0`. `0` means leave it alone. |
 | `pause` | float | `0` | Seconds to wait **before** speaking. |
+| `direction` | string, ≤ 300 | `""` | How this line is delivered — `powerful, short`, `a smile in the voice`. Wins over the persona's own way of speaking and the talk's `direction`. |
 
 **Voices**: `alloy`, `ash`, `ballad`, `coral`, `echo`, `fable`, `onyx`, `nova`,
 `sage`, `shimmer`, `verse`. A name outside this list is refused, by name.
@@ -123,11 +127,70 @@ also a change of volume.
 **`voice` on the beat wins over all of it** — including the inline markers. A
 line cannot be both "all in onyx" and "this bit in somebody else's voice".
 
+## How a line is delivered
+
+`direction` is a note to a performer: a few words on how to say it. It goes to
+the TTS model as its *instructions*, so `"powerful, short"` is said powerfully
+and short, not read out.
+
+```yaml
+direction: "warm, unhurried"             # the talk
+beats:
+  - id: the-gag
+    trigger: slide:8
+    text: "Oh, I know this one."
+    direction: "deadpan, then a quick laugh"   # this line
+```
+
+The narrowest one that says wins:
+
+1. the beat's `direction`;
+2. else the **persona** speaking — each character has its own *Voice direction*
+   (Robot → Persona → edit; the built-ins come with one: the butler *dry,
+   unhurried, understated*, the kids companion *warm, soft, playful*, the
+   workshop coach *confident, clear, energetic*);
+3. else the talk's `direction`;
+4. else none.
+
+A voice handed over mid-line with `[persona:x]` speaks in **its** way, unless
+the beat names a direction — then the whole line is said that way.
+
+**The model has to be able to take one.** `gpt-4o-mini-tts` (the default) does;
+`tts-1` and `tts-1-hd` do not. With those the line is still spoken, undirected,
+and the Present panel says the direction was not applied — it is never quietly
+dropped.
+
+## Each line is recorded once
+
+A written line (`speak`) is recorded **when the talk is started**, in the
+background, a few at a time: every voice of it, in its own voice, speed and
+direction. On its cue the recording plays — so it sounds **the same on every
+run**, and there is no round-trip to the TTS service at the cue (which on a
+hotspot is the delay). A cue that comes while its line is still being recorded
+waits for that recording; it never asks for a second one.
+
+- **The Present panel shows it**: *N of M lines recorded*, and per line
+  *recorded*, *recording…* or *not recorded*. **re-record** takes a line again;
+  the new take is the one he plays from then on.
+- **A take is known by its words, voice, speed, direction and the TTS model.**
+  Change any of them and it is a new take, recorded on the next start; change
+  none and it is the same take — after *End* and *Run again*, and after
+  restarting AURA, because takes are also kept on disk (`RECORDINGS_DIR`,
+  default `scenarios/recordings` next to your saved scenarios; the 400 most
+  recently used).
+- **A line that failed to record is not "ready".** It is tried again when its
+  beat fires, and if that fails too the panel says he was not heard.
+- **Improvised lines are not recorded** — they do not exist until the beat
+  fires, and they are meant to be new every time.
+
 ## The things that bite
 
 - **An unknown field stops the load.** Including a misspelt one: `voise: onyx`
   is refused, it does not fall through.
 - **`chime_in` must use a `keyword:` trigger.** Nothing else can arm it.
+- **A direction is a note, not a script.** Over 300 characters is refused.
+- **Changing `TTS_MODEL` makes every line a new take.** Start the talk once
+  after changing it, so the lines are recorded before the cues need them.
 - **A beat that needs live data must set `engine: pipeline`.** The realtime
   engine has no tool access.
 - **`pause` is skipped in a rehearsal.** Walking the show is for reading the

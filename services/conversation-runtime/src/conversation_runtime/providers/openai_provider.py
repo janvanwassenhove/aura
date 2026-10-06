@@ -45,6 +45,15 @@ class OpenAISTTProvider(STTProvider):
         return _single()
 
 
+def supports_instructions(model: str) -> bool:
+    """U409: whether a TTS model performs a line as directed.
+
+    `gpt-4o-mini-tts` does; `tts-1` and `tts-1-hd` have no `instructions`
+    parameter at all. Named by what cannot, so a newer model is assumed able.
+    """
+    return not (model or "").strip().lower().startswith("tts-1")
+
+
 class OpenAITTSProvider(TTSProvider):
     """TTS via OpenAI API."""
 
@@ -60,7 +69,7 @@ class OpenAITTSProvider(TTSProvider):
         self._voice = voice
         self._speed = max(0.25, min(4.0, float(speed)))  # U84: character voice_speed
 
-    async def synthesize(self, text: str) -> bytes:
+    async def synthesize(self, text: str, instructions: str = "") -> bytes:
         kwargs: dict = dict(
             model=self._model,
             voice=self._voice,  # type: ignore[arg-type]
@@ -69,6 +78,10 @@ class OpenAITTSProvider(TTSProvider):
         )
         if abs(self._speed - 1.0) > 1e-3:
             kwargs["speed"] = self._speed
+        # U409: how to say it. Never to a model without the parameter — the
+        # line is still spoken, undirected, and the caller says so.
+        if instructions.strip() and supports_instructions(self._model):
+            kwargs["instructions"] = instructions.strip()
         response = await self._client.audio.speech.create(**kwargs)
         return response.content
 

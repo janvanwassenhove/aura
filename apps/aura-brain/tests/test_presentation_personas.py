@@ -82,7 +82,7 @@ def rig(monkeypatch, tmp_path):
 
     calls: list[tuple[str, str, float]] = []
 
-    async def recording_tts(text, voice_id=None, speed=1.0):
+    async def recording_tts(text, voice_id=None, speed=1.0, instructions=""):
         calls.append((text, voice_id or "", speed))
         # Stand-in PCM whose bytes name the voice, so the joined utterance can
         # be read back and checked.
@@ -99,6 +99,18 @@ def rig(monkeypatch, tmp_path):
 
 def _load(c, yaml_text=TWO_VOICES_YAML):
     assert c.post("/presentation/scenario", json={"yaml": yaml_text}).status_code == 200
+
+
+def asked(calls, text: str) -> tuple[str, float]:
+    """How a line was asked for — its voice and speed.
+
+    U409: every fixed line is recorded when the talk loads, in the background
+    and in no particular order, so the calls are no longer the cue's alone and
+    their order says nothing. Each line is asked for in exactly one way.
+    """
+    ways = {(v, sp) for t, v, sp in calls if t == text}
+    assert len(ways) == 1, f"{text!r} asked for as {ways}"
+    return ways.pop()
 
 
 # --------------------------------------------------------------------------- #
@@ -137,7 +149,7 @@ def test_a_beat_uses_its_personas_own_voice_and_speed(rig) -> None:
     _load(c)
     c.post("/presentation/next")                       # butler
 
-    assert calls == [("Goedendag.", "ash", 0.95)]
+    assert asked(calls, "Goedendag.") == ("ash", 0.95)
     assert robot.heard[0][0] == "Goedendag."
 
 
@@ -147,7 +159,7 @@ def test_a_beat_without_a_persona_keeps_the_presentation_voice(rig) -> None:
     for _ in range(3):
         c.post("/presentation/next")
 
-    assert calls[-1] == ("Gewoon mijn eigen stem.", "alloy", 1.0)
+    assert asked(calls, "Gewoon mijn eigen stem.") == ("alloy", 1.0)
 
 
 def test_the_present_voice_setting_still_wins_when_no_persona_is_named(rig, monkeypatch) -> None:
@@ -159,8 +171,8 @@ def test_the_present_voice_setting_still_wins_when_no_persona_is_named(rig, monk
     for _ in range(3):
         c.post("/presentation/next")
 
-    assert calls[-1][1] == "shimmer"
-    assert calls[0][1] == "ash", "a persona still overrides the mode voice"
+    assert asked(calls, "Gewoon mijn eigen stem.")[0] == "shimmer"
+    assert asked(calls, "Goedendag.")[0] == "ash", "a persona still overrides the mode voice"
 
 
 # --------------------------------------------------------------------------- #
@@ -173,11 +185,8 @@ def test_one_line_can_be_spoken_by_two_characters(rig) -> None:
     c.post("/presentation/next")                       # butler
     c.post("/presentation/next")                       # handover
 
-    assert [(t, v) for t, v, _ in calls[1:]] == [
-        ("Ik stel mijn collega voor.", "ash"),
-        ("Hoi hoi!", "nova"),
-        ("Dank u.", "ash"),
-    ]
+    assert [asked(calls, t)[0] for t in ("Ik stel mijn collega voor.", "Hoi hoi!", "Dank u.")] \
+        == ["ash", "nova", "ash"]
 
 
 def test_the_markers_are_never_spoken(rig) -> None:
@@ -214,7 +223,7 @@ def test_a_dead_segment_does_not_let_a_half_line_pass_as_whole(rig, monkeypatch)
     sentence in the middle of a talk with nothing anywhere saying so."""
     c, robot, _, _ = rig
 
-    async def only_the_butler(text, voice_id=None, speed=1.0):
+    async def only_the_butler(text, voice_id=None, speed=1.0, instructions=""):
         if voice_id == "nova":
             return None
         return base64.b64encode((voice_id or "?").encode()).decode()
@@ -364,8 +373,8 @@ def test_a_beat_can_ask_for_a_voice_and_a_speed_outright(rig) -> None:
     c.post("/presentation/next")                 # setup — the talk's own voice
     c.post("/presentation/next")                 # fanfare — the gag
 
-    assert calls[0] == ("Oh, I know this one.", "alloy", 1.0)
-    assert calls[1] == ("Ta. Ta. Ta. Taa-ta-taaa.", "onyx", 0.85)
+    assert asked(calls, "Oh, I know this one.") == ("alloy", 1.0)
+    assert asked(calls, "Ta. Ta. Ta. Taa-ta-taaa.") == ("onyx", 0.85)
 
 
 def test_a_named_voice_beats_the_persona(rig) -> None:
@@ -383,7 +392,7 @@ beats:
     text: "Ta."
 """)
     c.post("/presentation/next")
-    assert calls[0][1] == "onyx"
+    assert asked(calls, "Ta.")[0] == "onyx"
 
 
 def test_a_persona_still_decides_when_no_voice_is_named(rig) -> None:
@@ -391,7 +400,7 @@ def test_a_persona_still_decides_when_no_voice_is_named(rig) -> None:
     c, _, _, calls = rig
     _load(c)
     c.post("/presentation/next")
-    assert calls[0] == ("Goedendag.", "ash", 0.95)
+    assert asked(calls, "Goedendag.") == ("ash", 0.95)
 
 
 def test_a_named_speed_applies_without_a_voice(rig) -> None:
@@ -406,4 +415,4 @@ beats:
     text: "Slowly."
 """)
     c.post("/presentation/next")
-    assert calls[0] == ("Slowly.", "alloy", 0.5)
+    assert asked(calls, "Slowly.") == ("alloy", 0.5)

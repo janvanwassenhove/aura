@@ -203,6 +203,12 @@
         <template v-if="presenter.beats.length && !builderOpen">
           <div class="beats-head">
             <h3 class="d2-h3">Beats</h3>
+            <!-- U409: each fixed line is recorded once and played on its cue -->
+            <span v-if="recordings && recordings.total" class="beats-rec" data-test="recordings"
+                  :class="{ bad: recordings.failed }"
+                  title="Each written line is recorded once, so it sounds the same every run and starts on its cue">
+              {{ recordings.ready }} of {{ recordings.total }} lines recorded<template v-if="recordings.rendering"> · recording {{ recordings.rendering }}…</template><template v-if="recordings.failed"> · {{ recordings.failed }} failed</template>
+            </span>
             <span class="spacer" />
             <span class="beats-note">Slide beats fire when you advance the deck · keyword beats when you say the word</span>
           </div>
@@ -215,6 +221,13 @@
               <div class="beat-say">{{ b.say || '—' }}</div>
               <div class="beat-do">{{ b.do }}</div>
             </div>
+            <template v-if="recordingOf(b.id)">
+              <span class="beat-rec" data-test="beat-recording" :data-state="recordingOf(b.id)"
+                    :title="REC_TITLE[recordingOf(b.id)]">{{ REC_LABEL[recordingOf(b.id)] }}</span>
+              <button class="beat-rerec" data-test="rerecord"
+                      title="Record this line again — the new take is the one he plays from now on"
+                      @click="presentation.rerecord(b.id)">re-record</button>
+            </template>
             <span class="beat-kind" :class="b.kind">{{ b.kind }}</span>
           </div>
         </template>
@@ -359,6 +372,21 @@ import { usePresenterStore } from '../stores/presenterStore'
 
 const modeStore = useModeStore()
 const presentation = usePresentationStore()
+
+/** U409: which of the talk's fixed lines are recorded and ready to play. */
+const recordings = computed(() => presentation.status.recordings ?? null)
+function recordingOf(id: string): string {
+  return recordings.value?.beats?.[id] ?? ''
+}
+const REC_LABEL: Record<string, string> = {
+  ready: 'recorded', rendering: 'recording…', failed: 'not recorded', waiting: 'not recorded yet',
+}
+const REC_TITLE: Record<string, string> = {
+  ready: 'Recorded — this take plays on the cue, the same every run',
+  rendering: 'Being recorded now — if the cue comes first, it waits for this take',
+  failed: 'The recording failed — it is tried again when the beat fires',
+  waiting: 'Recorded when it is first said',
+}
 const presenter = usePresenterStore()
 const camera = useCameraFeed()
 
@@ -771,6 +799,19 @@ async function saveAsideBehaviour(key: string, value: string): Promise<void> {
 
 .beats-head { display: flex; align-items: center; gap: 10px; margin: 16px 0 9px; }
 .beats-note { font-size: 12px; color: var(--ink-3); }
+.beats-rec { font-size: 12px; color: var(--ink-3); margin-left: 10px; }
+.beats-rec.bad { color: var(--warn, #d08700); }
+.beat-rec {
+  font-size: 10.5px; padding: 2px 7px; border-radius: 999px; flex-shrink: 0;
+  background: var(--surface-2); color: var(--ink-3);
+}
+.beat-rec[data-state="ready"] { background: var(--ok-wash, rgba(40, 160, 90, 0.12)); color: var(--ok); }
+.beat-rec[data-state="failed"] { background: var(--warn-wash, rgba(200, 150, 20, 0.12)); color: var(--warn, #d08700); }
+.beat-rerec {
+  font-size: 11px; padding: 2px 8px; border-radius: 999px; flex-shrink: 0; cursor: pointer;
+  border: 1px solid var(--line); background: transparent; color: var(--ink-2);
+}
+.beat-rerec:hover { border-color: var(--present); color: var(--present); }
 .beat-row {
   display: flex; gap: 12px; align-items: flex-start; padding: 11px 14px;
   border: 1px solid var(--line); border-radius: 11px; background: var(--surface); margin-bottom: 7px;

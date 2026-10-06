@@ -71,3 +71,16 @@ def _own_mode_policy(monkeypatch, tmp_path):
     yield
     mode_policy.reset_cache_for_tests()
     mode_policy.set_active("work")
+
+
+@pytest.fixture(autouse=True)
+def _own_recordings(monkeypatch, tmp_path):
+    """U409: a talk's lines are recorded to disk and kept between runs. Without
+    this a test would write takes into ./scenarios/recordings, and find the
+    previous test's take of the same words instead of its own."""
+    monkeypatch.setenv("RECORDINGS_DIR", str(tmp_path / "recordings"))
+    from aura_brain import recordings
+
+    recordings.reset()
+    yield
+    recordings.reset()

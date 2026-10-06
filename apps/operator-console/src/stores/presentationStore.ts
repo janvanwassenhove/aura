@@ -59,6 +59,13 @@ export interface PresentationStatus {
   slide?: number
   slide_total?: number
   deck_warnings?: { kind: string; message: string }[]
+  /** U409: the talk's fixed lines, recorded once and played on their cue —
+   *  how many are ready, and per beat id what state its recording is in. A
+   *  failed one is tried again when its beat fires. */
+  recordings?: {
+    ready: number; total: number; failed: number; rendering: number
+    beats: Record<string, 'ready' | 'rendering' | 'failed' | 'waiting'>
+  }
 }
 
 export const usePresentationStore = defineStore('presentation', () => {
@@ -244,6 +251,21 @@ export const usePresentationStore = defineStore('presentation', () => {
     }
   }
 
+  /** U409: another take of one line, or of all of them. The brain answers
+   *  with the status, so the line shows as being recorded at once. */
+  async function rerecord(beatId = ''): Promise<void> {
+    try {
+      const r = await fetch(`${BRAIN_URL}/presentation/rerecord`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(beatId ? { beat_id: beatId } : {}),
+      })
+      if (r.ok) status.value = await r.json()
+      else error.value = (await r.json().catch(() => ({}))).error ?? 'That line could not be recorded again.'
+    } catch {
+      error.value = 'The brain did not respond.'
+    }
+  }
+
   /** U389: forget the talk — what End used to do. */
   async function remove(): Promise<void> {
     busy.value = true
@@ -259,5 +281,5 @@ export const usePresentationStore = defineStore('presentation', () => {
   return { status, subtitle, lastBeat, lastMode, lastPersona, busy, error,
     timeline, cueAt, speakingUntil, speakerPersona,
            applyEvent, fetchStatus, start, startScenario, next, pushSpeech, stop,
-           setRehearsing, fetchScenario, remove }
+           setRehearsing, fetchScenario, remove, rerecord }
 })

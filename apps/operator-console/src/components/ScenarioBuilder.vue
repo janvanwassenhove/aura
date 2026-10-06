@@ -55,6 +55,14 @@
       </span>
     </label>
 
+    <!-- U409: how every line is delivered, unless a beat or its persona says.
+         Sent to the TTS model as its instructions. -->
+    <label class="sb-field">
+      <span>Delivery <em class="sb-hint">how he says the talk's lines, unless a beat or its persona says otherwise</em></span>
+      <input v-model="scenarioDirection" class="sb-input sb-scenario-direction" maxlength="300"
+             placeholder="e.g. warm, unhurried, a smile in the voice" />
+    </label>
+
     <!-- Beats -->
     <div v-for="(b, i) in beats" :key="b._k" class="sb-beat"
          :class="{ 'sb-beat--bad': badBeats.includes(b.id.trim()) }">
@@ -153,6 +161,12 @@
               <option v-for="p in personas" :key="p.id" :value="p.id">{{ p.name }}</option>
             </select>
           </label>
+          <!-- U409: this line's delivery — wins over the persona's and the talk's -->
+          <label class="sb-lbl sb-lbl--direction">Direction
+            <input v-model="b.direction" class="sb-input sb-direction" maxlength="300"
+                   placeholder="e.g. powerful, short"
+                   title="How this line is delivered. Wins over the persona's own way of speaking and the talk's." />
+          </label>
           <label class="sb-lbl">Gesture
             <select v-model="b.gesture" class="sb-input sb-gest">
               <option :value="null">none</option>
@@ -207,6 +221,8 @@ interface FormBeat {
   voice: string; speed: number; pause: number
   /** U394: '' leave as it is | 'on' | 'off', from this beat onwards. */
   wander: string; follow_me: string
+  /** U409: how this line is delivered; '' leaves it to the persona or the talk. */
+  direction: string
   /** U387: only when the scenario wrote it — carried, never invented. */
   once: boolean | null
 }
@@ -217,6 +233,7 @@ const pptx = ref('')
 const scenarioOverlay = ref('')   // U352: '' shown throughout | 'hidden'
 const scenarioWander = ref('')    // U394: '' not said | 'on' | 'off'
 const scenarioFollow = ref('')    // U394: '' not said | 'on' | 'off'
+const scenarioDirection = ref('') // U409: '' not said
 const beats = ref<FormBeat[]>([])
 const saved = ref<{ name: string; title: string; beats: number }[]>([])
 const saveName = ref('')
@@ -238,7 +255,7 @@ function blankBeat(): FormBeat {
            _tkind: 'manual', _tslide: 1, _tword: '', trigger: 'manual',
            text: '', topic: '', guardrails: '', gesture: null, engine: '',
            persona: '', overlay: '', voice: '', speed: 0, pause: 0,
-           wander: '', follow_me: '', once: null }
+           wander: '', follow_me: '', once: null, direction: '' }
 }
 
 /** U394: 'on' / 'off' / '' to what the brain reads — true / false / left out. */
@@ -298,6 +315,8 @@ function toScenario(): object {
     // U394: left out when not chosen - "not said" is the owner's settings.
     ...(scenarioWander.value ? { wander: scenarioWander.value === 'on' } : {}),
     ...(scenarioFollow.value ? { follow_me: scenarioFollow.value === 'on' } : {}),
+    // U409: left out when not written - "not said" lets each persona speak its way.
+    ...(scenarioDirection.value.trim() ? { direction: scenarioDirection.value.trim() } : {}),
     beats: beats.value.map(b => {
       if (b.mode === 'chime_in') b._tkind = 'keyword'
       syncTrigger(b)
@@ -321,6 +340,7 @@ function toScenario(): object {
       if (b.wander) out.wander = b.wander === 'on'
       if (b.follow_me) out.follow_me = b.follow_me === 'on'
       if (b.once !== null) out.once = b.once
+      if (b.direction.trim()) out.direction = b.direction.trim()
       return out
     }),
   }
@@ -342,6 +362,7 @@ function loadScenario(sc: Record<string, unknown>, name = '') {
   scenarioOverlay.value = String(sc.overlay ?? '').toLowerCase() === 'hidden' ? 'hidden' : ''
   scenarioWander.value = onOff(sc.wander)
   scenarioFollow.value = onOff(sc.follow_me)
+  scenarioDirection.value = String(sc.direction ?? '')
   if (name) saveName.value = name
   beats.value = ((sc.beats as Record<string, unknown>[]) ?? []).map((b) => {
     const trig = String(b.trigger ?? 'manual')
@@ -357,6 +378,7 @@ function loadScenario(sc: Record<string, unknown>, name = '') {
       voice: String(b.voice ?? ''), speed: Number(b.speed ?? 0), pause: Number(b.pause ?? 0),
       wander: onOff(b.wander), follow_me: onOff(b.follow_me),
       once: typeof b.once === 'boolean' ? b.once : null,
+      direction: String(b.direction ?? ''),
     }
   })
 }
@@ -442,6 +464,8 @@ defineExpose({ setError: (m: string) => { error.value = m }, loadScenario })
 .sb-row { display: flex; gap: 1rem; }
 .sb-gest { padding: 0.2rem; }
 .sb-persona { padding: 0.2rem; max-width: 12rem; }
+.sb-lbl--direction { flex: 1 1 14rem; }
+.sb-direction { width: 100%; min-width: 10rem; box-sizing: border-box; }
 .sb-overlay { padding: 0.2rem; max-width: 13rem; }
 .sb-hint { font-style: normal; color: var(--text-faint); font-size: 0.72rem; }
 .sb-marker-hint { margin: 0; }

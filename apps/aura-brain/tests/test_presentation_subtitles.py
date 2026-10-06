@@ -78,7 +78,7 @@ def rig(monkeypatch, tmp_path):
     presentation_api._kept = None
     presentation_api._voice_note = ""
 
-    async def tts(text, voice_id=None, speed=1.0):
+    async def tts(text, voice_id=None, speed=1.0, instructions=""):
         return base64.b64encode(PCM).decode()
     monkeypatch.setattr(voice, "synthesize_b64", tts)
     speech_out.forget_all()

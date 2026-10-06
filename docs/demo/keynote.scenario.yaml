@@ -22,6 +22,10 @@ overlay: shown
 wander: on
 follow_me: on
 
+# How he says his lines, unless a beat says otherwise (U409). Each line is
+# recorded when you start the talk, so it sounds the same every run.
+direction: "warm, unhurried, a smile in the voice"
+
 beats:
   # Slide 1 is your title, up while people sit down. Nothing here — the start
   # of the talk already has him wandering.
@@ -65,5 +69,6 @@ beats:
     trigger: slide:31
     mode: speak
     text: "Thank you. I'll be by the coffee — the one not drinking any."
+    direction: "dry, a beat before the punchline"
     wander: off
     gesture: nod

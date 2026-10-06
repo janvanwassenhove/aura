@@ -37,6 +37,14 @@ head nodding with the words, still looking where Follow me points him. For a
 line he should say to the room rather than to you, give that beat
 `follow_me: off`.
 
+**Directing a talk.** A scenario can say how a line is delivered —
+`direction: "powerful, short"` on a beat, a `direction` for the whole talk, and
+each persona has its own *Voice direction* (Robot → Persona). Every written line
+is recorded once when you start the talk, so it sounds the same on every run and
+starts on its cue without waiting for the internet; the Present panel shows how
+many are recorded, and *re-record* takes a line again. See
+`docs/demo/scenario-format.md`.
+
 **Volume** (the slider on the Talk screen and on Robot — one slider): how loud
 he is, wherever he speaks. It sets the robot's own speaker, so his emotion
 sounds follow it as well as his words, and the laptop's speaker when he talks

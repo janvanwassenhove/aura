@@ -59,6 +59,9 @@ class CharacterPersona:
     # console's drawn archetypes (LOOKS). Empty: the character chosen in the
     # console's header, as before.
     look: str = ""
+    # U409: how this character delivers a talk's lines — sent to the TTS model
+    # as its instructions when a beat names no direction of its own.
+    voice_direction: str = ""
 
     def motion_scale(self) -> float:
         return _MOTION_SCALE.get(self.robot_motion_style, 1.0)
@@ -99,6 +102,19 @@ _BUILTIN_LOOKS = {
     "workshop_coach": "host",         # projected voice, theatrical, broad
     "quiet_mode": "orb",              # clear voice, sparse words, gliding
 }
+
+# U409: the way each built-in persona speaks. Filled in on reading a persona
+# file written before directions existed, as U404 does for looks.
+_BUILTIN_DIRECTIONS = {
+    "friendly_assistant": "warm, natural, upbeat",
+    "dry_tech_butler": "dry, unhurried, understated",
+    "kids_companion": "warm, soft, playful",
+    "workshop_coach": "confident, clear, energetic",
+    "quiet_mode": "calm, quiet, plain",
+}
+
+#: U409: the same limit a scenario's direction has.
+VOICE_DIRECTION_MAX = 300
 
 _BUILTINS: list[dict] = [
     dict(id="friendly_assistant", display_name="Friendly Assistant",
@@ -154,6 +170,7 @@ class CharacterStore:
             if not path.exists():
                 seeded = CharacterPersona(**b)
                 seeded.look = _BUILTIN_LOOKS.get(seeded.id, "")
+                seeded.voice_direction = _BUILTIN_DIRECTIONS.get(seeded.id, "")
                 path.write_text(json.dumps(asdict(seeded), indent=2,
                                            ensure_ascii=False), encoding="utf-8")
 
@@ -169,6 +186,8 @@ class CharacterStore:
                     c = CharacterPersona(**known)
                     if "look" not in data:        # U404: seeded before looks existed
                         c.look = _BUILTIN_LOOKS.get(c.id, "")
+                    if "voice_direction" not in data:  # U409: before directions existed
+                        c.voice_direction = _BUILTIN_DIRECTIONS.get(c.id, "")
                     out.append(c)
             except (json.JSONDecodeError, TypeError) as exc:
                 logger.warning("character %s unreadable: %s", f.name, exc)
@@ -185,7 +204,7 @@ class CharacterStore:
                  "interruptibility", "emotional_style", "voice_id",
                  "voice_speed", "robot_motion_style", "greeting_message",
                  "fallback_message", "learned_traits", "language",
-                 "voice_engine", "look"}  # U203, U404
+                 "voice_engine", "look", "voice_direction"}  # U203, U404, U409
 
     def update(self, character_id: str, fields: dict) -> CharacterPersona | None:
         """U85: owner edits a character (Robot panel). Unknown fields ignored."""
@@ -202,6 +221,9 @@ class CharacterStore:
                 continue
             # U404: a look the console cannot draw would leave a blank avatar.
             if k == "look" and str(v).strip().lower() not in ("", *LOOKS):
+                continue
+            # U409: a note on delivery, not an essay — the scenario's limit.
+            if k == "voice_direction" and len(str(v).strip()) > VOICE_DIRECTION_MAX:
                 continue
             setattr(current, k, type(getattr(current, k))(v))
         (self._dir / f"{character_id}.json").write_text(

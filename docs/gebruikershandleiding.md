@@ -37,6 +37,14 @@ antennes bewegen en zijn hoofd knikt mee met de woorden, terwijl hij blijft
 kijken waar Follow me hem laat kijken. Voor een zin die hij tot de zaal moet
 richten in plaats van tot jou, geef je die beat `follow_me: off`.
 
+**Een talk regisseren.** Een scenario kan zeggen hoe een zin gebracht wordt —
+`direction: "powerful, short"` op een beat, een `direction` voor de hele talk,
+en elke persona heeft een eigen *Voice direction* (Robot -> Persona). Elke
+geschreven zin wordt één keer opgenomen wanneer je de talk start, zodat hij bij
+elke run hetzelfde klinkt en op zijn cue start zonder op het internet te
+wachten; het Present-paneel toont hoeveel er opgenomen zijn, en *re-record*
+neemt een zin opnieuw op. Zie `docs/demo/scenario-format.md`.
+
 **Volume** (het schuifje in het Talk-scherm en bij Robot — één schuifje): hoe
 luid hij is, waar hij ook spreekt. Het zet de luidspreker van de robot zelf, dus
 ook zijn emotiegeluiden volgen het, en de luidspreker van de laptop als hij via

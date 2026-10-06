@@ -33,6 +33,9 @@ export interface BeatRow {
   /** U388: the slide it belongs to, so "next" can mean the next slide ahead
    *  rather than the next line in the file. */
   slide?: number | null
+  /** U409: speak | improvise | chime_in | silent — only a speak beat has a
+   *  recording. A beat that does not say is a speak beat, as in the brain. */
+  mode?: string
 }
 
 export function slideOf(b: RawBeat): number | null {
@@ -73,5 +76,6 @@ export function toRows(beats: RawBeat[] | undefined): BeatRow[] {
     say: b.text || b.topic || '',
     do: b.motion ?? b.gesture ?? b.mode ?? '',
     slide: slideOf(b),
+    mode: b.mode ?? 'speak',
   }))
 }

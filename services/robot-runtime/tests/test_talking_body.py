@@ -431,6 +431,8 @@ async def test_his_speaking_gestures_happen_while_he_says_the_line() -> None:
 
 
 async def test_a_line_cut_short_takes_its_gestures_with_it() -> None:
+    """The cue waiting for its moment is interrupted by the line ending — the
+    `except TimeoutError` that U408b corrected (UP041) is this path."""
     robot = _Speaker(cut=0.3)
     engine, bus = await _engine(robot)
     await engine.speak(WORDS, _tone(3.0))

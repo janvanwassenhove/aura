@@ -79,6 +79,8 @@ def main(argv: list[str]) -> int:
     # U394: what the talk asks of his body, in the order the room will see it.
     print(f"  wander          {_stage_plan(scenario, 'wander')}")
     print(f"  follow-me       {_stage_plan(scenario, 'follow_me')}")
+    # U409: how the talk's lines are delivered unless a beat or persona says.
+    print(f"  direction       {scenario.direction or '-'}")
 
     # The things that are legal and still worth a second look.
     for beat in scenario.beats:
@@ -87,6 +89,8 @@ def main(argv: list[str]) -> int:
                   f"{f' at {beat.speed}x' if beat.speed else ''}")
         if beat.pause:
             print(f"  ! {beat.id}: waits {beat.pause}s before speaking")
+        if beat.direction:
+            print(f"  ! {beat.id}: delivered {beat.direction}")
         if beat.mode == "speak" and len(beat.speech_segments()) > 1:
             voices = " then ".join(s.persona or "(the talk's own)"
                                 for s in beat.speech_segments())

@@ -6,7 +6,7 @@ priority: P2
 risk: Medium
 created: "2026-04-25"
 amended: "2026-09-13"
-units: [U27, U205, U206, U207, U208, U246, U263, U263b, U264, U265, U266, U267, U269, U282, U320, U334, U349, U351, U352, U360, U361, U386, U387, U388, U389, U394, U400, U404, U407, U408]
+units: [U27, U205, U206, U207, U208, U246, U263, U263b, U264, U265, U266, U267, U269, U282, U320, U334, U349, U351, U352, U360, U361, U386, U387, U388, U389, U394, U400, U404, U407, U408, U409]
 ---
 
 # Feature Specification: Presentation Copilot
@@ -388,6 +388,32 @@ settings aside as the example.
   `POST /robot/speak` returns when the line ends rather than after them, so the
   next beat is not held back by gestures of the last (U408, spec 016 FR-011c).
 
+- **FR-126**: **A line is directed** (U409). `direction` (≤ 300 characters) on
+  a beat and on the scenario; a character's `voice_direction`, editable in the
+  persona editor, with one for each built-in and filled in on reading a persona
+  file written before it existed. A stretch of a line is delivered by the
+  beat's direction, else that stretch's persona's, else the talk's, else none —
+  so an inline `[persona:x]` speaks its own way unless the beat names one. The
+  direction is sent to the TTS model as `instructions` only when the model can
+  take them (`gpt-4o-mini-tts`; not `tts-1`/`tts-1-hd`); otherwise the line is
+  spoken undirected and `voice_note` says the direction was not applied. An
+  unknown field stays refused (U360). The builder offers both, the pre-flight
+  check prints both.
+- **FR-127**: **A fixed line is recorded once** (U409). On `POST
+  /presentation/scenario` every `speak` beat is synthesized in the background,
+  three at a time, one take per persona stretch; improvised beats are not. A
+  take is keyed by its text, voice, speed, direction and TTS model, kept in
+  memory and on disk (`RECORDINGS_DIR`, default `<SCENARIOS_DIR>/recordings`,
+  the 400 most recently used), so it survives a reload, End and Run again, and
+  a restart. At the cue the recording plays; a take still rendering is awaited,
+  never requested twice; a miss is synthesized then and kept. `status.recordings`
+  reports ready / total / failed / rendering and each speak beat's state; a
+  failed take is not ready, is retried when its beat fires, and the beat raises
+  as before if that fails too (U269). `POST /presentation/rerecord {beat_id?}`
+  drops and re-renders one beat (404 unknown, 422 improvised) or all (409 with
+  no talk). This is what makes SC-002 reachable on a slow connection: the cue
+  no longer waits on the TTS service.
+
 ## Superseded
 
 FR-002's `slide_index`/`speech_cue` script format is retained as the storage
@@ -415,6 +441,7 @@ applies to `slide:N` beats; `manual` and `keyword:` beats have no such deadline.
 | U404 | The projector's avatar is the look of the persona speaking |
 | U407 | In a talk he moves as he speaks — antennae and a nodding head — whichever speaker the room hears him from |
 | U408 | His speaking gestures during the line, not after it — and a beat no longer waits for the last one's gestures |
+| U409 | A scenario directs how a line is spoken — beat, persona, talk — and each fixed line is recorded once, so it sounds the same every run and starts on its cue |
 | U400 | The projector's subtitles start with his voice, last as long as he speaks, and step through the line |
 | U320 | The panel regrouped: locks as chips, status as status, the projector block given the weight it earns, a run button that names its own action, an empty state with the two doors, and help you can put away |
 | U334 | Present mode enforces what it always promised: only the scenario speaks, and no open microphone answers the room |

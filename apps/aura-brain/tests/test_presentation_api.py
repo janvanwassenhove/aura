@@ -68,7 +68,7 @@ def client(monkeypatch):
     # hours. A test that needs an ambient credential is not a test.
     from aura_brain import voice
 
-    async def fake_tts(text, voice_id=None, speed=1.0):
+    async def fake_tts(text, voice_id=None, speed=1.0, instructions=""):
         return "AAAA"          # stand-in base64 PCM; no network, no cost
     monkeypatch.setattr(voice, "synthesize_b64", fake_tts)
 
@@ -328,9 +328,14 @@ def test_speech_error_clears_once_he_is_heard_again(client, monkeypatch) -> None
 
     calls = {"n": 0}
 
+    # U409: the fixed lines are recorded when the talk loads, so "the first
+    # call" is no longer the keyword beat's. Fail the improvised line itself.
     async def flaky(text, *a, **kw):
-        calls["n"] += 1
-        return None if calls["n"] == 1 else "AAAA"
+        if text.startswith("[improv:"):
+            calls["n"] += 1
+            if calls["n"] == 1:
+                return None
+        return "AAAA"
     monkeypatch.setattr(voice, "synthesize_b64", flaky)
 
     c, _, _ = client

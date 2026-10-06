@@ -120,6 +120,116 @@ def _voice_for(persona: str) -> tuple[str, float, str]:
             character.voice_speed or 1.0, "")
 
 
+def _direction_for(beat: Any, persona: str, scenario: Any) -> str:
+    """U409: how a stretch of a line is delivered — the narrowest that says.
+
+    The beat's own `direction`; else the persona speaking that stretch (its
+    `voice_direction`), so a voice handed over mid-line with `[persona:x]`
+    speaks its own way; else the talk's `direction`; else nothing.
+    """
+    own = (getattr(beat, "direction", "") or "").strip()
+    if own:
+        return own
+    if persona:
+        character = _character(persona)
+        theirs = (getattr(character, "voice_direction", "") or "").strip()
+        if theirs:
+            return theirs
+    return (getattr(scenario, "direction", "") or "").strip()
+
+
+def _scenario_now() -> Any:
+    """The talk that is loaded — running, or ended and kept (U389)."""
+    if _runner is not None:
+        return getattr(_runner, "_scenario", None)
+    return _kept
+
+
+def _takes(beat: Any, scenario: Any, text: str | None = None) -> list[tuple[Any, str]]:
+    """Each stretch of the line as it is to be performed — words, voice, speed,
+    direction and model — with what went wrong choosing its voice, if anything.
+
+    The one place both recording ahead (U409) and speaking at the cue decide
+    this, so a recording made at load is the take the cue asks for.
+    """
+    from aura_brain import voice  # noqa: PLC0415 — optional at import time
+    from aura_brain.recordings import Take  # noqa: PLC0415
+
+    persona = getattr(beat, "persona", "") or ""
+    named_voice = (getattr(beat, "voice", "") or "").strip().lower()
+    named_speed = float(getattr(beat, "speed", 0.0) or 0.0)
+    line = getattr(beat, "text", "") if text is None else text
+    model = voice.tts_model()
+    out: list[tuple[Any, str]] = []
+    for segment in split_persona_segments(line or "", persona):
+        # U273: a beat persona outranks the Present screen's voice — the same
+        # order every other speaking path uses.
+        voice_id, speed, why = _voice_for(segment.persona)
+        # U360: a voice named on the beat overrides every segment's — including
+        # the inline `[persona:x]` ones, because a line cannot both be "all in
+        # onyx" and "this bit in somebody else's voice".
+        if named_voice or named_speed:
+            voice_id, speed = named_voice or voice_id, named_speed or speed
+        out.append((Take(text=segment.text, voice=voice_id, speed=float(speed),
+                         direction=_direction_for(beat, segment.persona, scenario),
+                         model=model), why))
+    return out
+
+
+#: U409: the takes each fixed line of the loaded talk was recorded as, so the
+#: status (polled every second while presenting) does not re-read every
+#: persona file for every beat.
+_plan: dict[str, list[Any]] = {}
+
+
+def _prepare(scenario: Scenario) -> None:
+    """U409: record every fixed line of the talk in the background.
+
+    Only `speak` beats: an improvised line does not exist until it fires. Each
+    persona's stretch is its own take, in its own voice, speed and direction.
+    A line already recorded — reloaded, run again, or rehearsed before a
+    restart — is not recorded again.
+    """
+    from aura_brain import recordings  # noqa: PLC0415
+
+    _plan.clear()
+    for beat in scenario.beats:
+        if beat.mode == "speak":
+            _plan[beat.id] = [take for take, _ in _takes(beat, scenario)]
+    try:
+        recordings.store().prepare(t for takes in _plan.values() for t in takes)
+    except Exception as exc:  # noqa: BLE001 — the cue records it then, as before
+        logger.warning("recording the talk's lines could not start: %s", exc)
+
+
+def _recordings_status(scenario: Any) -> dict:
+    """U409: lines ready, being recorded, failed — out of the fixed lines.
+
+    Counted per line, not per voice: a line with two voices is one line, ready
+    when both are. A failed take is not ready; it is tried again when its beat
+    fires, and if that fails too the beat says so (speech_error, U269).
+    """
+    from aura_brain import recordings  # noqa: PLC0415
+
+    store = recordings.store()
+    beats: dict[str, str] = {}
+    for beat in getattr(scenario, "beats", []):
+        if beat.mode != "speak":
+            continue
+        takes = _plan.get(beat.id) or [take for take, _ in _takes(beat, scenario)]
+        states = {store.state(t) for t in takes}
+        for state in (recordings.FAILED, recordings.RENDERING, recordings.WAITING):
+            if state in states:
+                beats[beat.id] = state
+                break
+        else:
+            beats[beat.id] = recordings.READY
+    count = list(beats.values())
+    return {"ready": count.count(recordings.READY), "total": len(count),
+            "failed": count.count(recordings.FAILED),
+            "rendering": count.count(recordings.RENDERING), "beats": beats}
+
+
 async def _speak(text: str, beat: Any = None) -> None:
     """Say a beat OUT LOUD.
 
@@ -153,32 +263,21 @@ async def _speak(text: str, beat: Any = None) -> None:
     if _robot is None:
         raise RuntimeError("no robot is connected, so nothing could be said out loud")
 
-    from aura_brain import voice  # noqa: PLC0415 — optional at import time
+    from aura_brain import recordings, voice  # noqa: PLC0415 — optional at import time
 
     persona = getattr(beat, "persona", "") or ""
-    named_voice = (getattr(beat, "voice", "") or "").strip().lower()
-    named_speed = float(getattr(beat, "speed", 0.0) or 0.0)
-    segments = split_persona_segments(text, persona)
-    if not segments:
+    takes = _takes(beat, _scenario_now(), text)
+    if not takes:
         return
-    # U273: the Present screen has its own Voice dropdown, and this call
-    # ignored it — `synthesize_b64(text)` resolves with no mode and no
-    # persona, so every beat came out in the Settings default no matter what
-    # the presenter had chosen for the talk. A beat persona now outranks it,
-    # which is the same order every other speaking path already uses.
-    chosen = [_voice_for(s.persona) for s in segments]
-    # U360: a voice named on the beat overrides every segment's — including the
-    # inline `[persona:x]` ones, because a line cannot both be "all in onyx"
-    # and "this bit in somebody else's voice"; the beat said onyx, so onyx.
-    if named_voice or named_speed:
-        chosen = [(named_voice or v, named_speed or sp, why) for v, sp, why in chosen]
-
-    # Synthesized together, not one after the other: a slide-triggered beat has
-    # 500 ms to start speaking (SC-002), and three sequential round-trips would
-    # spend that budget on a line the presenter meant as a flourish.
+    # U409: a fixed line plays its recording — the same take every run, and no
+    # round-trip at the cue; one still being recorded is waited for, never
+    # asked for twice. An improvised line is new every time and is performed
+    # now. Either way the stretches go together, not one after the other: a
+    # slide-triggered beat has 500 ms to start speaking (SC-002).
+    fixed = getattr(beat, "mode", "") == "speak" and text == getattr(beat, "text", None)
+    store = recordings.store()
     audio = await asyncio.gather(*(
-        voice.synthesize_b64(segment.text, voice_id, speed)
-        for segment, (voice_id, speed, _) in zip(segments, chosen)))
+        store.take(take) if fixed else recordings.perform(take) for take, _ in takes))
 
     if any(part is None for part in audio):
         # Text-only reaches the robot as a log line. Saying so is the whole
@@ -190,12 +289,19 @@ async def _speak(text: str, beat: Any = None) -> None:
             "speech could not be synthesized (no TTS key or the provider "
             "failed), so the robot had nothing to play")
 
-    _voice_note = " ".join(dict.fromkeys(p for _, _, p in chosen if p))
+    notes = [why for _, why in takes if why]
+    # U409: constitution XI — a direction the model cannot take is said, not
+    # quietly dropped. The line was still spoken, undirected.
+    directed = next((t.direction for t, _ in takes if t.direction), "")
+    if directed and not voice.direction_applies():
+        notes.append(f"the TTS model {voice.tts_model()} cannot take a direction, "
+                     f"so {directed!r} was not applied")
+    _voice_note = " ".join(dict.fromkeys(notes))
     # U364: the robot's speaker, or this laptop if that is what the owner
     # chose. The joined utterance is the same either way.
     from aura_brain import speech_out  # noqa: PLC0415
 
-    line = " ".join(s.text for s in segments)
+    line = " ".join(take.text for take, _ in takes)
     await speech_out.deliver(
         _robot, _bus, line, voice.join_pcm_b64(list(audio), _HANDOVER_MS),
         # U400: announced as it starts, with its real length, for the overlay.
@@ -323,6 +429,7 @@ async def load_scenario(body: dict) -> JSONResponse:
     _runner = ScenarioRunner(
         scenario, speak=_speak, generate=_generate, gesture=_gesture, on_event=_on_event)
     _kept = scenario
+    _prepare(scenario)               # U409: every fixed line, before its cue
 
     # U263: ALWAYS start watching. The old code asked once whether a slideshow
     # was already up and, if not, created no watcher at all - so setting the
@@ -419,6 +526,43 @@ async def set_rehearsing(body: dict) -> JSONResponse:
     return JSONResponse(_status_payload())
 
 
+@router.post("/rerecord")
+async def rerecord(body: dict | None = None) -> JSONResponse:
+    """U409: another take of one line (`beat_id`), or of every fixed line.
+
+    The take that is there is dropped and a new one recorded in the background;
+    the next cue plays the new one, and every run after it. 409 when no talk is
+    loaded, 404 for a beat that is not in it, 422 for one that is improvised —
+    it has no recording, it is written when it fires.
+    """
+    from aura_brain import recordings  # noqa: PLC0415
+
+    scenario = _scenario_now()
+    if scenario is None:
+        return JSONResponse({"error": "no presentation loaded"}, status_code=409)
+    beat_id = str((body or {}).get("beat_id") or "").strip()
+    if beat_id:
+        beat = next((b for b in scenario.beats if b.id == beat_id), None)
+        if beat is None:
+            return JSONResponse({"error": f"there is no beat {beat_id!r} in this talk"},
+                                status_code=404)
+        if beat.mode != "speak":
+            return JSONResponse(
+                {"error": f"{beat_id!r} is {beat.mode}: it is written when it fires, "
+                          f"so there is no recording to take again"}, status_code=422)
+        targets = [beat]
+    else:
+        targets = [b for b in scenario.beats if b.mode == "speak"]
+    takes = []
+    for beat in targets:
+        _plan[beat.id] = [take for take, _ in _takes(beat, scenario)]
+        takes += _plan[beat.id]
+    store = recordings.store()
+    store.forget(takes)
+    store.prepare(takes)
+    return JSONResponse(_status_payload())
+
+
 @router.get("/scenario")
 async def active_scenario() -> JSONResponse:
     """The scenario that is loaded, so it can be EDITED rather than retyped.
@@ -463,6 +607,10 @@ def _status_payload() -> dict:
     # U349: he was heard, but not as the scenario asked. Distinct from
     # speech_error, which means he was not heard at all.
     out["voice_note"] = _voice_note
+    # U409: which lines are recorded and ready to play on their cue.
+    scenario = getattr(_runner, "_scenario", None)
+    if scenario is not None:
+        out["recordings"] = _recordings_status(scenario)
 
     state = _watcher.state if _watcher is not None else None
     out["watching"] = _watcher is not None
