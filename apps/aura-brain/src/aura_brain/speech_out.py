@@ -47,6 +47,11 @@ KEEP = 8
 
 _waiting: "OrderedDict[str, bytes]" = OrderedDict()
 
+#: U407: a talk's lines on the laptop, kept until the window playing each says
+#: it has started — then handed to the robot to move along with. Kept as long
+#: as `_waiting` keeps its lines, and for the same reason.
+_along: "OrderedDict[str, tuple[Any, str]]" = OrderedDict()
+
 
 def output() -> str:
     """Where speech should be played. Read live, so the toggle applies at once.
@@ -85,6 +90,7 @@ def pending() -> int:
 
 def forget_all() -> None:
     _waiting.clear()
+    _along.clear()
 
 
 def _hold(pcm: bytes) -> str:
@@ -108,7 +114,7 @@ async def deliver(robot: Any, bus: Any, text: str, audio_b64: str | None,
     playing window reports starting.
     """
     if output() == LAPTOP:
-        return await _offer(bus, text, audio_b64, subtitle)
+        return await _offer(bus, text, audio_b64, subtitle, robot=robot)
     if robot is None:
         return False
     if subtitle is not None:
@@ -178,8 +184,11 @@ async def stop(robot: Any, bus: Any) -> None:
 
 
 async def _offer(bus: Any, text: str, audio_b64: str | None,
-                 subtitle: dict | None = None) -> bool:
-    """Hold one piece of audio for the console and tell it so."""
+                 subtitle: dict | None = None, robot: Any = None) -> bool:
+    """Hold one piece of audio for the console and tell it so.
+
+    U407: a talk's line is also kept for the robot, to move along with once
+    the room starts hearing it."""
     if not audio_b64:
         return False
     try:
@@ -196,6 +205,10 @@ async def _offer(bus: Any, text: str, audio_b64: str | None,
     from shared_schemas.events.audio import SpeechAudioReady  # noqa: PLC0415
 
     utterance_id = _hold(pcm)
+    if subtitle is not None and robot is not None:
+        _along[utterance_id] = (robot, audio_b64)
+        while len(_along) > KEEP:
+            _along.popitem(last=False)
     if subtitle is not None:
         # U400: before the line is offered, so it is known before it can play.
         await _announce(bus, subtitle, len(pcm) / (SAMPLE_RATE * CHANNELS * BITS // 8),
@@ -239,7 +252,35 @@ async def speech_started(utterance_id: str, body: dict | None = None) -> JSONRes
 
         await _bus.publish(SpeechLineStarted(
             session_id="default", utterance_id=utterance_id, duration_s=seconds))
-    return JSONResponse({"ok": True})
+    return JSONResponse({"ok": True, "robot": await _move_along(utterance_id)})
+
+
+async def _move_along(utterance_id: str) -> str:
+    """U407: the robot moves with a talk's line the laptop has started playing.
+
+    Asked for as "ensure while talking antenna's are moving and head moving up
+    & down ... as if actually talking". On the laptop the robot used to be told
+    nothing, and stood still while the room heard him. It is told now, at the
+    start the playing window reports — the moment the room starts hearing it.
+
+    The Pi is older than the app: a 404 or any failure costs the line nothing
+    (it is already playing) and is said, not swallowed.
+    """
+    held = _along.pop(utterance_id, None)
+    if held is None:
+        return "not a talk's line"
+    robot, audio_b64 = held
+    try:
+        await robot.talk_along(audio_b64)
+    except Exception as exc:  # noqa: BLE001 — the line plays whatever the robot does
+        status = getattr(getattr(exc, "response", None), "status_code", None)
+        if status == 404:
+            logger.warning("the robot is older than this app: it stands still while "
+                           "the laptop speaks (no /robot/speak/along)")
+            return "the robot is older than this app and cannot move along"
+        logger.warning("the robot could not move along with the line: %s", exc)
+        return f"the robot could not move along: {exc}"
+    return "moving along"
 
 
 @router.get("/speech/{utterance_id}.wav")

@@ -31,7 +31,11 @@ MSI rather than silently — you will see the wizard.
 laptop. The voice is identical either way - the same audio is synthesized once
 and only the speaker changes - so a bigger room can hear him through the laptop
 without losing his character. That holds for every word, the live engine
-included, and Stop (or talking over him) silences the laptop as well.
+included, and Stop (or talking over him) silences the laptop as well. In a
+presentation he moves as he speaks from either speaker: antennas going and his
+head nodding with the words, still looking where Follow me points him. For a
+line he should say to the room rather than to you, give that beat
+`follow_me: off`.
 
 **Volume** (the slider on the Talk screen and on Robot — one slider): how loud
 he is, wherever he speaks. It sets the robot's own speaker, so his emotion

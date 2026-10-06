@@ -6407,3 +6407,63 @@ animation loop.
 neither switches nor lists, a known face that does not become the speaker
 (and still does at work), the camera tag and the Mind panel saying someone
 (five red before).
+
+### U407 — in a talk he moves as he speaks
+
+Asked: *"in present mode -> when the robot has to say anything (following the
+scenario) -> ensure while talking antenna's are moving and head moving up &
+down while looking to audience (as if actually talking)"*.
+
+**What was actually wrong** — on each speaker, something different:
+
+- **His own speaker.** A talk's line is one whole utterance, and playing it
+  holds the motion lock for its whole length so that no gesture cuts the line.
+  The U157 antenna loop, which is what moves the antennae while he talks, was
+  only ever started by the *streamed* path — and it stands down whenever the
+  lock is held. So in a talk the antennae never moved. The head had the SDK's
+  audio-reactive sway (U157/U158), and that was all.
+- **The laptop** (U364). Nothing was sent to the robot. With the PA as his
+  speaker, the room heard him from the hall and saw a robot standing still.
+
+**The change.** A line he plays himself starts the antenna loop for its
+length, and his own voice holding the lock lets the antennae through (a
+gesture holding it still does not — U157's rule). A talk's line on the laptop
+is kept by the brain and, when the window playing it reports it has started
+(U400's start), handed to the robot with a new `POST /robot/speak/along` — the
+same audio, moved along with and never played. The robot runs the SDK's own
+speech tapper over it and sends the head offsets, one per 50 ms hop, through
+the daemon's speech-offset channel, which is composed with the face tracker's
+aim before IK: the nod is laid over wherever follow-me points him, and it is
+the same motion his own speaker produces. Zeroed at the end and on Stop; not
+asleep; a 404 from an older robot is said and costs the line nothing. Decided
+in ADR-018, with the alternatives (an envelope from the brain, head targets,
+the SDK's GLib wobbler) and why not.
+
+"While looking to audience": where he looks is still `follow_me`'s. On, he
+nods at the face nearest him, normally the presenter's; `off` on a beat and he
+faces forward, at the room. Written into the guides and the scenario format.
+
+**Verified on the robot** (wandering on, Stand), sampling the daemon's state
+at 25 Hz: a 3 s line from the laptop moved head pitch over 0.115 rad and the
+antennae over 0.40 rad, against 0.001 and 0 in the 1.5 s before; a line on his
+own speaker — which first waited 1.8 s for an emotion that held the lock —
+swung the antennae to +0.50/+0.34 rad and back while it played. The laptop half
+of the brain is covered by tests through the real runtime on the fake robot;
+the running AURA picks it up on its next start.
+
+**Not done**: an ordinary reply on the laptop still does not move him (not
+asked; the talk is). The persona's speaking gestures still queue behind a
+whole line's lock and play after it, as before.
+
+**Drawing**: media paths, panel 3 — the laptop route is no longer "nothing
+reaches the robot".
+
+**Tests**: twenty — in the runtime, antennae during a line he plays (and
+still not through a gesture), the nod, laid over the tracker rather than
+replacing it, spread over the line, the antennae on a laptop line, Stop,
+asleep, an SDK without the tapper, and the route (200, 422, 409, 501); in the
+brain, moved along with at the window's start and not before, once, not on his
+own speaker, an older robot and a failing one costing nothing, Stop, ordinary
+replies untouched, and the client against the real runtime (sixteen red
+before).
+

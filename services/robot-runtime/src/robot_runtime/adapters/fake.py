@@ -171,6 +171,16 @@ class FakeRobotAdapter(RobotAdapter):
         """U155: gapless segment playback — recorded like play_audio."""
         self._played_audio.append(audio_bytes)
 
+    async def talk_along(self, audio_bytes: bytes, sample_rate: int = 24_000) -> dict:
+        """U407: a line the laptop plays — recorded by its length, not played,
+        and not moved either: the fake has no head to nod."""
+        if not hasattr(self, "talked_along"):
+            self.talked_along: list[float] = []
+        seconds = len(audio_bytes) / 2 / sample_rate if sample_rate else 0.0
+        self.talked_along.append(seconds)
+        return {"moving": True, "seconds": round(seconds, 3),
+                "head": "recorded, not moved: this is the fake robot"}
+
     async def aim(self, yaw: float = 0.0, pitch: float = 0.0,
                   body_yaw: float | None = None, duration: float = 0.35) -> dict:
         """U161: manual head/torso aim — records the last commanded direction."""

@@ -4,7 +4,9 @@
 U384** (2026-10-03). As shipped in U364 the decision held and the code did not:
 the reply path passed an undefined name to `deliver()`, and the event that tells
 the console to fetch the line was never broadcast. The live engine, listed below
-as the exception, is what the owner heard instead.
+as the exception, is what the owner heard instead. Since U407 a talk's line
+on the laptop is also handed to the robot — to move along with, never to play
+([ADR-018](ADR-018-he-moves-with-the-voice-the-room-hears.md)).
 **Date**: 2026-10-02
 **Owner**: aura-brain / speech_out, operator-console / playback
 **Related**: [ADR-005](ADR-005-voice-pipeline.md) (the speech paths),

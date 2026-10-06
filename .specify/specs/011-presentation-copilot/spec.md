@@ -6,7 +6,7 @@ priority: P2
 risk: Medium
 created: "2026-04-25"
 amended: "2026-09-13"
-units: [U27, U205, U206, U207, U208, U246, U263, U263b, U264, U265, U266, U267, U269, U282, U320, U334, U349, U351, U352, U360, U361, U386, U387, U388, U389, U394, U400, U404]
+units: [U27, U205, U206, U207, U208, U246, U263, U263b, U264, U265, U266, U267, U269, U282, U320, U334, U349, U351, U352, U360, U361, U386, U387, U388, U389, U394, U400, U404, U407]
 ---
 
 # Feature Specification: Presentation Copilot
@@ -373,6 +373,18 @@ settings aside as the example.
   longer drives the projector's subtitle, which used to appear after the line
   had been heard, as one block held for a guess.
 
+- **FR-125**: **He looks like the one talking** (U407). While a beat's line
+  plays he moves with it — antennae going, head nodding with the words over
+  wherever he is looking (spec 016 FR-011b) — from either speaker. Through the
+  laptop the brain keeps each line it offers the console and, when the window
+  playing it reports `POST /speech/{id}/started`, hands the same audio to the
+  robot with `POST /robot/speak/along`: once, at the moment the room starts
+  hearing it, never before, and not after a Stop. The start answers what
+  happened (`robot`: moving along, older than this app, or why not); a 404 or a
+  failure never costs the line or its subtitle. Ordinary replies on the laptop
+  are not part of this. Where he looks stays `follow_me`'s: on, the face nearest
+  him; `off` on a beat, straight ahead at the room.
+
 ## Superseded
 
 FR-002's `slide_index`/`speech_cue` script format is retained as the storage
@@ -398,6 +410,7 @@ applies to `slide:N` beats; `manual` and `keyword:` beats have no such deadline.
 | U389 | End keeps the talk: Run again, Edit or Remove |
 | U394 | Wander and follow-me in a scenario, with a keynote and a conference talk as worked examples |
 | U404 | The projector's avatar is the look of the persona speaking |
+| U407 | In a talk he moves as he speaks — antennae and a nodding head — whichever speaker the room hears him from |
 | U400 | The projector's subtitles start with his voice, last as long as he speaks, and step through the line |
 | U320 | The panel regrouped: locks as chips, status as status, the projector block given the weight it earns, a run button that names its own action, an empty state with the two doors, and help you can put away |
 | U334 | Present mode enforces what it always promised: only the scenario speaks, and no open microphone answers the room |

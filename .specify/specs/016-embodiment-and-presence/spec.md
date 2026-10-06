@@ -5,7 +5,7 @@ owner: "robot-runtime"
 priority: P1
 risk: Medium
 created: "2026-09-05"
-units: [U16, U36a, U36d, U36g, U37, U51, U99, U100, U101, U102, U111, U116, U126, U127, U137, U138, U139, U147, U157, U158, U161, U162, U164, U165, U175, U196, U212, U219, U237, U238, U252b, U252d, U253, U268, U270, U286, U325, U326, U328, U336, U341, U341b, U357, U357b, U359, U365]
+units: [U16, U36a, U36d, U36g, U37, U51, U99, U100, U101, U102, U111, U116, U126, U127, U137, U138, U139, U147, U157, U158, U161, U162, U164, U165, U175, U196, U212, U219, U237, U238, U252b, U252d, U253, U268, U270, U286, U325, U326, U328, U336, U341, U341b, U357, U357b, U359, U365, U407]
 ---
 
 # Feature Specification: Embodiment and Presence
@@ -282,6 +282,22 @@ while he is speaking, so that a conversation looks like a conversation.
   contact. The reply gesture on the typed path is **started**, not awaited: it
   used to be awaited before synthesis even began, which added its whole
   duration to every answer — a move, a silence, then a voice (U326).
+- **FR-011b**: **He moves while he talks, wherever his voice comes out**
+  (U407). A line he plays himself — streamed or whole — keeps his antennae
+  moving for as long as it lasts (an accent every 1.2–2.4 s, `TALK_ANTENNAS`):
+  a whole line holds the motion lock so no gesture can cut it, and his own
+  voice holding it lets the antennae through, which a gesture holding it does
+  not. A line the laptop plays (`AUDIO_OUTPUT=laptop`) can be handed to him with
+  `POST /robot/speak/along` — the same PCM, moved along with and never played:
+  the same antennae, and the head nodding through the daemon's speech offsets,
+  one per 50 ms hop from the SDK's own speech tapper over that audio, zeroed at
+  the end or on Stop. Offsets are composed with the tracker's aim before IK —
+  the channel the SDK's sway uses from his own speaker — so the nod is laid
+  over wherever follow-me points him and never takes the head from it.
+  Asleep or disconnected it answers 409 and nothing moves; an SDK without the
+  tapper moves the antennae and says the head stays still. Measured on the
+  robot: head pitch over 0.115 rad and antennae over 0.40 rad during a 3 s
+  laptop line, against 0.001 and 0 before it (ADR-018).
 - **FR-010**: The re-acquire sweep follows the room: nothing while a face is in
   view, `IDLE_SCAN_LOST_S` after one was just lost, `IDLE_SCAN_S` once nobody
   has been seen for `IDLE_SCAN_RECENT_S` (U325). The sweep leaves the head
@@ -353,6 +369,7 @@ while he is speaking, so that a conversation looks like a conversation.
 | U270 | Battery, in the three states it can actually be in |
 | U336 | The brain follows the robot to a new network instead of reporting offline until somebody scans by hand |
 | U365 | The event bridge follows him too, a disconnect stops repeating itself, and the console keeps asking |
+| U407 | He moves while he talks on either speaker: antennae through his own voice's lock, and a line the laptop plays moved along with — a nod laid over follow-me through the speech offsets |
 | U328 | Antenna reactions: an antenna-led vocabulary, head-and-antennae in one command, and one tone classification feeding both |
 | U326 | Conversational body language both ways: acknowledging while someone speaks, moving with what he says, and a reply gesture that no longer delays the reply |
 | U325 | `gaze`: looking at someone without taking follow-me away; the face position the recogniser already had; a sweep whose cadence follows the room |

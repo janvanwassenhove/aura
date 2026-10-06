@@ -129,6 +129,13 @@ class RobotClient:
         return (await self._request(
             "POST", "/robot/speak/segment", {"audio_b64": audio_b64})).json().get("ok", False)
 
+    async def talk_along(self, audio_b64: str) -> dict:
+        """U407: move as if saying this line — it is playing on the laptop.
+        The robot nods and moves its antennae for the line's length and plays
+        nothing. A 404 is a robot older than this call."""
+        return (await self._request(
+            "POST", "/robot/speak/along", {"audio_b64": audio_b64})).json()
+
     async def execute_motion(self, command: MotionCommand) -> bool:
         body = command.model_dump(mode="json")
         return (await self._request("POST", "/robot/motion", body)).json().get("ok", False)

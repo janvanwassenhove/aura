@@ -164,6 +164,41 @@ async def speak_segment(body: dict) -> JSONResponse:
     return JSONResponse({"ok": True, "path": "playbin"})
 
 
+@router.post("/robot/speak/along")
+async def speak_along(body: dict) -> JSONResponse:
+    """U407: move as if saying this line, without playing it.
+
+    For a talk's line that the laptop plays (U364): the room hears it there,
+    and the robot moves with it — antennae, and a head that nods over wherever
+    follow-me points it. The brain sends it when the window playing the line
+    says it has started. Answers once the movement has begun. 422 no audio,
+    409 he cannot now (asleep, not connected), 501 an adapter with no body.
+    """
+    assert adapter is not None
+    _touch()
+    mover = getattr(adapter, "talk_along", None)
+    if mover is None:
+        return JSONResponse({"error": "adapter cannot move along with a line"}, status_code=501)
+    audio_b64 = body.get("audio_b64")
+    if not audio_b64:
+        return JSONResponse({"error": "audio_b64 is required"}, status_code=422)
+    import base64
+    import binascii
+
+    try:
+        audio_bytes = base64.b64decode(audio_b64, validate=True)
+    except (binascii.Error, ValueError):
+        return JSONResponse({"error": "audio_b64 is not valid base64"}, status_code=422)
+    try:
+        rate = int(body.get("sample_rate") or 24_000)
+    except (TypeError, ValueError):
+        return JSONResponse({"error": "sample_rate is not a number"}, status_code=422)
+    result = await mover(audio_bytes, rate)
+    if not result.get("moving"):
+        return JSONResponse({"error": result.get("reason") or "not moving"}, status_code=409)
+    return JSONResponse(result)
+
+
 @router.get("/robot/audio/stream")
 async def audio_stream(raw: bool = False):
     """U154 conversation-session mode: stream the mic continuously as raw

@@ -32,6 +32,10 @@ deze laptop. De stem is in beide gevallen identiek - dezelfde audio wordt een
 keer gemaakt en alleen de speaker verschilt - dus een grotere zaal kan hem via
 de laptop horen zonder dat hij zijn karakter verliest. Dat geldt voor elk woord,
 ook in de live-modus, en Stop (of door hem heen praten) legt ook de laptop stil.
+In een presentatie beweegt hij terwijl hij spreekt, uit welke speaker ook: zijn
+antennes bewegen en zijn hoofd knikt mee met de woorden, terwijl hij blijft
+kijken waar Follow me hem laat kijken. Voor een zin die hij tot de zaal moet
+richten in plaats van tot jou, geef je die beat `follow_me: off`.
 
 **Volume** (het schuifje in het Talk-scherm en bij Robot — één schuifje): hoe
 luid hij is, waar hij ook spreekt. Het zet de luidspreker van de robot zelf, dus

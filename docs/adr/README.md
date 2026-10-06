@@ -29,6 +29,7 @@ loses the reason.
 | [015](ADR-015-wandering-is-a-layer-not-a-setting.md) | Wandering is a layer over follow-me, not a change to it | Accepted 2026-10-03 — implemented in U393 |
 | [016](ADR-016-his-emotions-are-the-robots-recordings.md) | His emotions are the robot's own recordings, played by the daemon | Accepted 2026-10-03 — implemented in U395 |
 | [017](ADR-017-a-fair-is-a-mode.md) | A fair is a mode: where he is decides what he may reach and whether he wanders | Accepted 2026-10-03 — implemented in U397 |
+| [018](ADR-018-he-moves-with-the-voice-the-room-hears.md) | He moves with the voice the room hears, wherever it comes out | Accepted 2026-10-06 — implemented in U407 |
 
 ## Reading order for someone new
 

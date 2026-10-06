@@ -145,6 +145,14 @@ class ReachyRobotAdapter(RobotAdapter):
         self._aec_active = False
         # U157: conversational body language while speaking + idle re-acquire.
         self._talk_task: asyncio.Task | None = None
+        # U407: until when he is saying a line (monotonic) — one he plays
+        # himself, or one the laptop plays that he moves along with — and
+        # whether the motion lock is held by his own voice, which antennae may
+        # move through but a gesture may not.
+        self._talk_until = 0.0
+        self._speech_holds_lock = False
+        # U407: the head nodding along with a line the laptop is playing.
+        self._along_task: asyncio.Task | None = None
         # U325: where WE last pointed the head, in the operator frame, so a
         # gaze nudge can be relative to it. It is only meaningful while the
         # daemon's tracker has no face — when it has one, it owns the head and
@@ -971,6 +979,14 @@ class ReachyRobotAdapter(RobotAdapter):
             except Exception as exc:  # noqa: BLE001 — scan is best-effort
                 logger.debug("idle scan failed: %s", exc)
 
+    # U157's cadence: an antenna accent every 1.2–2.4 s while he talks.
+    TALK_GAP_S = (1.2, 2.4)
+
+    def _talk_deadline(self) -> float:
+        """U407: when the line he is saying ends — streamed, played whole, or
+        played by the laptop."""
+        return max(self._appsrc_until, self._talk_until)
+
     def _ensure_talk_task(self) -> None:
         """U157: start the talking-antenna loop for the current utterance."""
         if os.environ.get("TALK_ANTENNAS", "true").lower() != "true":
@@ -979,31 +995,42 @@ class ReachyRobotAdapter(RobotAdapter):
             self._talk_task = asyncio.ensure_future(self._talk_gesture_loop())
 
     async def _talk_gesture_loop(self) -> None:
-        """Subtle antenna accents while streamed speech is playing — antennas
-        don't touch the head, so face tracking (and the wobbler) keep working.
-        Ends by itself shortly after the playback clock runs out."""
+        """Subtle antenna accents while he speaks — antennas don't touch the
+        head, so face tracking (and the wobbler) keep working. Ends by itself
+        shortly after the line runs out.
+
+        U407: "while he speaks" now means every line, not only a streamed one.
+        A whole line holds the motion lock so that no gesture cuts it, and this
+        loop used to stand down whenever the lock was held — so a talk's lines,
+        which are whole, never moved the antennae at all. His own voice holding
+        the lock lets them through; a gesture holding it still does not."""
         import random
         import time
 
         try:
-            while self._mini is not None and time.monotonic() < self._appsrc_until + 0.5:
-                await asyncio.sleep(random.uniform(1.2, 2.4))
+            while self._mini is not None and time.monotonic() < self._talk_deadline() + 0.5:
+                await asyncio.sleep(random.uniform(*self.TALK_GAP_S))
                 mini = self._mini
-                if mini is None or time.monotonic() >= self._appsrc_until:
+                if mini is None or time.monotonic() >= self._talk_deadline():
                     break
-                if self._motion_lock.locked():
+                through_his_voice = self._speech_holds_lock
+                if self._motion_lock.locked() and not through_his_voice:
                     continue
                 a = random.uniform(0.25, 0.55) * random.choice((1.0, -1.0))
                 b = a * random.uniform(0.3, 1.0)
-                async with self._motion_lock:
-                    def _wiggle() -> None:
-                        # U158: body_yaw=None — the default 0.0 silently spun
-                        # the torso back to centre on EVERY wiggle, turning the
-                        # robot away from the person he's talking to.
-                        mini.goto_target(antennas=[a, b], duration=0.5, body_yaw=None)
-                        mini.goto_target(antennas=[0.0, 0.0], duration=0.7, body_yaw=None)
 
+                def _wiggle() -> None:
+                    # U158: body_yaw=None — the default 0.0 silently spun
+                    # the torso back to centre on EVERY wiggle, turning the
+                    # robot away from the person he's talking to.
+                    mini.goto_target(antennas=[a, b], duration=0.5, body_yaw=None)
+                    mini.goto_target(antennas=[0.0, 0.0], duration=0.7, body_yaw=None)
+
+                if through_his_voice:
                     await asyncio.to_thread(_wiggle)
+                else:
+                    async with self._motion_lock:
+                        await asyncio.to_thread(_wiggle)
         except asyncio.CancelledError:
             pass
         except Exception as exc:  # noqa: BLE001 — decoration only
@@ -1025,6 +1052,10 @@ class ReachyRobotAdapter(RobotAdapter):
         if self._emotion_task is not None:
             self._emotion_task.cancel()
             self._emotion_task = None
+        if self._along_task is not None:
+            self._along_task.cancel()
+            self._along_task = None
+        self._talk_until = 0.0
         if self._doa_client is not None:
             try:
                 await self._doa_client.aclose()
@@ -1139,7 +1170,7 @@ class ReachyRobotAdapter(RobotAdapter):
         rendered in the console, not on the speaker.
         """
         if audio_bytes:
-            await self.play_audio(audio_bytes)
+            await self.play_audio(audio_bytes, talking=True)
         else:
             logger.info("Reachy speak (no audio payload): %r", text[:80])
 
@@ -1150,8 +1181,12 @@ class ReachyRobotAdapter(RobotAdapter):
         *,
         normalize: bool = True,
         tail_margin: float = 0.4,
+        talking: bool = False,
     ) -> None:
         """Play PCM s16le mono. Default rate 24 kHz (OpenAI TTS output).
+
+        U407: `talking` — this is a line he says, so his antennae move with it
+        (`speak` passes it; a dance's groove does not).
 
         U153 streaming: when playing a reply as consecutive segments, pass
         ``normalize=False`` (each segment's own peak would otherwise be pushed
@@ -1224,7 +1259,17 @@ class ReachyRobotAdapter(RobotAdapter):
 
         self._audio_abort.clear()
         async with self._motion_lock:  # hold the lock so nothing cuts the speech
-            await asyncio.to_thread(_play)
+            if talking:
+                import time
+
+                self._speech_holds_lock = True
+                seconds = len(audio_bytes) / 2 / sample_rate if sample_rate else 0.0
+                self._talk_until = max(self._talk_until, time.monotonic() + seconds)
+                self._ensure_talk_task()
+            try:
+                await asyncio.to_thread(_play)
+            finally:
+                self._speech_holds_lock = False
 
     # U329: streamed speech reached the speaker about 9 dB quieter than
     # spoken speech, which is what "zijn audio is heel stil" was. The
@@ -1321,7 +1366,99 @@ class ReachyRobotAdapter(RobotAdapter):
             except Exception:  # noqa: BLE001 — flush is best-effort
                 pass
         self._appsrc_until = 0.0
+        # U407: and whatever he was moving along with stops with the voice.
+        self._talk_until = 0.0
+        if self._along_task is not None and not self._along_task.done():
+            self._along_task.cancel()
         return True
+
+    # ------------------------------------------------------------------
+    # U407: moving along with a line the laptop plays
+    # ------------------------------------------------------------------
+
+    _REST = (0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+
+    async def talk_along(self, audio_bytes: bytes, sample_rate: int = 24_000) -> dict:
+        """Move as if saying this line, without playing it.
+
+        For when his voice comes out of the laptop (U364): the room hears it
+        from there, and he should still look like the one talking. The antennae
+        move as they do for a line he plays himself; the head nods through the
+        daemon's speech offsets — the channel the SDK's own audio-reactive sway
+        uses, composed on top of the tracker's aim before IK. So he keeps
+        looking where follow-me points him, and the nod is the same motion the
+        SDK makes from his own speaker, driven by the same analysis of the
+        same audio. A head *target* would take the head from the tracker.
+
+        Returns at once; the movement runs for the length of the line.
+        """
+        import time
+
+        mini = self._mini
+        if mini is None:
+            return {"moving": False, "seconds": 0.0, "reason": "not connected"}
+        if sleep_state.is_asleep():
+            return {"moving": False, "seconds": 0.0, "reason": "asleep"}
+        pcm = np.frombuffer(audio_bytes, dtype=np.int16).astype(np.float32) / 32768.0
+        seconds = len(pcm) / sample_rate if sample_rate else 0.0
+        if seconds <= 0.0:
+            return {"moving": False, "seconds": 0.0, "reason": "no audio"}
+        start = time.monotonic()
+        self._talk_until = max(self._talk_until, start + seconds)
+        self._ensure_talk_task()
+        sway = self._sway(pcm, sample_rate)
+        if sway is None:
+            head = "still: this SDK has no speech tapper"
+        else:
+            if self._along_task is not None and not self._along_task.done():
+                self._along_task.cancel()
+            hop_s, offsets = sway
+            self._along_task = asyncio.ensure_future(
+                self._nod_along(mini, hop_s, offsets, start))
+            head = "nodding"
+        return {"moving": True, "seconds": round(seconds, 3), "head": head}
+
+    @staticmethod
+    def _sway(pcm: np.ndarray, sample_rate: int) -> tuple[float, list[tuple]] | None:
+        """The SDK's speech tapper over the whole line: one head offset per hop.
+        None when this SDK has none — then only the antennae move."""
+        try:
+            from reachy_mini.motion import speech_tapper
+        except Exception:  # noqa: BLE001 — an older or newer SDK without it
+            return None
+        hops = speech_tapper.SwayRollRT(sample_rate=int(sample_rate)).feed(pcm)
+        offsets = [(h["x_mm"] / 1000.0, h["y_mm"] / 1000.0, h["z_mm"] / 1000.0,
+                    h["roll_rad"], h["pitch_rad"], h["yaw_rad"]) for h in hops]
+        return speech_tapper.HOP_MS / 1000.0, offsets
+
+    async def _nod_along(self, mini: Any, hop_s: float, offsets: list[tuple],
+                         start: float) -> None:
+        """Each hop at its moment in the line; at rest when it ends or stops."""
+        import time
+
+        try:
+            for i, offset in enumerate(offsets):
+                late = time.monotonic() - (start + i * hop_s)
+                if late < 0:
+                    await asyncio.sleep(-late)
+                elif late > hop_s:
+                    continue                  # behind: skip to where the line is
+                if self._mini is not mini or sleep_state.is_asleep():
+                    break
+                self._speech_offsets(mini, offset)
+        except asyncio.CancelledError:
+            pass
+        finally:
+            self._speech_offsets(mini, self._REST)
+
+    @staticmethod
+    def _speech_offsets(mini: Any, offsets: tuple) -> None:
+        try:
+            from reachy_mini.io.protocol import SetSpeechOffsetsCmd
+
+            mini.client.send_command(SetSpeechOffsetsCmd(offsets=[float(o) for o in offsets]))
+        except Exception as exc:  # noqa: BLE001 — decoration never breaks a line
+            logger.debug("speech offsets not sent: %s", exc)
 
     # ------------------------------------------------------------------
     # U138: dance music — a tiny synthesized groove so the moves have a beat

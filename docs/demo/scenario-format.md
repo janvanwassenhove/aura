@@ -159,6 +159,11 @@ line cannot be both "all in onyx" and "this bit in somebody else's voice".
   The tracker cannot tell the presenter from the audience — that is why the
   keynote stops wandering at slide 2, where follow-me alone keeps him on the
   face nearest to him: yours.
+- **He moves as he speaks.** Every line — from his own speaker or the
+  laptop's — keeps his antennas going and his head nodding with the words,
+  laid over wherever he is looking; nothing in the scenario turns it on (U407).
+  For a line to the room rather than to you, put `follow_me: off` on that beat:
+  he faces forward and nods there.
 - **Wandering never makes him speak.** On stage only the scenario speaks; while
   wandering he turns towards voices, nothing more. He never wanders asleep.
 - **Two worked examples**: [`keynote.scenario.yaml`](keynote.scenario.yaml)
