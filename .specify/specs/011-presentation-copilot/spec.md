@@ -6,7 +6,7 @@ priority: P2
 risk: Medium
 created: "2026-04-25"
 amended: "2026-09-13"
-units: [U27, U205, U206, U207, U208, U246, U263, U263b, U264, U265, U266, U267, U269, U282, U320, U334, U349, U351, U352, U360, U361, U386, U387, U388, U389, U394, U400, U404, U407, U408, U409]
+units: [U27, U205, U206, U207, U208, U246, U263, U263b, U264, U265, U266, U267, U269, U282, U320, U334, U349, U351, U352, U360, U361, U386, U387, U388, U389, U394, U400, U404, U407, U408, U409, U410]
 ---
 
 # Feature Specification: Presentation Copilot
@@ -414,6 +414,24 @@ settings aside as the example.
   no talk). This is what makes SC-002 reachable on a slow connection: the cue
   no longer waits on the TTS service.
 
+- **FR-128**: **A talk's lines are on the robot before their cues** (U410).
+  Once a fixed line is recorded, the brain sends it — joined as the robot
+  plays it — to the robot in the background, one line at a time, asking first
+  whether he holds it (`POST /robot/takes/held`) and storing it if not (`POST
+  /robot/takes`). A line is named by a hash of its audio, so a re-recorded take
+  is a new name and the robot never plays the take it replaced. At the cue a
+  line he holds is played by name (`/robot/speak` and `/robot/speak/along`
+  accept `take`); a name he does not hold answers 409, and the line goes with
+  its audio in the same cue and is sent again. A name is sent only to a robot
+  that has answered `held` — an older one would play nothing and say ok
+  (U269); a 404 marks him older and every cue carries the audio as before. The
+  robot keeps takes on disk (`ROBOT_TAKES_DIR`, default `~/.cache/aura/takes`,
+  the 300 most recently used), keys checked to be hex before they become file
+  names. `status.recordings` adds `on_robot`, `robot` (holds / older /
+  unknown) and `sending`; the Present view says how many lines he holds, or
+  that he is older and each line travels at its cue. Measured on home Wi-Fi: a
+  5 s line at the cue cost 79 ms median (313 kB); its name, 27 ms (46 bytes).
+
 ## Superseded
 
 FR-002's `slide_index`/`speech_cue` script format is retained as the storage
@@ -442,6 +460,7 @@ applies to `slide:N` beats; `manual` and `keyword:` beats have no such deadline.
 | U407 | In a talk he moves as he speaks — antennae and a nodding head — whichever speaker the room hears him from |
 | U408 | His speaking gestures during the line, not after it — and a beat no longer waits for the last one's gestures |
 | U409 | A scenario directs how a line is spoken — beat, persona, talk — and each fixed line is recorded once, so it sounds the same every run and starts on its cue |
+| U410 | A talk's recorded lines are on the robot before their cues, so on a hotspot the cue carries a name instead of the audio |
 | U400 | The projector's subtitles start with his voice, last as long as he speaks, and step through the line |
 | U320 | The panel regrouped: locks as chips, status as status, the projector block given the weight it earns, a run button that names its own action, an empty state with the two doors, and help you can put away |
 | U334 | Present mode enforces what it always promised: only the scenario speaks, and no open microphone answers the room |

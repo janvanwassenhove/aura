@@ -207,7 +207,10 @@
             <span v-if="recordings && recordings.total" class="beats-rec" data-test="recordings"
                   :class="{ bad: recordings.failed }"
                   title="Each written line is recorded once, so it sounds the same every run and starts on its cue">
-              {{ recordings.ready }} of {{ recordings.total }} lines recorded<template v-if="recordings.rendering"> · recording {{ recordings.rendering }}…</template><template v-if="recordings.failed"> · {{ recordings.failed }} failed</template>
+              {{ recordings.ready }} of {{ recordings.total }} lines recorded<template v-if="recordings.rendering"> · recording {{ recordings.rendering }}…</template><template v-if="recordings.failed"> · {{ recordings.failed }} failed</template><!--
+              U410: and which of them are on the robot already, so the cue names
+              them instead of carrying the audio over the Wi-Fi.
+              --><template v-if="recordings.robot === 'holds'"> · {{ recordings.on_robot ?? 0 }} on the robot<template v-if="recordings.sending"> (sending {{ recordings.sending }} to the robot…)</template></template><template v-else-if="recordings.robot === 'older'"> · the robot is older than this app: each line travels at its cue</template>
             </span>
             <span class="spacer" />
             <span class="beats-note">Slide beats fire when you advance the deck · keyword beats when you say the word</span>

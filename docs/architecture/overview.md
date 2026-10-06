@@ -39,7 +39,7 @@ Wi-Fi link runs one way: the laptop calls the robot, never the reverse.
 The robot carries the transducers; the laptop does the thinking. No model runs
 on the Pi and no key reaches it.
 
-![The media paths: the camera makes one JPEG at request time, downscaled on the Pi and pulled one frame at a time (0.22–0.28 s flat, where the MJPEG stream drifted to 2.5 s); the microphone returns 16 kHz mono plus a raw peak so silence is dropped before transcription; text-to-speech runs on the laptop and the robot is posted PCM it plays and moves with — or, when the laptop is the speaker, a talk's line to move along with and never play.](../diagrams/media-paths.svg)
+![The media paths: the camera makes one JPEG at request time, downscaled on the Pi and pulled one frame at a time (0.22–0.28 s flat, where the MJPEG stream drifted to 2.5 s); the microphone returns 16 kHz mono plus a raw peak so silence is dropped before transcription; text-to-speech runs on the laptop and the robot is posted PCM it plays and moves with — or, when the laptop is the speaker, a talk's line to move along with and never play; a talk's recorded lines are sent to him ahead of their cues and named at the cue.](../diagrams/media-paths.svg)
 
 ### What happens when something stops answering
 

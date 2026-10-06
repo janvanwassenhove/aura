@@ -50,7 +50,7 @@ _waiting: "OrderedDict[str, bytes]" = OrderedDict()
 #: U407: a talk's lines on the laptop, kept until the window playing each says
 #: it has started — then handed to the robot to move along with. Kept as long
 #: as `_waiting` keeps its lines, and for the same reason.
-_along: "OrderedDict[str, tuple[Any, str]]" = OrderedDict()
+_along: "OrderedDict[str, tuple[Any, str, str]]" = OrderedDict()
 
 
 def output() -> str:
@@ -102,7 +102,7 @@ def _hold(pcm: bytes) -> str:
 
 
 async def deliver(robot: Any, bus: Any, text: str, audio_b64: str | None,
-                  subtitle: dict | None = None) -> bool:
+                  subtitle: dict | None = None, take: str = "") -> bool:
     """Play one line. Returns whether it was actually handed anywhere.
 
     Never pretends: a line with no audio reports False rather than looking
@@ -112,13 +112,30 @@ async def deliver(robot: Any, bus: Any, text: str, audio_b64: str | None,
     as it starts — before the robot is handed it (its `speak` returns only
     once it has finished playing), or tied to the laptop's line id, which the
     playing window reports starting.
+
+    U410: `take` is the key of a talk's line the robot may already hold. If he
+    does, only that name travels at the cue; if he has lost it (409), the
+    audio goes in this same cue and the line is sent to him again.
     """
     if output() == LAPTOP:
-        return await _offer(bus, text, audio_b64, subtitle, robot=robot)
+        return await _offer(bus, text, audio_b64, subtitle, robot=robot, take=take)
     if robot is None:
         return False
     if subtitle is not None:
         await _announce(bus, subtitle, _seconds(audio_b64), "")
+    from aura_brain import robot_takes  # noqa: PLC0415
+
+    held = robot_takes.store()
+    if take and held.holds(take):
+        try:
+            await robot.speak(text, take=take)
+            return True
+        except Exception as exc:  # noqa: BLE001 — only "he does not have it" is ours
+            if robot_takes.status_of(exc) != 409:
+                raise
+            held.lost(take)
+            if audio_b64:
+                held.resend(robot, take, audio_b64)
     await robot.speak(text, audio_b64=audio_b64)
     return True
 
@@ -184,7 +201,7 @@ async def stop(robot: Any, bus: Any) -> None:
 
 
 async def _offer(bus: Any, text: str, audio_b64: str | None,
-                 subtitle: dict | None = None, robot: Any = None) -> bool:
+                 subtitle: dict | None = None, robot: Any = None, take: str = "") -> bool:
     """Hold one piece of audio for the console and tell it so.
 
     U407: a talk's line is also kept for the robot, to move along with once
@@ -206,7 +223,7 @@ async def _offer(bus: Any, text: str, audio_b64: str | None,
 
     utterance_id = _hold(pcm)
     if subtitle is not None and robot is not None:
-        _along[utterance_id] = (robot, audio_b64)
+        _along[utterance_id] = (robot, audio_b64, take)
         while len(_along) > KEEP:
             _along.popitem(last=False)
     if subtitle is not None:
@@ -269,9 +286,9 @@ async def _move_along(utterance_id: str) -> str:
     held = _along.pop(utterance_id, None)
     if held is None:
         return "not a talk's line"
-    robot, audio_b64 = held
+    robot, audio_b64, take = held
     try:
-        await robot.talk_along(audio_b64)
+        await _talk_along(robot, audio_b64, take)
     except Exception as exc:  # noqa: BLE001 — the line plays whatever the robot does
         status = getattr(getattr(exc, "response", None), "status_code", None)
         if status == 404:
@@ -281,6 +298,23 @@ async def _move_along(utterance_id: str) -> str:
         logger.warning("the robot could not move along with the line: %s", exc)
         return f"the robot could not move along: {exc}"
     return "moving along"
+
+
+async def _talk_along(robot: Any, audio_b64: str, take: str) -> None:
+    """U410: by name when he has the line, with the audio when he does not."""
+    from aura_brain import robot_takes  # noqa: PLC0415
+
+    held = robot_takes.store()
+    if take and held.holds(take):
+        try:
+            await robot.talk_along(take=take)
+            return
+        except Exception as exc:  # noqa: BLE001
+            if robot_takes.status_of(exc) != 409:
+                raise
+            held.lost(take)
+            held.resend(robot, take, audio_b64)
+    await robot.talk_along(audio_b64)
 
 
 @router.get("/speech/{utterance_id}.wav")

@@ -106,6 +106,14 @@ async def speak(body: dict) -> JSONResponse:
             audio_bytes = base64.b64decode(audio_b64)
         except Exception:
             return JSONResponse({"error": "audio_b64 is not valid base64"}, status_code=422)
+    elif body.get("take"):
+        # U410: a line sent ahead, named at the cue. One he does not have is a
+        # 409 the brain answers by sending the audio — never a speak that
+        # plays nothing and says ok (U269).
+        audio_bytes = _takes().get(str(body["take"]))
+        if audio_bytes is None:
+            return JSONResponse({"error": "that take is not here", "take": body["take"]},
+                                status_code=409)
     # U359: an unhandled exception here became a bare 500, and a bare 500 sent
     # the owner to a page about HTTP status codes in the middle of a talk:
     # "Server error '500 Internal Server Error' … For more information check:
@@ -164,6 +172,57 @@ async def speak_segment(body: dict) -> JSONResponse:
     return JSONResponse({"ok": True, "path": "playbin"})
 
 
+# ── U410: a talk's lines, sent ahead of their cue ───────────────────────────
+
+def _takes():
+    """The robot's store of takes (robot_runtime.takes). A path and nothing
+    else, so it is made per request and ROBOT_TAKES_DIR is read live."""
+    from robot_runtime.takes import TakeStore
+
+    return TakeStore()
+
+
+@router.post("/robot/takes")
+async def store_take(body: dict) -> JSONResponse:
+    """U410: keep one recorded line, under the brain's key, until its cue.
+
+    Sent in the background when a talk is loaded, so that at the cue a name
+    travels instead of the audio — on a phone's hotspot, the difference
+    between a line on time and a line late. 422 for a key that is not one (it
+    becomes a file name) or audio that is not base64.
+    """
+    import base64
+    import binascii
+
+    from robot_runtime.takes import is_key
+
+    _touch()
+    key = str(body.get("key") or "")
+    if not is_key(key):
+        return JSONResponse({"error": "key must be a take's hex key"}, status_code=422)
+    audio_b64 = body.get("audio_b64")
+    if not audio_b64:
+        return JSONResponse({"error": "audio_b64 is required"}, status_code=422)
+    try:
+        pcm = base64.b64decode(audio_b64, validate=True)
+    except (binascii.Error, ValueError):
+        return JSONResponse({"error": "audio_b64 is not valid base64"}, status_code=422)
+    try:
+        _takes().put(key, pcm)
+    except OSError as exc:
+        return JSONResponse({"error": f"could not keep it: {exc}"}, status_code=507)
+    return JSONResponse({"key": key, "bytes": len(pcm)})
+
+
+@router.post("/robot/takes/held")
+async def held_takes(body: dict) -> JSONResponse:
+    """U410: which of these takes he already has — so a brain that restarted,
+    or a talk run again, sends only what is missing."""
+    _touch()
+    keys = [str(k) for k in (body.get("keys") or [])][:1000]
+    return JSONResponse({"held": _takes().held(keys)})
+
+
 @router.post("/robot/speak/along")
 async def speak_along(body: dict) -> JSONResponse:
     """U407: move as if saying this line, without playing it.
@@ -180,15 +239,22 @@ async def speak_along(body: dict) -> JSONResponse:
     if mover is None:
         return JSONResponse({"error": "adapter cannot move along with a line"}, status_code=501)
     audio_b64 = body.get("audio_b64")
-    if not audio_b64:
+    if not audio_b64 and body.get("take"):
+        # U410: the line was sent ahead; nothing but its name travels now.
+        audio_bytes = _takes().get(str(body["take"]))
+        if audio_bytes is None:
+            return JSONResponse({"error": "that take is not here", "take": body["take"]},
+                                status_code=409)
+    elif not audio_b64:
         return JSONResponse({"error": "audio_b64 is required"}, status_code=422)
-    import base64
-    import binascii
+    else:
+        import base64
+        import binascii
 
-    try:
-        audio_bytes = base64.b64decode(audio_b64, validate=True)
-    except (binascii.Error, ValueError):
-        return JSONResponse({"error": "audio_b64 is not valid base64"}, status_code=422)
+        try:
+            audio_bytes = base64.b64decode(audio_b64, validate=True)
+        except (binascii.Error, ValueError):
+            return JSONResponse({"error": "audio_b64 is not valid base64"}, status_code=422)
     try:
         rate = int(body.get("sample_rate") or 24_000)
     except (TypeError, ValueError):

@@ -94,12 +94,19 @@ class RobotClient:
     async def disconnect(self) -> bool:
         return (await self._request("POST", "/robot/disconnect")).json().get("connected", True)
 
-    async def speak(self, text: str, audio_b64: str | None = None) -> bool:
+    async def speak(self, text: str, audio_b64: str | None = None,
+                    take: str | None = None) -> bool:
         """Speak on the robot. With ``audio_b64`` (PCM s16le mono 24 kHz) the
-        robot plays real synthesized speech; without it, text-only (logged)."""
+        robot plays real synthesized speech; without it, text-only (logged).
+
+        U410: ``take`` names a line sent ahead (`store_take`) instead of
+        carrying it. Only for a robot that keeps takes — an older one would
+        play nothing and say ok — and a 409 means he does not have it."""
         body: dict = {"text": text}
         if audio_b64:
             body["audio_b64"] = audio_b64
+        elif take:
+            body["take"] = take
         return (await self._request("POST", "/robot/speak", body)).json().get("ok", False)
 
     async def stream_audio(self):
@@ -129,12 +136,23 @@ class RobotClient:
         return (await self._request(
             "POST", "/robot/speak/segment", {"audio_b64": audio_b64})).json().get("ok", False)
 
-    async def talk_along(self, audio_b64: str) -> dict:
+    async def talk_along(self, audio_b64: str | None = None, take: str | None = None) -> dict:
         """U407: move as if saying this line — it is playing on the laptop.
         The robot nods and moves its antennae for the line's length and plays
-        nothing. A 404 is a robot older than this call."""
+        nothing. A 404 is a robot older than this call. U410: ``take`` names a
+        line he was sent ahead; 409 if he does not have it."""
+        body = {"audio_b64": audio_b64} if audio_b64 else {"take": take}
+        return (await self._request("POST", "/robot/speak/along", body)).json()
+
+    async def held_takes(self, keys: list[str]) -> list[str]:
+        """U410: which of these lines he already has. 404 on an older robot."""
         return (await self._request(
-            "POST", "/robot/speak/along", {"audio_b64": audio_b64})).json()
+            "POST", "/robot/takes/held", {"keys": keys})).json().get("held", [])
+
+    async def store_take(self, key: str, audio_b64: str) -> dict:
+        """U410: send one recorded line ahead of its cue."""
+        return (await self._request(
+            "POST", "/robot/takes", {"key": key, "audio_b64": audio_b64})).json()
 
     async def execute_motion(self, command: MotionCommand) -> bool:
         body = command.model_dump(mode="json")

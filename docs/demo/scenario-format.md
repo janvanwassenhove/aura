@@ -182,6 +182,10 @@ waits for that recording; it never asks for a second one.
   beat fires, and if that fails too the panel says he was not heard.
 - **Improvised lines are not recorded** — they do not exist until the beat
   fires, and they are meant to be new every time.
+- **The recorded lines go to the robot ahead of their cues** (U410), one at a
+  time in the background, so on a phone's hotspot the cue sends a name, not the
+  line. The Present panel says how many he holds. A robot older than this app
+  gets each line at its cue, as before, and the panel says so.
 
 ## The things that bite
 

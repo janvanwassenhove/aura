@@ -65,6 +65,11 @@ export interface PresentationStatus {
   recordings?: {
     ready: number; total: number; failed: number; rendering: number
     beats: Record<string, 'ready' | 'rendering' | 'failed' | 'waiting'>
+    /** U410: lines the robot already holds, so the cue names them; whether he
+     *  can hold them at all; and how many are still on their way to him. */
+    on_robot?: number
+    robot?: 'holds' | 'older' | 'unknown'
+    sending?: number
   }
 }
 

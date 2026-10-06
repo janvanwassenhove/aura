@@ -41,8 +41,10 @@ line he should say to the room rather than to you, give that beat
 `direction: "powerful, short"` on a beat, a `direction` for the whole talk, and
 each persona has its own *Voice direction* (Robot → Persona). Every written line
 is recorded once when you start the talk, so it sounds the same on every run and
-starts on its cue without waiting for the internet; the Present panel shows how
-many are recorded, and *re-record* takes a line again. See
+starts on its cue without waiting for the internet. The recorded lines are also
+sent to the robot ahead of their cues, so on a phone's hotspot only a line's name
+travels when it is said. The Present panel shows how many are recorded and how
+many the robot holds, and *re-record* takes a line again. See
 `docs/demo/scenario-format.md`.
 
 **Volume** (the slider on the Talk screen and on Robot — one slider): how loud

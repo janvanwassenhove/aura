@@ -176,6 +176,34 @@ def _takes(beat: Any, scenario: Any, text: str | None = None) -> list[tuple[Any,
     return out
 
 
+async def _joined(takes: list[Any]) -> str | None:
+    """U410: a line as the robot plays it — its recordings (awaited if still
+    being made), joined into one utterance. None if any of it failed."""
+    from aura_brain import recordings, voice  # noqa: PLC0415
+
+    store = recordings.store()
+    audio = await asyncio.gather(*(store.take(t) for t in takes))
+    if not all(audio):
+        return None
+    return voice.join_pcm_b64(list(audio), _HANDOVER_MS)
+
+
+def _send_ahead(beat_ids: list[str] | None = None, *, replace: bool = True) -> None:
+    """U410: send the talk's recorded lines to the robot before their cues."""
+    from aura_brain import robot_takes  # noqa: PLC0415
+
+    ids = list(_plan) if beat_ids is None else beat_ids
+    lines = []
+    for beat_id in ids:
+        takes = _plan.get(beat_id) or []
+        if takes:
+            lines.append((beat_id, lambda t=takes: _joined(t)))
+    try:
+        robot_takes.store().send_ahead(_robot, lines, replace=replace)
+    except Exception as exc:  # noqa: BLE001 — the cue sends the audio, as before
+        logger.warning("the talk's lines could not be sent to the robot ahead: %s", exc)
+
+
 #: U409: the takes each fixed line of the loaded talk was recorded as, so the
 #: status (polled every second while presenting) does not re-read every
 #: persona file for every beat.
@@ -200,6 +228,7 @@ def _prepare(scenario: Scenario) -> None:
         recordings.store().prepare(t for takes in _plan.values() for t in takes)
     except Exception as exc:  # noqa: BLE001 — the cue records it then, as before
         logger.warning("recording the talk's lines could not start: %s", exc)
+    _send_ahead()                    # U410: and to the robot, before their cues
 
 
 def _recordings_status(scenario: Any) -> dict:
@@ -225,9 +254,15 @@ def _recordings_status(scenario: Any) -> dict:
         else:
             beats[beat.id] = recordings.READY
     count = list(beats.values())
+    # U410: which lines the robot already holds, so the cue names them.
+    from aura_brain import robot_takes  # noqa: PLC0415
+
+    held = robot_takes.store()
+    on_robot = sum(1 for beat_id in beats if held.holds_line(beat_id))
     return {"ready": count.count(recordings.READY), "total": len(count),
             "failed": count.count(recordings.FAILED),
-            "rendering": count.count(recordings.RENDERING), "beats": beats}
+            "rendering": count.count(recordings.RENDERING), "beats": beats,
+            "on_robot": on_robot, "robot": held.state(), "sending": held.sending()}
 
 
 async def _speak(text: str, beat: Any = None) -> None:
@@ -302,11 +337,21 @@ async def _speak(text: str, beat: Any = None) -> None:
     from aura_brain import speech_out  # noqa: PLC0415
 
     line = " ".join(take.text for take, _ in takes)
+    joined = voice.join_pcm_b64(list(audio), _HANDOVER_MS)
+    # U410: a fixed line may already be on the robot; then its name is enough.
+    # Named by its audio, so a new take is never mistaken for the one it replaced.
+    line_key = ""
+    if fixed:
+        from aura_brain import robot_takes  # noqa: PLC0415
+
+        line_key = robot_takes.key_of(joined)
+        robot_takes.store().named[str(getattr(beat, "id", ""))] = line_key
     await speech_out.deliver(
-        _robot, _bus, line, voice.join_pcm_b64(list(audio), _HANDOVER_MS),
+        _robot, _bus, line, joined,
         # U400: announced as it starts, with its real length, for the overlay.
         subtitle={"text": line, "persona": persona,
-                  "beat_id": str(getattr(beat, "id", "") or "")})
+                  "beat_id": str(getattr(beat, "id", "") or "")},
+        take=line_key)
 
 
 async def _gesture(name: str) -> None:
@@ -560,6 +605,7 @@ async def rerecord(body: dict | None = None) -> JSONResponse:
     store = recordings.store()
     store.forget(takes)
     store.prepare(takes)
+    _send_ahead([b.id for b in targets], replace=False)   # U410: the new take, ahead
     return JSONResponse(_status_payload())
 
 

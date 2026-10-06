@@ -42,8 +42,10 @@ richten in plaats van tot jou, geef je die beat `follow_me: off`.
 en elke persona heeft een eigen *Voice direction* (Robot -> Persona). Elke
 geschreven zin wordt één keer opgenomen wanneer je de talk start, zodat hij bij
 elke run hetzelfde klinkt en op zijn cue start zonder op het internet te
-wachten; het Present-paneel toont hoeveel er opgenomen zijn, en *re-record*
-neemt een zin opnieuw op. Zie `docs/demo/scenario-format.md`.
+wachten. De opgenomen zinnen gaan ook vooraf naar de robot, zodat op de
+hotspot van je gsm enkel de naam van een zin over de lijn gaat wanneer hij
+gezegd wordt. Het Present-paneel toont hoeveel er opgenomen zijn en hoeveel de
+robot er heeft, en *re-record* neemt een zin opnieuw op. Zie `docs/demo/scenario-format.md`.
 
 **Volume** (het schuifje in het Talk-scherm en bij Robot — één schuifje): hoe
 luid hij is, waar hij ook spreekt. Het zet de luidspreker van de robot zelf, dus

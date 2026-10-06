@@ -6600,3 +6600,48 @@ the hand-over, the undirectable model, the voice module and the persona field
 (14), the recordings (12), the pre-flight check (1), the console (8: builder,
 persona editor, Present view). Red first: all but the guards that pin what must not change.
 
+### U410 — a talk's lines are on the robot before their cue
+
+Asked (translated): *"can we add preloading to decrease delay/latency of e.g.
+wifi hotspot? other improvements?"*
+
+**What was left after U409.** The TTS service was out of the cue, but with the
+robot as the speaker the line itself still crossed the Wi-Fi when the beat
+fired: a whole utterance of PCM in one `POST /robot/speak`, 313 kB as sent for
+five seconds. On a phone's hotspot, upload bandwidth is the scarce thing.
+
+**The change.** The robot keeps takes on disk (`robot_runtime/takes.py`,
+`ROBOT_TAKES_DIR`, default `~/.cache/aura/takes`, the 300 most recently used;
+a key is checked to be hex before it becomes a file name), with `POST
+/robot/takes` and `POST /robot/takes/held`; `/robot/speak` and
+`/robot/speak/along` accept `take` and answer 409 for one they do not have.
+The brain (`robot_takes.py`) sends each recorded line, joined as he plays it,
+in the background, one at a time, asking first whether he has it; the cue
+names it, and a 409 sends the audio in the same cue and the line again for
+next time. Status says `on_robot`, whether he can hold takes at all, and how
+many are on their way; the Present view says it in words.
+
+**A first version was wrong, and a test caught it.** Lines were named from the
+takes' inputs. A re-record keeps those inputs, so the new take had the old
+name — the robot said he had it and kept playing the take the presenter had
+replaced. Lines are now named by a hash of their audio.
+
+**Older robots.** One without `/robot/takes` would ignore `take` and play
+nothing while answering ok (U269). A name is only sent after he has answered
+`held`; a 404 marks him older and every cue carries the audio, as before.
+
+**Verified on the robot**: a 3 s line stored (144 kB on disk), reported held,
+played by name (`audio: true`); an unknown name 409; a path-shaped key 422.
+**Measured from the laptop on home Wi-Fi**, seven of each: a cue carrying a
+5 s line cost **79 ms** median (137 ms worst); carrying its name, **27 ms**
+(37 ms worst). Not measured on a hotspot — the robot was on home Wi-Fi — where
+the gap is the one that matters and will be larger.
+
+**Drawing**: media paths, panel 3 — a fourth row, `POST /robot/takes`.
+**ADR-019** gets an addendum.
+
+**Tests**: twenty-three — the robot's store and routes (12, the key check five
+ways), the brain sending ahead, by name at the cue, only what is missing, a
+lost line in the same cue, an older robot, a new take, an improvised line, the
+laptop path (8), and the Present view (3). Red first: all of them.
+

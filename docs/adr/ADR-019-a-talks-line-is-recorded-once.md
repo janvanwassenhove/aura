@@ -1,6 +1,7 @@
 # ADR-019: A talk's line is recorded once, and played on its cue
 
-**Status**: **Accepted — implemented in U409** (2026-10-06).
+**Status**: **Accepted — implemented in U409** (2026-10-06); **extended in
+U410**: the takes are sent to the robot ahead of their cues (see the addendum).
 **Date**: 2026-10-06
 **Owner**: aura-brain / recordings, presentation_api
 **Related**: [spec 011](../../.specify/specs/011-presentation-copilot/spec.md)
@@ -66,3 +67,29 @@ SC-002's 500 ms.
 - Moving a take to the robot still happens at the cue when the robot is the
   speaker; on a slow link that transfer is what is left (a separate step:
   sending takes to the robot ahead).
+
+## Addendum — U410: the robot holds the takes
+
+Asked (translated): *"can we add preloading to decrease delay/latency of e.g.
+wifi hotspot?"* — the consequence this ADR left open. With the robot as the
+speaker each line still crossed the Wi-Fi at its cue.
+
+**Decision.** Once a line is recorded, the brain sends it to the robot in the
+background (one at a time, only what he lacks), and the cue names it.
+
+- **Named by its audio**, a hash of the joined line. A name from the takes'
+  inputs was the first version, and it let a re-recorded take — same words,
+  voice and direction — keep the old take's name, so the robot would have
+  played the take the presenter had just replaced.
+- **Only to a robot that has said it keeps takes.** An older runtime ignores
+  `take` and answers a speak with no audio by playing nothing and saying ok —
+  the exact silence U269 was about. A 404 on `held` marks him older for good.
+- **A 409 is answered in the same cue**: the line goes with its audio and is
+  sent again for next time. The room never waits for the fallback to be
+  decided elsewhere.
+
+**Rejected**: compressing the audio (Opus) instead — smaller at the cue, still
+at the cue, and a decoder on the Pi in the playback path; streaming the line
+to the robot as it plays — the round-trip is the cost, not the bandwidth alone;
+the robot synthesizing — it holds no keys and must not.
+
