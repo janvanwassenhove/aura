@@ -5,7 +5,7 @@ owner: "robot-runtime"
 priority: P1
 risk: Medium
 created: "2026-09-05"
-units: [U16, U36a, U36d, U36g, U37, U51, U99, U100, U101, U102, U111, U116, U126, U127, U137, U138, U139, U147, U157, U158, U161, U162, U164, U165, U175, U196, U212, U219, U237, U238, U252b, U252d, U253, U268, U270, U286, U325, U326, U328, U336, U341, U341b, U357, U357b, U359, U365, U407, U408]
+units: [U16, U36a, U36d, U36g, U37, U51, U99, U100, U101, U102, U111, U116, U126, U127, U137, U138, U139, U147, U157, U158, U161, U162, U164, U165, U175, U196, U212, U219, U237, U238, U252b, U252d, U253, U268, U270, U286, U325, U326, U328, U336, U341, U341b, U357, U357b, U359, U365, U407, U408, U408b]
 ---
 
 # Feature Specification: Embodiment and Presence
@@ -386,6 +386,7 @@ while he is speaking, so that a conversation looks like a conversation.
 | U365 | The event bridge follows him too, a disconnect stops repeating itself, and the console keeps asking |
 | U407 | He moves while he talks on either speaker: antennae through his own voice's lock, and a line the laptop plays moved along with — a nod laid over follow-me through the speech offsets |
 | U408 | His speaking gestures during the line rather than after it: spread over its real length, through his own voice's lock, dropped when it ends — and a line that no longer waits for them |
+| U408b | U408 pushed with its lint step red — the gate's summary was not read before the commit |
 | U328 | Antenna reactions: an antenna-led vocabulary, head-and-antennae in one command, and one tone classification feeding both |
 | U326 | Conversational body language both ways: acknowledging while someone speaks, moving with what he says, and a reply gesture that no longer delays the reply |
 | U325 | `gaze`: looking at someone without taking follow-me away; the face position the recogniser already had; a sweep whose cadence follows the room |

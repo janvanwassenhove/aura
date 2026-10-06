@@ -6517,3 +6517,17 @@ waiting for them, a line cut short taking its gestures with it, a laptop line
 getting them, and the timeline spread over the line, ending in time, and sized
 by length alone (seven red before).
 
+### U408b — U408 went out with its lint step red
+
+Not reported; found the moment after pushing U408. The gate ran 39 steps and
+said **1 failed** — ruff's lint: `except (asyncio.TimeoutError, TimeoutError)`
+(UP041: on 3.11 they are one class) and a blank line too many after the
+trailing import of `test_timeline_builder.py` (I001). The commit command only
+checked that the gate had printed its summary line, not what the line said,
+and committed on it. CI would have failed the same step on master.
+
+Both fixed; `ruff check packages/ services/` and the `F821` pass over `apps/`
+are clean, and the robot-runtime tests that cover the two files pass. The
+lesson is the commit's, not the code's: read the number, not the presence of a
+summary. No behaviour changed.
+

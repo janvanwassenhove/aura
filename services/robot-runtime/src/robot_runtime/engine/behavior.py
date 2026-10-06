@@ -296,7 +296,7 @@ class BehaviorEngine:
                 if delay > 0:
                     try:
                         await asyncio.wait_for(line_over.wait(), timeout=delay)
-                    except (asyncio.TimeoutError, TimeoutError):
+                    except TimeoutError:
                         pass
                 if line_over.is_set():
                     return

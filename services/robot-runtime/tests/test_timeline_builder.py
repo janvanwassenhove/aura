@@ -66,7 +66,6 @@ def test_idle_timeline_amplitude_is_subdued() -> None:
 
 import pytest  # noqa: E402 (keep at bottom so tests above are clear)
 
-
 # ── U408: spread over the line he is actually saying ────────────────────────
 
 def _at(timeline) -> list[int]:
