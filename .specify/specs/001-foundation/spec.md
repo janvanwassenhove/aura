@@ -5,7 +5,7 @@ owner: "platform"
 priority: P1
 risk: Low
 created: "2026-04-25"
-units: [U1, U2, U3, U4, U5, U7, U8, U9, U10, U11, U12, U31, U332, U411]
+units: [U1, U2, U3, U4, U5, U7, U8, U9, U10, U11, U12, U31, U332, U411, U411b]
 amended: "2026-09-05"
 ---
 
@@ -106,7 +106,10 @@ Every service, package, and app directory contains a `README.md` describing its 
   animations of a turn and of the degradation ladder (U411).
 - **FR-011**: **Every relative image in the documentation resolves, HTML
   included.** `scripts/check_doc_links.py` reads `<img src="...">` as well as
-  Markdown links and images; CI runs it (U411).
+  Markdown links and images; CI runs it (U411). Code spans and fenced blocks
+  are not links and are skipped, and a path segment ending in a dot or a
+  space counts as broken on every platform, because Windows trims it and the
+  runner does not (U411b).
 
 ### Key Entities
 

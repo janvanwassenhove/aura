@@ -83,3 +83,34 @@ def test_a_remote_html_image_is_not_our_problem() -> None:
 def test_a_broken_html_image_is_reported(tmp_path) -> None:
     (tmp_path / "README.md").write_text('<img src="docs/gone.webp" alt="gone">', encoding="utf-8")
     assert [t for _, t in broken(tmp_path)] == ["docs/gone.webp"]
+
+
+# U411b: U411's own spec quoted the syntax — `<img src="...">` — and the checker
+# read "..." as a link. Windows trims trailing dots from a path, so "..." was
+# the folder and the check passed here; on the Linux runner it is nothing, and
+# CI went red. Code is not a link: it never renders as one.
+
+def test_an_image_quoted_in_inline_code_is_not_a_link() -> None:
+    assert links_in('reads `<img src="...">` as well') == []
+
+
+def test_a_markdown_link_quoted_in_inline_code_is_not_a_link() -> None:
+    assert links_in("write it as `[text](target)`") == []
+
+
+def test_links_in_a_fenced_block_are_not_links() -> None:
+    text = "before\n```html\n<img src=\"nowhere.png\">\n[a](gone.md)\n```\nafter [b](here.md)"
+    assert links_in(text) == ["here.md"]
+
+
+def test_a_link_next_to_code_still_counts() -> None:
+    assert links_in("run `x` and see [the spec](spec.md)") == ["spec.md"]
+
+
+def test_a_name_windows_would_trim_is_broken_on_every_platform(tmp_path) -> None:
+    """Windows drops trailing dots from a path, so "..." resolved to the folder
+    and the check passed on the machine that wrote it — and failed on the
+    runner. A link must break the same way everywhere."""
+    (tmp_path / "docs").mkdir()
+    (tmp_path / "README.md").write_text("[x](...) [y](docs./) [z](docs/)", encoding="utf-8")
+    assert sorted(t for _, t in broken(tmp_path)) == ["...", "docs./"]

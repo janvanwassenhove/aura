@@ -32,6 +32,16 @@ _LINK = re.compile(r"!?\[[^\]]*\]\(\s*<?([^)>\s]+)>?(?:\s+\"[^\"]*\")?\s*\)")
 #: Markdown pattern never saw (U411). Either quote, any attribute order.
 _IMG = re.compile(r"""<img\b[^>]*?\bsrc\s*=\s*["']([^"']+)["']""", re.IGNORECASE)
 
+#: Code is not a link — it never renders as one. Fenced blocks first, then
+#: inline spans (double backticks before single). U411b: a spec quoting
+#: `<img src="...">` was read as a link to "...".
+_FENCE = re.compile(r"^(```|~~~).*?^\1", re.S | re.M)
+_INLINE_CODE = re.compile(r"``[^`]*?``|`[^`\n]*`")
+
+
+def _without_code(text: str) -> str:
+    return _INLINE_CODE.sub(" ", _FENCE.sub(" ", text))
+
 #: Where documentation lives. `.github/` is included because the instruction
 #: files link into docs, and those are the ones an agent follows.
 _ROOTS = (".specify", "docs", ".github")
@@ -63,6 +73,7 @@ def markdown_files(root: Path) -> list[Path]:
 
 def links_in(text: str) -> list[str]:
     """Relative link targets, in order. Absolute URLs and anchors dropped."""
+    text = _without_code(text)
     found = sorted([(m.start(), m.group(1)) for m in _LINK.finditer(text)]
                    + [(m.start(), m.group(1)) for m in _IMG.finditer(text)])
     return [target for _, target in found if not target.startswith(_SKIP_PREFIX)]
@@ -84,9 +95,18 @@ def broken(root: Path) -> list[tuple[Path, str]]:
         for target in links_in(text):
             if not target.split("#", 1)[0]:
                 continue          # a bare anchor, in-page
-            if not resolve(md, target, root).exists():
+            if _trimmed_by_windows(target) or not resolve(md, target, root).exists():
                 out.append((md.relative_to(root), target))
     return out
+
+
+def _trimmed_by_windows(target: str) -> bool:
+    """A segment ending in a dot or a space (other than . and ..) exists on
+    Windows — which trims it — and nowhere else. U411b: "..." passed here and
+    failed on the runner; a link has to break the same way everywhere."""
+    path = unquote(target.split("#", 1)[0].split("?", 1)[0])
+    return any(seg not in (".", "..") and seg.endswith((".", " "))
+               for seg in path.split("/") if seg)
 
 
 def main(argv: list[str] | None = None) -> int:

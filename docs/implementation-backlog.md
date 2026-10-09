@@ -6692,3 +6692,24 @@ URL being ignored, held already).
 
 Media budget: ten files, 1.6 MB, stills as WebP and the two animations at their
 original 85–120 kB.
+
+### U411b — U411 went out red: "..." exists on Windows
+
+Reported: *"workflows are failing."* CI, the branch CI and the Release for
+U411 all failed on one step — `Documentation links` — on
+`.specify/specs/001-foundation/spec.md -> ...`.
+
+**What was wrong.** U411 taught `check_doc_links.py` to read `<img src>`, and
+U411's own spec quoted the syntax in backticks: `<img src="...">`. The checker
+read `...` as a link target. On Windows a path's trailing dots are trimmed, so
+`...` resolved to the spec's own folder and existed — the gate ran here, green,
+327 links. On the Linux runner `...` is nothing, and it failed. "Verified
+locally" was true and still wrong: the platform was part of the check.
+
+**What changed.** Code is not a link — it never renders as one — so fenced
+blocks and inline code spans are removed before links are read. And a path
+segment ending in a dot or a space now counts as broken on every platform, so
+the next name Windows would quietly trim fails here first, not on the runner.
+
+Five tests, four red against U411's checker; the fifth (a link beside a code
+span still counts) held already. 326 links resolve.
