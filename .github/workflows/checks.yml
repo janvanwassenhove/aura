@@ -180,7 +180,7 @@ jobs:
           node-version: "20"
       - name: Lint Electron main process
         working-directory: apps/desktop
-        run: npx --yes eslint@9 main.cjs preload.cjs updater.cjs serving.cjs sign.cjs present-overlay.cjs screen-control.cjs
+        run: npx --yes eslint@9 main.cjs preload.cjs updater.cjs serving.cjs sign.cjs present-overlay.cjs screen-control.cjs mac-sign.cjs tool-paths.cjs
       - name: Updater verification tests
         working-directory: apps/desktop
         run: node test-updater-verify.cjs
@@ -209,6 +209,13 @@ jobs:
       - name: Screen-control warning tests
         working-directory: apps/desktop
         run: node test-screen-control.cjs
+      # U412: the Mac app is sealed ad hoc, and finds the uv it installed.
+      - name: Mac signing tests
+        working-directory: apps/desktop
+        run: node test-mac-sign.cjs
+      - name: Tool path tests
+        working-directory: apps/desktop
+        run: node test-tool-paths.cjs
 
   # U379: the desktop rung on a real Mac. The unit tests pin the exact osascript
   # and `open -b` commands on any OS; this runs them against macOS itself —
@@ -228,6 +235,33 @@ jobs:
         run: uv sync --package orchestrator --extra dev
       - name: Desktop rung on macOS
         run: uv run --package orchestrator --extra dev pytest services/orchestrator/tests/test_desktop_mac.py services/orchestrator/tests/test_desktop_tools.py -v
+
+  # U412: the Mac app as it ships — packed by electron-builder and sealed by the
+  # afterPack hook — verified on macOS on every push. The release log had said
+  # "skipped macOS code signing" for months; a downloaded copy with that broken
+  # seal is "damaged and can't be opened". A release must not be the first
+  # place this is checked. The console and commit stamp are stand-ins: the seal
+  # covers the bundle, not what is in it.
+  desktop-mac-package:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Pack and seal the Mac app (arm64)
+        working-directory: apps/desktop
+        run: |
+          mkdir -p ../operator-console/dist
+          echo "<!doctype html>" > ../operator-console/dist/index.html
+          git -C ../.. rev-parse HEAD > ../../BUILD_COMMIT
+          npm ci
+          npx electron-builder --mac dir --arm64 --publish never -c.extraMetadata.version=0.0.0
+      - name: Verify the seal
+        working-directory: apps/desktop
+        run: |
+          codesign --verify --deep --strict --verbose=2 dist/mac-arm64/AURA.app
+          codesign -dv dist/mac-arm64/AURA.app 2>&1 | grep -E "^(Identifier|Signature|Format)"
 
   lint:
     runs-on: ubuntu-latest

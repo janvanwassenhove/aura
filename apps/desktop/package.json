@@ -83,6 +83,7 @@
       }
     ],
     "artifactName": "AURA-${version}-${os}-${arch}.${ext}",
+    "afterPack": "./mac-sign.cjs",
     "win": {
       "target": [
         "nsis",

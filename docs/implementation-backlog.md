@@ -6713,3 +6713,50 @@ the next name Windows would quietly trim fails here first, not on the runner.
 
 Five tests, four red against U411's checker; the fifth (a link beside a code
 span still counts) held already. 326 links resolve.
+
+### U412 — the Mac app could not be opened
+
+Reported (translated): *"how can I fix the Mac installer (not working
+currently)?"*
+
+**What was actually wrong — two things.**
+
+1. **A broken seal.** `mac.identity: null`, and every release log said
+   `skipped macOS code signing reason=identity explicitly is set to null`, for
+   both architectures. Skipping is not leaving Electron's own signature
+   intact: electron-builder renames the executable and rewrites `Info.plist`
+   first, so the bundle no longer matches its seal. A downloaded app in that
+   state is "damaged and can't be opened — move it to the Trash" to
+   Gatekeeper, with no button past it.
+2. **`uv` invisible after the first launch.** An app started from Finder or
+   the Dock gets `PATH=/usr/bin:/bin:/usr/sbin:/sbin`. The bootstrap installs
+   `uv` into `~/.local/bin` and adds it to PATH for that one process, so every
+   later launch failed `uv --version`, downloaded `uv` again before the window
+   appeared — and offline threw "uv installation failed": no app at all. A
+   Homebrew `uv` was never found either.
+
+**What changed.**
+
+- `mac-sign.cjs`, an `afterPack` hook: the finished bundle is sealed ad hoc
+  (`codesign --force --deep --sign -`) and verified (`--verify --deep
+  --strict`) before the DMG and zip are made. A configured Developer ID makes
+  it step aside. The owner now confirms once in Privacy & Security instead of
+  being told the app is damaged — [ADR-020](adr/ADR-020-the-mac-app-is-sealed-ad-hoc-until-it-has-an-identity.md)
+  records why, and exactly what moving to a Developer ID takes.
+- `tool-paths.cjs`: `~/.local/bin`, `~/.cargo/bin`, `/opt/homebrew/bin` and
+  `/usr/local/bin` go on PATH at load, on macOS and Linux. Windows untouched.
+- CI: a `desktop-mac-package` job packs the arm64 app on macOS on every push
+  and verifies its seal; the release verifies both architectures before
+  uploading. Both new test files run in `desktop-lint`.
+- The README and both user guides say what the one confirmation looks like,
+  which `.dmg` to pick, and what to do with an older, "damaged" release.
+
+**What was not verified here.** This was built on Windows; there is no Mac in
+this loop. The tests pin the hook's commands and the PATH logic on any OS; the
+seal itself is verified by the new CI job on a macOS runner. That the old
+releases were rejected as "damaged" follows from the skipped signing and how
+Gatekeeper treats a broken seal — the owner can confirm it on their Mac with
+`codesign --verify --deep --strict /Applications/AURA.app`.
+
+Tests: `test-mac-sign.cjs` (5) and `test-tool-paths.cjs` (5), both red before
+the modules existed.

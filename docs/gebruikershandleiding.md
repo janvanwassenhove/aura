@@ -27,6 +27,21 @@ ondertekend is; die waarschuwing is niet wat de `.exe` tegenhoudt.
 Een MSI-installatie vraagt eenmalig een beheerder, en werkt zichzelf bij met de
 volgende MSI in plaats van stilletjes — je krijgt de wizard te zien.
 
+**Op een Mac** gebruik je de `.dmg`: `mac-arm64` voor een Mac met Apple
+Silicon (M1 en later), `mac-x64` voor een Intel-Mac. Sleep AURA naar
+Programma's en open het. macOS meldt dan dat het *niet kon controleren of AURA
+vrij is van malware* — AURA is verzegeld, maar nog niet ondertekend met een
+Apple Developer ID. Klik op **Gereed**, open **Systeeminstellingen → Privacy en
+beveiliging**, scrol naar *"AURA is geblokkeerd"* en klik op **Toch openen**.
+Dat doe je één keer per installatie. De eerste start installeert daarna de
+Python-omgeving, wat een paar minuten duurt; latere starts niet. Een update
+opent de releasepagina — download de nieuwe `.dmg` en vervang de app.
+
+Zegt een oudere release dat AURA *"beschadigd is en niet kan worden geopend"*,
+dan is dat het defect dat U412 verhelpt, niet je download. Installeer een
+recente release, of voer één keer uit in Terminal:
+`xattr -dr com.apple.quarantine /Applications/AURA.app`.
+
 **Waar hij spreekt** (Instellingen -> Waar hij spreekt): zijn eigen speaker, of
 deze laptop. De stem is in beide gevallen identiek - dezelfde audio wordt een
 keer gemaakt en alleen de speaker verschilt - dus een grotere zaal kan hem via

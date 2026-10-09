@@ -20,6 +20,12 @@ const path = require('path')
 const { listenPreferring, pickFreePort, withRuntimeConfig } = require('./serving.cjs')
 const { createPresentOverlay } = require('./present-overlay.cjs')
 const { createScreenControlWarning } = require('./screen-control.cjs')
+const { withUserToolPaths } = require('./tool-paths.cjs')
+
+// U412: a Mac app started from Finder gets PATH=/usr/bin:/bin:/usr/sbin:/sbin,
+// so the uv the bootstrap installed in ~/.local/bin was invisible on the next
+// launch — downloaded again every time, and no app at all offline.
+process.env.PATH = withUserToolPaths({ PATH: process.env.PATH, HOME: process.env.HOME }).PATH
 
 // U37-installer: a packaged (NSIS) install carries the Python workspace under
 // resources/aura and the built console under resources/console; a dev checkout

@@ -5,7 +5,7 @@ owner: "apps/desktop + CI"
 priority: P1
 risk: High
 created: "2026-09-05"
-units: [U32, U33, U44, U55, U56, U151, U152, U166, U168, U168b, U168c, U168d, U168e, U169, U169b, U170, U171, U172, U173, U174, U176, U177, U178, U192, U193, U197, U201, U211, U228, U229, U230, U231, U232, U233, U234, U235, U236, U283, U284, U285, U285b, U297, U179, U184, U185, U186, U210, U317, U318, U327, U330, U337, U338, U343, U344, U353, U354, U355, U363, U367, U367b, U368, U375, U396, U401]
+units: [U32, U33, U44, U55, U56, U151, U152, U166, U168, U168b, U168c, U168d, U168e, U169, U169b, U170, U171, U172, U173, U174, U176, U177, U178, U192, U193, U197, U201, U211, U228, U229, U230, U231, U232, U233, U234, U235, U236, U283, U284, U285, U285b, U297, U179, U184, U185, U186, U210, U317, U318, U327, U330, U337, U338, U343, U344, U353, U354, U355, U363, U367, U367b, U368, U375, U396, U401, U412]
 amended: "2026-09-13"
 ---
 
@@ -310,6 +310,14 @@ and installers for Windows, macOS (arm64 and x64) and Linux.
 - **FR-015**: A brain that exited fails the startup wait **immediately**,
   quoting its own last stderr. Waiting out a timeout on a dead process turns a
   named, logged cause into an unexplained freeze.
+- **FR-022**: **The Mac app opens** (U412,
+  [ADR-020](../../../docs/adr/ADR-020-the-mac-app-is-sealed-ad-hoc-until-it-has-an-identity.md)).
+  Without a Developer ID, every Mac build is sealed ad hoc after packing and
+  verified with `codesign --verify --deep --strict`; a broken seal fails the
+  build — in the release and in a CI job that packs the app on macOS on every
+  push. A configured Developer ID (`CSC_LINK`/`CSC_NAME`) takes over signing.
+  The shell puts the user's tool directories (`~/.local/bin`, Homebrew) on
+  PATH at load, so an app started from Finder finds the `uv` it installed.
 - **FR-021**: **No test reads or writes the owner's settings** (U401). Every
   brain and orchestrator test gets its own `MODE_POLICY_PATH` in a temporary
   directory, with Work active and Quiet off, from an autouse fixture in each

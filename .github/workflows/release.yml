@@ -229,6 +229,23 @@ jobs:
           git -C ../.. rev-parse HEAD > ../../BUILD_COMMIT
           npx electron-builder ${{ matrix.args }} --publish never -c.extraMetadata.version=${{ needs.version.outputs.version }}
 
+      # U412: the hook seals the Mac app ad hoc and verifies it; this says so
+      # in the release log, for every architecture, on the machine that built
+      # it. A broken seal is "damaged and can't be opened" on the owner's Mac.
+      - name: Verify the Mac app's seal
+        if: runner.os == 'macOS'
+        working-directory: apps/desktop
+        shell: bash
+        run: |
+          set -e
+          found=0
+          for app in dist/mac*/AURA.app; do
+            found=1
+            codesign --verify --deep --strict --verbose=2 "$app"
+            codesign -dv "$app" 2>&1 | grep -E "^(Identifier|Signature|Format)" || true
+          done
+          test "$found" = 1 || { echo "no AURA.app was built"; exit 1; }
+
       # ── U338: SignPath Foundation — free code signing for open source ──
       # Two steps, both skipped entirely when the token is absent, and neither
       # allowed to fail a release: an unsigned build is the status quo and the

@@ -31,6 +31,7 @@ loses the reason.
 | [017](ADR-017-a-fair-is-a-mode.md) | A fair is a mode: where he is decides what he may reach and whether he wanders | Accepted 2026-10-03 — implemented in U397 |
 | [018](ADR-018-he-moves-with-the-voice-the-room-hears.md) | He moves with the voice the room hears, wherever it comes out | Accepted 2026-10-06 — implemented in U407 |
 | [019](ADR-019-a-talks-line-is-recorded-once.md) | A talk's line is recorded once, and played on its cue | Accepted 2026-10-06 — implemented in U409 |
+| [020](ADR-020-the-mac-app-is-sealed-ad-hoc-until-it-has-an-identity.md) | The Mac app is sealed ad hoc until it has an identity | Accepted 2026-10-09 — implemented in U412 |
 
 ## Reading order for someone new
 

@@ -168,6 +168,12 @@ Windows (`.exe`), macOS (`.dmg`, Apple Silicon + Intel) or Linux
 (`.AppImage`/`.deb`). First launch installs its own Python runtime; the app
 then checks for updates and offers to install them for you.
 
+**On a Mac, the first open needs one confirmation.** The app is sealed but not
+yet signed with an Apple Developer ID ([ADR-020](docs/adr/ADR-020-the-mac-app-is-sealed-ad-hoc-until-it-has-an-identity.md)),
+so macOS asks once: open AURA, then **System Settings → Privacy & Security →
+Open Anyway**. Pick the `arm64` file for an Apple Silicon Mac (M1 and later)
+and `x64` for an Intel one.
+
 ## Quick start (from source)
 
 **Dry run — no hardware, no keys:**

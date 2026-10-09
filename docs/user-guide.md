@@ -27,6 +27,20 @@ what blocks the `.exe`.
 An MSI install needs an administrator once, and updates itself with the next
 MSI rather than silently — you will see the wizard.
 
+**On a Mac** use the `.dmg`: `mac-arm64` for an Apple Silicon Mac (M1 and
+later), `mac-x64` for an Intel one. Drag AURA to Applications and open it.
+macOS will say it *could not verify AURA is free of malware* — AURA is sealed,
+but not yet signed with an Apple Developer ID. Click **Done**, then open
+**System Settings → Privacy & Security**, scroll to *"AURA was blocked"* and
+click **Open Anyway**. You do this once per install. The first start then
+installs its Python runtime, which takes a few minutes; later starts do not.
+An update opens the release page — download the new `.dmg` and replace the
+app.
+
+If an older release says AURA *"is damaged and can't be opened"*, that is the
+defect fixed in U412, not your download. Install a current release, or run once
+in Terminal: `xattr -dr com.apple.quarantine /Applications/AURA.app`.
+
 **Where he speaks** (Settings -> Where he speaks): his own speaker, or this
 laptop. The voice is identical either way - the same audio is synthesized once
 and only the speaker changes - so a bigger room can hear him through the laptop
