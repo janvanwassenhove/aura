@@ -40,6 +40,11 @@ However, a review against the **actual product goals** (a personal Reachy Mini
    system prompt, so the function-calling API never returns `tool_calls`. The
    connector execution path is effectively unreachable from a real turn.
 
+What that looked like, as drawn for the conference talk
+([more from the talks](../talks/)):
+
+![The first design: six service columns — orchestrator, conversation, connectors, memory, identity, robot runtime — each with its own Dockerfile, health check and event bus, all talking over plain HTTP, for one robot. Caption: the full price of microservices, and none of the decoupling.](../talks/media/six-services.webp)
+
 ## Decision
 
 ### 1. Collapse to two deployables

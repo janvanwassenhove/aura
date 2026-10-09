@@ -43,6 +43,11 @@ on the Pi and no key reaches it.
 
 ### What happens when something stops answering
 
+The same ladder, animated, as shown in the conference talk
+([more from the talks](../talks/)):
+
+![An animation of the degradation ladder. Degraded: the robot and tools still work, the capable model is gone, a local model on the laptop answers without tools. Offline: tools and both models are gone, six commands survive — time, reminder, timer, status, and two honest refusals. The robot alone says once that it has lost connection to its brain, and keeps moving.](../talks/media/when-things-break.gif)
+
 ![The degradation ladder: a heartbeat every 30 s, three consecutive failures to DEGRADED, 30 s clean back to ONLINE. No robot — text only, and it says so. No internet — a local model answers without tools. No model at all — six regex commands survive. No laptop — after 15 s the robot says so once and keeps moving on its own.](../diagrams/degradation-ladder.svg)
 
 ### Four loops on four clocks

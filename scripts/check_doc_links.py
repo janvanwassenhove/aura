@@ -8,7 +8,8 @@ link, and the reader finds out by clicking. A stale reference is worse than no
 reference, for the same reason constitution IX gives about diagrams: it is
 believed.
 
-Checked: relative Markdown links and images in the documentation tree. Not
+Checked: relative Markdown links and images, and HTML `<img src>`, in the
+documentation tree. Not
 checked: `http(s)` URLs (a network call in CI is a flake, not a check) and
 anchors within a file.
 
@@ -26,6 +27,10 @@ from urllib.parse import unquote
 #: `[text](target)` and `![alt](target)`. Targets with spaces are wrapped in
 #: <>, which Markdown allows and which several diagram links use.
 _LINK = re.compile(r"!?\[[^\]]*\]\(\s*<?([^)>\s]+)>?(?:\s+\"[^\"]*\")?\s*\)")
+
+#: `<img src="...">` — the README's hero and screenshots are HTML, which the
+#: Markdown pattern never saw (U411). Either quote, any attribute order.
+_IMG = re.compile(r"""<img\b[^>]*?\bsrc\s*=\s*["']([^"']+)["']""", re.IGNORECASE)
 
 #: Where documentation lives. `.github/` is included because the instruction
 #: files link into docs, and those are the ones an agent follows.
@@ -58,12 +63,9 @@ def markdown_files(root: Path) -> list[Path]:
 
 def links_in(text: str) -> list[str]:
     """Relative link targets, in order. Absolute URLs and anchors dropped."""
-    out: list[str] = []
-    for target in _LINK.findall(text):
-        if target.startswith(_SKIP_PREFIX):
-            continue
-        out.append(target)
-    return out
+    found = sorted([(m.start(), m.group(1)) for m in _LINK.finditer(text)]
+                   + [(m.start(), m.group(1)) for m in _IMG.finditer(text)])
+    return [target for _, target in found if not target.startswith(_SKIP_PREFIX)]
 
 
 def resolve(source: Path, target: str, root: Path) -> Path:

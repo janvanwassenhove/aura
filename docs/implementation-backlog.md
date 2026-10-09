@@ -6645,3 +6645,50 @@ ways), the brain sending ahead, by name at the cue, only what is missing, a
 lost line in the same cue, an older robot, a new take, an improvised line, the
 laptop path (8), and the Present view (3). Red first: all of them.
 
+### U411 — the talks, in the documentation
+
+Asked: *"update readme/documentation with the drawings/animations/demos from
+the keynote/conference talk where useful."*
+
+**What there was.** Two decks in the owner's Downloads — the keynote *From
+Brainless to Brilliant* (23 slides) and the conference talk *I Hired a Real
+Robot as My Junior Dev* (92 slides) — and the scenarios that drove the robot
+on stage, already in `docs/demo/`. Every image and animation was extracted and
+looked at before choosing.
+
+**What was taken, and where it went.**
+
+- `docs/talks/README.md`, new: both talks, the scenarios, and each reused
+  visual pointed at its code or canonical drawing — the capability map, the
+  animated turn, the animated degradation ladder, a real skill-rewrite
+  proposal, the assembly photos and the closing game.
+- The README: the project's own robot as the hero (the vendor photo it replaces
+  is removed), the keynote's "what the brain actually does" map, and the two
+  animations next to the drawings they animate.
+- Three talk figures with no SVG counterpart, placed where they explain
+  something: the first six-service design in ADR-007's context, the loop that
+  closes through the air in `voice-conversation.md`, and the threat model on
+  the talks page. The degradation animation also went into the architecture
+  overview.
+
+**Checked before embedding, against the code:** three failed heartbeats to
+drop a tier and thirty seconds to climb back (`heartbeat.py`), eight rounds
+(`AGENT_MAX_ROUNDS`), a four-round read-only sub-agent, ten characters, three
+ways to talk to it. Two talk figures are out of date and were not reproduced:
+the automation ladder has five rungs (the desktop rung of U378 came after), and
+"three loops" is four since wandering (U393). The page says so.
+
+**Left out on purpose:** a slide showing a real person's stored memories, UI
+mock-ups carrying the owner's name and personal facts, the generated story
+illustrations, and the decks themselves. The talks page lists those
+exclusions too.
+
+**And a gap it found.** The README's hero and every screenshot are
+`<img src>` tags, and `check_doc_links.py` read only Markdown syntax — so
+renaming an image would have broken the front page of a public repository with
+every check green. It now reads HTML images too: 316 links became 326, all
+resolving. Four tests, three red against the old checker (the fourth, a remote
+URL being ignored, held already).
+
+Media budget: ten files, 1.6 MB, stills as WebP and the two animations at their
+original 85–120 kB.

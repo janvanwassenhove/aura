@@ -5,7 +5,7 @@ owner: "platform"
 priority: P1
 risk: Low
 created: "2026-04-25"
-units: [U1, U2, U3, U4, U5, U7, U8, U9, U10, U11, U12, U31, U332]
+units: [U1, U2, U3, U4, U5, U7, U8, U9, U10, U11, U12, U31, U332, U411]
 amended: "2026-09-05"
 ---
 
@@ -96,6 +96,17 @@ Every service, package, and app directory contains a `README.md` describing its 
 - **FR-007**: Every directory under `services/`, `packages/`, and `apps/` MUST contain a `README.md`.
 - **FR-008**: Repository MUST contain `docs/adr/` with at minimum ADR-001 through ADR-006.
 - **FR-009**: Repository MUST contain `docs/architecture/overview.md` with a system-level Mermaid diagram.
+- **FR-010**: **Visuals from the talks live in `docs/talks/`, never in
+  `docs/diagrams/`.** The Devoxx 2026 keynote and conference talk are kept as
+  one page that points every reused picture at the code or the canonical
+  drawing it shows, and says what was left out and why (real household data,
+  generated illustrations, the decks). The canonical drawings stay
+  hand-authored SVG and win when a talk picture disagrees. The README's hero is
+  the project's own robot, and it reuses the talk's capability map and the two
+  animations of a turn and of the degradation ladder (U411).
+- **FR-011**: **Every relative image in the documentation resolves, HTML
+  included.** `scripts/check_doc_links.py` reads `<img src="...">` as well as
+  Markdown links and images; CI runs it (U411).
 
 ### Key Entities
 

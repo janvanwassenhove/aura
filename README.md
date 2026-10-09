@@ -4,7 +4,7 @@
 > life private — on your own laptop.**
 
 <p align="center">
-  <img src="docs/screenshots/reachy-mini.webp" alt="An assembled Reachy Mini: a white rounded body, a head with two dark camera eyes, and two coiled wire antennae." width="440">
+  <img src="docs/talks/media/richie.webp" alt="Richie, the Reachy Mini this project runs on: a white rounded body, a head with two round dark camera eyes joined by a bar, and two coiled wire antennae, against a dark background." width="560">
 </p>
 
 AURA turns a **Reachy Mini** into a personal chief-of-staff. It recognises the
@@ -21,7 +21,8 @@ is how most of it was built.
 [What you need](#what-you-need) ·
 [How it fits together](#how-it-fits-together) ·
 [How it was built](docs/implementation-backlog.md) ·
-[Architecture decisions](docs/adr/)
+[Architecture decisions](docs/adr/) ·
+[From the talks](docs/talks/)
 
 ---
 
@@ -72,6 +73,14 @@ appear here.*
   encryption, biometrics that never touch disk unencrypted, a step-up gate on
   destructive actions, and a scanner that blocks personal data from ever
   reaching git.
+
+### What the brain on the laptop actually does
+
+The one-slide answer from the Devoxx 2026 keynote — every item on it is in this
+repository. More from both talks, each picture pointed at the code it shows:
+**[docs/talks/](docs/talks/)**.
+
+![What the brain on the laptop actually does, in eight groups. Senses: wide-angle camera, four microphones, wake word, face recognition, it reacts while you are still talking. Memory: facts you told it, signals it inferred, confidence it has to earn, topics it links itself, the whole household every turn, encrypted per person. Thinking: an agentic loop with a round budget, bounded sub-agents, dozens of tools, a judgment layer per turn, three ways to talk to it, every round on an event bus. Learning: writes its own procedures, triggers in plain English, notices what keeps failing, and cannot save any of it. Hands: mail and calendar, music, the browser, VS Code and Claude Code, the things with no API, the screen itself. Body: a head that turns every way yours does, it follows you, ten characters, antennae that answer you, present-mode overlay. People: owner, family, minor with no inferences, guest, a different amount of me each time. The brakes: every sensitive action asks, allows / asks / blocked, read-only delegation, a gate in code, not in a prompt.](docs/talks/media/what-the-brain-does.webp)
 
 ---
 
@@ -137,6 +146,13 @@ touches the outside world stops at the approval gate first.
 
 ![One turn: someone speaks, round one uses a fast model, most turns end there; if tools are needed round two onwards orchestrates with a stronger model and approval-gated calls stop and ask the owner.](docs/diagrams/one-turn.svg)
 
+The same turn as it plays out on the event bus — the animation from the
+conference talk:
+
+<p align="center">
+  <img src="docs/talks/media/one-turn.gif" alt="An animation of one turn on the event bus: round one on the fast model ends most turns with ResponseDrafted; when tools are needed, rounds two and three switch to the capable model, read files and delegate a read-only sub-task, and round four stops at ApprovalRequested, waiting for the owner." width="900">
+</p>
+
 More drawings — the loops that run whether or not anyone is talking, the
 knowledge model, envelope encryption, the bounds on a delegated agent — live in
 **[docs/diagrams/](docs/diagrams/)**, and the written architecture is in
@@ -190,7 +206,7 @@ encrypted knowledge store.
   ([details](docs/voice-conversation.md)).
 - **Survives failures**: heartbeat monitoring degrades gracefully — local LLM
   when the internet dies, regex fallback after that, and an on-device loop so
-  the robot stays polite even with no brain at all.
+  the robot stays polite even with no brain at all (animated below).
 - **Always stoppable**: one **Stop** button cuts speech mid-word, ends the
   conversation and mutes the microphone — because a voice assistant that can
   be triggered by ambient noise must be silenceable in one click.
@@ -201,6 +217,13 @@ encrypted knowledge store.
 
 *What a failure looks like: not a spinner, but the reason plus the field that
 fixes it.*
+
+<p align="center">
+  <img src="docs/talks/media/when-things-break.gif" alt="An animation of the degradation ladder. Degraded: the robot and tools still work, the capable model is gone, a local model on the laptop answers without tools. Offline: tools and both models are gone, six commands survive — time, reminder, timer, status, and two honest refusals. The robot alone says once that it has lost connection to its brain, and keeps moving." width="900">
+</p>
+
+*And the ladder underneath it: three failed heartbeats drop a tier, thirty
+clean seconds climb back — [the drawing](docs/diagrams/degradation-ladder.svg).*
 
 ## Security model (ADR-008)
 
@@ -251,6 +274,7 @@ infra/
 docs/
 ├── setup-guide.md             # ★ Device day: unboxing → talking robot
 ├── diagrams/                  # ★ The canonical drawings — keep them true
+├── talks/                     # Visuals from the Devoxx 2026 talks, each pointed at its code
 ├── architecture/overview.md   # Written architecture
 ├── implementation-backlog.md  # The autonomous build ledger (source of truth)
 └── adr/                       # Architecture decision records (ADR-001…008)

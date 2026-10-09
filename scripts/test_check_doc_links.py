@@ -61,3 +61,25 @@ def test_it_looks_at_the_files_that_matter() -> None:
     assert any(n.startswith("docs/adr/") for n in names)
     # Vendored and generated trees are not ours to keep true.
     assert not any("node_modules" in n or "win-unpacked" in n for n in names)
+
+
+# U411: the README's hero and every screenshot are <img src="…"> tags — HTML,
+# so the Markdown pattern never saw them. Renaming an image broke the front
+# page of a public repository with every check green.
+
+def test_an_html_image_counts_too() -> None:
+    html = '<p align="center">\n  <img src="docs/talks/media/richie.webp" alt="x" width="560">\n</p>'
+    assert links_in(html) == ["docs/talks/media/richie.webp"]
+
+
+def test_an_html_image_with_single_quotes_and_attributes_first() -> None:
+    assert links_in("<img alt='a robot' src='media/one-turn.gif'>") == ["media/one-turn.gif"]
+
+
+def test_a_remote_html_image_is_not_our_problem() -> None:
+    assert links_in('<img src="https://example.com/x.png">') == []
+
+
+def test_a_broken_html_image_is_reported(tmp_path) -> None:
+    (tmp_path / "README.md").write_text('<img src="docs/gone.webp" alt="gone">', encoding="utf-8")
+    assert [t for _, t in broken(tmp_path)] == ["docs/gone.webp"]

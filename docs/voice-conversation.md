@@ -33,6 +33,14 @@ telling the model its previous answer was cut off.
 **Known limitation:** full-duplex acoustic echo cancellation while the robot is
 speaking is still unstable in a live room. Barge-in works; AEC misfires.
 
+Why it is hard is easier to see than to say. The robot speaks into a room, and
+the room answers back into its own microphone — off the wall, off the fridge.
+No architecture diagram has an arrow for that loop:
+
+![The loop that closed through the air: the robot on a kitchen counter speaks out loud into the room; the sound reflects off the fridge and comes back into its own microphone, so it hears itself — and the fridge hums, which a biased transcriber finds suggestive.](talks/media/loop-through-the-air.webp)
+
+*From the conference talk ([more](talks/)).*
+
 ## Characters
 
 `personas/*.json`, seeded on first run: `friendly_assistant`, `dry_tech_butler`,
