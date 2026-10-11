@@ -5,7 +5,7 @@ owner: "aura-brain / conversation"
 priority: P1
 risk: High
 created: "2026-09-05"
-units: [U22, U36b, U36e, U36h, U45, U46, U47, U49, U54, U67, U73, U80, U81, U82, U83, U84, U85, U86, U87, U88, U89, U91, U92, U96, U128, U129, U130, U131, U132, U133, U134, U135, U140, U141, U142, U143, U144, U145, U146, U148, U149, U150, U153, U154, U155, U156, U163, U203, U209, U256, U257, U258, U260, U273, U275, U287, U288, U289, U291, U292, U321, U322, U324, U329, U331, U333, U349, U366, U364, U384, U385, U392, U398, U399]
+units: [U22, U36b, U36e, U36h, U45, U46, U47, U49, U54, U67, U73, U80, U81, U82, U83, U84, U85, U86, U87, U88, U89, U91, U92, U96, U128, U129, U130, U131, U132, U133, U134, U135, U140, U141, U142, U143, U144, U145, U146, U148, U149, U150, U153, U154, U155, U156, U163, U203, U209, U256, U257, U258, U260, U273, U275, U287, U288, U289, U291, U292, U321, U322, U324, U329, U331, U333, U349, U366, U364, U384, U385, U392, U398, U399, U413]
 ---
 
 # Feature Specification: Voice and Language
@@ -246,6 +246,16 @@ the Present panel's Voice still decides.
   first" — because an open session makes whatever is loudest the one asking.
   Answering is untouched: the wake word gates every turn, which is what Quiet
   always meant (U333, U256).
+- **FR-022c**: **In Quiet, "asked" means his name is in the sentence** (U413).
+  FR-022 sent every Quiet turn back through the wake word, and three doors
+  stayed open behind it: the follow-up window after his own answer, his name
+  alone followed by whatever the room said next, and the local detector
+  vouching for a sentence that does not contain his name. While Quiet is on:
+  his answer opens no window and none survives into Quiet; his name alone
+  opens nothing; the detector alone is not being asked; only his name
+  interrupts him. Outside Quiet all four behave as before. The turn's prompt
+  also says Quiet is on — answer what was asked, briefly, and do not ask
+  anything back — because the questions that kept the room talking were his.
 - **FR-022b**: **And it keeps being true while he is already talking.** Quiet
   and Present end an OPEN session too, on the same one-second tick that
   notices Stop — a session holds the microphone for up to ten minutes, so a

@@ -62,6 +62,15 @@ PUBLIC_NOTE = (
     "guess at it. Who you are talking to is a visitor."
 )
 
+# U413: Quiet was a switch the model never heard about, so in Quiet he still
+# made conversation — every answer ended in a question, and each question
+# opened the room's next turn.
+QUIET_NOTE = (
+    "QUIET IS ON. Your owner asked for quiet. Answer exactly what was asked, in "
+    "one or two short sentences, and stop. Do not ask a question back, do not "
+    "invite more talk, and do not offer anything further."
+)
+
 # ── The eight capability groups ────────────────────────────────────────────
 # (id, label, detail, tools). Conversation has no tools: talking is the turn
 # itself, not a tool call — it exists so the chip row can say so.

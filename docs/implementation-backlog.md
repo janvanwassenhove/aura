@@ -6760,3 +6760,56 @@ Gatekeeper treats a broken seal — the owner can confirm it on their Mac with
 
 Tests: `test-mac-sign.cjs` (5) and `test-tool-paths.cjs` (5), both red before
 the modules existed.
+
+### U413 — in Quiet he answered the room, one question after another
+
+Reported with a screenshot — Quiet on, the header reading "Awake but hushed —
+he answers when asked and never speaks first": *"aura in quiet mode, but still
+talking / asking"*. The chat showed him answering "Ne rodime.", "This book?"
+and "Ik heb al veel", each reply ending in a question of his own.
+
+**Measured on the owner's machine** (2.0.216, read only): `mode-policy.json`
+said `"quiet": true`, and `turn_traces.jsonl` held eight turns in forty
+minutes on transcripts like "Jestę parkirny.", "Tu as divisé." and "Now, so
+this tovalted meja." — a room, heard by a transcriber that returns words for
+any noise. Nobody had asked him anything.
+
+**What was actually wrong.** U332 wrote the rule down — "while Quiet is on,
+every turn goes back through the wake word" — and applied it to the open
+sessions. Three doors stayed open behind the wake word, and all three were
+used that afternoon:
+
+1. **The follow-up window.** After he speaks he listens nine seconds without
+   his name. "Ne rodíme." arrived eighteen seconds after the turn before it.
+2. **His name alone.** Two of the last three traces carry a `second_capture`:
+   the transcriber returned "Richie" for noise, and the room's next line —
+   "This book?", "Ik heb al veel" — became the question.
+3. **The local detector alone.** When it fires, the whole transcript counts as
+   addressed to him, whether or not his name is in it.
+
+U398 had closed (1) and (2) for a Stand. Quiet — the mode whose entire
+promise is that he speaks only when asked — had neither.
+
+**What changed.** In Quiet his name and the question come in one breath: his
+answer opens no window and none survives into Quiet, his name alone opens
+nothing, the detector alone is not being asked, and only his name interrupts
+him. One helper (`_asked_by_name_only`) now carries the Stand's rule and
+Quiet's. And the turn is told Quiet is on — answer what was asked, briefly, do
+not ask anything back — because nothing had ever told the model, so it made
+conversation, and each question of his opened the room's next turn.
+
+**What this does not fix.** A transcriber that puts his name AND a sentence
+into one window of noise still gets an answer; that needs both in four
+seconds, where each door above needed one. And the Stand still lets the
+detector vouch for a sentence — the same hole, left alone because nobody has
+reported it there and a noisy stand is where a dropped name is likeliest.
+
+**Found on the way, not fixed here:** `brain.log` on that machine was last
+written on 14 July although `main.cjs` appends to it on every start, which is
+why this was read from the turn traces; and a brain test re-seeds the tracked
+`skills/.builtin-seeded.json` when the suite runs from the repository root.
+
+Tests: `test_quiet_listening.py` (10 — four red against the old loop on the
+reported transcripts, plus the controls proving every door still works outside
+Quiet) and `test_quiet_answers_and_stops.py` (2, both red). Orchestrator 568,
+brain 925 green.

@@ -368,6 +368,18 @@ class VoiceLoop:
         except Exception:  # noqa: BLE001
             return False
 
+    def _asked_by_name_only(self) -> bool:
+        """Must his name and the question come in one breath, with no window
+        after his answer? At a Stand (U398) — and in Quiet (U413).
+
+        Quiet promises "he answers when asked and never speaks first". With a
+        transcriber that returns words for any noise, "asked" has to mean his
+        name is in the sentence: reported with Quiet on, he answered "Ne
+        rodíme.", "This book?" and "Ik heb al veel", each through a door that
+        only the Stand had closed.
+        """
+        return self._public() or self._hushed()
+
     def note_sound(self, seconds: float) -> None:
         """U398: he is making a sound that is not speech — an emotion from the
         robot's library. To the echo guards it is his own voice: a giggle the
@@ -406,9 +418,10 @@ class VoiceLoop:
         # and FOLLOWUP_CHAIN_MAX wake-word-less turns later the wake word is
         # required again - so a phantom can talk to itself twice, not forever.
         followup_s = self._followup_s
-        if followup_s <= 0 or now < self._music_until or self._public():
+        if followup_s <= 0 or now < self._music_until or self._asked_by_name_only():
             # U398: at a stand the next voice after his answer is as likely
             # someone else's — the name and the question come together there.
+            # U413: and in Quiet his answer is an answer, not an invitation.
             self._followup_until = 0.0  # wake word required
         elif self._followup_chain < self._max_followup_chain:
             self._followup_until = self._speaking_until + followup_s
@@ -493,8 +506,10 @@ class VoiceLoop:
                     mode = "wake_word"
                     if self._manager is not None and self._manager.character is not None:
                         mode = self._manager.character.interruptibility or "wake_word"
-                    if self._public():
-                        mode = "wake_word"   # U398: a crowd is not an interruption
+                    if self._asked_by_name_only():
+                        # U398: a crowd is not an interruption. U413: in Quiet
+                        # neither is the room.
+                        mode = "wake_word"
                     if mode == "off":
                         continue
                     barge_text = (await voice.transcribe(wav, filename="robot.wav") or "").strip()
@@ -545,8 +560,10 @@ class VoiceLoop:
                         continue  # silence — cheap skip, no STT
 
                 in_followup = in_barge or time.monotonic() < self._followup_until
-                if self._public() and not in_barge:
-                    in_followup = False   # U398: no window survives into a crowd
+                if self._asked_by_name_only() and not in_barge:
+                    # U398: no window survives into a crowd — U413: or into Quiet,
+                    # switched on while one was open.
+                    in_followup = False
                 # U128: LOCAL wake gate — outside a follow-up window, detect the
                 # wake word on-device before spending a network STT call. No
                 # detector (or a follow-up window) → keep the old transcribe path.
@@ -637,8 +654,16 @@ class VoiceLoop:
                 # U128: a local-confirmed wake means the wake word WAS said even
                 # if STT dropped it — treat the transcript as command-bearing
                 # (strip a leading wake token if it did transcribe).
-                command = self._extract_command(text, in_followup or wake_confirmed)
+                # U413: in Quiet the detector does not vouch for a sentence.
+                # It fires on a television, and then "Tu as divisé." was his
+                # question. His name has to be in what was transcribed.
+                vouched = wake_confirmed and not self._hushed()
+                command = self._extract_command(text, in_followup or vouched)
                 if command is None:
+                    if wake_confirmed and not vouched:
+                        self._stat["last_skipped"] = (
+                            "in Quiet his name has to be in the sentence — "
+                            f"heard {text[:60]!r}")
                     continue
                 # U67: track the wake-word-less chain. Hearing the wake word
                 # (transcribed OR locally detected, U128) resets it — a real
@@ -654,6 +679,14 @@ class VoiceLoop:
                 # gibberish, do NOTHING (no generic "how can I help" reply that
                 # made phantom turns). Only start a turn once we have a real
                 # command.
+                if not command and self._hushed():
+                    # U413: "Richie" out of noise, and the room's next line as
+                    # the question — two of the reported turns came in this way.
+                    self._stat["last_skipped"] = (
+                        "heard his name alone — in Quiet the question has to "
+                        "come with it")
+                    logger.info("in Quiet: his name alone opens nothing")
+                    continue
                 if not command and self._public():
                     # U398: at a stand his name alone is what the transcriber
                     # makes of noise, of a clipping microphone and of his own

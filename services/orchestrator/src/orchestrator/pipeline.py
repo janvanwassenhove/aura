@@ -386,6 +386,17 @@ _TOOL_ROUTES: dict[str, tuple[str, str]] = {
 }
 
 
+def _quiet_on() -> bool:
+    """U413: has the owner switched Quiet on? A policy that cannot be read is
+    not Quiet — it must never cost him his ordinary voice."""
+    try:
+        from orchestrator import mode_policy
+
+        return mode_policy.quiet()
+    except Exception:  # noqa: BLE001
+        return False
+
+
 def _in_public() -> bool:
     """U397: is the room strangers? Asked of the policy, which owns the mode."""
     try:
@@ -828,6 +839,10 @@ class OrchestratorPipeline:
         system_prompt = _identity_prefix(_prefs.get("language", "")) + system_prompt
         if allowed:  # U58: the automation ladder governs every tool choice
             system_prompt += "\n\n" + LADDER_NOTE
+        if _quiet_on():  # U413: an answer, not the start of a conversation
+            from orchestrator.mode_policy import QUIET_NOTE
+
+            system_prompt += "\n\n" + QUIET_NOTE
         # U249: the model can only ask for what it can NAME, so the catalogue
         # travels with the tool. Listed here rather than in the schema so
         # unblocks.py stays the one source of truth.

@@ -93,6 +93,11 @@ Connections, Robot, Appearance and Logs.
 - The robot speaks replies aloud with a gesture that matches the content and
   the current mode (silent-desk mode stays quiet, presentation mode is
   expressive).
+- **Quiet** (the moon button): he speaks only when asked, and "asked" means
+  his name and your question in one breath — "«name», what time is it?". His
+  name alone opens nothing, his answer opens no follow-up window, and only his
+  name interrupts him. He answers briefly and does not ask anything back. A
+  television or a busy room cannot start a conversation with him.
 
 ## 3. People & recognition
 

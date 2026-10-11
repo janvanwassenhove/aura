@@ -93,6 +93,12 @@ LLM, Connections, Robot, Appearance en Logs.
   praat: praat luider dan de robot en hij stopt om te luisteren.
 - De robot spreekt antwoorden uit met een gebaar dat past bij de inhoud en de
   actieve modus (silent-desk blijft stil, presentatiemodus is expressief).
+- **Quiet** (de knop met het maantje): hij spreekt alleen als hem iets
+  gevraagd wordt, en "gevraagd" betekent zijn naam en je vraag in één adem —
+  "«naam», hoe laat is het?". Alleen zijn naam opent niets, zijn antwoord opent
+  geen vervolg-venster, en alleen zijn naam onderbreekt hem. Hij antwoordt kort
+  en stelt geen wedervraag. Een televisie of een drukke kamer kan geen gesprek
+  met hem beginnen.
 
 ## 3. Mensen & herkenning
 
